@@ -70,11 +70,6 @@ impl TuiIntegrationTester {
         }
     }
 
-    /// Create with default configuration
-    pub fn default() -> Self {
-        Self::new(IntegrationTestConfig::default())
-    }
-
     /// Run comprehensive integration tests
     pub async fn run_integration_tests(&mut self) -> Result<IntegrationTestResults> {
         let start_time = std::time::Instant::now();
@@ -160,11 +155,8 @@ impl TuiIntegrationTester {
         ];
 
         let mut commands = Vec::new();
-        let mut idx = 0;
-
-        for _ in 0..self.config.stress_test_commands {
+        for (idx, _) in (0..self.config.stress_test_commands).enumerate() {
             commands.push(base_commands[idx % base_commands.len()].to_string());
-            idx += 1;
         }
 
         commands
@@ -199,23 +191,23 @@ impl TuiIntegrationTester {
         }
 
         // Check performance SLO violations
-        if let Some(perf_results) = &results.performance_results {
-            if !perf_results.slo_violations.is_empty() {
-                issues.push(format!(
-                    "{} SLO violations",
-                    perf_results.slo_violations.len()
-                ));
-            }
+        if let Some(perf_results) = &results.performance_results
+            && !perf_results.slo_violations.is_empty()
+        {
+            issues.push(format!(
+                "{} SLO violations",
+                perf_results.slo_violations.len()
+            ));
         }
 
         // Check cross-platform blocking issues
-        if let Some(cp_results) = &results.cross_platform_results {
-            if !cp_results.blocking_issues.is_empty() {
-                issues.push(format!(
-                    "{} blocking cross-platform issues",
-                    cp_results.blocking_issues.len()
-                ));
-            }
+        if let Some(cp_results) = &results.cross_platform_results
+            && !cp_results.blocking_issues.is_empty()
+        {
+            issues.push(format!(
+                "{} blocking cross-platform issues",
+                cp_results.blocking_issues.len()
+            ));
         }
 
         issues
@@ -236,10 +228,10 @@ impl TuiIntegrationTester {
             recommendations.push("Improve test reliability and error handling".to_string());
         }
 
-        if let Some(perf_results) = &results.performance_results {
-            if perf_results.benchmarks_passed < perf_results.benchmarks_total {
-                recommendations.push("Address performance SLO violations".to_string());
-            }
+        if let Some(perf_results) = &results.performance_results
+            && perf_results.benchmarks_passed < perf_results.benchmarks_total
+        {
+            recommendations.push("Address performance SLO violations".to_string());
         }
 
         if let Some(cp_results) = &results.cross_platform_results {
@@ -297,16 +289,16 @@ impl TuiIntegrationTester {
             return false;
         }
 
-        if let Some(cp_results) = &results.cross_platform_results {
-            if !cp_results.blocking_issues.is_empty() {
-                return false;
-            }
+        if let Some(cp_results) = &results.cross_platform_results
+            && !cp_results.blocking_issues.is_empty()
+        {
+            return false;
         }
 
-        if let Some(perf_results) = &results.performance_results {
-            if perf_results.benchmarks_passed < perf_results.benchmarks_total {
-                return false;
-            }
+        if let Some(perf_results) = &results.performance_results
+            && perf_results.benchmarks_passed < perf_results.benchmarks_total
+        {
+            return false;
         }
 
         true
@@ -470,6 +462,12 @@ impl TuiIntegrationTester {
 
         let harness_result = TuiTestHarness::new(harness_config).await;
         Ok(harness_result.is_ok())
+    }
+}
+
+impl Default for TuiIntegrationTester {
+    fn default() -> Self {
+        Self::new(IntegrationTestConfig::default())
     }
 }
 

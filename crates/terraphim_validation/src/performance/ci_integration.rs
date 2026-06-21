@@ -273,10 +273,10 @@ impl CIPerformanceRunner {
             self.generate_markdown_report(report).await?;
         }
 
-        if self.config.reporting.upload_external {
-            if let Some(url) = &self.config.reporting.upload_url {
-                self.upload_report(report, url).await?;
-            }
+        if self.config.reporting.upload_external
+            && let Some(url) = &self.config.reporting.upload_url
+        {
+            self.upload_report(report, url).await?;
         }
 
         Ok(())
@@ -362,7 +362,7 @@ impl CIPerformanceRunner {
             ));
         }
 
-        content.push_str("\n");
+        content.push('\n');
 
         // SLO violations
         if !report.slo_compliance.violations.is_empty()
@@ -384,7 +384,7 @@ impl CIPerformanceRunner {
                 ));
             }
 
-            content.push_str("\n");
+            content.push('\n');
         }
 
         // Performance trends
@@ -396,7 +396,7 @@ impl CIPerformanceRunner {
                 for (operation, change) in &trends.improvements {
                     content.push_str(&format!("✅ **{}:** {:.1}% faster\n", operation, change));
                 }
-                content.push_str("\n");
+                content.push('\n');
             }
 
             if !trends.regressions.is_empty() {
@@ -408,7 +408,7 @@ impl CIPerformanceRunner {
                         change.abs()
                     ));
                 }
-                content.push_str("\n");
+                content.push('\n');
             }
 
             if !trends.new_operations.is_empty() {
@@ -416,7 +416,7 @@ impl CIPerformanceRunner {
                 for operation in &trends.new_operations {
                     content.push_str(&format!("🆕 **{}:** New benchmark added\n", operation));
                 }
-                content.push_str("\n");
+                content.push('\n');
             }
         }
 
@@ -563,10 +563,10 @@ impl CLIInterface {
                         println!("🚫 {}", failure.message);
                     }
 
-                    return Ok(1); // Non-zero exit code for CI failure
+                    Ok(1) // Non-zero exit code for CI failure
                 } else {
                     println!("✅ All performance gates passed");
-                    return Ok(0); // Success exit code
+                    Ok(0) // Success exit code
                 }
             }
             Err(e) => {

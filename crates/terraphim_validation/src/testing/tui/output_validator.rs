@@ -36,6 +36,12 @@ struct ValidationPattern {
     description: String,
 }
 
+impl Default for OutputValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OutputValidator {
     /// Create a new output validator
     pub fn new() -> Self {
@@ -270,10 +276,10 @@ impl OutputValidator {
         }
 
         // Validate table formatting for commands that should produce tables
-        if self.should_have_table(&command_base) {
-            if let Err(e) = self.validate_table_format(output) {
-                result.warnings.push(format!("Table format warning: {}", e));
-            }
+        if self.should_have_table(&command_base)
+            && let Err(e) = self.validate_table_format(output)
+        {
+            result.warnings.push(format!("Table format warning: {}", e));
         }
 
         Ok(result)

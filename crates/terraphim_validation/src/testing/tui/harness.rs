@@ -242,7 +242,7 @@ impl TuiTestHarness {
         }
 
         // Test command history
-        let history_commands = vec![
+        let history_commands = [
             "/search history test 1",
             "/search history test 2",
             "/search history test 3",

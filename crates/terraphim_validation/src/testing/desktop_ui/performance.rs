@@ -266,8 +266,8 @@ impl PerformanceTester {
         }
 
         let avg_time = times.iter().sum::<Duration>() / times.len() as u32;
-        let min_time = times.iter().min().unwrap().clone();
-        let max_time = times.iter().max().unwrap().clone();
+        let min_time = *times.iter().min().unwrap();
+        let max_time = *times.iter().max().unwrap();
 
         Ok(BenchmarkResult {
             operation: operation.name.clone(),

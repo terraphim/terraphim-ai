@@ -399,6 +399,17 @@ impl DesktopUITestOrchestrator {
                     UITestStatus::Error => "fail",
                 };
 
+                let status_str = format!("{:?}", result.status);
+                let message_html = result
+                    .message
+                    .as_ref()
+                    .map(|msg| format!("<p><strong>Message:</strong> {}</p>", msg))
+                    .unwrap_or_default();
+                let details_html = result
+                    .details
+                    .as_ref()
+                    .map(|details| format!("<p><strong>Details:</strong> {}</p>", details))
+                    .unwrap_or_default();
                 format!(
                     r#"<div class="test-result {}">
                         <h3>{}</h3>
@@ -406,19 +417,7 @@ impl DesktopUITestOrchestrator {
                         {}
                         {}
                     </div>"#,
-                    css_class,
-                    result.name,
-                    format!("{:?}", result.status),
-                    result
-                        .message
-                        .as_ref()
-                        .map(|msg| format!("<p><strong>Message:</strong> {}</p>", msg))
-                        .unwrap_or_default(),
-                    result
-                        .details
-                        .as_ref()
-                        .map(|details| format!("<p><strong>Details:</strong> {}</p>", details))
-                        .unwrap_or_default()
+                    css_class, result.name, status_str, message_html, details_html
                 )
             })
             .collect::<Vec<_>>()
