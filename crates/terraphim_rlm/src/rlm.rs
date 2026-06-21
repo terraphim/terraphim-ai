@@ -938,7 +938,14 @@ impl TerraphimRlm {
                 .unwrap_or_else(|_| "meta-llama/llama-3.2-3b-instruct:free".to_string());
             role.llm_api_key = Some(key.clone());
             role.llm_model = Some(or_model.clone());
-            // Cache for child processes and build_llm_from_role
+            // Cache for child processes and build_llm_from_role.
+            // SAFETY: single-threaded initialisation. auto_configure_llm is
+            // &mut self and is invoked once from main (rlm/src/main.rs) before
+            // any tokio task is spawned. OPENROUTER_API_KEY is read only at
+            // query time (llm_bridge.rs build_llm_from_role), which runs after
+            // this returns and on the same runtime, so no concurrent reader
+            // observes the mutation. Mirrors the pattern in
+            // terraphim_update/src/state.rs:130.
             unsafe {
                 std::env::set_var("OPENROUTER_API_KEY", key);
             }
