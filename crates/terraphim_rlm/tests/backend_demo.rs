@@ -51,7 +51,10 @@ async fn demo_local_executor() {
     println!("\n  Local executor works.\n");
 }
 
+/// Requires: Docker daemon accessible and `python:3.11-slim` image pulled locally.
+/// Run explicitly with: cargo test -p terraphim_rlm --test backend_demo demo_docker_executor -- --ignored
 #[tokio::test]
+#[ignore = "requires Docker daemon and python:3.11-slim image; not available in standard CI"]
 async fn demo_docker_executor() {
     println!("\n═══════════════════════════════════════════");
     println!("  DOCKER EXECUTOR (container isolation)");
