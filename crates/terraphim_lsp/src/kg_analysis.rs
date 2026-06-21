@@ -188,4 +188,25 @@ mod tests {
             let _ = analyse_kg_document(input, &thesaurus);
         }
     }
+
+    // Property test: `analyse_kg_document` must never panic on arbitrary input.
+    //
+    // This is the last unmet acceptance criterion of #2669. The function slices the
+    // document at byte offsets returned by `terraphim_automata::find_matches` and also
+    // normalises individual characters, so arbitrary `String` input (which is valid
+    // UTF-8 by construction but can contain any combination of whitespace, control
+    // characters, multibyte sequences and thesaurus terms) is the highest-value
+    // fuzz surface. Semantic correctness is covered by the unit tests above; this
+    // property only asserts panic freedom.
+    proptest::proptest! {
+        #![proptest_config(proptest::test_runner::Config {
+            cases: 256,
+            ..proptest::test_runner::Config::default()
+        })]
+        #[test]
+        fn analyse_kg_document_never_panics(input in proptest::arbitrary::any::<String>()) {
+            let thesaurus = sample_thesaurus();
+            let _ = analyse_kg_document(&input, &thesaurus);
+        }
+    }
 }

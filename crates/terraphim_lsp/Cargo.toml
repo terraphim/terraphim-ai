@@ -23,6 +23,7 @@ env_logger = "0.11"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
+proptest = "1"
 
 [[bin]]
 name = "terraphim-lsp"
