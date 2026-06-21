@@ -480,23 +480,10 @@ fn extract_words(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// Find the largest byte index <= `index` that is a valid UTF-8 char boundary.
-/// Polyfill for str::floor_char_boundary (stable since Rust 1.91, MSRV is 1.80).
-fn floor_char_boundary(s: &str, index: usize) -> usize {
-    if index >= s.len() {
-        return s.len();
-    }
-    let mut i = index;
-    while i > 0 && !s.is_char_boundary(i) {
-        i -= 1;
-    }
-    i
-}
-
 /// Truncate a string for logging (max 100 chars).
 fn truncate_for_log(s: &str) -> String {
     if s.len() > 100 {
-        let boundary = floor_char_boundary(s, 97);
+        let boundary = s.floor_char_boundary(97);
         format!("{}...", &s[..boundary])
     } else {
         s.to_string()
@@ -645,7 +632,7 @@ mod tests {
     #[test]
     fn test_truncate_for_log_multibyte() {
         // Each emoji is 4 bytes; 26 of them = 104 bytes, triggering truncation.
-        // The byte boundary at 97 falls mid-emoji without floor_char_boundary.
+        // The byte boundary at 97 falls mid-emoji; floor_char_boundary aligns to a valid char.
         let emoji_str = "😀".repeat(26);
         let result = truncate_for_log(&emoji_str);
         assert!(result.ends_with("..."));

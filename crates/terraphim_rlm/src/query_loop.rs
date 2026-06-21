@@ -685,25 +685,12 @@ fn format_execution_output(result: &ExecutionResult) -> String {
     output
 }
 
-/// Find the largest byte index <= `index` that is a valid UTF-8 char boundary.
-/// Polyfill for str::floor_char_boundary (stable since Rust 1.91, MSRV is 1.80).
-fn floor_char_boundary(s: &str, index: usize) -> usize {
-    if index >= s.len() {
-        return s.len();
-    }
-    let mut i = index;
-    while i > 0 && !s.is_char_boundary(i) {
-        i -= 1;
-    }
-    i
-}
-
 /// Truncate a string for display.
 fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        let boundary = floor_char_boundary(s, max_len);
+        let boundary = s.floor_char_boundary(max_len);
         format!("{}...", &s[..boundary])
     }
 }
@@ -715,7 +702,7 @@ mod tests {
     #[test]
     fn test_truncate_multibyte() {
         // Each CJK char is 3 bytes; 200 of them = 600 bytes, > 500 limit.
-        // Without floor_char_boundary, slicing at byte 500 panics mid-char.
+        // str::floor_char_boundary ensures slicing stays on a valid UTF-8 boundary.
         let cjk = "中".repeat(200);
         let result = truncate(&cjk, 500);
         assert!(result.ends_with("..."));
