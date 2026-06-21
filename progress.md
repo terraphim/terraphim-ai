@@ -23,7 +23,8 @@
    - Quality gates (Sentrux) enforced
 
 ## Current Quarter Focus
-- Fix test failures and hangs (Refs #1239, #1245, #1260)
-- Complete PR merge for ADF stability (Refs #1256)
-- Documentation gap closure (Refs #1183)
-- Agent tier routing and config (Refs #409)
+- MSRV stabilisation: `.clippy.toml` set to 1.91.0; polyfill removal (#2811 PR #2812) and workspace rust-version propagation (#2770 PR #2774) in review queue (WIG-4)
+- Grep correctness: #2722 — kg_hits/concepts hardcoded to 0/empty in Insufficient path; fix target is terraphim-clients polyrepo (WIG-1)
+- ADF live-validation epic #2707 — skill-level validation coverage; files issues on generator not leaves (WIG-3)
+- Quality gate: remove global `#![allow(clippy::all)]` from terraphim_validation (#2758, PR #2773 in queue) (WIG-4)
+- Merge channel active as of 2026-06-20; priority PRs queued: #2772 #2773 #2774 #2778 #2780 #2785 #2804 #2812
