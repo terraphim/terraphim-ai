@@ -31,6 +31,12 @@ pub struct PrSummary {
     pub mergeable: Option<bool>,
 }
 
+/// One file entry from the Gitea PR files endpoint.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PrFile {
+    pub filename: String,
+}
+
 impl GiteaClient {
     /// Build a client. `base_url` is e.g. `https://git.terraphim.cloud`.
     /// `token` is the Gitea API token; treated as opaque.
@@ -77,6 +83,29 @@ impl GiteaClient {
         let body = serde_json::json!({"Do": "merge"});
         self.post_with_retry(&url, &body).await?;
         Ok(())
+    }
+
+    /// List the filenames changed by a PR.
+    ///
+    /// Uses the same 1 s/2 s/4 s retry as other calls (Failure-3).
+    /// Callers must handle `Err` with `apply_contamination_result` so that
+    /// failures are surfaced as `CONTAMINATION_CHECK_SKIPPED` events.
+    pub async fn list_pr_files(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<Vec<String>, MergeCoordinatorError> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/pulls/{}/files",
+            self.base_url, owner, repo, index
+        );
+        let resp = self.get_with_retry(&url).await?;
+        let files = resp
+            .json::<Vec<PrFile>>()
+            .await
+            .map_err(|e| MergeCoordinatorError::Api(format!("decode pr files: {e}")))?;
+        Ok(files.into_iter().map(|f| f.filename).collect())
     }
 
     /// Close an issue by index (PATCH state=closed).

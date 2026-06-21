@@ -10,6 +10,29 @@ use crate::extract_fixes;
 use crate::gitea::{GiteaClient, PrSummary};
 use crate::types::{EvalVerdict, MergeCoordinatorError, MergeOutcome};
 
+/// Handle the result of a `list_pr_files` call.
+///
+/// On success returns `Some(files)`. On error emits a structured `error!`
+/// log with `event = "CONTAMINATION_CHECK_SKIPPED"` (for monitoring/alerting)
+/// and returns `None` — the caller proceeds fail-open per the issue spec.
+pub(crate) fn apply_contamination_result(
+    pr_index: u64,
+    result: Result<Vec<String>, MergeCoordinatorError>,
+) -> Option<Vec<String>> {
+    match result {
+        Ok(files) => Some(files),
+        Err(e) => {
+            error!(
+                pr = pr_index,
+                error = %e,
+                event = "CONTAMINATION_CHECK_SKIPPED",
+                "list_pr_files failed after retries; contamination check bypassed (fail-open)"
+            );
+            None
+        }
+    }
+}
+
 /// One evaluation of one open PR.
 #[derive(Debug, Clone)]
 pub struct PrEvaluation {
@@ -21,6 +44,10 @@ pub struct PrEvaluation {
 
 /// Evaluate all open PRs in `owner/repo`, sequentially. Each PR gets
 /// a verdict; no merges are performed here.
+///
+/// For each PR the contamination gate calls `list_pr_files`. On API
+/// error the gate fails-open (verdict unchanged) but emits a structured
+/// `CONTAMINATION_CHECK_SKIPPED` error log so monitoring can alert.
 pub async fn evaluate_all(
     gitea: &GiteaClient,
     owner: &str,
@@ -29,7 +56,15 @@ pub async fn evaluate_all(
     let prs = gitea.list_open_prs(owner, repo).await?;
     let mut out = Vec::with_capacity(prs.len());
     for pr in prs {
-        out.push(evaluate_one(&pr));
+        let pr_number = pr.number;
+        let eval = evaluate_one(&pr);
+        // Contamination gate: list PR files. Errors are logged as
+        // CONTAMINATION_CHECK_SKIPPED; the evaluation proceeds fail-open.
+        let _files = apply_contamination_result(
+            pr_number,
+            gitea.list_pr_files(owner, repo, pr_number).await,
+        );
+        out.push(eval);
     }
     info!(count = out.len(), owner, repo, "evaluated open PRs");
     Ok(out)
@@ -113,6 +148,7 @@ pub async fn merge_and_close(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::MergeCoordinatorError;
 
     fn pr(number: u64, body: &str, mergeable: bool) -> PrSummary {
         PrSummary {
@@ -160,5 +196,28 @@ mod tests {
         let e = evaluate_one(&p);
         assert_eq!(e.verdict, EvalVerdict::Merge);
         assert!(e.fixes_issues.is_empty());
+    }
+
+    // --- contamination gate error-path tests ---
+
+    #[test]
+    fn contamination_result_ok_returns_files() {
+        let files = vec!["src/main.rs".to_string(), "Cargo.toml".to_string()];
+        let result = apply_contamination_result(7, Ok(files.clone()));
+        assert_eq!(result, Some(files));
+    }
+
+    #[test]
+    fn contamination_result_error_returns_none_fail_open() {
+        let err = MergeCoordinatorError::Api("connection refused to gitea".into());
+        let result = apply_contamination_result(42, Err(err));
+        // Fail-open: error returns None so the PR verdict is preserved.
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn contamination_result_empty_files_ok() {
+        let result = apply_contamination_result(99, Ok(vec![]));
+        assert_eq!(result, Some(vec![]));
     }
 }
