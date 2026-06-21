@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_lsp"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "Language Server Protocol (LSP) implementation for Terraphim AI"
