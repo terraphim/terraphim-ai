@@ -97,8 +97,6 @@ terraphim_service = { version = "1.20.5", registry = "terraphim" }
 # genai patch temporarily disabled to test crates.io 0.6.0 compatibility for v1.20.0 publish chain.
 # genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
 self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }
-# Security: Patch tokio-tungstenite to use rustls 0.23+ for RUSTSEC-2026-0049
-tokio-tungstenite = { git = "https://github.com/snapview/tokio-tungstenite.git", tag = "v0.28.0" }
 # Security: Patch rustls-webpki to fix RUSTSEC-2026-0049 (CRL bypass), 0098, 0099 (name constraints)
 # Using git source to force version override
 rustls-webpki = { git = "https://github.com/rustls/webpki.git", tag = "v/0.103.12" }
