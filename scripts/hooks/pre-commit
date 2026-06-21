@@ -43,6 +43,38 @@ if [ -n "$large_files" ]; then
 fi
 print_status "SUCCESS" "No large files found"
 
+# Check for agent artefact contamination (Issue #2413)
+# Rejects staging of well-known ADF/AI scratch file patterns.
+print_status "INFO" "Checking for agent artefact contamination..."
+ARTEFACT_PATTERNS=(
+    "\.terraphim/flow-state/"
+    "session-ses_[^/]*$"
+    "\.pr_review_temp/"
+    "pr_review_files/"
+    "\.pr[^/]*\.diff$"
+    "\.handoff-[^/]*\.md$"
+    "pr_gate_result[^/]*\.rs$"
+    "reconcile_impl_(new|old)\.rs$"
+    "\.docs/[^/]*-pr-[^/]*-merge\.md$"
+)
+staged_new=$(git diff --cached --name-only --diff-filter=A 2>/dev/null || true)
+artefact_found=false
+if [ -n "$staged_new" ]; then
+    for pat in "${ARTEFACT_PATTERNS[@]}"; do
+        matched=$(echo "$staged_new" | grep -E "$pat" || true)
+        if [ -n "$matched" ]; then
+            print_status "FAIL" "Agent artefact pattern '${pat}' matched in staged additions:"
+            echo "$matched"
+            artefact_found=true
+        fi
+    done
+fi
+if [ "$artefact_found" = true ]; then
+    print_status "FAIL" "Agent artefacts staged for commit. Add to .gitignore or remove the files."
+    exit 1
+fi
+print_status "SUCCESS" "No agent artefact contamination detected"
+
 # Check for secrets and sensitive patterns
 print_status "INFO" "Checking for secrets and sensitive data..."
 secrets_found=false
