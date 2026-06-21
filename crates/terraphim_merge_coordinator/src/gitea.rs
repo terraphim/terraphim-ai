@@ -13,6 +13,13 @@ use crate::types::MergeCoordinatorError;
 
 const RETRY_DELAYS_SECS: &[u64] = &[1, 2, 4];
 
+/// Maximum number of open PRs fetched per `list_open_prs` call.
+///
+/// Gitea's hard cap is 50 when no explicit limit is set; the API accepts up
+/// to 300.  Using 300 ensures PRs beyond position 50 are not silently skipped
+/// by the evaluation loop (issue #2850).
+const OPEN_PRS_LIMIT: u32 = 300;
+
 /// Minimal Gitea API client. Caller supplies the API token via env or
 /// secure storage; it is never written to logs.
 pub struct GiteaClient {
@@ -52,8 +59,8 @@ impl GiteaClient {
         repo: &str,
     ) -> Result<Vec<PrSummary>, MergeCoordinatorError> {
         let url = format!(
-            "{}/api/v1/repos/{}/{}/pulls?state=open&limit=50",
-            self.base_url, owner, repo
+            "{}/api/v1/repos/{}/{}/pulls?state=open&limit={}",
+            self.base_url, owner, repo, OPEN_PRS_LIMIT
         );
         let resp = self.get_with_retry(&url).await?;
         let prs = resp
@@ -196,5 +203,39 @@ mod tests {
     #[test]
     fn retry_delays_are_one_two_four_seconds() {
         assert_eq!(RETRY_DELAYS_SECS, &[1u64, 2, 4]);
+    }
+
+    #[test]
+    fn open_prs_limit_exceeds_gitea_default_of_50() {
+        assert!(
+            OPEN_PRS_LIMIT > 50,
+            "OPEN_PRS_LIMIT must exceed 50 so PRs beyond position 50 are not silently dropped"
+        );
+    }
+
+    #[test]
+    fn open_prs_limit_within_gitea_max_page_size() {
+        assert!(
+            OPEN_PRS_LIMIT <= 300,
+            "Gitea max page size is 300; limit must not exceed it"
+        );
+    }
+
+    #[test]
+    fn pr_summary_vec_of_51_items_deserialises() {
+        // Construct JSON array with 51 items to verify no artificial truncation
+        // happens at the deserialization layer.
+        let items: String = (1u64..=51)
+            .map(|n| format!(r#"{{"number":{n},"title":"PR {n}","state":"open"}}"#))
+            .collect::<Vec<_>>()
+            .join(",");
+        let json = format!("[{items}]");
+        let prs: Vec<PrSummary> = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            prs.len(),
+            51,
+            "all 51 PRs must be present after deserialisation"
+        );
+        assert_eq!(prs[50].number, 51, "PR at position 51 must be present");
     }
 }
