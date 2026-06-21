@@ -348,6 +348,12 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
 
     log::info!("🔧 Testing empty rolegraph search behavior");
 
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("workspace root")
+        .to_path_buf();
+    let kg_dir = workspace_root.join("docs/src/kg");
+
     // Create minimal role configuration without documents
     let role_name = RoleName::new("Empty Test Role");
     let mut config = Config::default();
@@ -360,7 +366,7 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
             automata_path: None,
             knowledge_graph_local: Some(KnowledgeGraphLocal {
                 input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
-                path: PathBuf::from("docs/src/kg"),
+                path: kg_dir,
             }),
             public: true,
             publish: true,
