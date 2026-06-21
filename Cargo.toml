@@ -58,7 +58,7 @@ default-members = ["terraphim_server"]
 [workspace.package]
 version = "1.20.5"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.91"
 authors = ["Terraphim Team <team@terraphim.ai>"]
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
