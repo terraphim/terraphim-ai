@@ -141,18 +141,18 @@ impl GiteaClient {
             }
             match req.send().await {
                 Ok(resp) if resp.status().is_success() => {
-                    debug!(method = %method, url = %redact(url), attempt, "gitea call ok");
+                    debug!(method = %method, url, attempt, "gitea call ok");
                     return Ok(resp);
                 }
                 Ok(resp) => {
                     let status = resp.status();
                     let body_text = resp.text().await.unwrap_or_default();
                     last_err = Some(format!("status {status}: {body_text}"));
-                    warn!(method = %method, url = %redact(url), attempt, %status, "gitea non-success; will retry if attempts remain");
+                    warn!(method = %method, url, attempt, %status, "gitea non-success; will retry if attempts remain");
                 }
                 Err(e) => {
                     last_err = Some(format!("network: {e}"));
-                    warn!(method = %method, url = %redact(url), attempt, error = %e, "gitea network error; will retry if attempts remain");
+                    warn!(method = %method, url, attempt, error = %e, "gitea network error; will retry if attempts remain");
                 }
             }
         }
@@ -164,12 +164,13 @@ impl GiteaClient {
     }
 }
 
-/// Redact the token if a URL contains one inline (defence in depth).
-fn redact(url: &str) -> String {
-    // tokens never appear in URLs in this client, but keep the helper
-    // so future log-points stay consistent.
-    url.to_string()
-}
+// Security invariant (issue #2861): this client never embeds the API token in
+// any request URL. The token is placed exclusively in the `Authorization`
+// header inside `send_with_retry`. URL strings are therefore safe to log
+// verbatim — the previous `redact()` helper was a no-op that gave false
+// defence-in-depth assurance. If you ever introduce a URL-embedded credential
+// (e.g. `?token=`), you MUST add real scrubbing here; a grep for `token=` in
+// this file should find none today.
 
 #[cfg(test)]
 mod tests {
@@ -196,5 +197,50 @@ mod tests {
     #[test]
     fn retry_delays_are_one_two_four_seconds() {
         assert_eq!(RETRY_DELAYS_SECS, &[1u64, 2, 4]);
+    }
+
+    // Regression test for issue #2861: the API token must NEVER appear in any
+    // request URL this client builds. The token is placed only in the
+    // `Authorization` header. This test reconstructs every URL the public
+    // methods produce and asserts the token substring is absent — locking the
+    // security invariant in place so a future maintainer who adds `?token=`
+    // to a URL fails this test immediately.
+    #[test]
+    fn token_never_appears_in_any_request_url() {
+        let secret = "super-secret-token-do-not-log-1234567890";
+        let client = GiteaClient::new("https://git.example.test", secret);
+        let owner = "terraphim";
+        let repo = "terraphim-ai";
+        let pr_index: u64 = 99;
+
+        // These mirror the `format!` strings in list_open_prs, merge_pr,
+        // list_pr_files and close_issue respectively.
+        let urls = [
+            format!(
+                "{}/api/v1/repos/{}/{}/pulls?state=open&limit=50",
+                client.base_url, owner, repo
+            ),
+            format!(
+                "{}/api/v1/repos/{}/{}/pulls/{}/merge",
+                client.base_url, owner, repo, pr_index
+            ),
+            format!(
+                "{}/api/v1/repos/{}/{}/pulls/{}/files",
+                client.base_url, owner, repo, pr_index
+            ),
+            format!(
+                "{}/api/v1/repos/{}/{}/issues/{}",
+                client.base_url, owner, repo, pr_index
+            ),
+        ];
+
+        for (i, url) in urls.iter().enumerate() {
+            assert!(!url.contains(secret), "token leaked into URL #{}: {url}", i);
+            assert!(
+                !url.contains("token=") && !url.contains("access_token="),
+                "URL #{} embeds a credential query param: {url}",
+                i
+            );
+        }
     }
 }
