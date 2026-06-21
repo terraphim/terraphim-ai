@@ -20,6 +20,15 @@ const RETRY_DELAYS_SECS: &[u64] = &[1, 2, 4];
 /// by the evaluation loop (issue #2850).
 const OPEN_PRS_LIMIT: u32 = 300;
 
+// Compile-time invariant: OPEN_PRS_LIMIT must exceed Gitea's implicit cap of 50
+// (so PRs beyond position 50 are never silently skipped) and stay within the
+// documented max page size of 300. Evaluated at build time, so a future edit
+// that drifts out of range fails the build immediately. (issue #2850)
+const _: () = {
+    assert!(OPEN_PRS_LIMIT > 50);
+    assert!(OPEN_PRS_LIMIT <= 300);
+};
+
 /// Minimal Gitea API client. Caller supplies the API token via env or
 /// secure storage; it is never written to logs.
 pub struct GiteaClient {
@@ -208,22 +217,6 @@ mod tests {
     #[test]
     fn retry_delays_are_one_two_four_seconds() {
         assert_eq!(RETRY_DELAYS_SECS, &[1u64, 2, 4]);
-    }
-
-    #[test]
-    fn open_prs_limit_exceeds_gitea_default_of_50() {
-        assert!(
-            OPEN_PRS_LIMIT > 50,
-            "OPEN_PRS_LIMIT must exceed 50 so PRs beyond position 50 are not silently dropped"
-        );
-    }
-
-    #[test]
-    fn open_prs_limit_within_gitea_max_page_size() {
-        assert!(
-            OPEN_PRS_LIMIT <= 300,
-            "Gitea max page size is 300; limit must not exceed it"
-        );
     }
 
     #[test]
