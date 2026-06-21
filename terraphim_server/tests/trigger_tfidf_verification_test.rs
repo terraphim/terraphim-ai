@@ -14,12 +14,18 @@ mod trigger_tfidf_verification {
     fn trigger_index_builds_and_queries() {
         let mut index = TriggerIndex::new(0.3);
         let mut triggers: AHashMap<u64, String> = AHashMap::new();
-        triggers.insert(1, "managing cargo dependencies in rust projects".to_string());
+        triggers.insert(
+            1,
+            "managing cargo dependencies in rust projects".to_string(),
+        );
         triggers.insert(2, "async tokio runtime configuration".to_string());
         index.build(triggers);
 
         let results = index.query("cargo dependency management");
-        assert!(!results.is_empty(), "TF-IDF should match cargo dependency trigger");
+        assert!(
+            !results.is_empty(),
+            "TF-IDF should match cargo dependency trigger"
+        );
         let ids: Vec<u64> = results.iter().map(|(id, _)| *id).collect();
         assert!(ids.contains(&1), "node 1 should score above threshold");
 
@@ -42,7 +48,10 @@ mod trigger_tfidf_verification {
 
         // Empty graph => no Aho-Corasick matches, no trigger index => empty results
         let results = graph.find_matching_node_ids_with_fallback("dependency management", false);
-        assert!(results.is_empty(), "empty graph should return empty results");
+        assert!(
+            results.is_empty(),
+            "empty graph should return empty results"
+        );
     }
 
     #[test]
