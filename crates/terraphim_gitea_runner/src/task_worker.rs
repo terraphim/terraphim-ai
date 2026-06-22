@@ -132,10 +132,10 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             return;
         };
         let mut parts = full.splitn(2, '/');
-        if let (Some(owner), Some(repo)) = (parts.next(), parts.next()) {
-            if let Err(e) = writer.post(owner, repo, &sha, state, context, desc).await {
-                log::warn!("legacy status mirror failed: {e}");
-            }
+        if let (Some(owner), Some(repo)) = (parts.next(), parts.next())
+            && let Err(e) = writer.post(owner, repo, &sha, state, context, desc).await
+        {
+            log::warn!("legacy status mirror failed: {e}");
         }
     }
 
