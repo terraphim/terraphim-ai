@@ -197,7 +197,7 @@ Error: "Release v1.0.1 already exists"
 **Solutions**:
 1. Ensure `contents: write` permission
 2. Check for conflicts in homebrew-formulas/
-3. Manual update: Run `scripts/update-homebrew-checksums.sh`
+3. Manual update: formulas now live in the official tap `terraphim/homebrew-terraphim` (the in-repo `scripts/update-homebrew-checksums.sh` was removed — see #2895).
 
 ### crates.io Publish Fails
 
