@@ -61,7 +61,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_validation_system_creation() {
-        let system = ValidationSystem::new().unwrap();
-        assert!(true); // Basic creation test
+        // Construction itself is the behaviour under test: ValidationSystem::new
+        // returns Ok only if ValidationOrchestrator initialisation succeeds.
+        let system = ValidationSystem::new();
+        assert!(system.is_ok(), "ValidationSystem::new should succeed");
     }
 }

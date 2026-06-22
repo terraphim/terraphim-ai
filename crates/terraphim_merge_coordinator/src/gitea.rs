@@ -211,6 +211,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)] // intentional compile-time invariant on the const
     fn open_prs_limit_exceeds_gitea_default_of_50() {
         assert!(
             OPEN_PRS_LIMIT > 50,
@@ -219,6 +220,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)] // intentional compile-time invariant on the const
     fn open_prs_limit_within_gitea_max_page_size() {
         assert!(
             OPEN_PRS_LIMIT <= 300,

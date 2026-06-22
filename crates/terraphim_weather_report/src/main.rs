@@ -248,10 +248,10 @@ fn print_model_row(m: &terraphim_weather_report::ModelRow) {
         "  {cond:<7} {:<16} {:<24} {:<10} {latency:<8} {cost}",
         m.provider, m.model, m.cli
     );
-    if let Some(detail) = &m.detail {
-        if !detail.is_empty() {
-            println!("          {detail}");
-        }
+    if let Some(detail) = &m.detail
+        && !detail.is_empty()
+    {
+        println!("          {detail}");
     }
 }
 
