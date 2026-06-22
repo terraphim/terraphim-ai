@@ -277,16 +277,8 @@ impl WorkspaceManager {
     /// Uses component-aware [`Path::starts_with`] rather than string comparison to
     /// prevent prefix-confusion attacks where a root of `/tmp/ws` would incorrectly
     /// accept `/tmp/ws_evil` under string-based matching.
-    fn validate_path(&self, path: &Path, identifier: &str) -> Result<()> {
+    fn validate_path(&self, path: &Path, _identifier: &str) -> Result<()> {
         if !path.starts_with(&self.root) {
-            return Err(WorkspaceError::PathOutsideRoot {
-                path: path.to_string_lossy().into_owned(),
-            });
-        }
-
-        // Reject if workspace key would create subdirectories
-        let key = sanitise_workspace_key(identifier);
-        if key.contains('/') || key.contains('\\') {
             return Err(WorkspaceError::PathOutsideRoot {
                 path: path.to_string_lossy().into_owned(),
             });
