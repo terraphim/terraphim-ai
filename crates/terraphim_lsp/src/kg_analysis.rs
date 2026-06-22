@@ -1,3 +1,8 @@
+//! Knowledge-graph analysis helpers for Terraphim LSP.
+//!
+//! Analyses a markdown document against a thesaurus, returning matched
+//! KG terms with byte positions and a list of unrecognised words.
+
 use std::collections::HashSet;
 
 use terraphim_automata::{Matched, find_matches};

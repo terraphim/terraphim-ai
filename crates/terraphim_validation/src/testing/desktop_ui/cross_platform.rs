@@ -117,10 +117,10 @@ impl CrossPlatformUITester {
             }
 
             // Test Touch Bar
-            if let Some(touch_bar) = &macos_config.touch_bar {
-                if touch_bar.enabled {
-                    results.push(self.test_macos_touch_bar().await?);
-                }
+            if let Some(touch_bar) = &macos_config.touch_bar
+                && touch_bar.enabled
+            {
+                results.push(self.test_macos_touch_bar().await?);
             }
         }
 

@@ -50,7 +50,10 @@ pub enum TerminationReason {
     /// FINAL command was executed.
     FinalReached,
     /// FINAL_VAR command was executed.
-    FinalVarReached { variable: String },
+    FinalVarReached {
+        /// Name of the variable that carried the final value.
+        variable: String,
+    },
     /// Token budget exhausted.
     TokenBudgetExhausted,
     /// Time budget exhausted.
@@ -60,7 +63,10 @@ pub enum TerminationReason {
     /// Maximum recursion depth reached.
     RecursionDepthExhausted,
     /// Error occurred during execution.
-    Error { message: String },
+    Error {
+        /// Human-readable description of the error.
+        message: String,
+    },
     /// Cancelled by user.
     Cancelled,
 }
@@ -690,7 +696,13 @@ fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        let boundary = s.floor_char_boundary(max_len);
+        let boundary = {
+            let mut i = max_len.min(s.len());
+            while i > 0 && !s.is_char_boundary(i) {
+                i -= 1;
+            }
+            i
+        };
         format!("{}...", &s[..boundary])
     }
 }

@@ -151,3 +151,28 @@ projects/odilo/
 /PYEOF
 # Home-directory stubs (literal '~' dir created by unexpanded tilde in git commands)
 ~/
+
+# === Agent artefact prevention at source (Issue #2413) ===
+# Stops ADF/AI agent scratch files from contaminating PRs.
+# These extend the root-only patterns above to cover subdirectory
+# and additional naming variants found slipping the current rules.
+
+# KG flow-state and agent session scratch
+.terraphim/flow-state/
+.sessions/
+session-ses_*.md
+
+# PR review temp directories and diff files
+.pr_review_temp/
+pr_review_files/
+.pr*.diff
+.handoff-*.md
+
+# Merged-doc artefacts (e.g. .docs/foo-pr-2318-merge.md)
+.docs/*-pr-*-merge.md
+
+# PR gate and reconcile impl snapshots -- recursive and non-dot variants
+# (root-only dot-prefixed versions are already handled above)
+pr_gate_result*.rs
+reconcile_impl_new.rs
+reconcile_impl_old.rs

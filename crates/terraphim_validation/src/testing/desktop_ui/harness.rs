@@ -7,7 +7,7 @@ use crate::testing::ValidationResult;
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 use tokio::process::Command;
@@ -261,7 +261,7 @@ impl PlaywrightClient {
         Ok(vec!["main".to_string()])
     }
 
-    async fn take_screenshot(&self, path: &PathBuf) -> Result<()> {
+    async fn take_screenshot(&self, path: &Path) -> Result<()> {
         // Take screenshot using Playwright
         Ok(())
     }
