@@ -21,9 +21,13 @@ synonyms:: disciplined-implementation
 
 trigger:: code writing, review, testing, and mid-complexity development tasks
 
-# Z.AI Coding Plan healthy via pi-rust; broken via opencode 1.14.48
-# (opencode emits only step_start, no text). Investigation: 2026-05-23.
-# Route through pi-rust until opencode integration is fixed upstream.
+# Z.AI Coding Plan: GLM-5.2 is the latest model (free via subscription).
+# Route through pi-rust; opencode integration broken for zai-coding-plan.
+route:: zai-coding-plan, zai-coding-plan/glm-5.2
+is_free:: true
+action:: /home/alex/.local/bin/pi-rust --provider zai-coding-plan --model {{ model }} -p "{{ prompt }}"
+
+# GLM-5.1 as fallback when 5.2 is unavailable.
 route:: zai-coding-plan, zai-coding-plan/glm-5.1
 is_free:: true
 action:: /home/alex/.local/bin/pi-rust --provider zai-coding-plan --model {{ model }} -p "{{ prompt }}"
@@ -37,6 +41,15 @@ action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ promp
 route:: openai, openai/gpt-5.3-codex
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
+# MiniMax-3 via opencode (subscription plan).
+route:: minimax, minimax-coding-plan/MiniMax-3
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+
+# MiniMax-3 via pi-rust (subscription plan).
+route:: minimax-coding-plan, MiniMax-3
+action:: /home/alex/.local/bin/pi-rust --provider minimax-coding-plan --model {{ model }} -p "{{ prompt }}"
+
+# MiniMax-M2.7 as fallback.
 route:: minimax, minimax-coding-plan/MiniMax-M2.7-highspeed
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 

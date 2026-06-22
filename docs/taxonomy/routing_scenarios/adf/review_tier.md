@@ -17,9 +17,12 @@ synonyms:: disciplined-verification, disciplined-validation
 
 trigger:: verification, validation, and review tasks that check existing work
 
-# Z.AI Coding Plan healthy via pi-rust; broken via opencode 1.14.48
-# (opencode emits only step_start, no text). Investigation: 2026-05-23.
-# Route through pi-rust until opencode integration is fixed upstream.
+# Z.AI Coding Plan: GLM-5.2 for fast review (free via subscription).
+route:: zai-coding-plan, zai-coding-plan/glm-5.2
+is_free:: true
+action:: /home/alex/.local/bin/pi-rust --provider zai-coding-plan --model {{ model }} -p "{{ prompt }}"
+
+# GLM-5.1 as fallback.
 route:: zai-coding-plan, zai-coding-plan/glm-5.1
 is_free:: true
 action:: /home/alex/.local/bin/pi-rust --provider zai-coding-plan --model {{ model }} -p "{{ prompt }}"
@@ -33,6 +36,11 @@ action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ promp
 route:: openai, openai/gpt-5.4-mini
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
+# MiniMax-3 for fast review.
+route:: minimax, minimax-coding-plan/MiniMax-3
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+
+# MiniMax-M2.5 as fallback.
 route:: minimax, minimax-coding-plan/MiniMax-M2.5
 is_free:: true
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
