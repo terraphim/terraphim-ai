@@ -91,7 +91,7 @@ impl PerformanceMonitor {
     pub fn record_command_time(&mut self, command: &str, duration: Duration) {
         self.command_times
             .entry(command.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(duration);
     }
 

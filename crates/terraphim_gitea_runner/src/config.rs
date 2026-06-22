@@ -35,8 +35,11 @@ pub struct RunnerConfig {
     pub http_request_timeout: Duration,
     /// Belt-and-suspenders timeout wrapping each `poll_once` call in
     /// `run_forever`. Should exceed `http_request_timeout` so reqwest's own
-    /// timeout fires first; defaults to `2 × http_request_timeout`.
+    /// timeout fires first; defaults to `2 x http_request_timeout`.
     pub poll_timeout: Duration,
+    /// Directory containing `command_policy.md` for the taxonomy-driven
+    /// command allowlist. If `None`, the embedded default policy is used.
+    pub taxonomy_dir: Option<PathBuf>,
 }
 
 /// Configuration for the optional legacy commit-status mirror.
@@ -62,6 +65,7 @@ impl Default for RunnerConfig {
             status_token: None,
             http_request_timeout: Duration::from_secs(30),
             poll_timeout: Duration::from_secs(60),
+            taxonomy_dir: None,
         }
     }
 }

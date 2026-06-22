@@ -52,6 +52,7 @@ async fn demo_local_executor() {
 }
 
 #[tokio::test]
+#[ignore = "requires Docker daemon with python:3.11-slim image; run with --ignored to enable"]
 async fn demo_docker_executor() {
     println!("\n═══════════════════════════════════════════");
     println!("  DOCKER EXECUTOR (container isolation)");

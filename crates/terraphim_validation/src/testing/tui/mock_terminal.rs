@@ -174,31 +174,28 @@ impl TerminalState {
         match seq.chars().last() {
             Some('H') | Some('f') => {
                 // Cursor position (ESC[row;colH or ESC[row;colf)
-                if parts.len() >= 2 {
-                    if let (Ok(row), Ok(col)) = (
+                if parts.len() >= 2
+                    && let (Ok(row), Ok(col)) = (
                         parts[parts.len() - 2].parse::<u16>(),
                         parts[parts.len() - 1]
                             .trim_end_matches('H')
                             .trim_end_matches('f')
                             .parse::<u16>(),
-                    ) {
-                        // ANSI is 1-based, convert to 0-based
-                        self.cursor.x = (col - 1).min(self.size.width - 1);
-                        self.cursor.y = (row - 1).min(self.size.height - 1);
-                    }
+                    )
+                {
+                    // ANSI is 1-based, convert to 0-based
+                    self.cursor.x = (col - 1).min(self.size.width - 1);
+                    self.cursor.y = (row - 1).min(self.size.height - 1);
                 }
             }
             Some('J') => {
                 // Clear screen
-                match parts[0].trim_end_matches('J') {
-                    "2" => {
-                        // Clear entire screen
-                        for line in &mut self.buffer {
-                            *line = " ".repeat(self.size.width as usize);
-                        }
-                        self.cursor = CursorPosition::new(0, 0);
+                if parts[0].trim_end_matches('J') == "2" {
+                    // Clear entire screen
+                    for line in &mut self.buffer {
+                        *line = " ".repeat(self.size.width as usize);
                     }
-                    _ => {} // Other clear operations not implemented
+                    self.cursor = CursorPosition::new(0, 0);
                 }
             }
             Some('K') => {
@@ -400,7 +397,7 @@ impl Write for MockTerminal {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let text = String::from_utf8_lossy(buf);
         // Call the MockTerminal's write method with &str
-        MockTerminal::write(self, &text).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        MockTerminal::write(self, &text).map_err(io::Error::other)?;
         Ok(buf.len())
     }
 

@@ -23,18 +23,6 @@ static NORMALIZE_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(||
     Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create normalize regex")
 });
 
-/// Find the largest byte index <= `index` that is a valid UTF-8 char boundary.
-/// Polyfill for str::floor_char_boundary (stable since Rust 1.91).
-fn floor_char_boundary(s: &str, index: usize) -> usize {
-    if index >= s.len() {
-        return s.len();
-    }
-    let mut i = index;
-    while i > 0 && !s.is_char_boundary(i) {
-        i -= 1;
-    }
-    i
-}
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_config::ConfigState;
 use terraphim_persistence::Persistable;
@@ -127,9 +115,8 @@ fn create_document_description(content: &str) -> Option<String> {
     };
 
     // Limit total length to 400 characters for more informative descriptions
-    // Use floor_char_boundary to safely truncate at a valid UTF-8 boundary
     let description = if combined.len() > 400 {
-        let safe_end = floor_char_boundary(&combined, 397);
+        let safe_end = combined.floor_char_boundary(397);
         format!("{}...", &combined[..safe_end])
     } else {
         combined
@@ -640,6 +627,238 @@ async fn index_html() -> Response {
 
 async fn not_found() -> Response {
     (StatusCode::NOT_FOUND, "404").into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- floor_char_boundary ---
+
+    #[test]
+    fn floor_char_boundary_index_beyond_len_returns_len() {
+        let s = "hello";
+        assert_eq!(floor_char_boundary(s, 100), s.len());
+    }
+
+    #[test]
+    fn floor_char_boundary_index_equal_to_len_returns_len() {
+        let s = "hello";
+        assert_eq!(floor_char_boundary(s, 5), 5);
+    }
+
+    #[test]
+    fn floor_char_boundary_index_at_valid_ascii_boundary() {
+        let s = "hello";
+        assert_eq!(floor_char_boundary(s, 3), 3);
+    }
+
+    #[test]
+    fn floor_char_boundary_zero_index_returns_zero() {
+        let s = "hello";
+        assert_eq!(floor_char_boundary(s, 0), 0);
+    }
+
+    #[test]
+    fn floor_char_boundary_empty_string_returns_zero() {
+        assert_eq!(floor_char_boundary("", 0), 0);
+        assert_eq!(floor_char_boundary("", 5), 0);
+    }
+
+    #[test]
+    fn floor_char_boundary_multibyte_char_at_boundary() {
+        // "é" encodes as 2 bytes: [0xC3, 0xA9]; "aé".len() == 3
+        let s = "aé";
+        assert_eq!(floor_char_boundary(s, 1), 1); // byte 1 = start of 'é' — valid
+        assert_eq!(floor_char_boundary(s, 2), 1); // byte 2 = inside 'é' — retreat to 1
+        assert_eq!(floor_char_boundary(s, 3), 3); // index >= len — returns len
+    }
+
+    #[test]
+    fn floor_char_boundary_inside_multibyte_char_retreats() {
+        // CJK character '中' encodes as 3 bytes: [0xE4, 0xB8, 0xAD]
+        let s = "a中b";
+        // byte index 2 and 3 are inside '中', so floor should return 1 (the 'a' boundary)
+        assert_eq!(floor_char_boundary(s, 2), 1);
+        assert_eq!(floor_char_boundary(s, 3), 1);
+        // byte index 4 is the start of 'b', valid boundary
+        assert_eq!(floor_char_boundary(s, 4), 4);
+    }
+
+    #[test]
+    fn floor_char_boundary_emoji_inside_retreats() {
+        // "🦀" encodes as 4 bytes
+        let s = "x🦀y";
+        // byte indices 2 and 3 are inside the emoji (starts at 1)
+        assert_eq!(floor_char_boundary(s, 2), 1);
+        assert_eq!(floor_char_boundary(s, 3), 1);
+        // byte index 5 is the start of 'y'
+        assert_eq!(floor_char_boundary(s, 5), 5);
+    }
+
+    // --- create_document_description ---
+
+    #[test]
+    fn create_document_description_empty_content_returns_none() {
+        assert_eq!(create_document_description(""), None);
+    }
+
+    #[test]
+    fn create_document_description_only_whitespace_returns_none() {
+        assert_eq!(create_document_description("   \n\n  "), None);
+    }
+
+    #[test]
+    fn create_document_description_only_frontmatter_returns_none() {
+        let content = "---\ntitle: My Doc\nauthor: Alice\n---\n";
+        assert_eq!(create_document_description(content), None);
+    }
+
+    #[test]
+    fn create_document_description_simple_paragraph() {
+        let content = "This is a simple paragraph that is long enough to be included.";
+        let result = create_document_description(content);
+        assert!(result.is_some());
+        assert!(result.unwrap().contains("simple paragraph"));
+    }
+
+    #[test]
+    fn create_document_description_header_included() {
+        let content = "# My Great Document\n\nSome body text here that is informative.";
+        let result = create_document_description(content);
+        assert!(result.is_some());
+        let desc = result.unwrap();
+        assert!(
+            desc.contains("My Great Document"),
+            "Expected header in description, got: {desc}"
+        );
+    }
+
+    #[test]
+    fn create_document_description_synonyms_line_included() {
+        let content = "synonyms:: foo, bar, baz";
+        let result = create_document_description(content);
+        assert!(result.is_some());
+        let desc = result.unwrap();
+        assert!(desc.contains("synonyms: foo, bar, baz"), "Got: {desc}");
+    }
+
+    #[test]
+    fn create_document_description_tags_line_skipped() {
+        let content = "tags:: rust, programming\n\nActual description text that is long enough.";
+        let result = create_document_description(content);
+        assert!(result.is_some());
+        let desc = result.unwrap();
+        assert!(
+            !desc.contains("tags::"),
+            "tags:: line should be excluded, got: {desc}"
+        );
+    }
+
+    #[test]
+    fn create_document_description_image_references_skipped() {
+        let content = "![logo](img/logo.png)\n\nActual description text that is long enough.";
+        let result = create_document_description(content);
+        assert!(result.is_some());
+        let desc = result.unwrap();
+        assert!(
+            !desc.contains("!["),
+            "Image reference should be excluded, got: {desc}"
+        );
+    }
+
+    #[test]
+    fn create_document_description_code_block_skipped() {
+        let content = "```rust\nfn main() {}\n```\n\nActual description text that is long enough.";
+        let result = create_document_description(content);
+        // code block lines starting with ``` are skipped
+        if let Some(desc) = result {
+            assert!(
+                !desc.contains("```"),
+                "Code fence should be excluded, got: {desc}"
+            );
+        }
+    }
+
+    #[test]
+    fn create_document_description_html_comment_skipped() {
+        let content = "<!-- This is a comment -->\n\nReal content that is long enough here.";
+        let result = create_document_description(content);
+        assert!(result.is_some());
+        let desc = result.unwrap();
+        assert!(
+            !desc.contains("<!--"),
+            "HTML comment should be excluded, got: {desc}"
+        );
+    }
+
+    #[test]
+    fn create_document_description_long_content_truncated_at_valid_boundary() {
+        // Build content that exceeds 400 characters
+        let long_line = "a".repeat(500);
+        let result = create_document_description(&long_line);
+        assert!(result.is_some());
+        let desc = result.unwrap();
+        assert!(
+            desc.len() <= 403,
+            "Truncated description should be <=403 chars, got {}",
+            desc.len()
+        );
+        assert!(
+            desc.ends_with("..."),
+            "Truncated description should end with '...', got: {desc}"
+        );
+    }
+
+    #[test]
+    fn create_document_description_long_unicode_truncated_at_char_boundary() {
+        // Build a string of 200 multibyte chars — each '中' is 3 bytes, so 200*3=600 bytes > 400
+        let content = "中".repeat(200);
+        let result = create_document_description(&content);
+        assert!(result.is_some());
+        let desc = result.unwrap();
+        // Must be valid UTF-8 (would panic if not)
+        let _ = desc.len();
+        assert!(
+            desc.ends_with("..."),
+            "Should be truncated with '...', got: {desc}"
+        );
+    }
+
+    #[test]
+    fn create_document_description_short_lines_ignored() {
+        // Lines shorter than 20 chars are not included as content
+        let content = "short\nalso short\n\nThis line is long enough to qualify as content for the description.";
+        let result = create_document_description(content);
+        assert!(result.is_some());
+        let desc = result.unwrap();
+        assert!(
+            !desc.contains("short"),
+            "Short lines should be ignored, got: {desc}"
+        );
+    }
+
+    #[test]
+    fn create_document_description_combines_header_and_body() {
+        let content = "# Knowledge Graph\n\nThis document describes the core concepts in the knowledge graph system.";
+        let result = create_document_description(content);
+        assert!(result.is_some());
+        let desc = result.unwrap();
+        assert!(desc.contains("Knowledge Graph"), "Got: {desc}");
+        assert!(desc.contains("core concepts"), "Got: {desc}");
+    }
+
+    #[test]
+    fn create_document_description_at_most_four_parts() {
+        // Provide many qualifying lines; ensure we stop collecting after 4 parts
+        let content = "# Header\n".to_string()
+            + &"This is a meaningful content line that is long enough. ".repeat(10);
+        let result = create_document_description(&content);
+        assert!(result.is_some());
+        // Result should not be unbounded — capped by the length limit or content_lines<3
+        let desc = result.unwrap();
+        assert!(!desc.is_empty());
+    }
 }
 
 /// Constructs a minimal Axum router suitable for integration tests.

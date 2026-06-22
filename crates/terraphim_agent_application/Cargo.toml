@@ -2,6 +2,7 @@
 name = "terraphim_agent_application"
 version = "1.0.0"
 edition.workspace = true
+rust-version.workspace = true
 description = "OTP-style application behavior for Terraphim agent system"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"

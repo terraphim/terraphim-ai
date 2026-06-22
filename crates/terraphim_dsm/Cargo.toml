@@ -2,6 +2,7 @@
 name = "terraphim_dsm"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 description = "Semantic module grouping using Terraphim knowledge graphs (sentrux companion tool)"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"

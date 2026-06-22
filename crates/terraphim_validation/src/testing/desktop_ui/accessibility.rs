@@ -18,6 +18,7 @@ pub struct AccessibilityTestConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::upper_case_acronyms)] // AAA is the established WCAG accessibility conformance level name
 pub enum WCAGLevel {
     A,
     AA,
@@ -95,7 +96,7 @@ impl AccessibilityTester {
 
         for screen_reader in &self.config.screen_readers {
             if screen_reader.enabled {
-                results.push(self.test_screen_reader(&screen_reader).await?);
+                results.push(self.test_screen_reader(screen_reader).await?);
             }
         }
 

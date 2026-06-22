@@ -777,16 +777,34 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
     async fn cleanup(&self) -> Result<(), Self::Error> {
         log::info!("FirecrackerExecutor::cleanup called");
 
-        // Clear all session mappings
+        // Collect VM IDs before clearing maps so we can stop each VM
+        let vm_ids: Vec<String> = self.session_to_vm.read().values().cloned().collect();
+
+        // Stop each running VM; log failures but never abort the cleanup
+        if !vm_ids.is_empty() {
+            let mut vm_manager_guard = self.vm_manager.lock().await;
+            if let Some(ref mut vm_manager) = *vm_manager_guard {
+                for vm_id in &vm_ids {
+                    if let Err(e) = vm_manager.stop_vm(vm_id, true).await {
+                        log::warn!("Failed to stop VM {} during cleanup: {}", vm_id, e);
+                    } else {
+                        log::debug!("Stopped VM {} during cleanup", vm_id);
+                    }
+                }
+            } else {
+                log::warn!(
+                    "FirecrackerExecutor::cleanup: vm_manager not initialised, {} VM(s) not stopped",
+                    vm_ids.len()
+                );
+            }
+        }
+
+        // Clear all session mappings after teardown attempts
         self.session_to_vm.write().clear();
         self.current_snapshot.write().clear();
         self.snapshot_counts.write().clear();
 
-        // TODO: Stop and cleanup VMs via VmManager
-        // for (session_id, vm_id) in session_to_vm {
-        //     vm_manager.stop_vm(&vm_id, true).await?;
-        // }
-
+        log::info!("FirecrackerExecutor::cleanup complete");
         Ok(())
     }
 
@@ -918,5 +936,49 @@ mod tests {
         // Health check should fail if not initialized
         let result = executor.health_check().await.unwrap();
         assert!(!result);
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_clears_all_session_maps() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+
+        let config = RlmConfig::default();
+        let executor = FirecrackerExecutor::new(config).unwrap();
+
+        let session_id1 = SessionId::new();
+        let session_id2 = SessionId::new();
+
+        // Populate all three session maps
+        executor.assign_vm_to_session(session_id1, "vm-cleanup-1".to_string());
+        executor.assign_vm_to_session(session_id2, "vm-cleanup-2".to_string());
+        executor.set_current_snapshot(&session_id1, "snap-cleanup-1".to_string());
+        *executor
+            .snapshot_counts
+            .write()
+            .entry(session_id1)
+            .or_insert(0) = 2;
+
+        assert_eq!(executor.session_to_vm.read().len(), 2);
+        assert_eq!(executor.current_snapshot.read().len(), 1);
+        assert_eq!(executor.snapshot_counts.read().len(), 1);
+
+        // cleanup() must clear all maps even when vm_manager is not initialised
+        executor.cleanup().await.expect("cleanup should succeed");
+
+        assert!(
+            executor.session_to_vm.read().is_empty(),
+            "session_to_vm must be empty after cleanup"
+        );
+        assert!(
+            executor.current_snapshot.read().is_empty(),
+            "current_snapshot must be empty after cleanup"
+        );
+        assert!(
+            executor.snapshot_counts.read().is_empty(),
+            "snapshot_counts must be empty after cleanup"
+        );
     }
 }
