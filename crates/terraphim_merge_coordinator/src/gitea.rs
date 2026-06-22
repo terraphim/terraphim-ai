@@ -20,6 +20,38 @@ const RETRY_DELAYS_SECS: &[u64] = &[1, 2, 4];
 /// by the evaluation loop (issue #2850).
 const OPEN_PRS_LIMIT: u32 = 300;
 
+/// Gitea operations consumed by the evaluator/merge logic.
+///
+/// Extracted as a trait (#2892) so that `evaluate_all` and `merge_and_close`
+/// can be exercised end-to-end with a concrete fake instead of a live Gitea
+/// server (project policy: no mocks in tests). `GiteaClient` implements this;
+/// tests use [`FakeGiteaClient`].
+#[async_trait::async_trait]
+pub trait GiteaOperations: Sync {
+    /// List open PRs for `owner/repo`.
+    async fn list_open_prs(
+        &self,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<PrSummary>, MergeCoordinatorError>;
+
+    /// Merge a PR by index. Returns `Ok(())` on success.
+    async fn merge_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<(), MergeCoordinatorError>;
+
+    /// Close an issue by index. Returns `Ok(())` on success.
+    async fn close_issue(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<(), MergeCoordinatorError>;
+}
+
 /// Minimal Gitea API client. Caller supplies the API token via env or
 /// secure storage; it is never written to logs.
 pub struct GiteaClient {
@@ -173,6 +205,38 @@ impl GiteaClient {
             RETRY_DELAYS_SECS.len() + 1,
             last_err.unwrap_or_else(|| "no error captured".into())
         )))
+    }
+}
+
+// `GiteaClient` satisfies the trait by delegating to its inherent async
+// methods. Kept as a separate block so the trait bound in `evaluate_all` /
+// `merge_and_close` is satisfied without altering the existing public API.
+#[async_trait::async_trait]
+impl GiteaOperations for GiteaClient {
+    async fn list_open_prs(
+        &self,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<PrSummary>, MergeCoordinatorError> {
+        GiteaClient::list_open_prs(self, owner, repo).await
+    }
+
+    async fn merge_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<(), MergeCoordinatorError> {
+        GiteaClient::merge_pr(self, owner, repo, index).await
+    }
+
+    async fn close_issue(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<(), MergeCoordinatorError> {
+        GiteaClient::close_issue(self, owner, repo, index).await
     }
 }
 

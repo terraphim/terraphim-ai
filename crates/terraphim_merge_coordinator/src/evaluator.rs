@@ -7,7 +7,7 @@
 use tracing::{error, info, warn};
 
 use crate::extract_fixes;
-use crate::gitea::{GiteaClient, PrSummary};
+use crate::gitea::{GiteaOperations, PrSummary};
 use crate::types::{EvalVerdict, MergeCoordinatorError, MergeOutcome};
 
 /// One evaluation of one open PR.
@@ -25,11 +25,17 @@ pub struct PrEvaluation {
 
 /// Evaluate all open PRs in `owner/repo`, sequentially. Each PR gets
 /// a verdict; no merges are performed here.
-pub async fn evaluate_all(
-    gitea: &GiteaClient,
+///
+/// Generic over [`GiteaOperations`] (#2892) so callers can supply a concrete
+/// fake in tests instead of a live Gitea server.
+pub async fn evaluate_all<T>(
+    gitea: &T,
     owner: &str,
     repo: &str,
-) -> Result<Vec<PrEvaluation>, MergeCoordinatorError> {
+) -> Result<Vec<PrEvaluation>, MergeCoordinatorError>
+where
+    T: GiteaOperations + ?Sized,
+{
     let prs = gitea.list_open_prs(owner, repo).await?;
     let mut out = Vec::with_capacity(prs.len());
     for pr in prs {
@@ -63,12 +69,15 @@ fn evaluate_one(pr: &PrSummary) -> PrEvaluation {
 /// Failure-1: if merge succeeds but any close fails, returns
 /// `PartialFailure` so the caller can emit CRITICAL + exit 2.
 /// Failure-2: nothing is closed if the merge itself fails.
-pub async fn merge_and_close(
-    gitea: &GiteaClient,
+pub async fn merge_and_close<T>(
+    gitea: &T,
     owner: &str,
     repo: &str,
     eval: &PrEvaluation,
-) -> Result<MergeOutcome, MergeCoordinatorError> {
+) -> Result<MergeOutcome, MergeCoordinatorError>
+where
+    T: GiteaOperations + ?Sized,
+{
     match &eval.verdict {
         EvalVerdict::Hold(reason) => {
             info!(pr = eval.pr_index, reason, "skipping PR (Hold)");
