@@ -728,7 +728,10 @@ mod tests {
         let result = create_document_description(content);
         assert!(result.is_some());
         let desc = result.unwrap();
-        assert!(desc.contains("My Great Document"), "Expected header in description, got: {desc}");
+        assert!(
+            desc.contains("My Great Document"),
+            "Expected header in description, got: {desc}"
+        );
     }
 
     #[test]
@@ -746,7 +749,10 @@ mod tests {
         let result = create_document_description(content);
         assert!(result.is_some());
         let desc = result.unwrap();
-        assert!(!desc.contains("tags::"), "tags:: line should be excluded, got: {desc}");
+        assert!(
+            !desc.contains("tags::"),
+            "tags:: line should be excluded, got: {desc}"
+        );
     }
 
     #[test]
@@ -755,7 +761,10 @@ mod tests {
         let result = create_document_description(content);
         assert!(result.is_some());
         let desc = result.unwrap();
-        assert!(!desc.contains("!["), "Image reference should be excluded, got: {desc}");
+        assert!(
+            !desc.contains("!["),
+            "Image reference should be excluded, got: {desc}"
+        );
     }
 
     #[test]
@@ -764,7 +773,10 @@ mod tests {
         let result = create_document_description(content);
         // code block lines starting with ``` are skipped
         if let Some(desc) = result {
-            assert!(!desc.contains("```"), "Code fence should be excluded, got: {desc}");
+            assert!(
+                !desc.contains("```"),
+                "Code fence should be excluded, got: {desc}"
+            );
         }
     }
 
@@ -774,7 +786,10 @@ mod tests {
         let result = create_document_description(content);
         assert!(result.is_some());
         let desc = result.unwrap();
-        assert!(!desc.contains("<!--"), "HTML comment should be excluded, got: {desc}");
+        assert!(
+            !desc.contains("<!--"),
+            "HTML comment should be excluded, got: {desc}"
+        );
     }
 
     #[test]
@@ -784,8 +799,15 @@ mod tests {
         let result = create_document_description(&long_line);
         assert!(result.is_some());
         let desc = result.unwrap();
-        assert!(desc.len() <= 403, "Truncated description should be <=403 chars, got {}", desc.len());
-        assert!(desc.ends_with("..."), "Truncated description should end with '...', got: {desc}");
+        assert!(
+            desc.len() <= 403,
+            "Truncated description should be <=403 chars, got {}",
+            desc.len()
+        );
+        assert!(
+            desc.ends_with("..."),
+            "Truncated description should end with '...', got: {desc}"
+        );
     }
 
     #[test]
@@ -797,7 +819,10 @@ mod tests {
         let desc = result.unwrap();
         // Must be valid UTF-8 (would panic if not)
         let _ = desc.len();
-        assert!(desc.ends_with("..."), "Should be truncated with '...', got: {desc}");
+        assert!(
+            desc.ends_with("..."),
+            "Should be truncated with '...', got: {desc}"
+        );
     }
 
     #[test]
@@ -807,7 +832,10 @@ mod tests {
         let result = create_document_description(content);
         assert!(result.is_some());
         let desc = result.unwrap();
-        assert!(!desc.contains("short"), "Short lines should be ignored, got: {desc}");
+        assert!(
+            !desc.contains("short"),
+            "Short lines should be ignored, got: {desc}"
+        );
     }
 
     #[test]
