@@ -36,8 +36,8 @@ action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ promp
 route:: openai, openai/gpt-5.4-mini
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
-# MiniMax-3 for fast review.
-route:: minimax, minimax-coding-plan/MiniMax-3
+# MiniMax-M3 for fast review.
+route:: minimax, minimax-coding-plan/MiniMax-M3
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
 # MiniMax-M2.5 as fallback.

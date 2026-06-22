@@ -41,12 +41,12 @@ action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ promp
 route:: openai, openai/gpt-5.3-codex
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
-# MiniMax-3 via opencode (subscription plan).
-route:: minimax, minimax-coding-plan/MiniMax-3
+# MiniMax-M3 via opencode (subscription plan).
+route:: minimax, minimax-coding-plan/MiniMax-M3
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
-# MiniMax-3 via pi-rust (subscription plan).
-route:: minimax-coding-plan, MiniMax-3
+# MiniMax-M3 via pi-rust (subscription plan).
+route:: minimax-coding-plan, MiniMax-M3
 action:: /home/alex/.local/bin/pi-rust --provider minimax-coding-plan --model {{ model }} -p "{{ prompt }}"
 
 # MiniMax-M2.7 as fallback.
