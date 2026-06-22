@@ -633,45 +633,45 @@ async fn not_found() -> Response {
 mod tests {
     use super::*;
 
-    // --- floor_char_boundary ---
+    // --- floor_char_boundary (stdlib str::floor_char_boundary, stable since MSRV 1.91.0) ---
 
     #[test]
     fn floor_char_boundary_index_beyond_len_returns_len() {
         let s = "hello";
-        assert_eq!(floor_char_boundary(s, 100), s.len());
+        assert_eq!(s.floor_char_boundary(100), s.len());
     }
 
     #[test]
     fn floor_char_boundary_index_equal_to_len_returns_len() {
         let s = "hello";
-        assert_eq!(floor_char_boundary(s, 5), 5);
+        assert_eq!(s.floor_char_boundary(5), 5);
     }
 
     #[test]
     fn floor_char_boundary_index_at_valid_ascii_boundary() {
         let s = "hello";
-        assert_eq!(floor_char_boundary(s, 3), 3);
+        assert_eq!(s.floor_char_boundary(3), 3);
     }
 
     #[test]
     fn floor_char_boundary_zero_index_returns_zero() {
         let s = "hello";
-        assert_eq!(floor_char_boundary(s, 0), 0);
+        assert_eq!(s.floor_char_boundary(0), 0);
     }
 
     #[test]
     fn floor_char_boundary_empty_string_returns_zero() {
-        assert_eq!(floor_char_boundary("", 0), 0);
-        assert_eq!(floor_char_boundary("", 5), 0);
+        assert_eq!("".floor_char_boundary(0), 0);
+        assert_eq!("".floor_char_boundary(5), 0);
     }
 
     #[test]
     fn floor_char_boundary_multibyte_char_at_boundary() {
         // "é" encodes as 2 bytes: [0xC3, 0xA9]; "aé".len() == 3
         let s = "aé";
-        assert_eq!(floor_char_boundary(s, 1), 1); // byte 1 = start of 'é' — valid
-        assert_eq!(floor_char_boundary(s, 2), 1); // byte 2 = inside 'é' — retreat to 1
-        assert_eq!(floor_char_boundary(s, 3), 3); // index >= len — returns len
+        assert_eq!(s.floor_char_boundary(1), 1); // byte 1 = start of 'é' — valid
+        assert_eq!(s.floor_char_boundary(2), 1); // byte 2 = inside 'é' — retreat to 1
+        assert_eq!(s.floor_char_boundary(3), 3); // index >= len — returns len
     }
 
     #[test]
@@ -679,10 +679,10 @@ mod tests {
         // CJK character '中' encodes as 3 bytes: [0xE4, 0xB8, 0xAD]
         let s = "a中b";
         // byte index 2 and 3 are inside '中', so floor should return 1 (the 'a' boundary)
-        assert_eq!(floor_char_boundary(s, 2), 1);
-        assert_eq!(floor_char_boundary(s, 3), 1);
+        assert_eq!(s.floor_char_boundary(2), 1);
+        assert_eq!(s.floor_char_boundary(3), 1);
         // byte index 4 is the start of 'b', valid boundary
-        assert_eq!(floor_char_boundary(s, 4), 4);
+        assert_eq!(s.floor_char_boundary(4), 4);
     }
 
     #[test]
@@ -690,10 +690,10 @@ mod tests {
         // "🦀" encodes as 4 bytes
         let s = "x🦀y";
         // byte indices 2 and 3 are inside the emoji (starts at 1)
-        assert_eq!(floor_char_boundary(s, 2), 1);
-        assert_eq!(floor_char_boundary(s, 3), 1);
+        assert_eq!(s.floor_char_boundary(2), 1);
+        assert_eq!(s.floor_char_boundary(3), 1);
         // byte index 5 is the start of 'y'
-        assert_eq!(floor_char_boundary(s, 5), 5);
+        assert_eq!(s.floor_char_boundary(5), 5);
     }
 
     // --- create_document_description ---
