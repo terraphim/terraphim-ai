@@ -20,7 +20,7 @@ use async_trait::async_trait;
 use tokio::process::Command;
 use tokio::time::timeout;
 
-use crate::config::BackendType;
+use crate::config::{BackendType, KgStrictness};
 use crate::error::{RlmError, RlmResult};
 use crate::executor::ExecutionEnvironment;
 use crate::executor::context::{
@@ -35,6 +35,7 @@ const BACKEND_NAME: &str = "local";
 pub struct LocalExecutor {
     python_path: String,
     validator: Option<Arc<KnowledgeGraphValidator>>,
+    kg_strictness: KgStrictness,
 }
 
 impl LocalExecutor {
@@ -43,12 +44,19 @@ impl LocalExecutor {
         Self {
             python_path: "python3".to_string(),
             validator: None,
+            kg_strictness: KgStrictness::Normal,
         }
     }
 
     /// Create a LocalExecutor with a knowledge graph validator.
     pub fn with_validator(mut self, validator: Option<Arc<KnowledgeGraphValidator>>) -> Self {
         self.validator = validator;
+        self
+    }
+
+    /// Set the KG validation strictness level for this executor.
+    pub fn with_kg_strictness(mut self, strictness: KgStrictness) -> Self {
+        self.kg_strictness = strictness;
         self
     }
 
@@ -175,7 +183,7 @@ impl ExecutionEnvironment for LocalExecutor {
                 let vr = validator.validate(input)?;
                 Ok(ValidationResult::from_validator_result(
                     &vr,
-                    crate::config::KgStrictness::Normal,
+                    self.kg_strictness,
                 ))
             }
             _ => Ok(ValidationResult::valid(Vec::new())),
@@ -372,5 +380,39 @@ mod tests {
         let executor = LocalExecutor::new();
         let session = SessionId::new();
         assert!(executor.end_session(&session).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_validate_no_validator_always_valid() {
+        let executor = LocalExecutor::new();
+        let vr = executor.validate("any command").await.unwrap();
+        assert!(vr.is_valid);
+    }
+
+    #[tokio::test]
+    async fn test_validate_empty_input_always_valid() {
+        let executor = LocalExecutor::new();
+        let vr = executor.validate("").await.unwrap();
+        assert!(vr.is_valid);
+    }
+
+    #[tokio::test]
+    async fn test_validate_strictness_propagated_to_result() {
+        use crate::config::KgStrictness;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        use std::sync::Arc;
+
+        let validator = Arc::new(KnowledgeGraphValidator::new(ValidatorConfig::default()));
+        let executor = LocalExecutor::new()
+            .with_validator(Some(validator))
+            .with_kg_strictness(KgStrictness::Strict);
+
+        // Without a thesaurus the validator passes (no terms to check against).
+        // The key assertion is that the strictness stored in the result matches.
+        let vr = executor
+            .validate("test input for validation")
+            .await
+            .unwrap();
+        assert_eq!(vr.strictness, KgStrictness::Strict);
     }
 }

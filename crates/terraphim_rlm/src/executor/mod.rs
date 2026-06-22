@@ -49,11 +49,12 @@ fn build_validator_for_executor(config: &RlmConfig) -> Option<Arc<KnowledgeGraph
     {
         return None;
     }
-    let vcfg = match config.kg_strictness {
+    let mut vcfg = match config.kg_strictness {
         crate::config::KgStrictness::Permissive => ValidatorConfig::permissive(),
         crate::config::KgStrictness::Normal => ValidatorConfig::default(),
         crate::config::KgStrictness::Strict => ValidatorConfig::strict(),
     };
+    vcfg.max_retries = config.kg_max_retries;
     let mut validator = KnowledgeGraphValidator::new(vcfg);
     if let Some(ref thesaurus) = config.thesaurus {
         validator = validator.with_thesaurus(thesaurus.clone());
@@ -192,7 +193,11 @@ pub async fn select_executor(
                     "Falling back to LocalExecutor (NO ISOLATION). Tried: {:?}",
                     tried
                 );
-                return Ok(Box::new(LocalExecutor::new().with_validator(validator)));
+                return Ok(Box::new(
+                    LocalExecutor::new()
+                        .with_validator(validator)
+                        .with_kg_strictness(config.kg_strictness),
+                ));
             }
         }
     }

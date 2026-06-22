@@ -29,7 +29,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
 use super::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
-use crate::config::{BackendType, RlmConfig};
+use crate::config::{BackendType, KgStrictness, RlmConfig};
 use crate::error::{RlmError, RlmResult};
 use crate::types::SessionId;
 
@@ -49,6 +49,7 @@ pub struct DockerExecutor {
     host_config: HostConfig,
     capabilities: Vec<Capability>,
     validator: Option<Arc<crate::validator::KnowledgeGraphValidator>>,
+    kg_strictness: KgStrictness,
 }
 
 /// Build the default `HostConfig` applied to every session container.
@@ -81,7 +82,7 @@ impl DockerExecutor {
     /// Connect to the local Docker daemon and build a `DockerExecutor` with the
     /// default image and host configuration.
     pub fn new(
-        _config: RlmConfig,
+        config: RlmConfig,
         validator: Option<Arc<crate::validator::KnowledgeGraphValidator>>,
     ) -> Result<Self, RlmError> {
         let docker =
@@ -107,6 +108,7 @@ impl DockerExecutor {
             host_config: default_host_config(),
             capabilities,
             validator,
+            kg_strictness: config.kg_strictness,
         })
     }
 
@@ -377,7 +379,7 @@ impl super::ExecutionEnvironment for DockerExecutor {
                 let vr = validator.validate(input)?;
                 Ok(ValidationResult::from_validator_result(
                     &vr,
-                    crate::config::KgStrictness::Normal,
+                    self.kg_strictness,
                 ))
             }
             _ => Ok(ValidationResult::valid(Vec::new())),

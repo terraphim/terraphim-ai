@@ -363,11 +363,16 @@ pub enum KgStrictness {
 
 impl KgStrictness {
     /// Check if unknown terms should block execution.
+    ///
+    /// Returns `true` for `Normal` and `Strict` modes, matching the hot-path
+    /// behaviour in `TerraphimRlm::execute_code` / `execute_command` where a
+    /// failed validation result blocks execution for both levels.  `Permissive`
+    /// only warns and never blocks.
     pub fn blocks_unknown(&self) -> bool {
-        matches!(self, KgStrictness::Strict)
+        matches!(self, KgStrictness::Normal | KgStrictness::Strict)
     }
 
-    /// Check if retries are allowed.
+    /// Check if retries are allowed (i.e. LLM rephrasing loop is active).
     pub fn allows_retry(&self) -> bool {
         matches!(self, KgStrictness::Normal)
     }
@@ -450,10 +455,12 @@ mod tests {
 
     #[test]
     fn test_kg_strictness_behavior() {
+        // blocks_unknown: Permissive never blocks; Normal and Strict both block
         assert!(!KgStrictness::Permissive.blocks_unknown());
-        assert!(!KgStrictness::Normal.blocks_unknown());
+        assert!(KgStrictness::Normal.blocks_unknown());
         assert!(KgStrictness::Strict.blocks_unknown());
 
+        // allows_retry: only Normal retries before giving up
         assert!(!KgStrictness::Permissive.allows_retry());
         assert!(KgStrictness::Normal.allows_retry());
         assert!(!KgStrictness::Strict.allows_retry());
