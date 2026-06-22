@@ -206,6 +206,8 @@ impl WorkspaceManager {
         let key = sanitise_workspace_key(identifier);
         let path = self.root.join(&key);
 
+        self.validate_path(&path)?;
+
         if !path.exists() {
             return Ok(());
         }
@@ -247,6 +249,8 @@ impl WorkspaceManager {
         let key = sanitise_workspace_key(identifier);
         let path = self.root.join(&key);
 
+        self.validate_path(&path)?;
+
         if !path.exists() {
             return Err(WorkspaceError::Workspace {
                 identifier: identifier.into(),
@@ -277,7 +281,20 @@ impl WorkspaceManager {
     /// Uses component-aware [`Path::starts_with`] rather than string comparison to
     /// prevent prefix-confusion attacks where a root of `/tmp/ws` would incorrectly
     /// accept `/tmp/ws_evil` under string-based matching.
+    ///
+    /// Also rejects any path containing `..` components. Rust's `Path::starts_with`
+    /// performs literal component comparison without resolving `..`, so the path
+    /// `/canonical/root/..` would incorrectly satisfy `starts_with("/canonical/root")`.
+    /// Rejecting `..` early prevents this bypass.
     fn validate_path(&self, path: &Path) -> Result<()> {
+        if path
+            .components()
+            .any(|c| c == std::path::Component::ParentDir)
+        {
+            return Err(WorkspaceError::PathOutsideRoot {
+                path: path.to_string_lossy().into_owned(),
+            });
+        }
         if !path.starts_with(&self.root) {
             return Err(WorkspaceError::PathOutsideRoot {
                 path: path.to_string_lossy().into_owned(),
@@ -575,6 +592,76 @@ mod tests {
             result.is_err(),
             "sibling path with shared string prefix must be rejected"
         );
+    }
+
+    // P2-2 regression: validate_path must reject paths with `..` components.
+    // Path::starts_with is literal — /root/.. "starts with" /root — so we must
+    // explicitly reject ParentDir components before the starts_with check.
+    #[test]
+    fn dotdot_traversal_rejected_by_validate_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig::default(),
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+
+        // Construct a path that would pass string starts_with but must be rejected.
+        let traversal = mgr.root().join("..").join("evil");
+        let result = mgr.validate_path(&traversal);
+        assert!(
+            result.is_err(),
+            "path with .. component must be rejected; path={traversal:?}"
+        );
+        assert!(matches!(
+            result.unwrap_err(),
+            WorkspaceError::PathOutsideRoot { .. }
+        ));
+    }
+
+    // P1-1 regression: cleanup() must not allow `..` traversal.
+    #[tokio::test]
+    async fn cleanup_dotdot_is_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig::default(),
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+
+        let result = mgr.cleanup("..").await;
+        assert!(
+            result.is_err(),
+            "cleanup with .. identifier must return an error"
+        );
+        assert!(matches!(
+            result.unwrap_err(),
+            WorkspaceError::PathOutsideRoot { .. }
+        ));
+    }
+
+    // P2-1 regression: archive() must not allow `..` traversal.
+    #[tokio::test]
+    async fn archive_dotdot_is_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig::default(),
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+
+        let result = mgr.archive("..").await;
+        assert!(
+            result.is_err(),
+            "archive with .. identifier must return an error"
+        );
+        assert!(matches!(
+            result.unwrap_err(),
+            WorkspaceError::PathOutsideRoot { .. }
+        ));
     }
 
     #[test]
