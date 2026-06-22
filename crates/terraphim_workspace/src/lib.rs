@@ -646,4 +646,86 @@ mod tests {
             "LD_PRELOAD should have been stripped, got: {content:?}"
         );
     }
+
+    #[tokio::test]
+    async fn archive_creates_timestamped_directory() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig::default(),
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+        let env = HashMap::new();
+
+        mgr.prepare("ARC-1", &env).await.unwrap();
+        let original = tmp.path().join("ARC-1");
+        assert!(original.exists());
+
+        let archive_path = mgr.archive("ARC-1").await.unwrap();
+
+        // Original workspace directory must no longer exist.
+        assert!(
+            !original.exists(),
+            "original workspace path should be gone after archive"
+        );
+
+        // Archived directory must exist and live under the workspace root.
+        assert!(
+            archive_path.exists(),
+            "archive directory should exist at {archive_path:?}"
+        );
+        assert!(archive_path.starts_with(tmp.path()));
+
+        // Directory name must carry the `_archived_<timestamp>` suffix.
+        let name = archive_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .expect("archive directory has a valid UTF-8 name");
+        assert!(
+            name.starts_with("ARC-1_archived_"),
+            "archive name should start with `ARC-1_archived_`, got: {name}"
+        );
+        let timestamp = &name["ARC-1_archived_".len()..];
+        // Timestamp format is %Y%m%d_%H%M%S (15 digits + underscore).
+        assert_eq!(
+            timestamp.len(),
+            15,
+            "timestamp should be 15 chars (YYYYMMDD_HHMMSS), got: {timestamp:?}"
+        );
+        assert_eq!(timestamp.as_bytes()[8], b'_');
+        assert!(timestamp[0..8].chars().all(|c| c.is_ascii_digit()));
+        assert!(timestamp[9..15].chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[tokio::test]
+    async fn archive_nonexistent_returns_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig::default(),
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+
+        let err = mgr.archive("DOES-NOT-EXIST").await.unwrap_err();
+        match err {
+            WorkspaceError::Workspace { identifier, reason } => {
+                assert_eq!(identifier, "DOES-NOT-EXIST");
+                assert!(
+                    reason.contains("non-existent"),
+                    "reason should mention non-existent workspace, got: {reason}"
+                );
+            }
+            other => panic!("expected WorkspaceError::Workspace, got {other:?}"),
+        }
+
+        // Root must be untouched (no stray archive directory created).
+        assert!(
+            tmp.path()
+                .read_dir()
+                .map(|mut d| d.next().is_none())
+                .unwrap_or(true)
+        );
+    }
 }
