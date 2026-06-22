@@ -2,6 +2,7 @@
 name = "terraphim_rolegraph_py"
 version = "1.0.0"
 edition = "2024"
+rust-version = "1.85"
 authors = ["Terraphim Contributors"]
 description = "Python bindings for terraphim_rolegraph - Knowledge graph operations for AI agents"
 documentation = "https://terraphim.ai"

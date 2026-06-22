@@ -2,6 +2,7 @@
 edition.workspace = true
 name = "terraphim_ai_nodejs"
 version.workspace = true
+rust-version.workspace = true
 description = "Node.js bindings for Terraphim AI"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"

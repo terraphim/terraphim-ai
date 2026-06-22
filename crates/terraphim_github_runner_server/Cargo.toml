@@ -2,6 +2,7 @@
 name = "terraphim_github_runner_server"
 version = "0.1.0"
 edition.workspace = true
+rust-version.workspace = true
 description = "GitHub Actions runner server with webhook support for Terraphim AI"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
