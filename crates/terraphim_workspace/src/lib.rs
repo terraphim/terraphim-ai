@@ -129,7 +129,7 @@ impl WorkspaceManager {
         let path = self.root.join(&key);
 
         // Safety: ensure path stays under root
-        self.validate_path(&path, identifier)?;
+        self.validate_path(&path)?;
 
         let created_now = !path.exists();
         if created_now {
@@ -277,16 +277,8 @@ impl WorkspaceManager {
     /// Uses component-aware [`Path::starts_with`] rather than string comparison to
     /// prevent prefix-confusion attacks where a root of `/tmp/ws` would incorrectly
     /// accept `/tmp/ws_evil` under string-based matching.
-    fn validate_path(&self, path: &Path, identifier: &str) -> Result<()> {
+    fn validate_path(&self, path: &Path) -> Result<()> {
         if !path.starts_with(&self.root) {
-            return Err(WorkspaceError::PathOutsideRoot {
-                path: path.to_string_lossy().into_owned(),
-            });
-        }
-
-        // Reject if workspace key would create subdirectories
-        let key = sanitise_workspace_key(identifier);
-        if key.contains('/') || key.contains('\\') {
             return Err(WorkspaceError::PathOutsideRoot {
                 path: path.to_string_lossy().into_owned(),
             });
@@ -555,7 +547,7 @@ mod tests {
         let mgr = WorkspaceManager::new(&config).unwrap();
 
         let bad_path = PathBuf::from("/tmp/elsewhere/evil");
-        let result = mgr.validate_path(&bad_path, "../evil");
+        let result = mgr.validate_path(&bad_path);
         assert!(result.is_err());
     }
 
@@ -578,7 +570,7 @@ mod tests {
         };
         let mgr = WorkspaceManager::new(&config).unwrap();
 
-        let result = mgr.validate_path(&sibling, "file");
+        let result = mgr.validate_path(&sibling);
         assert!(
             result.is_err(),
             "sibling path with shared string prefix must be rejected"
@@ -645,5 +637,61 @@ mod tests {
             content.is_empty(),
             "LD_PRELOAD should have been stripped, got: {content:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn archive_creates_timestamped_directory() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig::default(),
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+        let env = HashMap::new();
+
+        mgr.prepare("ARCH-1", &env).await.unwrap();
+        assert!(tmp.path().join("ARCH-1").exists());
+
+        let archive_path = mgr.archive("ARCH-1").await.unwrap();
+
+        // Original path must be gone
+        assert!(
+            !tmp.path().join("ARCH-1").exists(),
+            "original path must not exist after archive"
+        );
+        // Archive path must exist under the root
+        assert!(archive_path.exists(), "archive path must exist");
+        assert!(
+            archive_path.starts_with(tmp.path()),
+            "archive must stay under root"
+        );
+        // Archive name must contain the expected suffix pattern
+        let name = archive_path.file_name().unwrap().to_string_lossy();
+        assert!(
+            name.starts_with("ARCH-1_archived_"),
+            "archive name must start with key_archived_"
+        );
+    }
+
+    #[tokio::test]
+    async fn archive_nonexistent_returns_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig::default(),
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+
+        let result = mgr.archive("NONEXISTENT-ARCH").await;
+        assert!(
+            result.is_err(),
+            "archiving a non-existent workspace must return an error"
+        );
+        assert!(matches!(
+            result.unwrap_err(),
+            WorkspaceError::Workspace { .. }
+        ));
     }
 }
