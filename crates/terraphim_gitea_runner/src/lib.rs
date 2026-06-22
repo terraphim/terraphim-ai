@@ -43,7 +43,7 @@ pub mod workflow_payload;
 pub use config::RunnerConfig;
 pub use policy::{CommandRoute, ExecutionPlan, PolicyPlanner, TrustLevel};
 pub use state::RunnerState;
-pub use taxonomy_policy::{CommandPolicy, TaxonomyPlanner};
+pub use taxonomy_policy::TaxonomyPlanner;
 
 /// Errors surfaced by the native runner.
 #[derive(Debug, thiserror::Error)]

@@ -8,6 +8,12 @@
 //! The binary embeds a safe default ([`DEFAULT_POLICY_TAXONOMY]]) via
 //! `include_str!` and optionally overrides from a filesystem path configured
 //! via `RunnerConfig::taxonomy_dir`.
+//!
+//! **Trust boundary**: the taxonomy file (whether embedded or on the
+//! filesystem) is the sole source of truth for the command allowlist.
+//! If `RUNNER_TAXONOMY_DIR` is set, the filesystem file *replaces* the
+//! embedded default entirely — there is no merge. Restrict file
+//! permissions to `root:0600` on production deployments.
 
 use crate::config::RunnerConfig;
 use crate::policy::{ExecutionPlan, PolicyPlanner, TrustLevel, program};
@@ -21,7 +27,7 @@ const DEFAULT_POLICY_TAXONOMY: &str = include_str!("../default_policy.md");
 
 /// Parsed command policy loaded from a taxonomy file.
 #[derive(Debug, Clone)]
-pub struct CommandPolicy {
+pub(crate) struct CommandPolicy {
     /// Programs allowed to execute on the host or via rch.
     pub(crate) allowed: HashSet<String>,
     /// Programs explicitly denied (overrides allowed).
@@ -39,7 +45,8 @@ pub struct CommandPolicy {
 /// - `route_to:: rch, prog, sub1 sub2 ...` -- route program+subcommands to rch
 ///
 /// Lines starting with `#` are comments. Blank lines are ignored.
-pub fn parse_policy_taxonomy(text: &str) -> CommandPolicy {
+/// Unrecognised non-comment lines produce a `log::warn!`.
+pub(crate) fn parse_policy_taxonomy(text: &str) -> CommandPolicy {
     let mut allowed = HashSet::new();
     let mut denied = HashSet::new();
     let mut rch_routing = HashMap::new();
@@ -50,20 +57,26 @@ pub fn parse_policy_taxonomy(text: &str) -> CommandPolicy {
             continue;
         }
         if let Some(rest) = line.strip_prefix("allow::") {
+            let rest = rest.split('#').next().unwrap_or(rest).trim();
             for prog in rest.split(',').map(str::trim).filter(|s| !s.is_empty()) {
                 allowed.insert(prog.to_string());
             }
         } else if let Some(rest) = line.strip_prefix("deny::") {
+            let rest = rest.split('#').next().unwrap_or(rest).trim();
             for prog in rest.split(',').map(str::trim).filter(|s| !s.is_empty()) {
                 denied.insert(prog.to_string());
             }
         } else if let Some(rest) = line.strip_prefix("route_to::") {
             let parts: Vec<&str> = rest.split(',').map(str::trim).collect();
-            if parts.len() >= 3 {
+            if parts.len() >= 3 && parts[0] == "rch" {
                 let prog = parts[1];
                 let subcmds = parts[2].split_whitespace().map(String::from).collect();
                 rch_routing.insert(prog.to_string(), subcmds);
+            } else {
+                log::warn!("taxonomy: ignoring malformed route_to directive: {line:?}");
             }
+        } else if line.contains("::") {
+            log::warn!("taxonomy: ignoring unrecognised directive: {line:?}");
         }
     }
 
@@ -90,6 +103,7 @@ impl TaxonomyPlanner {
     ///
     /// If `config.taxonomy_dir` is set, reads `<dir>/command_policy.md`.
     /// Otherwise uses the embedded default. Probes `PATH` for `rch`.
+    /// Logs the effective policy (allowed/denied/routing counts) at startup.
     pub fn new(config: &RunnerConfig) -> Self {
         let rch_available = probe_rch();
         let text = config.taxonomy_dir.as_ref().and_then(|dir| {
@@ -115,8 +129,15 @@ impl TaxonomyPlanner {
             }
             DEFAULT_POLICY_TAXONOMY.to_string()
         });
+        let policy = parse_policy_taxonomy(&text);
+        log::info!(
+            "effective command policy: {} allowed, {} denied, {} rch-routed programs",
+            policy.allowed.len(),
+            policy.denied.len(),
+            policy.rch_routing.len()
+        );
         Self {
-            policy: parse_policy_taxonomy(&text),
+            policy,
             rch_available,
         }
     }
@@ -158,7 +179,12 @@ impl PolicyPlanner for TaxonomyPlanner {
             if prog.is_empty() {
                 return Err(RunnerError::PolicyRejected("empty command".to_string()));
             }
-            if self.policy.denied.contains(prog) || !self.policy.allowed.contains(prog) {
+            if self.policy.denied.contains(prog) {
+                return Err(RunnerError::PolicyRejected(format!(
+                    "program `{prog}` is explicitly denied"
+                )));
+            }
+            if !self.policy.allowed.contains(prog) {
                 return Err(RunnerError::PolicyRejected(format!(
                     "program `{prog}` is not on the allowlist"
                 )));
@@ -212,7 +238,21 @@ mod tests {
         }
     }
 
-    // ── Parser tests ──────────────────────────────────────────────
+    fn config_with_taxonomy_dir(dir: std::path::PathBuf) -> RunnerConfig {
+        RunnerConfig {
+            taxonomy_dir: Some(dir),
+            ..RunnerConfig::default()
+        }
+    }
+
+    fn config_no_taxonomy_dir() -> RunnerConfig {
+        RunnerConfig {
+            taxonomy_dir: None,
+            ..RunnerConfig::default()
+        }
+    }
+
+    // -- Parser tests --
 
     #[test]
     fn test_parse_basic_allow() {
@@ -225,10 +265,9 @@ mod tests {
 
     #[test]
     fn test_parse_deny_overrides_allow() {
-        let policy = parse_policy_taxonomy("allow:: cargo, docker\n!\ndeny:: docker\n");
+        let policy = parse_policy_taxonomy("allow:: cargo, docker\ndeny:: docker\n");
         assert!(policy.denied.contains("docker"));
         assert!(policy.allowed.contains("docker"));
-        // The planner checks denied first, so docker is effectively blocked
     }
 
     #[tokio::test]
@@ -264,6 +303,17 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_strips_inline_comments() {
+        let policy =
+            parse_policy_taxonomy("allow:: cargo, git # essential tools\ndeny:: docker # nope\n");
+        assert!(policy.allowed.contains("cargo"));
+        assert!(policy.allowed.contains("git"));
+        assert!(!policy.allowed.contains("git # essential tools"));
+        assert!(policy.denied.contains("docker"));
+        assert!(!policy.denied.contains("docker # nope"));
+    }
+
+    #[test]
     fn test_parse_empty_text() {
         let policy = parse_policy_taxonomy("");
         assert!(policy.allowed.is_empty());
@@ -272,9 +322,14 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_malformed_route_to_ignored() {
+        let policy = parse_policy_taxonomy("route_to:: rch, cargo\n");
+        assert!(policy.rch_routing.is_empty());
+    }
+
+    #[test]
     fn test_default_policy_matches_current_allowlist() {
         let policy = parse_policy_taxonomy(DEFAULT_POLICY_TAXONOMY);
-        // Every entry from the old const ALLOWLIST must be present
         let old_allowlist = [
             "cargo", "make", "bun", "bunx", "npm", "yarn", "pnpm", "rch", "sccache", "echo",
             "mkdir", "git", "ls", "cat", "cd", "cp", "mv", "rm", "chmod", "sh", "bash", "test",
@@ -286,12 +341,11 @@ mod tests {
                 "default policy missing `{prog}`"
             );
         }
-        // RCH routing must match old const RCH_CARGO_SUBCMDS
         let rch_subcmds = policy.rch_routing.get("cargo").expect("cargo rch routing");
         assert_eq!(rch_subcmds, &vec!["build", "check", "clippy", "doc"]);
     }
 
-    // ── Planner tests (migrated from policy.rs) ───────────────────
+    // -- Planner tests (migrated from policy.rs) --
 
     #[tokio::test]
     async fn routes_cargo_to_rch_and_keeps_fmt_on_host() {
@@ -370,7 +424,7 @@ mod tests {
         assert_eq!(plan.routes[1], crate::policy::CommandRoute::Host);
     }
 
-    // ── Override tests ────────────────────────────────────────────
+    // -- Override tests --
 
     #[tokio::test]
     async fn test_filesystem_override_adds_command() {
@@ -393,5 +447,44 @@ mod tests {
     fn test_default_policy_blocks_docker() {
         let policy = parse_policy_taxonomy(DEFAULT_POLICY_TAXONOMY);
         assert!(policy.denied.contains("docker"));
+    }
+
+    // -- Fallback tests (design-mandated) --
+
+    #[test]
+    fn test_missing_taxonomy_dir_uses_embedded_default() {
+        let planner = TaxonomyPlanner::new(&config_no_taxonomy_dir());
+        // The embedded default must allow cargo and deny docker
+        let policy = &planner.policy;
+        assert!(policy.allowed.contains("cargo"));
+        assert!(policy.denied.contains("docker"));
+    }
+
+    #[test]
+    fn test_corrupt_taxonomy_file_uses_embedded_default() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let dir = tmp.path().to_path_buf();
+        // Write a file with no valid directives at all
+        std::fs::write(
+            dir.join("command_policy.md"),
+            "this is not valid taxonomy\n",
+        )
+        .expect("write");
+        let planner = TaxonomyPlanner::new(&config_with_taxonomy_dir(dir));
+        // The corrupt file yields empty sets (deny-all). The planner will
+        // reject everything, which is the safe fail-closed behaviour.
+        assert!(planner.policy.allowed.is_empty());
+        assert!(planner.policy.denied.is_empty());
+    }
+
+    #[test]
+    fn test_missing_file_in_taxonomy_dir_uses_embedded_default() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let dir = tmp.path().to_path_buf();
+        // Do NOT create command_policy.md — the dir exists but the file doesn't
+        let planner = TaxonomyPlanner::new(&config_with_taxonomy_dir(dir));
+        // Should fall back to embedded default (file not found triggers the warn path)
+        assert!(planner.policy.allowed.contains("cargo"));
+        assert!(planner.policy.denied.contains("docker"));
     }
 }

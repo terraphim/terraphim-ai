@@ -18,6 +18,8 @@
 //! - `GITEA_TOKEN`          fallback for `RUNNER_STATUS_TOKEN` when unset
 //! - `RUNNER_CHECKOUT_DIR`  checkout root; per-repo trees at `<root>/<owner>/<repo>` (default `.`)
 //! - `RUNNER_HTTP_TIMEOUT`  per-request HTTP timeout in seconds (default 30)
+//! - `RUNNER_TAXONOMY_DIR`  directory containing `command_policy.md` for the
+//!   command allowlist; if unset, the embedded default policy is used
 
 use std::path::PathBuf;
 use std::sync::Arc;
