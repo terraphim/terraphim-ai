@@ -277,16 +277,8 @@ impl WorkspaceManager {
     /// Uses component-aware [`Path::starts_with`] rather than string comparison to
     /// prevent prefix-confusion attacks where a root of `/tmp/ws` would incorrectly
     /// accept `/tmp/ws_evil` under string-based matching.
-    fn validate_path(&self, path: &Path, identifier: &str) -> Result<()> {
+    fn validate_path(&self, path: &Path, _identifier: &str) -> Result<()> {
         if !path.starts_with(&self.root) {
-            return Err(WorkspaceError::PathOutsideRoot {
-                path: path.to_string_lossy().into_owned(),
-            });
-        }
-
-        // Reject if workspace key would create subdirectories
-        let key = sanitise_workspace_key(identifier);
-        if key.contains('/') || key.contains('\\') {
             return Err(WorkspaceError::PathOutsideRoot {
                 path: path.to_string_lossy().into_owned(),
             });
@@ -586,6 +578,39 @@ mod tests {
     }
 
     #[test]
+    fn sibling_dir_with_same_prefix_is_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig::default(),
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+
+        // A sibling path that shares the root's string prefix but is NOT a child.
+        // e.g. root = /tmp/abc  →  sibling = /tmp/abc-evil/payload
+        let root_name = tmp
+            .path()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned();
+        let sibling = tmp
+            .path()
+            .parent()
+            .unwrap()
+            .join(format!("{}-evil", root_name))
+            .join("payload");
+
+        let result = mgr.validate_path(&sibling, "whatever");
+        assert!(
+            result.is_err(),
+            "sibling directory with same string prefix must be rejected"
+        );
+    }
+
+    #[test]
     fn sanitise_key_truncates_long_identifier() {
         let long = "a".repeat(500);
         let key = sanitise_workspace_key(&long);
@@ -645,5 +670,19 @@ mod tests {
             content.is_empty(),
             "LD_PRELOAD should have been stripped, got: {content:?}"
         );
+    }
+
+    #[test]
+    fn path_inside_root_is_accepted() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig::default(),
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+
+        let valid = tmp.path().join("MT-42");
+        assert!(mgr.validate_path(&valid, "MT-42").is_ok());
     }
 }
