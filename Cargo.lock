@@ -8602,7 +8602,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_lsp"
-version = "0.1.0"
+version = "1.20.5"
 dependencies = [
  "env_logger",
  "log",
@@ -9294,7 +9294,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_validation"
-version = "0.1.0"
+version = "1.20.5"
 dependencies = [
  "ahash",
  "anyhow",
