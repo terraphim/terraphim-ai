@@ -67,6 +67,7 @@ pub(crate) fn parse_policy_taxonomy(text: &str) -> CommandPolicy {
                 denied.insert(prog.to_string());
             }
         } else if let Some(rest) = line.strip_prefix("route_to::") {
+            let rest = rest.split('#').next().unwrap_or(rest).trim();
             let parts: Vec<&str> = rest.split(',').map(str::trim).collect();
             if parts.len() >= 3 && parts[0] == "rch" {
                 let prog = parts[1];
@@ -75,8 +76,8 @@ pub(crate) fn parse_policy_taxonomy(text: &str) -> CommandPolicy {
             } else {
                 log::warn!("taxonomy: ignoring malformed route_to directive: {line:?}");
             }
-        } else if line.contains("::") {
-            log::warn!("taxonomy: ignoring unrecognised directive: {line:?}");
+        } else {
+            log::warn!("taxonomy: ignoring unrecognised line: {line:?}");
         }
     }
 
@@ -461,7 +462,7 @@ mod tests {
     }
 
     #[test]
-    fn test_corrupt_taxonomy_file_uses_embedded_default() {
+    fn test_corrupt_taxonomy_file_produces_deny_all() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let dir = tmp.path().to_path_buf();
         // Write a file with no valid directives at all
