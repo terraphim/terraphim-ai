@@ -18,10 +18,12 @@
 //! - VM kernel and rootfs images
 
 use async_trait::async_trait;
+use jiff::Timestamp;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
+use ulid::Ulid;
 
 use fcctl_core::firecracker::models::SnapshotType;
 use fcctl_core::snapshot::SnapshotManager;
@@ -656,26 +658,74 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
     async fn list_snapshots(&self, session_id: &SessionId) -> Result<Vec<SnapshotId>, Self::Error> {
         // Get VM ID for this session
         let vm_id = self.session_to_vm.read().get(session_id).cloned();
+        let vm_id = match vm_id {
+            Some(id) => id,
+            None => {
+                log::debug!(
+                    "No VM assigned to session {}, returning empty snapshot list",
+                    session_id
+                );
+                return Ok(Vec::new());
+            }
+        };
 
-        if vm_id.is_none() {
-            log::debug!(
-                "No VM assigned to session {}, returning empty snapshot list",
-                session_id
-            );
-            return Ok(Vec::new());
+        log::debug!("list_snapshots for session {} (vm={})", session_id, vm_id);
+
+        // Acquire the snapshot-manager lock and delegate to fcctl-core, using
+        // the same Mutex<Option<SnapshotManager>> pattern as `delete_session_snapshots`
+        // below (L721-728). The TODO previously claimed `list_snapshots` needed
+        // `&mut self` access that was unavailable, but `cleanup_session`/
+        // `delete_session_snapshots` already acquire this lock — so the pattern
+        // is available here too.
+        let mut snapshots = Vec::new();
+        {
+            let mut snapshot_manager_guard = self.snapshot_manager.lock().await;
+            if let Some(snapshot_manager) = &mut *snapshot_manager_guard {
+                snapshots = snapshot_manager
+                    .list_snapshots(Some(&vm_id))
+                    .await
+                    .unwrap_or_default();
+            } else {
+                log::debug!(
+                    "SnapshotManager not initialised for session {}, returning empty list",
+                    session_id
+                );
+            }
         }
 
-        // List snapshots using fcctl-core SnapshotManager
-        // Note: SnapshotManager.list_snapshots requires &mut self
-        // For now, return empty list and log
-        log::debug!(
-            "list_snapshots for session {} (vm={})",
-            session_id,
-            vm_id.unwrap()
-        );
+        // Map each fcctl-core `Snapshot` to the RLM `SnapshotId`.
+        //
+        // The fcctl `Snapshot.id` is the ULID key used for every downstream
+        // operation (`restore_snapshot`/`delete_snapshot` call fcctl with
+        // `id.id.to_string()`), so it round-trips faithfully as `.id`. We also
+        // surface it as `.name` because the fcctl-core `Snapshot` (as used in
+        // `delete_session_snapshots`) exposes `.id` as its only identifier here;
+        // `create_snapshot` records the human name only in the count tracker, not
+        // in a field fcctl returns. ASSUMPTION: callers that look up snapshots by
+        // `.name` (rlm.rs:650/782) will match on the ULID id string for snapshots
+        // obtained via this path.
+        let result: Vec<SnapshotId> = snapshots
+            .into_iter()
+            .filter_map(|snap| match Ulid::from_string(&snap.id) {
+                Ok(ulid) => Some(SnapshotId {
+                    id: ulid,
+                    name: snap.id.clone(),
+                    session_id: *session_id,
+                    created_at: Timestamp::now(),
+                }),
+                Err(e) => {
+                    log::warn!(
+                        "Skipping snapshot with non-ULID id '{}' for session {}: {}",
+                        snap.id,
+                        session_id,
+                        e
+                    );
+                    None
+                }
+            })
+            .collect();
 
-        // TODO: Call snapshot_manager.list_snapshots() when we have mutable access
-        Ok(Vec::new())
+        Ok(result)
     }
 
     async fn delete_snapshot(&self, id: &SnapshotId) -> Result<(), Self::Error> {
@@ -979,6 +1029,47 @@ mod tests {
         assert!(
             executor.snapshot_counts.read().is_empty(),
             "snapshot_counts must be empty after cleanup"
+        );
+    }
+
+    /// Regression test for #2431: `list_snapshots` must exercise the
+    /// session_to_vm / snapshot_manager lock paths instead of unconditionally
+    /// returning `Vec::new()`. Verifies the two graceful empty-list paths:
+    /// (a) no VM assigned to the session, and (b) VM assigned but the
+    /// SnapshotManager guard is `None`. Both must return `Ok(Vec::new())`
+    /// without panicking. KVM-gated to match the existing firecracker test
+    /// convention (FirecrackerExecutor::new requires KVM).
+    #[tokio::test]
+    async fn test_list_snapshots_returns_empty_without_vm_or_manager() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+
+        let config = RlmConfig::default();
+        let executor = FirecrackerExecutor::new(config).unwrap();
+
+        // (a) No VM assigned -> early return, empty list, no lock taken.
+        let session_no_vm = SessionId::new();
+        let result = executor.list_snapshots(&session_no_vm).await;
+        assert!(result.is_ok(), "list_snapshots must be Ok");
+        assert!(
+            result.unwrap().is_empty(),
+            "no VM assigned -> empty snapshot list"
+        );
+
+        // (b) VM assigned but SnapshotManager guard is None -> graceful
+        //     empty list via the lock path (the exact TODO that #2431 fixes).
+        let session_with_vm = SessionId::new();
+        executor.assign_vm_to_session(session_with_vm, "vm-list-test".to_string());
+        let result = executor.list_snapshots(&session_with_vm).await;
+        assert!(
+            result.is_ok(),
+            "list_snapshots must be Ok even with None manager"
+        );
+        assert!(
+            result.unwrap().is_empty(),
+            "uninitialised SnapshotManager -> empty snapshot list, not an error"
         );
     }
 }
