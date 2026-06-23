@@ -30,6 +30,21 @@ Can you summarize your context files ".docs/summary-*.md" and save the result in
 
 Both steps are MANDATORY for every `/init` command execution.
 
+## Bigbox Deployment Rules
+
+1. **Git pull/push only** — never use `scp`, `cp`, or manual file copying to sync code between machines. Always commit locally, push to origin, then `git pull` on bigbox.
+2. **Weather report dependency** — `terraphim_weather_report` depends on `terraphim_orchestrator` from the registry. On bigbox, override to local agents repo:
+   ```bash
+   sed -i 's|terraphim_orchestrator = { version = "1.20.2", registry = "terraphim" }|terraphim_orchestrator = { path = "/home/alex/projects/terraphim/terraphim-agents/crates/terraphim_orchestrator" }|' crates/terraphim_weather_report/Cargo.toml
+   ```
+   This is a targeted override on one crate's Cargo.toml. Do NOT use `[patch]` in workspace Cargo.toml — it triggers workspace-wide re-resolution and breaks unrelated crates (serenity/reqwest conflict). Do NOT commit this override (machine-specific path).
+3. **Orchestrator binary** — built from `/home/alex/projects/terraphim/terraphim-agents`, NOT from `/data/projects/terraphim/terraphim-ai`. Deploy with:
+   ```bash
+   cd /home/alex/projects/terraphim/terraphim-agents && cargo build --release -p terraphim_orchestrator
+   sudo systemctl stop adf-orchestrator.service && sudo cp target/release/adf /usr/local/bin/adf && sudo systemctl start adf-orchestrator.service
+   ```
+4. **Terraphim-ai target dir** — safe to `cargo clean` on bigbox. The binary is built from the agents repo, not terraphim-ai. Reclaims ~1TB.
+
 ## Build/Lint/Test Commands
 
 ### Rust Backend
