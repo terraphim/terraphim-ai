@@ -578,7 +578,7 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
         // Update tracking
         *self.snapshot_counts.write().entry(*session_id).or_insert(0) += 1;
 
-        let result = SnapshotId::new(name, *session_id);
+        let result = SnapshotId::from_fcctl(&snapshot_id, name, *session_id);
 
         log::info!(
             "Snapshot '{}' ({}) created for session {}",
@@ -622,7 +622,7 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
                     })?;
 
                     snapshot_manager
-                        .restore_snapshot(vm_client, &id.id.to_string())
+                        .restore_snapshot(vm_client, &id.backend_id())
                         .await
                         .map_err(|e| RlmError::SnapshotRestoreFailed {
                             message: format!("Snapshot restore failed: {}", e),
@@ -642,7 +642,7 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
         }
 
         // Update current snapshot tracking
-        self.set_current_snapshot(&id.session_id, id.id.to_string());
+        self.set_current_snapshot(&id.session_id, id.backend_id());
 
         log::info!(
             "Snapshot '{}' restored for session {}",
@@ -676,10 +676,14 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
 
         let mut snapshot_manager_guard = self.snapshot_manager.lock().await;
         if let Some(snapshot_manager) = &mut *snapshot_manager_guard {
+            // Surface fcctl errors instead of silently swallowing them.
             let snapshots = snapshot_manager
                 .list_snapshots(Some(&vm_id))
                 .await
-                .unwrap_or_default();
+                .unwrap_or_else(|e| {
+                    log::warn!("list_snapshots failed for vm {}: {}", vm_id, e);
+                    Vec::new()
+                });
 
             log::debug!(
                 "list_snapshots for session {} (vm={}) returned {} snapshot(s)",
@@ -688,9 +692,14 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
                 snapshots.len()
             );
 
+            // Record fcctl's native id (`snap-<uuid>`) on each SnapshotId so that
+            // callers can round-trip it back to the backend via `delete_snapshot` /
+            // `restore_snapshot` (see SnapshotId::backend_id). Mapping via
+            // SnapshotId::new here would discard fcctl's id and mint an opaque
+            // ULID that the backend cannot resolve — see review of PR #2765.
             Ok(snapshots
                 .into_iter()
-                .map(|s| SnapshotId::new(s.name, *session_id))
+                .map(|s| SnapshotId::from_fcctl(s.id, s.name, *session_id))
                 .collect())
         } else {
             log::debug!(
@@ -714,7 +723,7 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
             let mut snapshot_manager_guard = self.snapshot_manager.lock().await;
             if let Some(snapshot_manager) = &mut *snapshot_manager_guard {
                 snapshot_manager
-                    .delete_snapshot(&id.id.to_string(), true)
+                    .delete_snapshot(&id.backend_id(), true)
                     .await
                     .map_err(|e| RlmError::SnapshotNotFound {
                         snapshot_id: format!("Delete failed: {}", e),

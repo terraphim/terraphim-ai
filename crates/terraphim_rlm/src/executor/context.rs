@@ -20,6 +20,16 @@ pub struct SnapshotId {
     pub session_id: SessionId,
     /// When the snapshot was created.
     pub created_at: Timestamp,
+    /// Backend-native snapshot identifier (e.g. fcctl-core's `snap-<uuid>`).
+    ///
+    /// Populated when a snapshot is *queried* from the backend (`list_snapshots`)
+    /// so that the same value can be round-tripped back to the backend for
+    /// `delete_snapshot` / `restore_snapshot`. Snapshot IDs constructed locally
+    /// (e.g. a freshly-created snapshot whose backend id we have not yet surfaced,
+    /// or the in-memory/mock executors) leave this `None`, in which case callers
+    /// fall back to the internal `id`.
+    #[serde(default)]
+    pub fcctl_id: Option<String>,
 }
 
 impl SnapshotId {
@@ -30,7 +40,37 @@ impl SnapshotId {
             name: name.into(),
             session_id,
             created_at: Timestamp::now(),
+            fcctl_id: None,
         }
+    }
+
+    /// Create a snapshot ID that records a backend-native identifier.
+    ///
+    /// Use this when materialising a `SnapshotId` from a backend query (e.g.
+    /// fcctl-core `list_snapshots`) so that `delete_snapshot` /
+    /// `restore_snapshot` can pass the backend its own identifier instead of
+    /// the opaque internal ULID.
+    pub fn from_fcctl(
+        fcctl_id: impl Into<String>,
+        name: impl Into<String>,
+        session_id: SessionId,
+    ) -> Self {
+        Self {
+            id: Ulid::new(),
+            name: name.into(),
+            session_id,
+            created_at: Timestamp::now(),
+            fcctl_id: Some(fcctl_id.into()),
+        }
+    }
+
+    /// Resolve the identifier to pass back to a backend (fcctl-core).
+    ///
+    /// Prefers the backend-native `fcctl_id` when present and falls back to the
+    /// internal ULID string, preserving the prior behaviour for locally-minted
+    /// snapshot IDs.
+    pub fn backend_id(&self) -> String {
+        self.fcctl_id.clone().unwrap_or_else(|| self.id.to_string())
     }
 }
 
@@ -397,6 +437,48 @@ mod tests {
         let snapshot = SnapshotId::new("test-snapshot", session_id);
         assert_eq!(snapshot.name, "test-snapshot");
         assert_eq!(snapshot.session_id, session_id);
+    }
+
+    /// Regression for the #2431 identity bug: a `SnapshotId` materialised from a
+    /// backend query (fcctl-core `list_snapshots`) MUST carry the backend's native
+    /// identifier so it can be round-tripped back to `delete_snapshot` /
+    /// `restore_snapshot`. The prior implementation used `SnapshotId::new`, which
+    /// mints an opaque ULID the backend cannot resolve (review of PR #2765).
+    #[test]
+    fn test_snapshot_id_from_fcctl_round_trips_backend_id() {
+        let session_id = SessionId::new();
+        let snapshot = SnapshotId::from_fcctl("snap-abcd1234", "pre-checkpoint", session_id);
+
+        // The user-facing name is preserved for the MCP/UI layer.
+        assert_eq!(snapshot.name, "pre-checkpoint");
+        assert_eq!(snapshot.session_id, session_id);
+        // The backend-native id is carried verbatim, ready for delete/restore.
+        assert_eq!(snapshot.fcctl_id.as_deref(), Some("snap-abcd1234"));
+        assert_eq!(snapshot.backend_id(), "snap-abcd1234");
+    }
+
+    /// The fallback path: a locally-minted `SnapshotId::new` has no backend id,
+    /// so `backend_id` falls back to the internal ULID. This preserves prior
+    /// behaviour for the in-memory/mock executors and the historical create path.
+    #[test]
+    fn test_snapshot_id_new_falls_back_to_ulid() {
+        let session_id = SessionId::new();
+        let snapshot = SnapshotId::new("local-snap", session_id);
+
+        assert!(snapshot.fcctl_id.is_none());
+        assert_eq!(snapshot.backend_id(), snapshot.id.to_string());
+    }
+
+    /// Listed snapshots must be distinguishable even when they share a name,
+    /// because each carries a distinct backend id.
+    #[test]
+    fn test_snapshot_id_from_fcctl_distinguishes_by_backend_id() {
+        let session_id = SessionId::new();
+        let a = SnapshotId::from_fcctl("snap-1", "checkpoint", session_id);
+        let b = SnapshotId::from_fcctl("snap-2", "checkpoint", session_id);
+
+        assert_eq!(a.name, b.name);
+        assert_ne!(a.backend_id(), b.backend_id());
     }
 
     #[test]
