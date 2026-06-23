@@ -1293,4 +1293,87 @@ mod tests {
             result
         );
     }
+
+    /// Permissive mode must log a warning but allow execution even when every
+    /// word in the command is absent from the knowledge graph (AC4).
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_execute_command_permissive_allows_unknown_terms() {
+        use crate::config::KgStrictness;
+        use terraphim_types::Thesaurus;
+
+        let mut config = RlmConfig::minimal();
+        config.kg_strictness = KgStrictness::Permissive;
+        let mut rlm = TerraphimRlm::with_executor(config, MockExecutor::new()).unwrap();
+
+        // Empty thesaurus -- all terms unknown, but Permissive must still allow.
+        let thesaurus = Thesaurus::new("test".to_string());
+        let validator =
+            KnowledgeGraphValidator::new(ValidatorConfig::permissive()).with_thesaurus(thesaurus);
+        rlm.set_validator_for_test(validator);
+
+        let session = rlm.create_session().await.unwrap();
+        let result = rlm.execute_command(&session.id, "xyzzy plugh").await;
+
+        assert!(
+            result.is_ok(),
+            "Permissive mode must not block execution; got {:?}",
+            result
+        );
+    }
+
+    /// Permissive mode must allow code execution even when all terms are
+    /// unknown (AC4).
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_execute_code_permissive_allows_unknown_terms() {
+        use crate::config::KgStrictness;
+        use terraphim_types::Thesaurus;
+
+        let mut config = RlmConfig::minimal();
+        config.kg_strictness = KgStrictness::Permissive;
+        let mut rlm = TerraphimRlm::with_executor(config, MockExecutor::new()).unwrap();
+
+        let thesaurus = Thesaurus::new("test".to_string());
+        let validator =
+            KnowledgeGraphValidator::new(ValidatorConfig::permissive()).with_thesaurus(thesaurus);
+        rlm.set_validator_for_test(validator);
+
+        let session = rlm.create_session().await.unwrap();
+        let result = rlm.execute_code(&session.id, "xyzzy_func()").await;
+
+        assert!(
+            result.is_ok(),
+            "Permissive mode must not block code execution; got {:?}",
+            result
+        );
+    }
+
+    /// Normal mode blocks execution when every word is absent from the KG and a
+    /// thesaurus is configured (AC5).
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_execute_command_normal_blocks_unknown_terms() {
+        use crate::config::KgStrictness;
+        use terraphim_types::Thesaurus;
+
+        let mut config = RlmConfig::minimal();
+        config.kg_strictness = KgStrictness::Normal;
+        let mut rlm = TerraphimRlm::with_executor(config, MockExecutor::new()).unwrap();
+
+        // Empty thesaurus -- no known terms at all, so Normal must fail.
+        let thesaurus = Thesaurus::new("test".to_string());
+        let validator =
+            KnowledgeGraphValidator::new(ValidatorConfig::default()).with_thesaurus(thesaurus);
+        rlm.set_validator_for_test(validator);
+
+        let session = rlm.create_session().await.unwrap();
+        let result = rlm.execute_command(&session.id, "xyzzy plugh").await;
+
+        assert!(
+            matches!(result, Err(RlmError::KgValidationFailed { .. })),
+            "Normal mode must block when no terms match; got {:?}",
+            result
+        );
+    }
 }
