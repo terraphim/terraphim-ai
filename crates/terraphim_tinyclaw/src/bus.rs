@@ -233,4 +233,88 @@ mod tests {
         assert_eq!(msg.channel, "telegram");
         assert_eq!(msg.reply_to, Some("msg123".to_string()));
     }
+
+    /// AC: a message is routed to the correct channel. The bus exposes two
+    /// independent channels (inbound/outbound); the outbound path — where the
+    /// `OutboundMessage.channel` field is the routing key a dispatcher reads to
+    /// pick the platform adapter — had zero coverage. This test verifies an
+    /// outbound message survives the bus round-trip with its routing key intact.
+    #[tokio::test]
+    async fn test_outbound_message_routed_with_channel_key_intact() {
+        let bus = MessageBus::new();
+        let sender = bus.outbound_sender();
+
+        let msg = OutboundMessage::new("discord", "chat789", "hello from the agent");
+        sender.send(msg.clone()).await.unwrap();
+
+        let received = bus.outbound_rx.lock().await.recv().await.unwrap();
+        assert_eq!(received.channel, "discord", "routing key must be preserved");
+        assert_eq!(received.chat_id, "chat789");
+        assert_eq!(received.content, "hello from the agent");
+        assert!(received.reply_to.is_none());
+    }
+
+    /// AC: multiple outbound messages to different channels preserve their
+    /// distinct routing keys in FIFO order (no cross-channel bleed).
+    #[tokio::test]
+    async fn test_outbound_messages_keep_distinct_channels_in_order() {
+        let bus = MessageBus::new();
+        let sender = bus.outbound_sender();
+
+        sender
+            .send(OutboundMessage::new("telegram", "t1", "first"))
+            .await
+            .unwrap();
+        sender
+            .send(OutboundMessage::new("slack", "s1", "second"))
+            .await
+            .unwrap();
+        sender
+            .send(OutboundMessage::new("discord", "d1", "third"))
+            .await
+            .unwrap();
+
+        let mut rx = bus.outbound_rx.lock().await;
+        let first = rx.recv().await.unwrap();
+        let second = rx.recv().await.unwrap();
+        let third = rx.recv().await.unwrap();
+
+        assert_eq!(first.channel, "telegram");
+        assert_eq!(first.content, "first");
+        assert_eq!(second.channel, "slack");
+        assert_eq!(second.content, "second");
+        assert_eq!(third.channel, "discord");
+        assert_eq!(third.content, "third");
+    }
+
+    /// AC: inbound and outbound channels are independent — an inbound message
+    /// never appears on the outbound receiver (and vice versa).
+    #[tokio::test]
+    async fn test_inbound_and_outbound_channels_are_independent() {
+        let bus = MessageBus::new();
+
+        bus.inbound_sender()
+            .send(InboundMessage::new("telegram", "u", "c", "in"))
+            .await
+            .unwrap();
+        bus.outbound_sender()
+            .send(OutboundMessage::new("telegram", "c", "out"))
+            .await
+            .unwrap();
+
+        // Outbound receiver must yield the outbound message, not the inbound one.
+        let out = bus.outbound_rx.lock().await.recv().await.unwrap();
+        assert_eq!(out.content, "out");
+        // Inbound receiver must yield the inbound message, not the outbound one.
+        let inc = bus.inbound_rx.lock().await.recv().await.unwrap();
+        assert_eq!(inc.content, "in");
+
+        // Both receivers must now be drained.
+        let out_drained = tokio::time::timeout(
+            std::time::Duration::from_millis(50),
+            bus.outbound_rx.lock().await.recv(),
+        )
+        .await;
+        assert!(out_drained.is_err(), "outbound channel must be drained");
+    }
 }
