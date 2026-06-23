@@ -18,10 +18,7 @@ synonyms:: pattern detection, anomaly review, fleet health
 
 trigger:: analytical decisions over execution data with session continuity
 
-route:: openai-codex, gpt-5.5
-action:: /home/alex/.local/bin/pi-rust --provider openai-codex --model {{ model }} -p "{{ prompt }}"
-
-route:: openai, opencode/gpt-5.5
+route:: openai, openai/gpt-5.5
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
 # Kimi K2.6 via pi-rust (faster, more reliable than opencode).
