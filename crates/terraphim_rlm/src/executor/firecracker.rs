@@ -665,17 +665,40 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
             return Ok(Vec::new());
         }
 
-        // List snapshots using fcctl-core SnapshotManager
-        // Note: SnapshotManager.list_snapshots requires &mut self
-        // For now, return empty list and log
-        log::debug!(
-            "list_snapshots for session {} (vm={})",
-            session_id,
-            vm_id.unwrap()
-        );
+        // List snapshots using fcctl-core SnapshotManager.
+        //
+        // `SnapshotManager::list_snapshots` requires `&mut self`. We obtain that
+        // mutable access through the same `self.snapshot_manager` (`Arc<Mutex<...>>`)
+        // lock pattern already used by `delete_session_snapshots` below (L745-749).
+        //
+        // vm_id is guaranteed Some here: the None branch returned early above.
+        let vm_id = vm_id.unwrap();
 
-        // TODO: Call snapshot_manager.list_snapshots() when we have mutable access
-        Ok(Vec::new())
+        let mut snapshot_manager_guard = self.snapshot_manager.lock().await;
+        if let Some(snapshot_manager) = &mut *snapshot_manager_guard {
+            let snapshots = snapshot_manager
+                .list_snapshots(Some(&vm_id))
+                .await
+                .unwrap_or_default();
+
+            log::debug!(
+                "list_snapshots for session {} (vm={}) returned {} snapshot(s)",
+                session_id,
+                vm_id,
+                snapshots.len()
+            );
+
+            Ok(snapshots
+                .into_iter()
+                .map(|s| SnapshotId::new(s.name, *session_id))
+                .collect())
+        } else {
+            log::debug!(
+                "SnapshotManager not initialised for session {}; returning empty snapshot list",
+                session_id
+            );
+            Ok(Vec::new())
+        }
     }
 
     async fn delete_snapshot(&self, id: &SnapshotId) -> Result<(), Self::Error> {
@@ -979,6 +1002,65 @@ mod tests {
         assert!(
             executor.snapshot_counts.read().is_empty(),
             "snapshot_counts must be empty after cleanup"
+        );
+    }
+
+    /// Regression test for #2431: `list_snapshots` must NOT unconditionally return
+    /// an empty list. It must acquire the `snapshot_manager` lock and query
+    /// fcctl-core. This test covers the two early-return contract branches that
+    /// do not require a live fcctl-core connection:
+    ///
+    /// 1. No VM assigned to the session -> empty list (no SnapshotManager call).
+    /// 2. VM assigned but SnapshotManager not initialised -> empty list (the
+    ///    `else` branch added by the #2431 fix; previously this path hit the
+    ///    unconditional `Ok(Vec::new())` TODO for *every* case).
+    ///
+    /// The live fcctl-core query path (manager `Some`) requires KVM + the
+    /// private firecracker-rust crate and is exercised in integration environments.
+    #[tokio::test]
+    async fn test_list_snapshots_returns_empty_without_vm() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+
+        let config = RlmConfig::default();
+        let executor = FirecrackerExecutor::new(config).unwrap();
+        let session_id = SessionId::new();
+
+        // AC: "Returns empty list only when no VM is assigned or snapshot
+        // manager is uninitialised" — no VM assigned.
+        let result = executor.list_snapshots(&session_id).await;
+        assert!(result.is_ok(), "list_snapshots must not error without a VM");
+        assert!(
+            result.unwrap().is_empty(),
+            "list_snapshots must return an empty list when no VM is assigned"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_list_snapshots_returns_empty_when_manager_uninitialised() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+
+        let config = RlmConfig::default();
+        let executor = FirecrackerExecutor::new(config).unwrap();
+        let session_id = SessionId::new();
+
+        // Assign a VM so the function proceeds past the first early return,
+        // reaching the new `else` branch (SnapshotManager not initialised).
+        executor.assign_vm_to_session(session_id, "vm-list-test".to_string());
+
+        let result = executor.list_snapshots(&session_id).await;
+        assert!(
+            result.is_ok(),
+            "list_snapshots must not error when the manager is uninitialised"
+        );
+        assert!(
+            result.unwrap().is_empty(),
+            "list_snapshots must return an empty list when the manager is uninitialised"
         );
     }
 }
