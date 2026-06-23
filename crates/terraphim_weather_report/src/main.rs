@@ -68,6 +68,7 @@ enum OutputFormat {
     #[default]
     Human,
     Json,
+    Markdown,
 }
 
 #[derive(Subcommand, Debug)]
@@ -131,6 +132,7 @@ fn main() -> Result<()> {
     match format {
         OutputFormat::Json => print_json(&report)?,
         OutputFormat::Human => print_human(&report, command),
+        OutputFormat::Markdown => print_markdown(&report, command),
     }
 
     Ok(())
@@ -292,6 +294,121 @@ fn print_summary(report: &WeatherReport, command: ReportCommand) {
         ReportCommand::Report | ReportCommand::Tiers => "",
     };
     println!("Summary{scope}: {joined}");
+}
+
+fn print_markdown(report: &WeatherReport, command: ReportCommand) {
+    let ts = &report.generated_at;
+    println!("## Model Weather Report — {ts}");
+    println!();
+    println!(
+        "**{} tier(s) | {} model(s) | {}**",
+        report.tiers.len(),
+        report.total_models,
+        if report.probed {
+            format!("live probe ({}s timeout per model)", PROBE_TIMEOUT_SECS)
+        } else {
+            "configured roster (no live probe)".to_string()
+        }
+    );
+    println!();
+
+    for tier in &report.tiers {
+        print_tier_markdown(tier);
+    }
+
+    print_summary_markdown(report, command);
+}
+
+fn print_tier_markdown(tier: &terraphim_weather_report::TierSection) {
+    println!("### {} : {}", tier.kind.label(), tier.heading);
+    println!();
+    println!("> {}", tier.kind.blurb());
+    if let Some(p) = tier.priority {
+        println!("> priority: {p}");
+    }
+    println!();
+
+    if tier.models.is_empty() {
+        println!("_(no models configured)_");
+        println!();
+        return;
+    }
+
+    println!("| Status | Provider | Model | CLI | Latency | Cost |");
+    println!("|--------|----------|-------|-----|---------|------|");
+    for m in &tier.models {
+        let cond = condition_emoji(&m.condition);
+        let latency = match m.latency_ms {
+            Some(ms) => format!("{ms}ms"),
+            None => match m.condition {
+                terraphim_weather_report::WeatherCondition::Stormy => "timeout".to_string(),
+                _ => "-".to_string(),
+            },
+        };
+        let cost = if m.is_free { "FREE" } else { "paid" };
+        println!(
+            "| {} | {} | `{}` | {} | {} | {} |",
+            cond, m.provider, m.model, m.cli, latency, cost
+        );
+        if let Some(detail) = &m.detail {
+            if !detail.is_empty() && !detail.starts_with("probe skipped") {
+                println!("| | | | | | *{}* |", detail.replace('|', "\\|"));
+            }
+        }
+    }
+    println!();
+}
+
+fn condition_emoji(c: &terraphim_weather_report::WeatherCondition) -> &'static str {
+    use terraphim_weather_report::WeatherCondition;
+    match c {
+        WeatherCondition::Sunny => "SUNNY",
+        WeatherCondition::Fair => "FAIR",
+        WeatherCondition::Cloudy => "CLOUDY",
+        WeatherCondition::Stormy => "STORMY",
+        WeatherCondition::Offline => "OFFLINE",
+        WeatherCondition::Unknown => "UNKNOWN",
+        WeatherCondition::Configured => "—",
+    }
+}
+
+fn print_summary_markdown(report: &WeatherReport, command: ReportCommand) {
+    let s = &report.summary;
+    let mut parts: Vec<String> = Vec::new();
+    if s.available() > 0 {
+        parts.push(format!(
+            "**{} available** ({} sunny, {} fair, {} cloudy)",
+            s.available(),
+            s.sunny,
+            s.fair,
+            s.cloudy
+        ));
+    }
+    if s.stormy > 0 {
+        parts.push(format!("{} stormy", s.stormy));
+    }
+    if s.offline > 0 {
+        parts.push(format!("{} offline", s.offline));
+    }
+    if s.unknown > 0 {
+        parts.push(format!("{} unknown", s.unknown));
+    }
+    if s.configured > 0 {
+        parts.push(format!("{} configured", s.configured));
+    }
+    let joined = if parts.is_empty() {
+        "no models".to_string()
+    } else {
+        parts.join(" | ")
+    };
+
+    let scope = match command {
+        ReportCommand::Thinking => " [thinking tiers]",
+        ReportCommand::Fast => " [fast & cheap tiers]",
+        ReportCommand::Workhorse => " [workhorse tiers]",
+        ReportCommand::Report | ReportCommand::Tiers => "",
+    };
+    println!("**Summary{scope}:** {joined}");
 }
 
 fn now_timestamp() -> String {
