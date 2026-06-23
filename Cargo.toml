@@ -27,7 +27,6 @@ exclude = [
     "crates/terraphim_orchestrator",
     "crates/terraphim_service",
     "crates/terraphim_settings",
-    "crates/terraphim_spawner",
     # Experimental crates
     "crates/terraphim_agent_application",
     "crates/terraphim_truthforge",

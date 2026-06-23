@@ -594,7 +594,7 @@ impl AgentSpawner {
         // error, model not found). These cause the CLI to exit within seconds.
         let early_exit = tokio::select! {
             _ = tokio::time::sleep(EARLY_EXIT_GRACE) => None,
-            status = poll_exit(&mut handle) => status,
+            status = poll_exit(&mut handle) => Some(status),
         };
 
         match early_exit {
