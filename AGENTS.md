@@ -45,6 +45,44 @@ Both steps are MANDATORY for every `/init` command execution.
    ```
 4. **Terraphim-ai target dir** — safe to `cargo clean` on bigbox. The binary is built from the agents repo, not terraphim-ai. Reclaims ~1TB.
 
+## Search Tooling Policy
+
+Agents MUST use the standard, always-present CLI tools for code/content search in this repo. Do NOT rely on editor-bundled FFF `grep`/`find`/`glob` tools (e.g. opencode's bundled tools have a directory-`path`-filter bug — see `anomalyco/opencode#32688` — and are not under Terraphim's control).
+
+### Tools that are always present on agent hosts
+
+| Task | Use | Notes |
+|------|-----|-------|
+| Content search (regex) | `rg` | ripgrep. Fast, respects `.gitignore`. Preferred for code search. |
+| Content search (git-tracked only) | `git grep` | Searches only tracked files at a given commit/HEAD. |
+| File-name lookup | `git ls-files`, `fdfind`, `find` | `fd` is NOT installed; use `fdfind` (Debian package name) or `find`. |
+| Plain text search | `grep` | Fallback; use `rg` first. |
+
+### `terraphim-grep` (optional, NOT installed by default)
+
+`terraphim-grep` (the `fff_search` crate CLI) was Terraphim's own search stack but has been **extracted to a polyrepo** (see #2914) and is **not installed** on agent hosts (`command -v terraphim-grep` → not found). If you specifically need it, install it first:
+
+```bash
+cargo install terraphim-grep   # only if the task requires its KG-aware features
+```
+
+Do not write commands or docs that assume `terraphim-grep` is already on `$PATH`.
+
+### Examples (in-repo paths only — `crates/terraphim_service/` was extracted and no longer exists)
+
+```bash
+# Find a symbol definition (content search)
+rg "fn ensure_thesaurus_loaded" --type rust
+rg "DeviceStorage::init" --type rust -C 3
+
+# List tracked source files (file-name lookup)
+git ls-files 'crates/**/*.rs'
+fdfind -e rs . crates/
+
+# Search only git-tracked Rust files for a pattern
+git grep -n "KgValidationFailed" -- 'crates/terraphim_rlm/*.rs'
+```
+
 ## Build/Lint/Test Commands
 
 ### Rust Backend
