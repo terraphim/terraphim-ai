@@ -34,11 +34,8 @@ action:: /home/alex/.local/bin/pi-rust --provider kimi-for-coding --model {{ mod
 route:: openai, openai/gpt-5.4
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
-route:: openai, opencode/gpt-5.5
+route:: openai, openai/gpt-5.5
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
-
-route:: openai-codex, gpt-5.5
-action:: /home/alex/.local/bin/pi-rust --provider openai-codex --model {{ model }} -p "{{ prompt }}"
 
 # Z.AI Coding Plan: GLM-5.2 for deep reasoning (free via subscription).
 route:: zai-coding-plan, glm-5.2
