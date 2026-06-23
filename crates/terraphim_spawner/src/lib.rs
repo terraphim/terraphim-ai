@@ -99,6 +99,25 @@ pub enum SpawnerError {
     ConfigValidation(#[from] ValidationError),
 }
 
+/// Grace period (in seconds) for early-exit detection in
+/// [`AgentSpawner::spawn_with_fallback`]. If the primary agent exits within
+/// this window with a non-zero code, the fallback provider is attempted.
+/// Rate-limit and auth failures cause immediate exit, so 5 seconds is
+/// generous while keeping the happy-path delay minimal.
+const EARLY_EXIT_GRACE_SECS: u64 = 5;
+const EARLY_EXIT_GRACE: Duration = Duration::from_secs(EARLY_EXIT_GRACE_SECS);
+
+/// Poll an agent handle for process exit at 100ms intervals.
+/// Used by `spawn_with_fallback` for early-exit detection.
+async fn poll_exit(handle: &mut AgentHandle) -> Result<std::process::ExitStatus, SpawnerError> {
+    loop {
+        if let Some(status) = handle.try_wait()? {
+            return Ok(status);
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
 /// Request to spawn an agent with primary and fallback configuration.
 ///
 /// If the primary provider fails to spawn, the spawner will automatically
@@ -544,13 +563,19 @@ impl AgentSpawner {
     ///
     /// Attempts to spawn with the primary provider first. If that fails,
     /// falls back to the fallback provider (if configured).
+    ///
+    /// After a successful spawn, waits up to `EARLY_EXIT_GRACE_SECS` for the
+    /// process to exit. If it exits with a non-zero code within that window
+    /// (indicating an immediate failure like rate-limit or auth error), the
+    /// fallback is attempted. This catches CLI tools that start successfully
+    /// but fail immediately due to provider-level issues.
     pub async fn spawn_with_fallback(
         &self,
         request: &SpawnRequest,
         ctx: SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         // Try primary first with resource limits
-        let primary_result = self
+        let mut handle = self
             .spawn_with_options(
                 &request.primary_provider,
                 &request.task,
@@ -558,56 +583,72 @@ impl AgentSpawner {
                 request,
                 &ctx,
             )
-            .await;
+            .await?;
 
-        // If primary succeeds, return the handle
-        match primary_result {
-            Ok(handle) => Ok(handle),
-            Err(primary_err) => {
-                tracing::warn!(
-                    primary_provider = %request.primary_provider.id,
-                    error = %primary_err,
-                    "Primary spawn failed, attempting fallback"
+        // If no fallback configured, return immediately.
+        let Some(ref fallback) = request.fallback_provider else {
+            return Ok(handle);
+        };
+
+        // Early exit detection: poll for immediate failure (rate limit, auth
+        // error, model not found). These cause the CLI to exit within seconds.
+        let early_exit = tokio::select! {
+            _ = tokio::time::sleep(EARLY_EXIT_GRACE) => None,
+            status = poll_exit(&mut handle) => status,
+        };
+
+        match early_exit {
+            None => {
+                // Still running after grace period — healthy spawn.
+                tracing::debug!(
+                    provider = %request.primary_provider.id,
+                    "Primary still running after grace period"
                 );
+                Ok(handle)
+            }
+            Some(Ok(status)) if status.success() => {
+                tracing::debug!(
+                    provider = %request.primary_provider.id,
+                    "Primary exited cleanly during grace period"
+                );
+                Ok(handle)
+            }
+            Some(status_result) => {
+                let code = status_result.as_ref().ok().and_then(|s| s.code());
+                tracing::warn!(
+                    provider = %request.primary_provider.id,
+                    exit_code = ?code,
+                    "Primary exited during {}s grace period, attempting fallback",
+                    EARLY_EXIT_GRACE_SECS,
+                );
+                drop(handle);
 
-                // Try fallback if configured
-                if let Some(ref fallback) = request.fallback_provider {
-                    tracing::info!(
-                        fallback_provider = %fallback.id,
-                        "Attempting fallback spawn"
-                    );
-
-                    let fallback_result = self
-                        .spawn_with_options(
-                            fallback,
-                            &request.task,
-                            request.fallback_model.as_deref(),
-                            request,
-                            &ctx,
-                        )
-                        .await;
-
-                    match fallback_result {
-                        Ok(handle) => {
-                            tracing::info!(
-                                fallback_provider = %fallback.id,
-                                "Fallback spawn succeeded"
-                            );
-                            Ok(handle)
-                        }
-                        Err(fallback_err) => {
-                            tracing::error!(
-                                fallback_provider = %fallback.id,
-                                error = %fallback_err,
-                                "Fallback spawn also failed"
-                            );
-                            // Return the primary error since that's the original failure
-                            Err(primary_err)
-                        }
+                // Try fallback
+                match self
+                    .spawn_with_options(
+                        fallback,
+                        &request.task,
+                        request.fallback_model.as_deref(),
+                        request,
+                        &ctx,
+                    )
+                    .await
+                {
+                    Ok(fb_handle) => {
+                        tracing::info!(
+                            fallback_provider = %fallback.id,
+                            "Fallback spawn succeeded"
+                        );
+                        Ok(fb_handle)
                     }
-                } else {
-                    // No fallback configured, return primary error
-                    Err(primary_err)
+                    Err(fb_err) => {
+                        tracing::error!(
+                            fallback_provider = %fallback.id,
+                            error = %fb_err,
+                            "Fallback spawn also failed"
+                        );
+                        Err(fb_err)
+                    }
                 }
             }
         }
