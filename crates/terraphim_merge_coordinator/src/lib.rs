@@ -3,6 +3,7 @@
 //! Full spec at .docs/spec-merge-coordinator.md will be implemented in
 //! follow-up commits. This skeleton proves the crate scaffolds correctly.
 
+pub mod contamination;
 pub mod evaluator;
 pub mod gitea;
 pub mod jsonlog;

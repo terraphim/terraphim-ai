@@ -43,6 +43,15 @@ pub struct PrSummary {
     pub mergeable: Option<bool>,
 }
 
+/// One file changed in a PR (subset of Gitea ChangedFile fields).
+#[derive(Debug, Clone, Deserialize)]
+pub struct PrFileChange {
+    pub filename: String,
+    /// "added", "modified", "removed", "renamed", "copied"
+    pub status: String,
+    pub additions: u64,
+}
+
 impl GiteaClient {
     /// Build a client. `base_url` is e.g. `https://git.terraphim.cloud`.
     /// `token` is the Gitea API token; treated as opaque.
@@ -89,6 +98,27 @@ impl GiteaClient {
         let body = serde_json::json!({"Do": "merge"});
         self.post_with_retry(&url, &body).await?;
         Ok(())
+    }
+
+    /// List files changed by a PR. Returns up to 50 files (Gitea default
+    /// page size). Sufficient for contamination gating since artefact PRs
+    /// typically surface within the first 50 paths.
+    pub async fn list_pr_files(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<Vec<PrFileChange>, MergeCoordinatorError> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/pulls/{}/files?limit=50",
+            self.base_url, owner, repo, index
+        );
+        let resp = self.get_with_retry(&url).await?;
+        let files = resp
+            .json::<Vec<PrFileChange>>()
+            .await
+            .map_err(|e| MergeCoordinatorError::Api(format!("decode pr files: {e}")))?;
+        Ok(files)
     }
 
     /// Close an issue by index (PATCH state=closed).
@@ -211,6 +241,7 @@ mod tests {
     }
 
     #[test]
+    #[test]
     fn open_prs_limit_exceeds_gitea_default_of_50() {
         assert!(
             OPEN_PRS_LIMIT > 50,
@@ -231,7 +262,7 @@ mod tests {
         // Construct JSON array with 51 items to verify no artificial truncation
         // happens at the deserialization layer.
         let items: String = (1u64..=51)
-            .map(|n| format!(r#"{{"number":{n},"title":"PR {n}","state":"open"}}"#))
+            .map(|n| format!(r#"{{\"number\":{n},\"title\":\"PR {n}\",\"state\":\"open\"}}"#))
             .collect::<Vec<_>>()
             .join(",");
         let json = format!("[{items}]");
@@ -242,5 +273,22 @@ mod tests {
             "all 51 PRs must be present after deserialisation"
         );
         assert_eq!(prs[50].number, 51, "PR at position 51 must be present");
+    }
+
+    #[test]
+    fn pr_file_change_deserialises_added_file() {
+        let json = r#"{\"filename\":\"src/lib.rs\",\"status\":\"added\",\"additions\":42}"#;
+        let f: PrFileChange = serde_json::from_str(json).unwrap();
+        assert_eq!(f.filename, "src/lib.rs");
+        assert_eq!(f.status, "added");
+        assert_eq!(f.additions, 42);
+    }
+
+    #[test]
+    fn pr_file_change_deserialises_removed_file() {
+        let json = r#"{\"filename\":\"old.rs\",\"status\":\"removed\",\"additions\":0}"#;
+        let f: PrFileChange = serde_json::from_str(json).unwrap();
+        assert_eq!(f.status, "removed");
+    }
     }
 }

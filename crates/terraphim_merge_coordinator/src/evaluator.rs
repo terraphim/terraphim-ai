@@ -6,6 +6,7 @@
 
 use tracing::{error, info, warn};
 
+use crate::contamination::check_contamination;
 use crate::extract_fixes;
 use crate::gitea::{GiteaClient, PrSummary};
 use crate::types::{EvalVerdict, MergeCoordinatorError, MergeOutcome};
@@ -32,8 +33,40 @@ pub async fn evaluate_all(
 ) -> Result<Vec<PrEvaluation>, MergeCoordinatorError> {
     let prs = gitea.list_open_prs(owner, repo).await?;
     let mut out = Vec::with_capacity(prs.len());
-    for pr in prs {
-        out.push(evaluate_one(&pr));
+    for pr in &prs {
+        let eval = evaluate_one(pr);
+        // Skip contamination check if already held for another reason.
+        let eval = if eval.verdict == EvalVerdict::Merge {
+            match gitea.list_pr_files(owner, repo, pr.number).await {
+                Ok(files) => {
+                    let offenders = check_contamination(&files);
+                    if offenders.is_empty() {
+                        eval
+                    } else {
+                        warn!(
+                            pr = pr.number,
+                            ?offenders,
+                            "contamination gate: PR carries artefact paths"
+                        );
+                        PrEvaluation {
+                            verdict: EvalVerdict::Hold(format!(
+                                "artefact contamination: {}",
+                                offenders.join(", ")
+                            )),
+                            ..eval
+                        }
+                    }
+                }
+                Err(e) => {
+                    // Fail-open: log warning but do not block the PR.
+                    warn!(pr = pr.number, error = %e, "contamination check skipped: could not fetch PR files");
+                    eval
+                }
+            }
+        } else {
+            eval
+        };
+        out.push(eval);
     }
     info!(count = out.len(), owner, repo, "evaluated open PRs");
     Ok(out)
@@ -44,9 +77,6 @@ fn evaluate_one(pr: &PrSummary) -> PrEvaluation {
     let fixes_issues = extract_fixes(pr.body.as_deref().unwrap_or(""));
     let verdict = if !mergeable {
         EvalVerdict::Hold("not mergeable".into())
-    } else if fixes_issues.is_empty() {
-        // No Fixes #N -> safe to merge but nothing to auto-close.
-        EvalVerdict::Merge
     } else {
         EvalVerdict::Merge
     };
