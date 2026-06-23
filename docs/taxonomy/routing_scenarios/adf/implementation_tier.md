@@ -35,6 +35,11 @@ action:: /home/alex/.local/bin/pi-rust --provider zai-coding-plan --model {{ mod
 route:: anthropic, sonnet
 action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 50
 
+# Kimi K2.5 via pi-rust (faster, more reliable than opencode).
+route:: kimi-for-coding, kimi-k2.5
+action:: /home/alex/.local/bin/pi-rust --provider kimi-for-coding --model {{ model }} -p "{{ prompt }}"
+
+# Kimi K2.5 via opencode (fallback).
 route:: kimi, kimi-for-coding/k2p5
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
