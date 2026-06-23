@@ -24,6 +24,11 @@ action:: /home/alex/.local/bin/pi-rust --provider openai-codex --model {{ model 
 route:: openai, opencode/gpt-5.5
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
+# Kimi K2.6 via pi-rust (faster, more reliable than opencode).
+route:: kimi-for-coding, kimi-k2.6
+action:: /home/alex/.local/bin/pi-rust --provider kimi-for-coding --model {{ model }} -p "{{ prompt }}"
+
+# Kimi K2.6 via opencode (fallback).
 route:: kimi, kimi-for-coding/k2p6
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
