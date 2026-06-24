@@ -45,6 +45,64 @@ Both steps are MANDATORY for every `/init` command execution.
    ```
 4. **Terraphim-ai target dir** — safe to `cargo clean` on bigbox. The binary is built from the agents repo, not terraphim-ai. Reclaims ~1TB.
 
+## Crate Ownership (polyrepo map)
+
+After the #1910 polyrepo extraction, **many crate names live in standalone repos and are NOT buildable here.** Before touching a crate, check this table — most "ready" issues referencing `terraphim_service`, `terraphim_orchestrator`, `terraphim_rolegraph`, etc. are **phantom issues** that cannot be worked in this repo (see #2914).
+
+**Ground truth command** (the authoritative buildable set):
+```bash
+cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name' | sort
+```
+
+### Buildable in this workspace (13 — verified by `cargo metadata`)
+
+These are the only crates you can `cargo build -p <name>` / `cargo test -p <name>` against here:
+
+| Crate | Path | Notes |
+|-------|------|-------|
+| `terraphim_server` | `terraphim_server/` | workspace `default-members` |
+| `terraphim-firecracker` | `terraphim_firecracker/` | top-level |
+| `terraphim_ai_nodejs` | `terraphim_ai_nodejs/` | top-level (maturin) |
+| `terraphim_rlm` | `crates/terraphim_rlm/` | |
+| `terraphim_dsm` | `crates/terraphim_dsm/` | binary crate |
+| `terraphim_lsp` | `crates/terraphim_lsp/` | |
+| `terraphim_merge_coordinator` | `crates/terraphim_merge_coordinator/` | ADF merge bot |
+| `terraphim_spawner` | `crates/terraphim_spawner/` | ADF spawner |
+| `terraphim_tinyclaw` | `crates/terraphim_tinyclaw/` | |
+| `terraphim_update` | `crates/terraphim_update/` | |
+| `terraphim_validation` | `crates/terraphim_validation/` | |
+| `terraphim_weather_report` | `crates/terraphim_weather_report/` | |
+| `terraphim_workspace` | `crates/terraphim_workspace/` | |
+
+### Excluded from the workspace (have `Cargo.toml`, built/tested separately)
+
+| Crate | Path | Reason (see `exclude` in root `Cargo.toml`) |
+|-------|------|----------------------------------------------|
+| `terraphim_symphony` | `crates/terraphim_symphony/` | built separately (`cd crates/terraphim_symphony && cargo build`) |
+| `terraphim_gitea_runner`, `terraphim_github_runner`, `terraphim_github_runner_server` | `crates/*_runner*/` | host-only; omitted from Docker context |
+| `haystack_atlassian`, `haystack_discourse` | `crates/haystack_*` | unused providers, kept for future |
+| `terraphim_agent_application` | `crates/terraphim_agent_application/` | experimental |
+| `terraphim_automata_py`, `terraphim_rolegraph_py` | `crates/*_py` | Python bindings (`maturin develop`) |
+| `terraphim_build_args` | `crates/terraphim_build_args/` | planned future use |
+| `desktop/src-tauri` | `desktop/src-tauri/` | built via Tauri CLI |
+
+### Polyrepo-extracted — NOT in this repo (consumed from the `terraphim` registry)
+
+These names appear in old issues/docs but **cannot be built here.** File work against the successor repo, not this one.
+
+| Crates | Successor repo | Extraction | Commit ref |
+|--------|----------------|------------|------------|
+| `terraphim_types`, `terraphim_test_utils`, `terraphim-markdown-parser`, `terraphim_automata`, `terraphim_rolegraph` | **terraphim-core** | E1 | #1910 |
+| `terraphim-config-persistence` crates | **terraphim-config-persistence** | E2 | #1910 |
+| `terraphim-service` crates | **terraphim-service** | E3 | #1910 |
+| `terraphim_orchestrator`, `terraphim_agent`, `terraphim_cli`, `terraphim_multi_agent`, `terraphim_settings`, `terraphim_agent_evolution` | **terraphim-agents** | E4a | #1910 |
+| `terraphim-kg-agents` crates | **terraphim-kg-agents** | E4b | #1910 |
+| `clients-and-integrations` crates (incl. `fff_search` / `terraphim-grep`) | **clients-and-integrations** | E5 | #1910 |
+
+> Orphaned dirs `crates/terraphim_eval` (tests/ only), `crates/terraphim_repl` (superseded by `terraphim_agent`), and `crates/terraphim_truthforge` are residual and excluded.
+
+**Triage rule:** if `gtr ready` surfaces an issue whose subject/AC references a crate in the "Polyrepo-extracted" table, **SKIP it** — the code lives in another repo. Pick the next unblocked issue instead.
+
 ## Build/Lint/Test Commands
 
 ### Rust Backend
@@ -247,6 +305,7 @@ Rules:
 1. SKIP any issue where a remote branch or open PR already exists
 2. Pick the NEXT unblocked issue from `gtr ready` instead
 3. NEVER re-create a PR that already exists (409 Conflict = skip). Comment on the existing PR instead.
+4. SKIP any issue referencing a **polyrepo-extracted** crate (see the [Crate Ownership table](#crate-ownership-polyrepo-map) above) — that code lives in another repo. This is the #1 cause of swarm rework.
 
 This checkpoint is configured in all ADF developer agent task blocks (`conf.d/*.toml`) and MUST NOT be removed.
 
