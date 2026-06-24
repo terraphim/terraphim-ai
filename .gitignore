@@ -146,6 +146,9 @@ projects/odilo/
 /session-ses_*.md
 /security_audit_report_*.md
 /pr_review_files/
+# Agent scratch directories created at repo root (#2763)
+# Patterns like .pr2659/ are created by PR-reviewer agents.
+/.pr*/
 # Heredoc accidents (bare EOF/PYEOF files created by malformed shell heredocs)
 /EOF
 /PYEOF
