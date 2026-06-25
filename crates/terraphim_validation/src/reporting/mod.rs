@@ -450,13 +450,17 @@ mod tests {
 
         let report = ValidationReport::from_summary(summary);
 
-        // Test JSON generation
-        let json_result = report.generate(&ReportFormat::Json);
-        assert!(json_result.is_ok());
+        // Test JSON generation produces non-empty output
+        let json = report
+            .generate(&ReportFormat::Json)
+            .expect("JSON generation failed");
+        assert!(!json.is_empty(), "JSON output must not be empty");
 
-        // Test Markdown generation
-        let md_result = report.generate(&ReportFormat::Markdown);
-        assert!(md_result.is_ok());
+        // Test Markdown generation produces non-empty output
+        let md = report
+            .generate(&ReportFormat::Markdown)
+            .expect("Markdown generation failed");
+        assert!(!md.is_empty(), "Markdown output must not be empty");
     }
 
     #[test]

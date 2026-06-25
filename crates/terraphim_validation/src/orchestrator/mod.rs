@@ -379,4 +379,28 @@ mod tests {
 
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_validation_config_defaults() {
+        let config = ValidationConfig::default();
+        assert_eq!(config.download_dir, "target/validation-downloads");
+        assert_eq!(config.concurrent_validations, 4);
+        assert_eq!(config.timeout_seconds, 1800);
+        assert!(config.notification_webhook.is_none());
+        assert!(config.enabled_platforms.contains(&Platform::LinuxX86_64));
+        assert!(config.enabled_platforms.contains(&Platform::MacOSX86_64));
+        assert!(config.enabled_platforms.contains(&Platform::WindowsX86_64));
+        assert!(config.enabled_categories.contains(&"download".to_string()));
+        assert!(
+            config
+                .enabled_categories
+                .contains(&"installation".to_string())
+        );
+        assert!(
+            config
+                .enabled_categories
+                .contains(&"functionality".to_string())
+        );
+        assert!(config.enabled_categories.contains(&"security".to_string()));
+    }
 }

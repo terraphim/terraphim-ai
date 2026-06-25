@@ -282,4 +282,26 @@ mod tests {
         assert_eq!(artifact.version, "1.0.0");
         assert_eq!(artifact.platform, Platform::LinuxX86_64);
     }
+
+    #[test]
+    fn test_artifact_type_serde_roundtrip() {
+        let variants = [
+            ArtifactType::Binary,
+            ArtifactType::DebPackage,
+            ArtifactType::RpmPackage,
+            ArtifactType::TarGz,
+            ArtifactType::TarZst,
+            ArtifactType::Dmg,
+            ArtifactType::Msi,
+            ArtifactType::Exe,
+            ArtifactType::AppImage,
+            ArtifactType::DockerImage,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).expect("serialise ArtifactType");
+            let round_tripped: ArtifactType =
+                serde_json::from_str(&json).expect("deserialise ArtifactType");
+            assert_eq!(variant, &round_tripped);
+        }
+    }
 }
