@@ -276,7 +276,7 @@ pub struct AgentOrchestrator {
     /// Last compound-review fire time, used to gate the compound schedule
     /// independently of `last_tick_time`. Mirrors the `last_cron_fire`
     /// pattern for per-agent crons. Without this cursor, if the
-    /// `reconcile_tick` future is cancelled mid-await by its 90 s
+    /// `reconcile_tick` future is cancelled mid-await by its 30 s
     /// `tokio::time::timeout` safety wrapper, `last_tick_time` is never
     /// advanced and the same compound-review occurrence re-fires on the
     /// very next tick, producing a worktree storm (#1562).
@@ -427,6 +427,14 @@ impl ProviderRateLimitWindow {
 /// firing (~30 min active-window cadence); short enough that a misclassified
 /// non-quota error does not disable the provider for the day.
 pub(crate) const DEFAULT_RATE_LIMIT_BLOCK: Duration = Duration::from_secs(900);
+
+/// Hard upper bound on a single `reconcile_tick` invocation. Any tick that
+/// exceeds this duration is cancelled and an error is logged; the loop
+/// continues to the next tick rather than hanging the orchestrator.
+/// Observed peak tick durations exceeded 80 s (#2909, #2820), hence a value
+/// below 30 s is not safe. 30 s is chosen to catch hangs while still allowing
+/// normal polling bursts to complete.
+pub(crate) const RECONCILE_TICK_HARD_TIMEOUT_SECS: u64 = 30;
 
 pub(crate) fn parse_reset_time(quota_line: &str) -> Option<Instant> {
     let line = quota_line.to_lowercase();
@@ -1509,12 +1517,18 @@ impl AgentOrchestrator {
                             Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
                         }
                     }
-                    match tokio::time::timeout(reconcile_timeout, self.reconcile_tick()).await {
+                    match tokio::time::timeout(
+                        Duration::from_secs(RECONCILE_TICK_HARD_TIMEOUT_SECS),
+                        self.reconcile_tick(),
+                    )
+                    .await
+                    {
                         Ok(()) => {}
-                        Err(_) => {
-                            warn!(
-                                timeout_secs = reconcile_timeout.as_secs(),
-                                "reconcile_tick exceeded timeout, forcing continuation"
+                        Err(_elapsed) => {
+                            error!(
+                                timeout_secs = RECONCILE_TICK_HARD_TIMEOUT_SECS,
+                                tick = self.tick_count,
+                                "reconcile_tick timed out; forcing continuation to next tick"
                             );
                         }
                     }

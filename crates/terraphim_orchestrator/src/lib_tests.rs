@@ -368,7 +368,7 @@ async fn test_orchestrator_compound_review_manual() {
 /// the same occurrence; the cursor stays put.
 ///
 /// This is the property that breaks if the cursor is dropped: the
-/// 90 s `tokio::time::timeout` wrapping `reconcile_tick` cancels
+/// 30 s `tokio::time::timeout` wrapping `reconcile_tick` cancels
 /// the future mid-await, `last_tick_time` is never updated, and
 /// the next tick re-evaluates the same cron occurrence as "should
 /// fire", spawning a new worktree every tick (the bigbox storm).
@@ -3735,5 +3735,35 @@ async fn test_mutating_agent_fails_closed_when_worktree_creation_fails() {
     assert!(
         !orch.active_agents.contains_key("echo-safety"),
         "agent must not spawn in the shared checkout after worktree failure"
+    );
+}
+
+// =========================================================================
+// reconcile_tick hard timeout (Gitea #2929)
+// =========================================================================
+
+/// Verify that `RECONCILE_TICK_HARD_TIMEOUT_SECS` (30 s) fires when
+/// the future sleeps longer (60 s). With `tokio::time::pause` the
+/// runtime advances simulated time to the first pending deadline, so
+/// the test completes instantly in wall-clock time.
+///
+/// Acceptance criteria from issue #2929:
+///   Given a mock tick that sleeps 60 s
+///   When wrapped in the 30 s hard timeout
+///   Then it returns Err(Elapsed) and the caller can continue
+#[tokio::test]
+async fn test_reconcile_tick_timeout_fires_at_30s() {
+    tokio::time::pause();
+
+    let result = tokio::time::timeout(
+        Duration::from_secs(crate::RECONCILE_TICK_HARD_TIMEOUT_SECS),
+        tokio::time::sleep(Duration::from_secs(60)),
+    )
+    .await;
+
+    assert!(
+        result.is_err(),
+        "expected Elapsed error after {}s hard timeout; got Ok (no timeout fired)",
+        crate::RECONCILE_TICK_HARD_TIMEOUT_SECS,
     );
 }
