@@ -798,4 +798,84 @@ mod tests {
         assert!(!debug_output.contains("***REDACTED***"));
         assert!(debug_output.contains("AgentConfig"));
     }
+
+    fn minimal_config(cli_command: &str) -> AgentConfig {
+        AgentConfig {
+            agent_id: "test-agent".to_string(),
+            cli_command: cli_command.to_string(),
+            args: vec![],
+            working_dir: None,
+            env_vars: HashMap::new(),
+            required_api_keys: vec![],
+            resource_limits: ResourceLimits::default(),
+            use_stdin: false,
+            supports_stdin: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_validate_missing_cli_returns_cli_not_found() {
+        let config = minimal_config("__terraphim_no_such_cli_xyz_999__");
+        let validator = AgentValidator::new(&config);
+        let result = validator.validate().await;
+        assert!(
+            matches!(result, Err(ValidationError::CliNotFound(_))),
+            "expected CliNotFound, got {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_validate_missing_api_key_returns_api_key_not_set() {
+        const KEY: &str = "TERRAPHIM_TEST_MISSING_KEY_SPAWNER_XYZ";
+        unsafe { std::env::remove_var(KEY) };
+
+        let mut config = minimal_config("echo");
+        config.required_api_keys = vec![KEY.to_string()];
+
+        let validator = AgentValidator::new(&config);
+        let result = validator.validate().await;
+        assert!(
+            matches!(result, Err(ValidationError::ApiKeyNotSet(_))),
+            "expected ApiKeyNotSet, got {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_validate_valid_config_succeeds() {
+        let config = minimal_config("echo");
+        let validator = AgentValidator::new(&config);
+        let result = validator.validate().await;
+        assert!(result.is_ok(), "expected Ok(()), got {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_validate_api_key_present_succeeds() {
+        const KEY: &str = "TERRAPHIM_TEST_PRESENT_KEY_SPAWNER_XYZ";
+        unsafe { std::env::set_var(KEY, "dummy-value") };
+
+        let mut config = minimal_config("echo");
+        config.required_api_keys = vec![KEY.to_string()];
+
+        let validator = AgentValidator::new(&config);
+        let result = validator.validate().await;
+
+        unsafe { std::env::remove_var(KEY) };
+
+        assert!(result.is_ok(), "expected Ok(()), got {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_validate_missing_working_dir_returns_error() {
+        let mut config = minimal_config("echo");
+        config.working_dir = Some(std::path::PathBuf::from("/nonexistent/path/xyz_999"));
+        let validator = AgentValidator::new(&config);
+        let result = validator.validate().await;
+        assert!(
+            matches!(result, Err(ValidationError::WorkingDirNotFound(_))),
+            "expected WorkingDirNotFound, got {:?}",
+            result
+        );
+    }
 }
