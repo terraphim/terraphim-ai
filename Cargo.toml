@@ -47,10 +47,11 @@ exclude = [
     # Firecracker-based crates (fcctl-core is optional and commented out;
     # crate publishes to crates.io without firecracker feature)
     # "crates/terraphim_rlm",
-    # Host-only runners (omitted from Docker build context)
-    "crates/terraphim_github_runner",
+    # Host-only runners (omitted from Docker build context — but included in
+    # workspace so `cargo test -p terraphim_gitea_runner` works; the Docker
+    # build targets default-members = ["terraphim_server"] and never touches
+    # these crates). Refs #2951
     "crates/terraphim_github_runner_server",
-    "crates/terraphim_gitea_runner",
 ]
 default-members = ["terraphim_server"]
 

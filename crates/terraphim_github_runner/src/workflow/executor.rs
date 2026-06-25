@@ -385,11 +385,11 @@ impl WorkflowExecutor {
 
                     if !step_succeeded && self.config.stop_on_failure && !step.continue_on_error {
                         // Rollback if configured
-                        if self.config.auto_rollback {
-                            if let Some(ref snapshot_id) = last_snapshot {
-                                log::info!("Rolling back to snapshot {}", snapshot_id);
-                                let _ = self.command_executor.rollback(session, snapshot_id).await;
-                            }
+                        if self.config.auto_rollback
+                            && let Some(ref snapshot_id) = last_snapshot
+                        {
+                            log::info!("Rolling back to snapshot {}", snapshot_id);
+                            let _ = self.command_executor.rollback(session, snapshot_id).await;
                         }
 
                         return self.build_failed_result(
@@ -419,11 +419,11 @@ impl WorkflowExecutor {
 
                     if self.config.stop_on_failure && !step.continue_on_error {
                         // Rollback if configured
-                        if self.config.auto_rollback {
-                            if let Some(ref snapshot_id) = last_snapshot {
-                                log::info!("Rolling back to snapshot {}", snapshot_id);
-                                let _ = self.command_executor.rollback(session, snapshot_id).await;
-                            }
+                        if self.config.auto_rollback
+                            && let Some(ref snapshot_id) = last_snapshot
+                        {
+                            log::info!("Rolling back to snapshot {}", snapshot_id);
+                            let _ = self.command_executor.rollback(session, snapshot_id).await;
                         }
 
                         return self.build_failed_result(

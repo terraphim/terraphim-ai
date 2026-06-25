@@ -3,13 +3,12 @@
 //! Converts GitHub Actions workflows into executable command sequences using LLM.
 
 use crate::error::{GitHubRunnerError, Result};
-use crate::models::{GitHubEvent, GitHubEventType};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 #[cfg(feature = "github-runner")]
 use terraphim_service::llm::{ChatOptions, LlmClient};
 
 /// System prompt for workflow understanding
+#[cfg(feature = "github-runner")]
 const WORKFLOW_SYSTEM_PROMPT: &str = r#"You are an expert GitHub Actions workflow parser.
 Your task is to analyze GitHub Actions workflows and translate them into executable shell commands.
 
@@ -156,21 +155,19 @@ pub fn parse_single_workflow_yaml(yaml: &str) -> Result<ParsedWorkflow> {
         run: &mut Option<String>,
         uses: &mut bool,
     ) {
-        if !*uses {
-            if let Some(cmd) = run.take() {
-                let cmd = cmd.trim_end().to_string();
-                if !cmd.trim().is_empty() {
-                    let nm = name
-                        .clone()
-                        .unwrap_or_else(|| cmd.lines().next().unwrap_or("step").trim().to_string());
-                    steps.push(WorkflowStep {
-                        name: nm,
-                        command: cmd,
-                        working_dir: default_working_dir(),
-                        continue_on_error: false,
-                        timeout_seconds: default_timeout(),
-                    });
-                }
+        if !*uses && let Some(cmd) = run.take() {
+            let cmd = cmd.trim_end().to_string();
+            if !cmd.trim().is_empty() {
+                let nm = name
+                    .clone()
+                    .unwrap_or_else(|| cmd.lines().next().unwrap_or("step").trim().to_string());
+                steps.push(WorkflowStep {
+                    name: nm,
+                    command: cmd,
+                    working_dir: default_working_dir(),
+                    continue_on_error: false,
+                    timeout_seconds: default_timeout(),
+                });
             }
         }
         *name = None;

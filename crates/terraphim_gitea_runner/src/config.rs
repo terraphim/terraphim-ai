@@ -76,3 +76,88 @@ impl RunnerConfig {
         self.active_repos.is_empty() || self.active_repos.iter().any(|r| r == repo)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_config_accepts_all_repos() {
+        let cfg = RunnerConfig::default();
+        assert!(cfg.accepts_repo("terraphim/terraphim-ai"));
+        assert!(cfg.accepts_repo("any/repo"));
+        assert!(cfg.active_repos.is_empty());
+    }
+
+    #[test]
+    fn active_repos_allowlist_accepts_matching_repo() {
+        let cfg = RunnerConfig {
+            active_repos: vec!["terraphim/terraphim-ai".to_string()],
+            ..RunnerConfig::default()
+        };
+        assert!(cfg.accepts_repo("terraphim/terraphim-ai"));
+    }
+
+    #[test]
+    fn active_repos_allowlist_rejects_other_repo() {
+        let cfg = RunnerConfig {
+            active_repos: vec!["terraphim/terraphim-ai".to_string()],
+            ..RunnerConfig::default()
+        };
+        assert!(!cfg.accepts_repo("other/repo"));
+        assert!(!cfg.accepts_repo("terraphim/other-repo"));
+    }
+
+    #[test]
+    fn multiple_active_repos_accept_each_listed_repo() {
+        let cfg = RunnerConfig {
+            active_repos: vec![
+                "terraphim/terraphim-ai".to_string(),
+                "terraphim/terraphim-agents".to_string(),
+            ],
+            ..RunnerConfig::default()
+        };
+        assert!(cfg.accepts_repo("terraphim/terraphim-ai"));
+        assert!(cfg.accepts_repo("terraphim/terraphim-agents"));
+        assert!(!cfg.accepts_repo("terraphim/other"));
+    }
+
+    #[test]
+    fn default_config_has_expected_instance_url() {
+        let cfg = RunnerConfig::default();
+        assert_eq!(cfg.instance_url, "https://git.terraphim.cloud");
+    }
+
+    #[test]
+    fn default_config_has_no_registration_token() {
+        let cfg = RunnerConfig::default();
+        assert!(cfg.registration_token.is_none());
+    }
+
+    #[test]
+    fn default_config_has_no_status_token() {
+        let cfg = RunnerConfig::default();
+        assert!(cfg.status_token.is_none());
+    }
+
+    #[test]
+    fn default_config_has_no_legacy_mirror() {
+        let cfg = RunnerConfig::default();
+        assert!(cfg.legacy_status_mirror.is_none());
+    }
+
+    #[test]
+    fn default_config_poll_timeout_exceeds_http_timeout() {
+        let cfg = RunnerConfig::default();
+        assert!(
+            cfg.poll_timeout > cfg.http_request_timeout,
+            "poll_timeout must exceed http_request_timeout so reqwest fires first"
+        );
+    }
+
+    #[test]
+    fn default_config_has_terraphim_native_label() {
+        let cfg = RunnerConfig::default();
+        assert!(cfg.labels.contains(&"terraphim-native".to_string()));
+    }
+}
