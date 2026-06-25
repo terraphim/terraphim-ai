@@ -251,12 +251,11 @@ async fn handle_webhook(
                         pr_number, pr_title, pr_url, output
                     );
 
-                    if !_repo_full_name.is_empty() {
-                        if let Err(e) =
+                    if !_repo_full_name.is_empty()
+                        && let Err(e) =
                             post_pr_comment(&_repo_full_name, pr_number as u64, &comment).await
-                        {
-                            error!("Failed to post comment: {}", e);
-                        }
+                    {
+                        error!("Failed to post comment: {}", e);
                     }
                 }
                 Err(e) => {

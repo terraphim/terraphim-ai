@@ -461,21 +461,21 @@ impl LearningCoordinator for InMemoryLearningCoordinator {
         }
 
         // Record workflow in knowledge graph if available and successful
-        if let Some(ref kg) = self.knowledge_graph {
-            if result.success {
-                // Extract step names as commands for workflow recording
-                let commands: Vec<String> = result
-                    .steps
-                    .iter()
-                    .filter(|s| matches!(s.status, crate::models::ExecutionStatus::Success))
-                    .map(|s| s.name.clone())
-                    .collect();
+        if let Some(ref kg) = self.knowledge_graph
+            && result.success
+        {
+            // Extract step names as commands for workflow recording
+            let commands: Vec<String> = result
+                .steps
+                .iter()
+                .filter(|s| matches!(s.status, crate::models::ExecutionStatus::Success))
+                .map(|s| s.name.clone())
+                .collect();
 
-                if commands.len() >= 2 {
-                    let session_id = result.session_id.to_string();
-                    if let Err(e) = kg.record_workflow(&commands, &session_id).await {
-                        log::warn!("Failed to record workflow in knowledge graph: {}", e);
-                    }
+            if commands.len() >= 2 {
+                let session_id = result.session_id.to_string();
+                if let Err(e) = kg.record_workflow(&commands, &session_id).await {
+                    log::warn!("Failed to record workflow in knowledge graph: {}", e);
                 }
             }
         }
@@ -682,11 +682,11 @@ impl LearningCoordinator for EvolutionLearningCoordinator {
         let error_sig = InMemoryLearningCoordinator::error_signature(error);
         let key = InMemoryLearningCoordinator::failure_key(command, &error_sig);
 
-        if self.inner.should_create_lesson(&key) {
-            if let Some(tracker) = self.inner.failure_tracker.get(&key) {
-                let lesson_id = self.create_and_store_lesson(&tracker).await?;
-                self.inner.created_lessons.insert(key, lesson_id);
-            }
+        if self.inner.should_create_lesson(&key)
+            && let Some(tracker) = self.inner.failure_tracker.get(&key)
+        {
+            let lesson_id = self.create_and_store_lesson(&tracker).await?;
+            self.inner.created_lessons.insert(key, lesson_id);
         }
 
         Ok(())

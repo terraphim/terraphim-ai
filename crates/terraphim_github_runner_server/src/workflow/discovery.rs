@@ -56,15 +56,15 @@ pub async fn discover_workflows_for_event(
         debug!("Checking workflow file: {:?}", path);
 
         // Try to parse the workflow and check if it matches the event
-        if let Ok(workflow_content) = fs::read_to_string(&path) {
-            if matches_event(&workflow_content, event_type, branch) {
-                info!(
-                    "Workflow {:?} matches event type '{}'",
-                    path.file_name(),
-                    event_type
-                );
-                relevant_workflows.push(path);
-            }
+        if let Ok(workflow_content) = fs::read_to_string(&path)
+            && matches_event(&workflow_content, event_type, branch)
+        {
+            info!(
+                "Workflow {:?} matches event type '{}'",
+                path.file_name(),
+                event_type
+            );
+            relevant_workflows.push(path);
         }
     }
 
@@ -125,14 +125,14 @@ fn matches_event(workflow_content: &str, event_type: &str, branch: Option<&str>)
             // look for branch arrays
             if in_push_section && trimmed.contains("branches:") {
                 // Simple extraction of branch names from [main, develop] format
-                if let Some(start) = trimmed.find('[') {
-                    if let Some(end) = trimmed.find(']') {
-                        let branches_str = &trimmed[start + 1..end];
-                        for branch_name in branches_str.split(',') {
-                            let branch = branch_name.trim().trim_matches('"').trim_matches('\'');
-                            if !branch.is_empty() {
-                                push_branches.push(branch.to_string());
-                            }
+                if let Some(start) = trimmed.find('[')
+                    && let Some(end) = trimmed.find(']')
+                {
+                    let branches_str = &trimmed[start + 1..end];
+                    for branch_name in branches_str.split(',') {
+                        let branch = branch_name.trim().trim_matches('"').trim_matches('\'');
+                        if !branch.is_empty() {
+                            push_branches.push(branch.to_string());
                         }
                     }
                 }

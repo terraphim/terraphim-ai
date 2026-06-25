@@ -156,21 +156,21 @@ pub fn parse_single_workflow_yaml(yaml: &str) -> Result<ParsedWorkflow> {
         run: &mut Option<String>,
         uses: &mut bool,
     ) {
-        if !*uses {
-            if let Some(cmd) = run.take() {
-                let cmd = cmd.trim_end().to_string();
-                if !cmd.trim().is_empty() {
-                    let nm = name
-                        .clone()
-                        .unwrap_or_else(|| cmd.lines().next().unwrap_or("step").trim().to_string());
-                    steps.push(WorkflowStep {
-                        name: nm,
-                        command: cmd,
-                        working_dir: default_working_dir(),
-                        continue_on_error: false,
-                        timeout_seconds: default_timeout(),
-                    });
-                }
+        if !*uses
+            && let Some(cmd) = run.take()
+        {
+            let cmd = cmd.trim_end().to_string();
+            if !cmd.trim().is_empty() {
+                let nm = name
+                    .clone()
+                    .unwrap_or_else(|| cmd.lines().next().unwrap_or("step").trim().to_string());
+                steps.push(WorkflowStep {
+                    name: nm,
+                    command: cmd,
+                    working_dir: default_working_dir(),
+                    continue_on_error: false,
+                    timeout_seconds: default_timeout(),
+                });
             }
         }
         *name = None;

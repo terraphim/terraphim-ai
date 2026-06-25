@@ -125,31 +125,31 @@ pub async fn parse_workflow_yaml_with_llm(
         .to_string();
 
     // Use LLM parser if available and enabled
-    if let Some(parser) = llm_parser {
-        if env::var("USE_LLM_PARSER").unwrap_or_default() == "true" {
-            info!("🤖 Using LLM-based workflow parsing for: {}", workflow_name);
-            match parser.parse_workflow_yaml(&workflow_yaml).await {
-                Ok(workflow) => {
-                    info!("✅ LLM successfully parsed workflow: {}", workflow_name);
-                    info!("   - {} steps extracted", workflow.steps.len());
-                    info!("   - {} setup commands", workflow.setup_commands.len());
-                    for (i, step) in workflow.steps.iter().enumerate() {
-                        info!(
-                            "   - Step {}: {} (command: {})",
-                            i + 1,
-                            step.name,
-                            step.command.chars().take(50).collect::<String>()
-                        );
-                    }
-                    return Ok(workflow);
-                }
-                Err(e) => {
-                    warn!(
-                        "⚠️  LLM parsing failed, falling back to simple parser: {}",
-                        e
+    if let Some(parser) = llm_parser
+        && env::var("USE_LLM_PARSER").unwrap_or_default() == "true"
+    {
+        info!("🤖 Using LLM-based workflow parsing for: {}", workflow_name);
+        match parser.parse_workflow_yaml(&workflow_yaml).await {
+            Ok(workflow) => {
+                info!("✅ LLM successfully parsed workflow: {}", workflow_name);
+                info!("   - {} steps extracted", workflow.steps.len());
+                info!("   - {} setup commands", workflow.setup_commands.len());
+                for (i, step) in workflow.steps.iter().enumerate() {
+                    info!(
+                        "   - Step {}: {} (command: {})",
+                        i + 1,
+                        step.name,
+                        step.command.chars().take(50).collect::<String>()
                     );
-                    // Fall through to simple parser
                 }
+                return Ok(workflow);
+            }
+            Err(e) => {
+                warn!(
+                    "⚠️  LLM parsing failed, falling back to simple parser: {}",
+                    e
+                );
+                // Fall through to simple parser
             }
         }
     }
