@@ -463,4 +463,68 @@ mod tests {
         assert!(!manager.session_file_path("cli:delete_me").exists());
         assert!(manager.list_sessions().unwrap().is_empty());
     }
+
+    /// AC: oldest messages are dropped when the context-window capacity is exceeded.
+    ///
+    /// `get_recent_messages(n)` returns the most recent `n` messages, implicitly
+    /// dropping the oldest beyond that window. This regression test locks in that
+    /// contract: the context-window trimming path that the agent loop relies on.
+    #[test]
+    fn test_get_recent_messages_drops_oldest_beyond_capacity() {
+        let mut session = Session::new("cli:window");
+        for i in 0..5u8 {
+            session.add_message(ChatMessage::user(format!("msg-{i}"), "user1"));
+        }
+
+        // Request only the 3 most recent -> messages 2,3,4.
+        let recent = session.get_recent_messages(3);
+        assert_eq!(
+            recent.len(),
+            3,
+            "window should be capped at requested count"
+        );
+        assert_eq!(
+            recent[0].content, "msg-2",
+            "oldest retained is index len-capacity"
+        );
+        assert_eq!(recent[1].content, "msg-3");
+        assert_eq!(recent[2].content, "msg-4", "newest is the last message");
+        assert!(
+            !recent
+                .iter()
+                .any(|m| m.content == "msg-0" || m.content == "msg-1"),
+            "oldest messages must be dropped from the window"
+        );
+    }
+
+    /// AC boundary: requesting a window larger than the history returns all
+    /// messages unchanged (no padding, no panic).
+    #[test]
+    fn test_get_recent_messages_capacity_exceeds_history_returns_all() {
+        let mut session = Session::new("cli:window");
+        session.add_message(ChatMessage::user("only", "user1"));
+
+        let recent = session.get_recent_messages(50);
+        assert_eq!(recent.len(), 1, "must not pad beyond actual history");
+        assert_eq!(recent[0].content, "only");
+    }
+
+    /// AC boundary: a zero-width window returns nothing (no panic, no full slice).
+    #[test]
+    fn test_get_recent_messages_zero_capacity_returns_empty() {
+        let mut session = Session::new("cli:window");
+        session.add_message(ChatMessage::user("x", "user1"));
+
+        let recent = session.get_recent_messages(0);
+        assert!(recent.is_empty(), "zero-width window must be empty");
+    }
+
+    /// AC boundary: an empty session reports empty and yields no messages.
+    #[test]
+    fn test_empty_session_reports_is_empty() {
+        let session = Session::new("cli:empty");
+        assert!(session.is_empty());
+        assert_eq!(session.message_count(), 0);
+        assert!(session.get_recent_messages(10).is_empty());
+    }
 }
