@@ -283,6 +283,11 @@ jobs:
           fi
           cargo nextest --version
 
+      - name: Compile gate -- all workspace test code must compile
+        run: |
+          # Fail fast if any test code does not compile, before spending time running tests.
+          /home/alex/.local/bin/rch exec -- cargo test --workspace --all-targets --no-run --release --target ${{ matrix.target }} --features "self_update/signatures,terraphim_automata/medical"
+
       - name: Run tests
         run: |
           # Run unit and integration tests via nextest
