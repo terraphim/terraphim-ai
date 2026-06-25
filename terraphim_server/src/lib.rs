@@ -629,6 +629,39 @@ async fn not_found() -> Response {
     (StatusCode::NOT_FOUND, "404").into_response()
 }
 
+/// Constructs a minimal Axum router suitable for integration tests.
+pub async fn build_router_for_tests() -> Router {
+    use terraphim_config::ConfigBuilder;
+
+    // Create minimal test configuration
+    let mut config = ConfigBuilder::new()
+        .build_default_embedded()
+        .build()
+        .expect("Failed to build test config");
+
+    let config_state = ConfigState::new(&mut config)
+        .await
+        .expect("Failed to create ConfigState");
+
+    let (tx, _rx) = channel::<IndexedDocument>(10);
+
+    // Initialize summarization manager
+    let summarization_manager = Arc::new(SummarizationManager::new(QueueConfig::default()));
+
+    // Initialize workflow management components for tests
+    let workflow_sessions = Arc::new(RwLock::new(HashMap::new()));
+    let (websocket_broadcaster, _) = broadcast::channel(100);
+
+    // Create extended application state for tests
+    let app_state = AppState {
+        config_state,
+        workflow_sessions,
+        websocket_broadcaster,
+    };
+
+    build_router(app_state, tx, summarization_manager, false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -859,37 +892,4 @@ mod tests {
         let desc = result.unwrap();
         assert!(!desc.is_empty());
     }
-}
-
-/// Constructs a minimal Axum router suitable for integration tests.
-pub async fn build_router_for_tests() -> Router {
-    use terraphim_config::ConfigBuilder;
-
-    // Create minimal test configuration
-    let mut config = ConfigBuilder::new()
-        .build_default_embedded()
-        .build()
-        .expect("Failed to build test config");
-
-    let config_state = ConfigState::new(&mut config)
-        .await
-        .expect("Failed to create ConfigState");
-
-    let (tx, _rx) = channel::<IndexedDocument>(10);
-
-    // Initialize summarization manager
-    let summarization_manager = Arc::new(SummarizationManager::new(QueueConfig::default()));
-
-    // Initialize workflow management components for tests
-    let workflow_sessions = Arc::new(RwLock::new(HashMap::new()));
-    let (websocket_broadcaster, _) = broadcast::channel(100);
-
-    // Create extended application state for tests
-    let app_state = AppState {
-        config_state,
-        workflow_sessions,
-        websocket_broadcaster,
-    };
-
-    build_router(app_state, tx, summarization_manager, false)
 }

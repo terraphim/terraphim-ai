@@ -350,10 +350,11 @@ fn print_tier_markdown(tier: &terraphim_weather_report::TierSection) {
             "| {} | {} | `{}` | {} | {} | {} |",
             cond, m.provider, m.model, m.cli, latency, cost
         );
-        if let Some(detail) = &m.detail {
-            if !detail.is_empty() && !detail.starts_with("probe skipped") {
-                println!("| | | | | | *{}* |", detail.replace('|', "\\|"));
-            }
+        if let Some(detail) = &m.detail
+            && !detail.is_empty()
+            && !detail.starts_with("probe skipped")
+        {
+            println!("| | | | | | *{}* |", detail.replace('|', "\\|"));
         }
     }
     println!();
