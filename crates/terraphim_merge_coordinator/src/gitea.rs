@@ -212,18 +212,22 @@ mod tests {
 
     #[test]
     fn open_prs_limit_exceeds_gitea_default_of_50() {
-        assert!(
-            OPEN_PRS_LIMIT > 50,
-            "OPEN_PRS_LIMIT must exceed 50 so PRs beyond position 50 are not silently dropped"
-        );
+        const {
+            assert!(
+                OPEN_PRS_LIMIT > 50,
+                "OPEN_PRS_LIMIT must exceed 50 so PRs beyond position 50 are not silently dropped"
+            )
+        };
     }
 
     #[test]
     fn open_prs_limit_within_gitea_max_page_size() {
-        assert!(
-            OPEN_PRS_LIMIT <= 300,
-            "Gitea max page size is 300; limit must not exceed it"
-        );
+        const {
+            assert!(
+                OPEN_PRS_LIMIT <= 300,
+                "Gitea max page size is 300; limit must not exceed it"
+            )
+        };
     }
 
     #[test]
