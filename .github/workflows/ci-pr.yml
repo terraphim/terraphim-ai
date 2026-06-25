@@ -356,11 +356,14 @@ jobs:
         working-directory: desktop
         run: yarn run check
 
-  # Quick unit tests for changed code
+  # Test execution gate: runs all workspace tests (lib, bin, integration) to block merge on failures.
+  # Depends on rust-format (which includes cargo check) so compilation is verified first.
+  # Tests requiring external infra are #[ignore]-gated and do not run here.
+  # Refs #2934
   rust-tests:
-    name: Rust Unit Tests
+    name: Rust Workspace Tests
     runs-on: [self-hosted, bigbox]
-    timeout-minutes: 8
+    timeout-minutes: 20
     needs: [changes, rust-format]
     if: needs.changes.outputs.rust-changed == 'true' && needs.rust-format.result == 'success'
     env:
@@ -432,11 +435,13 @@ jobs:
           fi
           cargo nextest --version
 
-      - name: Run unit tests
+      - name: Run workspace tests (all targets)
         run: |
-          # Run unit tests via nextest (rocksdb feature disabled in CI, zlob enabled for fff-search)
+          # Run all workspace tests via nextest: lib, bin, and integration tests.
+          # --all-targets includes integration test files (tests/) in addition to lib/bin.
+          # Tests needing external infra are #[ignore]-gated and skipped automatically.
           # slow-timeout and fail-fast are configured in .config/nextest.toml [profile.ci]
-          /home/alex/.local/bin/rch exec -- cargo nextest run --workspace --profile ci --lib --bins --features zlob
+          /home/alex/.local/bin/rch exec -- cargo nextest run --workspace --profile ci --all-targets --features zlob
 
       - name: sccache stats
         if: always()
