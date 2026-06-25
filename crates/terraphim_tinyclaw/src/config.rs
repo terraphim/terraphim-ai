@@ -616,6 +616,9 @@ model = "llama3.2"
 
     #[test]
     fn test_env_var_expansion() {
+        // SAFETY: No other test in this binary reads or writes TEST_VAR.
+        // Cargo runs tests in parallel threads by default; we accept this because
+        // only this test touches this variable.
         unsafe {
             std::env::set_var("TEST_VAR", "test_value");
         }
