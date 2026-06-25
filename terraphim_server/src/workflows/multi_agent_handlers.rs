@@ -16,8 +16,8 @@ use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
 
 use super::{
-    ExecutionStatus, LlmConfig, StepConfig, WebSocketBroadcaster, WorkflowSessions,
-    update_workflow_status,
+    ExecutionStatus, LlmConfig, StepConfig, StepStatus, WebSocketBroadcaster, WorkflowSessions,
+    WorkflowStep, record_workflow_step, update_workflow_status,
 };
 use terraphim_config::ConfigState;
 
@@ -258,8 +258,13 @@ impl MultiAgentWorkflowExecutor {
 
             let input = CommandInput::new(step_prompt, CommandType::Generate);
 
+            // Capture step start time before executing
+            let step_started_at = chrono::Utc::now();
+
             // Execute with specialized agent
             let output = step_agent.process_command(input).await?;
+
+            let step_completed_at = chrono::Utc::now();
 
             // Update context for next step (prompt chaining)
             context = format!(
@@ -277,7 +282,7 @@ impl MultiAgentWorkflowExecutor {
                 "role": role,
                 "overall_role": overall_role,
                 "output": output.text,
-                "duration_ms": 2000, // Real execution time would be tracked
+                "duration_ms": (step_completed_at - step_started_at).num_milliseconds(),
                 "success": true,
                 "agent_id": step_agent.agent_id.to_string(),
                 "tokens_used": {
@@ -285,6 +290,21 @@ impl MultiAgentWorkflowExecutor {
                     "output": step_agent.token_tracker.read().await.total_output_tokens
                 }
             });
+
+            // Record step in workflow status for the trace endpoint
+            record_workflow_step(
+                sessions,
+                workflow_id,
+                WorkflowStep {
+                    id: step_id.clone(),
+                    name: step_name.clone(),
+                    status: StepStatus::Completed,
+                    started_at: step_started_at,
+                    completed_at: Some(step_completed_at),
+                    output: Some(output.text[..std::cmp::min(500, output.text.len())].to_string()),
+                },
+            )
+            .await;
 
             results.push(step_result);
 
