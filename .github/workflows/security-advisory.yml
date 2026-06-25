@@ -1,0 +1,54 @@
+name: Security Advisory Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - '**/Cargo.toml'
+      - '.cargo/audit.toml'
+
+concurrency:
+  group: security-advisory-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cargo-audit:
+    name: cargo audit (RUSTSEC advisory gate)
+    runs-on: [self-hosted, bigbox]
+    timeout-minutes: 5
+
+    steps:
+      - name: Fix target directory permissions
+        run: |
+          if [ -d "target" ]; then
+            sudo chown -R $(id -u):$(id -g) target 2>/dev/null || true
+            sudo chmod -R u+rw target 2>/dev/null || true
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: |
+          if ! command -v cargo-audit 2>/dev/null; then
+            AUDIT_VERSION="0.22.1"
+            curl -sSL "https://github.com/rustsec/rustsec/releases/download/cargo-audit/v${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-gnu-v${AUDIT_VERSION}.tgz" \
+              | tar xz --strip-components=1 -C "${CARGO_HOME:-$HOME/.cargo}/bin/" --wildcards '*/cargo-audit'
+          fi
+          cargo-audit --version
+
+      - name: Run cargo audit
+        run: |
+          # Uses .cargo/audit.toml for documented exceptions (each RUSTSEC ID has rationale).
+          # --deny warnings: also fails on unmaintained/unsound warnings not in the ignore list.
+          # Failures report advisory ID and affected crate name.
+          cargo audit --deny warnings

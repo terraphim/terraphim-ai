@@ -52,10 +52,6 @@ ignore = [
     # - serenity is OPTIONAL (discord feature), NOT in default features; same root as 0049/0098/0099
     # - semver-incompatible with 0.103.x fix; blocked on serenity 0.13+
     "RUSTSEC-2026-0104",
-    # RUSTSEC-2026-0185: quinn-proto 0.11.14 remote memory exhaustion (CVSS 7.5 High)
-    # - Fix: upgrade to quinn-proto >=0.11.15
-    # - PR #2950 tracks the upgrade; remove this entry once that PR is merged
-    "RUSTSEC-2026-0185",
     # RUSTSEC-2024-0384: instant 0.1.13 is unmaintained
     # - Transitive dependency via indicatif -> self_update -> terraphim_update
     # - No known vulnerabilities; successor is web-time
@@ -94,7 +90,7 @@ ignore = [
     "RUSTSEC-2026-0184",
     # RUSTSEC-2026-0186: memmap2 0.9.10 unchecked pointer offset (unsound)
     # - Transitive dependency; fix is upgrade to memmap2 0.9.11
-    # - PR #2950 tracks the upgrade to memmap2 0.9.11 + quinn-proto 0.11.15
-    # - Resolution: Remove this entry once PR #2950 is merged
+    # - Blocked on transitive dependency graph; tracked in issue backlog
+    # - Resolution: Remove this entry once memmap2 is upgraded to 0.9.11
     "RUSTSEC-2026-0186",
 ]
