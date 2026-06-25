@@ -618,4 +618,196 @@ mod tests {
             assert!(!d.routes.is_empty());
         }
     }
+
+    // --- Gap coverage for issue #2945: classify_tier keywords, boundaries,
+    //     case-insensitivity, keyword-over-priority precedence, the remaining
+    //     is_environment_error sentinels, filter_by_kind no-match, and
+    //     build_report heading-fallback / empty / order invariants. ---
+
+    #[test]
+    fn classify_tier_covers_all_named_keywords() {
+        // Thinking-band keywords not previously exercised.
+        assert_eq!(classify_tier("research_tier", Some(10)), TierKind::Thinking);
+        assert_eq!(classify_tier("design_tier", Some(10)), TierKind::Thinking);
+        // Workhorse-band keywords not previously exercised.
+        assert_eq!(classify_tier("build_tier", Some(95)), TierKind::Workhorse);
+        assert_eq!(classify_tier("code_tier", Some(95)), TierKind::Workhorse);
+        // FastCheap-band keywords / substrings not previously exercised.
+        assert_eq!(
+            classify_tier("disciplined-verification", Some(95)),
+            TierKind::FastCheap
+        );
+        assert_eq!(
+            classify_tier("validation_tier", Some(95)),
+            TierKind::FastCheap
+        );
+        assert_eq!(classify_tier("check_tier", Some(95)), TierKind::FastCheap);
+    }
+
+    #[test]
+    fn classify_tier_is_case_insensitive() {
+        // classify_tier lower-cases the concept before matching keywords, so
+        // mixed-case taxonomy filenames classify identically to lowercase.
+        assert_eq!(classify_tier("PLANNING", Some(0)), TierKind::Thinking);
+        assert_eq!(classify_tier("Review", Some(0)), TierKind::FastCheap);
+        assert_eq!(
+            classify_tier("IMPLEMENTATION", Some(0)),
+            TierKind::Workhorse
+        );
+        assert_eq!(classify_tier("DeSiGn", None), TierKind::Thinking);
+    }
+
+    #[test]
+    fn classify_tier_keyword_overrides_priority() {
+        // A known keyword must win even when the priority band would pick a
+        // different tier. Taxonomy authors trust the concept name to dominate,
+        // so this is the core routing invariant.
+        assert_eq!(
+            classify_tier("planning_tier", Some(5)),
+            TierKind::Thinking,
+            "planning keyword must override a low priority"
+        );
+        assert_eq!(
+            classify_tier("review_tier", Some(99)),
+            TierKind::FastCheap,
+            "review keyword must override a high priority"
+        );
+        assert_eq!(
+            classify_tier("implementation_tier", Some(5)),
+            TierKind::Workhorse,
+            "implementation keyword must override a low priority"
+        );
+    }
+
+    #[test]
+    fn classify_tier_priority_band_boundaries_are_exact() {
+        // For an unknown concept the priority fallback has exact thresholds:
+        // >= 60 -> Thinking, >= 45 -> Workhorse, else FastCheap.
+        assert_eq!(classify_tier("obscure", Some(60)), TierKind::Thinking);
+        assert_eq!(classify_tier("obscure", Some(59)), TierKind::Workhorse);
+        assert_eq!(classify_tier("obscure", Some(45)), TierKind::Workhorse);
+        assert_eq!(classify_tier("obscure", Some(44)), TierKind::FastCheap);
+        assert_eq!(classify_tier("obscure", Some(0)), TierKind::FastCheap);
+    }
+
+    #[test]
+    fn is_environment_error_recognises_remaining_sentinels() {
+        // The two credential/config sentinels not covered by the existing
+        // condition_distinguishes_env_error_from_offline test.
+        let no_action = probe(
+            ProbeStatus::Error,
+            None,
+            Some("probe skipped: no action:: template defined"),
+        );
+        assert_eq!(
+            WeatherCondition::from_probe(Some(&no_action), 3000),
+            WeatherCondition::Unknown,
+            "'no action:: template defined' is an environment error"
+        );
+
+        let spawn_failed = probe(
+            ProbeStatus::Error,
+            None,
+            Some("probe skipped: spawn failed: permission denied"),
+        );
+        assert_eq!(
+            WeatherCondition::from_probe(Some(&spawn_failed), 3000),
+            WeatherCondition::Unknown,
+            "'spawn failed' is an environment error"
+        );
+    }
+
+    #[test]
+    fn is_environment_error_requires_both_phrases_for_cli_path() {
+        // The 'CLI tool' branch is an AND of two phrases: a message containing
+        // only one half must NOT be misclassified as an environment error, so a
+        // genuinely-down provider with a coincidental substring stays Offline.
+        let only_cli = probe(
+            ProbeStatus::Error,
+            None,
+            Some("the CLI tool crashed mid-request"),
+        );
+        assert_eq!(
+            WeatherCondition::from_probe(Some(&only_cli), 3000),
+            WeatherCondition::Offline
+        );
+
+        let only_path = probe(
+            ProbeStatus::Error,
+            None,
+            Some("server not found on PATH to provider"),
+        );
+        assert_eq!(
+            WeatherCondition::from_probe(Some(&only_path), 3000),
+            WeatherCondition::Offline
+        );
+    }
+
+    #[test]
+    fn filter_by_kind_with_no_match_yields_empty_report() {
+        // A report whose tiers are all a different kind must filter down to an
+        // empty tiers slice with a zeroed summary and zero total_models.
+        let d = MarkdownDirectives {
+            priority: Some(40),
+            routes: vec![route("p", "m", "c", false)],
+            ..Default::default()
+        };
+        let entries = vec![("review_tier".to_string(), d)]; // FastCheap
+        let report = build_report(Path::new("/x"), &entries, &[], false, 3000);
+        assert_eq!(report.tiers.len(), 1);
+
+        let thinking = filter_by_kind(report, TierKind::Thinking);
+        assert!(thinking.tiers.is_empty());
+        assert_eq!(thinking.total_models, 0);
+        assert_eq!(thinking.summary, ConditionSummary::default());
+        // probed flag is preserved through filtering.
+        assert!(!thinking.probed);
+    }
+
+    #[test]
+    fn build_report_falls_back_to_concept_name_when_no_heading() {
+        // When a tier's directives carry no explicit heading, build_report
+        // uses the concept (taxonomy filename stem) as the section heading.
+        let d = MarkdownDirectives {
+            priority: Some(40),
+            routes: vec![route("p", "m", "c", false)],
+            heading: None,
+            ..Default::default()
+        };
+        let entries = vec![("review_tier".to_string(), d)];
+        let report = build_report(Path::new("/x"), &entries, &[], false, 3000);
+        assert_eq!(report.tiers.len(), 1);
+        assert_eq!(report.tiers[0].heading, "review_tier");
+        assert_eq!(report.tiers[0].concept, "review_tier");
+    }
+
+    #[test]
+    fn build_report_preserves_input_tier_order_and_handles_empty() {
+        // build_report emits tiers in the order given by `entries` (the
+        // caller has already sorted by priority) and tolerates an empty input.
+        let empty = build_report(Path::new("/x"), &[], &[], false, 3000);
+        assert!(empty.tiers.is_empty());
+        assert_eq!(empty.total_models, 0);
+        assert_eq!(empty.summary, ConditionSummary::default());
+        assert!(!empty.probed);
+
+        // With two tiers in a deliberately non-priority-sorted order, the
+        // report sections come back in exactly that input order (it does not
+        // re-sort).
+        let mk = |concept: &str, prio: u8| {
+            (
+                concept.to_string(),
+                MarkdownDirectives {
+                    priority: Some(prio),
+                    routes: vec![route("p", &format!("{concept}-m"), "c", false)],
+                    ..Default::default()
+                },
+            )
+        };
+        let entries = vec![mk("review_tier", 40), mk("planning_tier", 80)];
+        let report = build_report(Path::new("/x"), &entries, &[], false, 3000);
+        assert_eq!(report.tiers.len(), 2);
+        assert_eq!(report.tiers[0].concept, "review_tier");
+        assert_eq!(report.tiers[1].concept, "planning_tier");
+    }
 }
