@@ -59,71 +59,8 @@ schedule = "0 */4 * * *"
 task = """
 export GITEA_URL=https://git.terraphim.cloud
 export PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH
-## ADF Meta-Coordinator: Monitoring and Health Checks
-
-### 1. Tick-Stall Detection
-STALL_COUNT=$(sudo journalctl -u adf-orchestrator --since '4 hours ago' | grep -c 'reconcile_tick SLOW' || true)
-if [ "$STALL_COUNT" -gt 0 ]; then
-  echo "WARNING: $STALL_COUNT tick stalls detected in last 4h"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Tick-stall detected: $STALL_COUNT in 4h" --body "$STALL_COUNT reconcile_tick SLOW events detected.
-Theme-ID: adf-health-alert"
-fi
-
-### 2. Agent Failure Report
-FAILURES=$(sudo journalctl -u adf-orchestrator --since '4 hours ago' | grep 'exit classified' | grep -v 'success' | grep -v 'empty_success' || true)
-FAILURE_COUNT=$(echo "$FAILURES" | grep -c 'exit_class=' || true)
-if [ "$FAILURE_COUNT" -gt 3 ]; then
-  echo "WARNING: $FAILURE_COUNT non-success agent exits in last 4h"
-  echo "$FAILURES" | tail -20 > /tmp/adf-failures.txt
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] $FAILURE_COUNT agent failures in 4h" --body "$(cat /tmp/adf-failures.txt)
-Theme-ID: adf-health-alert"
-fi
-
-### 2b. Agents Exceeding max_cpu_seconds
-TIMEOUTS=$(sudo journalctl -u adf-orchestrator --since '4 hours ago' | grep 'AGENT EXCEEDED max_cpu_seconds' || true)
-TIMEOUT_COUNT=$(echo "$TIMEOUTS" | grep -c 'AGENT EXCEEDED' || true)
-if [ "$TIMEOUT_COUNT" -gt 0 ]; then
-  echo "WARNING: $TIMEOUT_COUNT agents exceeded max_cpu_seconds in last 4h"
-  echo "$TIMEOUTS" | tail -10 > /tmp/adf-timeouts.txt
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] $TIMEOUT_COUNT agents exceeded max_cpu_seconds" --body "Agents killed after exceeding their configured max_cpu_seconds:
-$(cat /tmp/adf-timeouts.txt)
-
-Consider increasing max_cpu_seconds or investigating why these agents are running long.
-Theme-ID: adf-health-alert"
-fi
-
-### 3. Disk Usage Check (worktrees)
-WORKTREE_SIZE=$(du -sm /data/projects/terraphim/terraphim-ai/.worktrees/ 2>/dev/null | cut -f1 || echo 0)
-if [ "$WORKTREE_SIZE" -gt 10240 ]; then
-  echo "WARNING: worktrees using $WORKTREE_SIZE MB (>10GB)"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Worktree disk usage: $WORKTREE_SIZE MB" --body "Worktree directory exceeds 10GB threshold.
-Theme-ID: adf-health-alert"
-fi
-
-### 4. Binary Version Check
-ADF_VERSION=$(/usr/local/bin/adf --version 2>/dev/null || echo 'unknown')
-if [ "$ADF_VERSION" != 'adf 1.20.2' ]; then
-  echo "WARNING: adf binary version mismatch: $ADF_VERSION"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Binary version mismatch: $ADF_VERSION" --body "Expected: adf 1.20.2
-Actual: $ADF_VERSION
-Theme-ID: adf-health-alert"
-fi
-
-### 5. Orphaned Worktree Check
-ORPHANS=$(ls /data/projects/terraphim/terraphim-ai/.worktrees/ 2>/dev/null | wc -l)
-if [ "$ORPHANS" -gt 10 ]; then
-  echo "INFO: $ORPHANS worktrees present"
-fi
-
-### 6. Gitea API Health
-GITEA_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: token $GITEA_TOKEN" "$GITEA_URL/api/v1/user" || echo 000)
-if [ "$GITEA_STATUS" != '200' ]; then
-  echo "WARNING: Gitea API returned HTTP $GITEA_STATUS"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Gitea API unhealthy: HTTP $GITEA_STATUS" --body "Gitea API health check failed.
-Theme-ID: adf-health-alert"
-fi
-
-echo "=== Meta-coordinator health check complete ==="
+cd /data/projects/terraphim/terraphim-ai
+./scripts/adf-meta-coordinator-health.sh
 """
 capabilities = [
     "coordination",
