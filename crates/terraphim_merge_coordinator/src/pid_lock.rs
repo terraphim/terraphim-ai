@@ -1,4 +1,4 @@
-//! File-based PID lock for merge-coordinator (Concurrency-1 per spec).
+//! File-based PID lock for merge-coordinator.
 //!
 //! Prevents concurrent invocations from racing on Gitea API calls.
 //! Lock file lives at /tmp/merge-coordinator.lock; if another process

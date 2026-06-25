@@ -1,8 +1,8 @@
 //! Thin Gitea API wrapper for merge-coordinator.
 //!
 //! Reuses workspace `reqwest` instead of pulling in terraphim_tracker
-//! to keep the binary small. Provides retry/backoff per spec Failure-3
-//! (1 s / 2 s / 4 s) and never logs the token (Security-2).
+//! to keep the binary small. Provides retry/backoff (1 s / 2 s / 4 s)
+//! and never logs the token.
 
 use std::time::Duration;
 
