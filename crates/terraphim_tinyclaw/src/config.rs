@@ -866,4 +866,60 @@ model = "llama3.2"
             "Redaction marker must appear in LlmConfig Debug output"
         );
     }
+
+    /// AC: "invalid provider falls back to default".
+    ///
+    /// NOTE ON FIDELITY: the codebase has NO provider-fallback logic. `provider`
+    /// is a free-form `String` (`DirectLlmConfig.provider`, config.rs:203) with no
+    /// validation against an allow-list and no fallback arm. The issue's premise
+    /// describes behaviour that does not exist; inventing it would be scope creep.
+    ///
+    /// What does exist and is untested: `DirectLlmConfig::default()` returns the
+    /// documented ollama/llama3.2 defaults, and an explicitly-configured provider
+    /// round-trips through TOML. These are the LLM-provider-selection invariants
+    /// this regression test locks in.
+    #[test]
+    fn test_direct_llm_config_defaults_to_ollama() {
+        let cfg = DirectLlmConfig::default();
+        assert_eq!(cfg.provider, "ollama", "default provider must be ollama");
+        assert_eq!(cfg.model, "llama3.2", "default model must be llama3.2");
+        assert_eq!(
+            cfg.base_url.as_deref(),
+            Some("http://127.0.0.1:11434"),
+            "default base_url must point at the local Ollama port"
+        );
+    }
+
+    /// AC: deserialisation honours an explicitly-set provider/model rather than
+    /// silently substituting the default — the silent-wrong-provider failure mode
+    /// the issue calls out. Deserialising `DirectLlmConfig` directly isolates the
+    /// provider-selection contract from the full `Config` plumbing.
+    #[test]
+    fn test_direct_llm_config_explicit_provider_round_trips_through_toml() {
+        let toml = r#"
+provider = "openai"
+model = "gpt-4o"
+base_url = "https://api.openai.com/v1"
+"#;
+        let cfg: DirectLlmConfig = toml::from_str(toml).unwrap();
+        assert_eq!(cfg.provider, "openai");
+        assert_eq!(cfg.model, "gpt-4o");
+        assert_eq!(cfg.base_url.as_deref(), Some("https://api.openai.com/v1"));
+        // Sanity: the default path is NOT taken when fields are explicit.
+        assert_ne!(cfg.provider, "ollama");
+    }
+
+    /// AC: `Config::default()` builds without panic and surfaces the default
+    /// agent workspace (".") so a missing config file degrades gracefully.
+    #[test]
+    fn test_config_default_builds_without_default_role() {
+        let cfg = Config::default();
+        assert_eq!(cfg.agent.workspace, PathBuf::from("."));
+        assert_eq!(cfg.agent.max_iterations, 20);
+        assert_eq!(cfg.agent.max_session_messages, 200);
+        assert!(
+            cfg.agent.default_role.is_none(),
+            "default_role must be opt-in"
+        );
+    }
 }

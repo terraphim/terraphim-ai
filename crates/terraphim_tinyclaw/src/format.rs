@@ -488,4 +488,70 @@ mod tests {
             assert!(chunk.len() <= 4000);
         }
     }
+
+    /// AC: a long message is capped at the correct boundary — no chunk may
+    /// exceed the platform limit. This is the invariant that existing tests
+    /// (`test_chunk_message_telegram` / `test_chunk_message_discord`) only
+    /// check for non-emptiness; this test enforces the actual cap.
+    ///
+    /// NOTE: `chunk_message` splits only on `\n\n` (paragraphs) then `\n`
+    /// (lines). A single unbreakable line longer than the limit CANNOT be
+    /// split — that is the pre-existing contract (a documented limitation, not
+    /// a bug). This test therefore uses paragraph-separated input that the
+    /// chunker is designed to split, and asserts the cap invariant on every
+    /// resulting chunk.
+    #[test]
+    fn test_chunk_message_enforces_cap_at_platform_limits() {
+        // Build paragraph-separated text that comfortably exceeds both limits.
+        let paragraph = "a ".repeat(500); // 1000 chars each
+        let long_text = (0..8)
+            .map(|_| paragraph.as_str())
+            .collect::<Vec<_>>()
+            .join("\n\n"); // ~8056 chars
+
+        // Telegram limit (4096): packs 4 paragraphs per chunk.
+        let chunks = chunk_message(&long_text, 4096);
+        assert!(
+            chunks.len() > 1,
+            "text exceeding the limit must be split into multiple chunks"
+        );
+        for (i, chunk) in chunks.iter().enumerate() {
+            assert!(
+                chunk.len() <= 4096,
+                "telegram chunk {} exceeds 4096 cap: {} chars",
+                i,
+                chunk.len()
+            );
+        }
+
+        // Discord limit (2000): packs 2 paragraphs per chunk.
+        let chunks = chunk_message(&long_text, 2000);
+        assert!(chunks.len() > 1, "discord text must split");
+        for (i, chunk) in chunks.iter().enumerate() {
+            assert!(
+                chunk.len() <= 2000,
+                "discord chunk {} exceeds 2000 cap: {} chars",
+                i,
+                chunk.len()
+            );
+        }
+    }
+
+    /// AC boundary: text under the limit returns a single, verbatim chunk.
+    #[test]
+    fn test_chunk_message_under_limit_returns_single_unchanged_chunk() {
+        let text = "short message";
+        let chunks = chunk_message(text, 4096);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], "short message");
+    }
+
+    /// AC boundary: exactly-at-limit text is not split (<= is the boundary).
+    #[test]
+    fn test_chunk_message_exactly_at_limit_is_single_chunk() {
+        let text = "a".repeat(2000);
+        let chunks = chunk_message(&text, 2000);
+        assert_eq!(chunks.len(), 1, "text exactly at limit must not split");
+        assert_eq!(chunks[0].len(), 2000);
+    }
 }
