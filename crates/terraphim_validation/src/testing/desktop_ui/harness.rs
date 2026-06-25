@@ -197,10 +197,10 @@ impl DesktopUITestHarness {
     fn add_platform_args(&self, command: &mut Command) {
         #[cfg(target_os = "macos")]
         {
-            if let Some(macos_config) = &self.config.platform_config.macos {
-                if let Some(bundle_id) = &macos_config.bundle_id {
-                    command.arg("--bundle-id").arg(bundle_id);
-                }
+            if let Some(macos_config) = &self.config.platform_config.macos
+                && let Some(bundle_id) = &macos_config.bundle_id
+            {
+                command.arg("--bundle-id").arg(bundle_id);
             }
         }
 
