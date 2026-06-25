@@ -623,17 +623,17 @@ jobs:
 
       - name: Run security audit
         run: |
-          # Fetch fresh advisory database to handle CVSS format updates
-          cargo audit --fetch || true
-          cargo audit || echo "::warning::cargo audit found issues or had parsing errors"
-        continue-on-error: true  # Don't fail PR for security advisories
+          # Uses .cargo/audit.toml for documented exceptions (each RUSTSEC ID has rationale).
+          # --deny warnings: also fails on unmaintained/unsound warnings not in the ignore list.
+          # Failures include advisory ID and affected crate name.
+          cargo audit --deny warnings
 
   # Job summary
   pr-summary:
     name: PR Validation Summary
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 1
-    needs: [changes, build-frontend, rust-format, rustdoc, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build, ranking-regression-gate]
+    needs: [changes, build-frontend, rust-format, rustdoc, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build, ranking-regression-gate, security-audit]
     if: always()
 
     steps:
@@ -659,6 +659,7 @@ jobs:
           echo "| Frontend Check | ${{ needs.frontend-check.result || 'skipped' }} | Frontend linting and types |" >> $GITHUB_STEP_SUMMARY
           echo "| WASM Build | ${{ needs.wasm-build.result || 'skipped' }} | WebAssembly compilation |" >> $GITHUB_STEP_SUMMARY
           echo "| Ranking Regression Gate | ${{ needs.ranking-regression-gate.result || 'skipped' }} | Kendall-tau snapshot gate (WIG-1) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Audit | ${{ needs.security-audit.result || 'skipped' }} | cargo audit -- blocks on unacknowledged RUSTSEC advisories |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [[ "${{ needs.rust-format.result }}" == "failure" ]] || \
@@ -666,7 +667,8 @@ jobs:
              [[ "${{ needs.rust-clippy.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-compile.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-tests.result }}" == "failure" ]] || \
-             [[ "${{ needs.ranking-regression-gate.result }}" == "failure" ]]; then
+             [[ "${{ needs.ranking-regression-gate.result }}" == "failure" ]] || \
+             [[ "${{ needs.security-audit.result }}" == "failure" ]]; then
             echo "❌ **PR Validation Failed** - Please fix the failing checks before merging." >> $GITHUB_STEP_SUMMARY
             exit 1
           else
