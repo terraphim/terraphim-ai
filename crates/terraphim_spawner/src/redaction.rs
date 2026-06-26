@@ -4,6 +4,8 @@
 //! secrets, passwords) from agent stdout/stderr before storage or remote
 //! posting.
 
+use std::sync::OnceLock;
+
 use regex::Regex;
 
 /// Default patterns that indicate sensitive content in agent output.
@@ -28,6 +30,30 @@ pub const DEFAULT_REDACTION_PATTERNS: &[&str] = &[
     r"(?i)(bearer\s+)([a-zA-Z0-9_\-]{20,})",
 ];
 
+/// Lazily-compiled redaction regexes.
+///
+/// Compiling these patterns on every `redact()`/`verify_redacted()` call is
+/// expensive (issue #2961): the unit test `test_captured_events_bounded` calls
+/// `redact()` 4,106 times, recompiling 7 patterns each time (>28k compiles).
+/// In production every spawned-agent output line flows through `redact()`, so
+/// this is a hot path. The patterns are static constants, so we compile them
+/// exactly once via `OnceLock`.
+static REDACTION_REGEXES: OnceLock<Vec<Regex>> = OnceLock::new();
+
+/// Return the compiled redaction regexes, initialising the cache on first use.
+///
+/// Mirrors the previous `if let Ok(re) = Regex::new(pattern)` behaviour: a
+/// pattern that fails to compile is silently omitted (all current patterns are
+/// valid literals, so this never drops anything in practice).
+fn compiled_patterns() -> &'static [Regex] {
+    REDACTION_REGEXES.get_or_init(|| {
+        DEFAULT_REDACTION_PATTERNS
+            .iter()
+            .filter_map(|p| Regex::new(p).ok())
+            .collect()
+    })
+}
+
 /// Redact sensitive patterns from a string, replacing matches with `***REDACTED***`.
 ///
 /// Preserves prefix capture groups (if any) and replaces only the last
@@ -35,29 +61,27 @@ pub const DEFAULT_REDACTION_PATTERNS: &[&str] = &[
 pub fn redact(input: &str) -> String {
     let mut result = input.to_string();
 
-    for pattern in DEFAULT_REDACTION_PATTERNS {
-        if let Ok(re) = Regex::new(pattern) {
-            result = re
-                .replace_all(&result, |caps: &regex::Captures| {
-                    let group_count = caps.len();
+    for re in compiled_patterns() {
+        result = re
+            .replace_all(&result, |caps: &regex::Captures| {
+                let group_count = caps.len();
 
-                    // No capture groups beyond the full match -> redact entire match
-                    if group_count <= 2 {
-                        return "***REDACTED***".to_string();
-                    }
+                // No capture groups beyond the full match -> redact entire match
+                if group_count <= 2 {
+                    return "***REDACTED***".to_string();
+                }
 
-                    // Preserve all capture groups except the last one
-                    let mut replacement = String::new();
-                    for i in 1..group_count - 1 {
-                        if let Some(m) = caps.get(i) {
-                            replacement.push_str(m.as_str());
-                        }
+                // Preserve all capture groups except the last one
+                let mut replacement = String::new();
+                for i in 1..group_count - 1 {
+                    if let Some(m) = caps.get(i) {
+                        replacement.push_str(m.as_str());
                     }
-                    replacement.push_str("***REDACTED***");
-                    replacement
-                })
-                .to_string();
-        }
+                }
+                replacement.push_str("***REDACTED***");
+                replacement
+            })
+            .to_string();
     }
 
     result
@@ -74,11 +98,9 @@ pub fn verify_redacted(input: &str) -> bool {
         return true;
     }
 
-    for pattern in DEFAULT_REDACTION_PATTERNS {
-        if let Ok(re) = Regex::new(pattern) {
-            if re.is_match(input) {
-                return false;
-            }
+    for re in compiled_patterns() {
+        if re.is_match(input) {
+            return false;
         }
     }
     true
