@@ -31,6 +31,7 @@ pub enum TierKind {
 }
 
 impl TierKind {
+    /// Short uppercase label suitable for table headers and log lines.
     pub fn label(&self) -> &'static str {
         match self {
             TierKind::Thinking => "THINKING",
@@ -154,34 +155,53 @@ fn is_environment_error(error: &str) -> bool {
 /// A single model row in the report.
 #[derive(Debug, Clone, Serialize)]
 pub struct ModelRow {
+    /// Provider identifier (e.g. `anthropic`, `openai`).
     pub provider: String,
+    /// Model identifier within the provider (e.g. `claude-sonnet-4-6`).
     pub model: String,
+    /// CLI tool basename used to reach this model (e.g. `claude`, `opencode`).
     pub cli: String,
+    /// Whether the route is flagged as free-tier in the taxonomy.
     pub is_free: bool,
+    /// Observed probe condition for this model.
     pub condition: WeatherCondition,
+    /// Round-trip latency in milliseconds from the last probe, if measured.
     pub latency_ms: Option<u64>,
+    /// Human-readable error or detail from the probe, if any.
     pub detail: Option<String>,
 }
 
 /// One tier section of the report (one taxonomy file).
 #[derive(Debug, Clone, Serialize)]
 pub struct TierSection {
+    /// Taxonomy concept name (the markdown filename stem, e.g. `planning_tier`).
     pub concept: String,
+    /// Human-readable heading from the taxonomy file's first `#` line.
     pub heading: String,
+    /// Coarse tier classification derived from the concept name and priority.
     pub kind: TierKind,
+    /// Priority value from the taxonomy directive, if present.
     pub priority: Option<u8>,
+    /// All model rows in this tier, in taxonomy order.
     pub models: Vec<ModelRow>,
 }
 
 /// Aggregate counts per condition for the summary line.
 #[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
 pub struct ConditionSummary {
+    /// Number of models reporting [`WeatherCondition::Sunny`] (fast and up).
     pub sunny: usize,
+    /// Number of models reporting [`WeatherCondition::Fair`] (up but slow).
     pub fair: usize,
+    /// Number of models reporting [`WeatherCondition::Cloudy`] (rate-limited).
     pub cloudy: usize,
+    /// Number of models reporting [`WeatherCondition::Stormy`] (timed out).
     pub stormy: usize,
+    /// Number of models reporting [`WeatherCondition::Offline`] (API error).
     pub offline: usize,
+    /// Number of models reporting [`WeatherCondition::Unknown`] (env/config error).
     pub unknown: usize,
+    /// Number of models reporting [`WeatherCondition::Configured`] (not probed).
     pub configured: usize,
 }
 
@@ -208,11 +228,17 @@ impl ConditionSummary {
 /// The full weather report.
 #[derive(Debug, Clone, Serialize)]
 pub struct WeatherReport {
+    /// ISO-8601 timestamp when the report was generated.
     pub generated_at: String,
+    /// Absolute path to the taxonomy directory that was loaded.
     pub taxonomy_path: String,
+    /// `true` if live provider probes were run; `false` for `--no-probe` mode.
     pub probed: bool,
+    /// Total number of model routes across all tiers.
     pub total_models: usize,
+    /// Aggregate condition counts across all tiers.
     pub summary: ConditionSummary,
+    /// Per-tier breakdowns, ordered by priority descending.
     pub tiers: Vec<TierSection>,
 }
 

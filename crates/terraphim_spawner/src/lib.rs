@@ -77,24 +77,30 @@ pub use mention::{MentionEvent, MentionRouter};
 pub use output::{OutputCapture, OutputEvent};
 pub use redaction::{redact, verify_redacted};
 
-/// Errors that can occur during agent spawning
+/// Errors that can occur during agent spawning.
 #[derive(thiserror::Error, Debug)]
 pub enum SpawnerError {
+    /// Agent configuration failed validation before spawning.
     #[error("Agent validation failed: {0}")]
     ValidationError(String),
 
+    /// The OS-level process spawn failed (e.g. CLI not found on PATH).
     #[error("Failed to spawn agent: {0}")]
     SpawnError(String),
 
+    /// The agent process exited before producing expected output.
     #[error("Agent process exited unexpectedly: {0}")]
     ProcessExit(String),
 
+    /// Heartbeat health-check failed after the grace window elapsed.
     #[error("Health check failed: {0}")]
     HealthCheckFailed(String),
 
+    /// Underlying I/O error (pipe read/write, file access).
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// Structured config validation error (field-level).
     #[error("Config validation error: {0}")]
     ConfigValidation(#[from] ValidationError),
 }

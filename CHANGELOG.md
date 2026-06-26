@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`RUNNER_POLL_TIMEOUT` env var** `terraphim_gitea_runner` now reads `RUNNER_POLL_TIMEOUT` (default `2h`) to control how long a runner waits for a job before timing out; prevents silent hangs during long builds (PR #2978, 2026-06-25)
+- **Spawner post-exit fallback** `terraphim_spawner` detects early process exits and falls back gracefully via `post_exit_fallback` + `ExitDetected` event, reducing silent failures during agent restarts (2026-06-23)
+- **Weather report markdown output** `terraphim_weather_report` CLI now accepts `--format markdown` to emit a human-readable tier table alongside the existing JSON and table formats (2026-06-23)
+- **ADF taxonomy additions** `kimi-k2.7-coding` added to implementation tier; `GLM-5.2` and `MiniMax-M3` added to ADF routing tiers; pi-rust routes added for kimi-for-coding models (2026-06-22/23)
+- **KG-driven dynamic command allowlist** `terraphim_gitea_runner` derives its shell command allowlist at runtime from the tier-taxonomy KG, eliminating the static hardcoded set (PR #2804, 2026-06-22)
 - **Rustdoc gaps resolved** doc comments added to all public items and struct/enum fields in `terraphim_rlm` (`RlmError` variants and their named fields, `LocalExecutor`, `DockerExecutor`, `SessionStats`, MCP response types), `terraphim_lsp` (module-level `//!` headers for `kg_analysis` and `server` modules), `terraphim_merge_coordinator` (`ExitCode` variants, `PrEvaluation` fields, `PrSummary` fields, `MergeOutcome` variant fields, `MergeCoordinatorError` variant fields), and `terraphim_workspace` (`WorkspaceError` variant fields) -- all four crates now build with `--warn missing-docs` at zero warnings (2026-06-18)
 - **Thesaurus matching in robot mode** `thesaurus_matched` field added to `SearchResultsData`; populated from Thesaurus entries that match query terms in both offline and server search paths (Refs #851, 2026-05-31)
 - **Context rot detection** `RotStatus` enum with `Fresh`/`Warning`/`Critical` states; `Conversation::with_token_budget()` and `Conversation::check_rot()` methods for monitoring token budget utilization in `terraphim_types` (Refs #1443, 2026-05-31)
@@ -31,6 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Unsafe `set_var` SAFETY comment** added explicit `SAFETY` comment to `set_var` call in `terraphim_tinyclaw` test, documenting the single-threaded invariant (Refs #2492, PR #2971, 2026-06-25)
+- **Merge-coordinator const asserts** runtime `assert!()` calls in `merge_coordinator/gitea.rs` converted to compile-time `const {}` blocks, eliminating clippy `assertions_on_constants` warnings (2026-06-25)
+- **Weather report clippy fix** nested `if` collapsed to satisfy `clippy::collapsible_if` (2026-06-25)
+- **Validation vacuous assert** `assert!(true)` removed and nested `if` collapsed in `terraphim_validation` (2026-06-25)
+- **Spawner source files restored** `terraphim_spawner` re-included in workspace after missing source files were restored (2026-06-23)
+- **Taxonomy stale model IDs** `openai-codex/opencode` routes replaced with `openai/gpt-5.5`; `MiniMax-3` corrected to `MiniMax-M3` (2026-06-22/23)
+- **`list_open_prs` limit** raised from 50 to 300 in `merge_coordinator` to avoid silently missing PRs in large repositories (Refs #2850, PR #2854, 2026-06-21)
+- **`rust-version` field** declared as `1.85.0` in workspace and all published crates, aligning with the clippy MSRV configuration (Refs #2770, PR #2774, 2026-06-22)
+- **`.sessions/` gitignore** existing tracked `.sessions/` files removed from the git index after the `gitignore` entry was added (Refs #2893, PR #2896, 2026-06-22)
 - **Redis security exposure** Docker Compose Redis service now binds to `127.0.0.1:6379` instead of `0.0.0.0:6379` to prevent unintended public exposure of the cache (Refs #1313, 2026-05-31)
 - **Nested `cargo run` in exit-code tests** replaced with `cargo_bin!` macro to avoid file-lock deadlock under concurrent `cargo test` (2026-06-01)
 - **ADF KG-router fallback respawn loop** closed after quota exit — agents no longer re-routed to `anthropic/sonnet` indefinitely when per-agent config or quota-fallback chose another provider (Refs #1793, PR#1794, 2026-05-22)
@@ -49,6 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### CI
 
+- **Native CI build gate repaired** non-existent `terraphim_gitea_runner` test step dropped from `ci-native.yml`; clippy errors blocking `native-ci/build` resolved (PR #2973, 2026-06-25)
+- **Bigbox deployment rules** documented in `docs/`: git pull/push only; no cp/scp between machines (2026-06-23)
 - **`rust-format` gate** added to `ci-main.yml` with pre-existing clippy error fixes (Refs #1390, 2026-05-16)
 
 - **`QualityScore` type** added to `IndexedDocument` and `Document` in `terraphim_types`, carrying `logic_score`, `structure_score`, and `composite` (NaN-guarded) fields for downstream ranking (Refs #547)
