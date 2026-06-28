@@ -654,6 +654,7 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
 }
 
 /// Result of executing a single command.
+#[derive(Debug)]
 enum ExecuteResult {
     /// FINAL was reached with a result.
     Final(String),
@@ -710,6 +711,52 @@ fn truncate(s: &str, max_len: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::config::RlmConfig;
+    use crate::executor::LocalExecutor;
+    use crate::session::SessionManager;
+    use crate::types::{BashCommand, PythonCode};
+    use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+    use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+    /// Build a thesaurus containing the given terms.
+    fn test_thesaurus(terms: &[&str]) -> Thesaurus {
+        let mut thesaurus = Thesaurus::new("test".to_string());
+        for (id, term) in terms.iter().enumerate() {
+            let value = NormalizedTermValue::from(*term);
+            thesaurus.insert(value.clone(), NormalizedTerm::new(id as u64 + 1, value));
+        }
+        thesaurus
+    }
+
+    /// Build a QueryLoop backed by a real LocalExecutor and a controlled thesaurus.
+    fn test_query_loop(terms: &[&str]) -> QueryLoop<LocalExecutor> {
+        let config = RlmConfig::default();
+        let session_manager = Arc::new(SessionManager::new(config.clone()));
+        let budget_tracker = Arc::new(BudgetTracker::new(&config));
+        let llm_bridge = Arc::new(LlmBridge::new(
+            crate::llm_bridge::LlmBridgeConfig::default(),
+            session_manager.clone(),
+        ));
+
+        let thesaurus = test_thesaurus(terms);
+        let validator = Arc::new(
+            KnowledgeGraphValidator::new(ValidatorConfig::default()).with_thesaurus(thesaurus),
+        );
+        let executor = Arc::new(LocalExecutor::new().with_validator(Some(validator)));
+
+        let session_id = SessionId::new();
+        let loop_config = QueryLoopConfig::default();
+
+        QueryLoop::new(
+            session_id,
+            session_manager,
+            budget_tracker,
+            llm_bridge,
+            executor,
+            loop_config,
+        )
+    }
 
     #[test]
     fn test_truncate_multibyte() {
@@ -782,5 +829,117 @@ mod tests {
         let output = format_execution_output(&result);
         // Even with empty stdout/stderr, we still show exit_code
         assert!(output.contains("exit_code: 0"));
+    }
+
+    #[tokio::test]
+    async fn run_command_validates_before_execution() {
+        let query_loop = test_query_loop(&["echo", "allowed"]);
+        let command = Command::Run(BashCommand::new("echo allowed"));
+        let ctx = ExecutionContext::default();
+        let mut history = CommandHistory::new();
+
+        let result = query_loop
+            .execute_command(&command, &ctx, &mut history)
+            .await
+            .expect("execute_command should succeed");
+
+        let output = match result {
+            ExecuteResult::Continue { output } => output,
+            other => panic!("expected Continue, got {:?}", other),
+        };
+
+        assert!(
+            output.contains("allowed"),
+            "allowed RUN command should execute and produce output, got: {}",
+            output
+        );
+        assert!(history.entries.len() == 1);
+        assert!(history.entries[0].success);
+        assert_eq!(history.entries[0].exit_code, Some(0));
+    }
+
+    #[tokio::test]
+    async fn code_command_validates_before_execution() {
+        let query_loop = test_query_loop(&["print", "allowed"]);
+        let command = Command::Code(PythonCode::new("print('allowed')"));
+        let ctx = ExecutionContext::default();
+        let mut history = CommandHistory::new();
+
+        let result = query_loop
+            .execute_command(&command, &ctx, &mut history)
+            .await
+            .expect("execute_command should succeed");
+
+        let output = match result {
+            ExecuteResult::Continue { output } => output,
+            other => panic!("expected Continue, got {:?}", other),
+        };
+
+        assert!(
+            output.contains("allowed"),
+            "allowed CODE command should execute and produce output, got: {}",
+            output
+        );
+        assert!(history.entries.len() == 1);
+        assert!(history.entries[0].success);
+        assert_eq!(history.entries[0].exit_code, Some(0));
+    }
+
+    #[tokio::test]
+    async fn validation_failure_blocks_run_command() {
+        // Thesaurus only contains "echo"; the command uses neither "echo" nor any other
+        // known term, so validation must fail before execution.
+        let query_loop = test_query_loop(&["echo"]);
+        let command = Command::Run(BashCommand::new("cat disallowed"));
+        let ctx = ExecutionContext::default();
+        let mut history = CommandHistory::new();
+
+        let result = query_loop
+            .execute_command(&command, &ctx, &mut history)
+            .await
+            .expect("execute_command should succeed");
+
+        let output = match result {
+            ExecuteResult::Continue { output } => output,
+            other => panic!("expected Continue, got {:?}", other),
+        };
+
+        assert!(
+            output.contains("Command validation warning"),
+            "disallowed RUN command should be blocked with validation feedback, got: {}",
+            output
+        );
+        assert!(history.entries.len() == 1);
+        assert!(!history.entries[0].success);
+        assert_eq!(history.entries[0].exit_code, Some(-1));
+    }
+
+    #[tokio::test]
+    async fn validation_failure_blocks_code_command() {
+        // Thesaurus only contains "print"; the code uses neither "print" nor any other
+        // known term, so validation must fail before execution.
+        let query_loop = test_query_loop(&["print"]);
+        let command = Command::Code(PythonCode::new("x = 'disallowed'"));
+        let ctx = ExecutionContext::default();
+        let mut history = CommandHistory::new();
+
+        let result = query_loop
+            .execute_command(&command, &ctx, &mut history)
+            .await
+            .expect("execute_command should succeed");
+
+        let output = match result {
+            ExecuteResult::Continue { output } => output,
+            other => panic!("expected Continue, got {:?}", other),
+        };
+
+        assert!(
+            output.contains("Command validation warning"),
+            "disallowed CODE command should be blocked with validation feedback, got: {}",
+            output
+        );
+        assert!(history.entries.len() == 1);
+        assert!(!history.entries[0].success);
+        assert_eq!(history.entries[0].exit_code, Some(-1));
     }
 }
