@@ -35,7 +35,7 @@ terraphim_agent_supervisor = { version = "1.19.2", optional = true }
 # Local MCP search engine. Used by the mcp_search_tools tool to look up tools
 # from a caller-supplied corpus. Gated under the same `mcp` feature as rmcp
 # so it only compiles when MCP is enabled.
-terraphim_mcp_search = { path = "../terraphim_mcp_search", optional = true }
+terraphim_mcp_search = { version = "0.1.0", registry = "terraphim", optional = true }
 
 # Firecracker-rust core for VM and snapshot management (private repo).
 # Uncomment when building with --features firecracker on a machine with
