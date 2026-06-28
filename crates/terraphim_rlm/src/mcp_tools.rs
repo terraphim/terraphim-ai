@@ -1,6 +1,6 @@
 //! MCP (Model Context Protocol) tools for RLM operations.
 //!
-//! This module provides 7 specialized MCP tools:
+//! This module provides 8 specialized MCP tools:
 //! - `rlm_code`: Execute Python code in isolated VM
 //! - `rlm_bash`: Execute bash commands in isolated VM
 //! - `rlm_query`: Query LLM recursively
@@ -9,13 +9,27 @@
 //! - `rlm_status`: Get session status
 //! - `mcp_search_tools`: Search a caller-supplied corpus of MCP tools by
 //!   free-text query (powered by `terraphim_mcp_search::mcp_search_tools`)
+//! - `mcp_search_skills`: Search a caller-supplied corpus of skill entries
+//!   by free-text query (powered by `terraphim_mcp_search::mcp_search_skills`)
+//!
+//! ## Tool Search Tool compatibility (SEP-1821)
+//!
+//! `mcp_search_tools` and `mcp_search_skills` are the canonical
+//! implementations of MCP's dynamic-tool-discovery pattern (SEP-1821 in the
+//! Model Context Protocol spec). The MCP server SHOULD advertise this
+//! capability via `ServerCapabilities.tools.listChanged = true` and accept
+//! the `query` parameter on `tools/list` for clients that want native
+//! integration. Today the implementation exposes the search via discrete
+//! tools (more portable across the current MCP client ecosystem); the
+//! capability advertisement is left for a follow-up when the
+//! `rmcp` SDK ships SEP-1821 support upstream.
 
 use std::sync::Arc;
 
 use rmcp::model::{CallToolResult, Content, ErrorData, Tool};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
-use terraphim_mcp_search::mcp_search_tools;
+use terraphim_mcp_search::{mcp_search_skills, mcp_search_tools, SkillEntry};
 use terraphim_types::McpToolEntry;
 use tokio::sync::RwLock;
 
@@ -37,6 +51,21 @@ pub struct McpSearchToolsResponse {
     pub count: usize,
     /// The matching tool entries, in original (Aho-Corasick) order.
     pub tools: Vec<McpToolEntry>,
+}
+
+/// Response payload for the `mcp_search_skills` MCP tool.
+///
+/// Parallel to [`McpSearchToolsResponse`] but for Terraphim skills. Same
+/// serialisation pattern: pretty-printed JSON inside a single text content
+/// block.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpSearchSkillsResponse {
+    /// The original query string (echoed back).
+    pub query: String,
+    /// Number of matching skills returned.
+    pub count: usize,
+    /// The matching skill entries, in original (Aho-Corasick) order.
+    pub skills: Vec<SkillEntry>,
 }
 
 /// RLM MCP service providing specialized tools for code execution.
@@ -79,6 +108,7 @@ impl RlmMcpService {
             Self::rlm_snapshot_tool(),
             Self::rlm_status_tool(),
             Self::mcp_search_tools_tool(),
+            Self::mcp_search_skills_tool(),
         ]
     }
 
@@ -96,6 +126,7 @@ impl RlmMcpService {
             "rlm_snapshot" => self.handle_rlm_snapshot(arguments).await,
             "rlm_status" => self.handle_rlm_status(arguments).await,
             "mcp_search_tools" => self.handle_mcp_search_tools(arguments),
+            "mcp_search_skills" => self.handle_mcp_search_skills(arguments),
             _ => Err(ErrorData::internal_error(
                 format!("Unknown RLM tool: {}", name),
                 None,
@@ -376,6 +407,64 @@ impl RlmMcpService {
                 "Search a caller-supplied corpus of MCP tool entries for \
                 those matching the query. Uses Aho-Corasick pattern matching \
                 over name + description + tags. NFR: < 70ms for 100 tools."
+                    .into(),
+            ),
+            input_schema: Arc::new(schema.as_object().unwrap().clone()),
+            output_schema: None,
+            annotations: None,
+            icons: None,
+            meta: None,
+        }
+    }
+
+    /// MCP tool definition for `mcp_search_skills`.
+    ///
+    /// Parallel to `mcp_search_tools` but for Terraphim skills. Takes a
+    /// free-text query and an inline array of skill entries to search
+    /// across. Returns matching entries as JSON. Same stateless contract:
+    /// the caller decides which corpus to feed; this service does not
+    /// maintain its own skill registry.
+    ///
+    /// `SkillEntry` is a discovery projection (name + description + version
+    /// + author + tags) — `inputs` and `steps` are intentionally NOT part
+    /// of the search index because they're workflow-shape, not
+    /// discoverability-shape.
+    fn mcp_search_skills_tool() -> Tool {
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Free-text search query (whitespace-split into keywords)"
+                },
+                "skills": {
+                    "type": "array",
+                    "description": "Array of skill entries to search across. \
+                                    Each entry must have at least 'name' and 'description'; \
+                                    'version', 'author', and 'tags' are optional.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": { "type": "string" },
+                            "description": { "type": "string" },
+                            "version": { "type": "string" },
+                            "author": { "type": "string" },
+                            "tags": { "type": "array", "items": { "type": "string" } }
+                        },
+                        "required": ["name", "description"]
+                    }
+                }
+            },
+            "required": ["query", "skills"]
+        });
+
+        Tool {
+            name: "mcp_search_skills".into(),
+            title: Some("Search Skills".into()),
+            description: Some(
+                "Search a caller-supplied corpus of Terraphim skill entries for \
+                those matching the query. Uses Aho-Corasick pattern matching \
+                over name + description + tags. NFR: < 70ms for 100 skills."
                     .into(),
             ),
             input_schema: Arc::new(schema.as_object().unwrap().clone()),
@@ -881,6 +970,71 @@ impl RlmMcpService {
         )]))
     }
 
+    /// Handler for the `mcp_search_skills` MCP tool.
+    ///
+    /// Parallel to `handle_mcp_search_tools` but for Terraphim skills.
+    /// Stateless: takes a query string and an inline `skills` array, runs
+    /// `terraphim_mcp_search::mcp_search_skills`, and returns matching
+    /// entries as JSON.
+    ///
+    /// # Arguments
+    ///
+    /// Expected JSON shape:
+    /// ```json
+    /// {
+    ///   "query": "review",
+    ///   "skills": [
+    ///     {"name": "code-review", "description": "Automated review",
+    ///      "version": "1.0.0", "author": "Terraphim", "tags": ["quality"]}
+    ///   ]
+    /// }
+    /// ```
+    ///
+    /// `skills` is parsed loosely: only `name` + `description` are required;
+    /// other fields default sensibly.
+    fn handle_mcp_search_skills(
+        &self,
+        arguments: Option<Map<String, serde_json::Value>>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let args =
+            arguments.ok_or_else(|| ErrorData::invalid_params("Missing arguments", None))?;
+
+        let query = args
+            .get("query")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter", None))?;
+
+        let skills_value = args
+            .get("skills")
+            .ok_or_else(|| ErrorData::invalid_params("Missing 'skills' parameter", None))?;
+
+        let skills_array = skills_value.as_array().ok_or_else(|| {
+            ErrorData::invalid_params("'skills' must be an array of skill entries", None)
+        })?;
+
+        // Explicit closure (not function pointer) to avoid stable-Rust
+        // inference quirks with `serde_json::from_value` (consumes its
+        // argument).
+        let skills: Vec<SkillEntry> = skills_array
+            .iter()
+            .cloned()
+            .map(|v| serde_json::from_value::<SkillEntry>(v))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| ErrorData::invalid_params(format!("Invalid skill entry: {}", e), None))?;
+
+        let hits = mcp_search_skills(query, skills.as_slice());
+
+        let response = McpSearchSkillsResponse {
+            query: query.to_string(),
+            count: hits.len(),
+            skills: hits,
+        };
+
+        Ok(CallToolResult::success(vec![Content::text(
+            serde_json::to_string_pretty(&response).unwrap(),
+        )]))
+    }
+
     // Helper methods
 
     async fn resolve_session_id(
@@ -987,7 +1141,7 @@ mod tests {
     #[test]
     fn test_get_tools() {
         let tools = RlmMcpService::get_tools();
-        assert_eq!(tools.len(), 7);
+        assert_eq!(tools.len(), 8);
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"rlm_code"));
@@ -997,6 +1151,100 @@ mod tests {
         assert!(names.contains(&"rlm_snapshot"));
         assert!(names.contains(&"rlm_status"));
         assert!(names.contains(&"mcp_search_tools"));
+        assert!(names.contains(&"mcp_search_skills"));
+    }
+
+    /// End-to-end test for the new MCP search tools. Builds a small corpus,
+    /// calls each tool's handler, and asserts the deserialised response shape.
+    #[tokio::test]
+    async fn test_mcp_search_tools_e2e() {
+        let service = RlmMcpService::new();
+
+        let tools = vec![
+            McpToolEntry::new("search_files", "Search for files", "filesystem"),
+            McpToolEntry::new("read_file", "Read file contents", "filesystem"),
+            McpToolEntry::new("grep_text", "Grep text with regex", "search"),
+        ];
+
+        // Invoke via the public dispatch path
+        let args: serde_json::Map<String, serde_json::Value> = serde_json::from_value(
+            serde_json::json!({
+                "query": "file",
+                "tools": tools,
+            }),
+        )
+        .unwrap();
+
+        let result = service
+            .call_tool("mcp_search_tools", Some(args))
+            .await
+            .expect("call_tool mcp_search_tools");
+
+        // Extract the JSON body from the first text content block.
+        let body = match &result.content.first().expect("content present").raw {
+            rmcp::model::RawContent::Text(t) => &t.text,
+            _ => panic!("expected text content"),
+        };
+        let response: McpSearchToolsResponse = serde_json::from_str(body).unwrap();
+        assert_eq!(response.query, "file");
+        assert_eq!(response.count, 2);
+        let names: Vec<&str> = response.tools.iter().map(|t| t.name.as_str()).collect();
+        assert!(names.contains(&"search_files"));
+        assert!(names.contains(&"read_file"));
+    }
+
+    #[tokio::test]
+    async fn test_mcp_search_skills_e2e() {
+        let service = RlmMcpService::new();
+
+        let skills = vec![
+            SkillEntry::new("code-review", "Automated code review")
+                .with_tags(vec!["quality".into()]),
+            SkillEntry::new("deploy", "Deploy to staging"),
+        ];
+
+        let args: serde_json::Map<String, serde_json::Value> = serde_json::from_value(
+            serde_json::json!({
+                "query": "review",
+                "skills": skills,
+            }),
+        )
+        .unwrap();
+
+        let result = service
+            .call_tool("mcp_search_skills", Some(args))
+            .await
+            .expect("call_tool mcp_search_skills");
+
+        let body = match &result.content.first().expect("content present").raw {
+            rmcp::model::RawContent::Text(t) => &t.text,
+            _ => panic!("expected text content"),
+        };
+        let response: McpSearchSkillsResponse = serde_json::from_str(body).unwrap();
+        assert_eq!(response.query, "review");
+        assert_eq!(response.count, 1);
+        assert_eq!(response.skills[0].name, "code-review");
+    }
+
+    #[tokio::test]
+    async fn test_mcp_search_tools_invalid_args() {
+        let service = RlmMcpService::new();
+
+        // Missing 'tools' parameter.
+        let args: serde_json::Map<String, serde_json::Value> = serde_json::from_value(
+            serde_json::json!({"query": "anything"}),
+        )
+        .unwrap();
+        let result = service.call_tool("mcp_search_tools", Some(args)).await;
+        assert!(result.is_err(), "expected error for missing 'tools' param");
+
+        // 'tools' is not an array.
+        let args = serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(
+            serde_json::json!({"query": "x", "tools": "not-an-array"}),
+        )
+        .unwrap();
+        let result = service.call_tool("mcp_search_tools", Some(args)).await;
+        assert!(result.is_err(), "expected error for non-array 'tools'");
     }
 
     #[test]
