@@ -242,7 +242,13 @@ impl WorkspaceManager {
         }
     }
 
-    /// Archive a workspace by renaming it with timestamp instead of deleting.
+    /// Archive a workspace by renaming it with a timestamp instead of deleting.
+    ///
+    /// The destination name is `<key>_archived_<YYYYMMDD_HHMMSS>`. If that path
+    /// already exists — which happens when the same key is archived twice within
+    /// one second — a numeric disambiguator (`_2`, `_3`, …) is appended until a
+    /// free path is found. Without this guard `rename(2)` fails with `ENOTEMPTY`
+    /// on Linux and the second archive would be lost (issue #2885).
     pub async fn archive(&self, identifier: &str) -> Result<PathBuf> {
         let key = sanitise_workspace_key(identifier);
         let path = self.root.join(&key);
@@ -254,9 +260,8 @@ impl WorkspaceManager {
             });
         }
 
-        let timestamp = jiff::Zoned::now().strftime("%Y%m%d_%H%M%S");
-        let archive_key = format!("{}_archived_{}", key, timestamp);
-        let archive_path = self.root.join(&archive_key);
+        let timestamp = jiff::Zoned::now().strftime("%Y%m%d_%H%M%S").to_string();
+        let archive_path = self.resolve_archive_path(&key, &timestamp);
 
         std::fs::rename(&path, &archive_path).map_err(|e| WorkspaceError::Workspace {
             identifier: identifier.into(),
@@ -270,6 +275,24 @@ impl WorkspaceManager {
         );
 
         Ok(archive_path)
+    }
+
+    /// Pick a non-existent archive destination for `key` under `root`.
+    ///
+    /// Starts from `<key>_archived_<timestamp>` and, on collision, appends an
+    /// incrementing numeric suffix (`_2`, `_3`, …). Bounded by [`u32::MAX`]; in
+    /// practice the loop exits on the first or second iteration.
+    fn resolve_archive_path(&self, key: &str, timestamp: &str) -> PathBuf {
+        let base = format!("{key}_archived_{timestamp}");
+        let mut candidate = self.root.join(&base);
+        for suffix in 2u32.. {
+            if !candidate.exists() {
+                return candidate;
+            }
+            candidate = self.root.join(format!("{base}_{suffix}"));
+        }
+        // Unreachable: the loop above runs u32::MAX iterations before reaching here.
+        candidate
     }
 
     /// Validate that a workspace path stays under the workspace root.
@@ -645,5 +668,138 @@ mod tests {
             content.is_empty(),
             "LD_PRELOAD should have been stripped, got: {content:?}"
         );
+    }
+
+    // --- archive() coverage (issue #2885) ---------------------------------
+
+    /// Helper: build a WorkspaceManager rooted at a fresh tempdir.
+    fn manager_in_tmp() -> (tempfile::TempDir, WorkspaceManager) {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig::default(),
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+        (tmp, mgr)
+    }
+
+    #[tokio::test]
+    async fn archive_creates_timestamped_directory() {
+        let (tmp, mgr) = manager_in_tmp();
+        let env = HashMap::new();
+
+        // Prepare a workspace with a marker file so we can verify content survives the rename.
+        let info = mgr.prepare("ARCH-1", &env).await.unwrap();
+        std::fs::write(info.path.join("marker.txt"), b"payload").unwrap();
+
+        let archive_path = mgr.archive("ARCH-1").await.unwrap();
+
+        // Original path must no longer exist...
+        assert!(
+            !info.path.exists(),
+            "original workspace path must be gone after archive"
+        );
+        // ...archive directory must exist under root ...
+        assert!(
+            archive_path.starts_with(tmp.path()),
+            "archive path must stay under workspace root"
+        );
+        assert!(archive_path.is_dir(), "archive path must be a directory");
+        // ...with the documented naming scheme <key>_archived_<YYYYMMDD_HHMMSS>.
+        let name = archive_path.file_name().unwrap().to_string_lossy();
+        assert!(
+            name.starts_with("ARCH-1_archived_"),
+            "archive dir name must start with '<key>_archived_', got: {name}"
+        );
+        let ts = &name["ARCH-1_archived_".len()..];
+        assert_eq!(
+            ts.len(),
+            15,
+            "timestamp suffix must be YYYYMMDD_HHMMSS (15 chars), got: {ts:?}"
+        );
+        assert_eq!(
+            ts.as_bytes()[8],
+            b'_',
+            "timestamp must use '_' between date and time, got: {ts:?}"
+        );
+
+        // Content must survive the rename.
+        assert_eq!(
+            std::fs::read(archive_path.join("marker.txt")).unwrap(),
+            b"payload",
+            "archived workspace must retain its contents"
+        );
+    }
+
+    #[tokio::test]
+    async fn archive_nonexistent_returns_error() {
+        let (_tmp, mgr) = manager_in_tmp();
+
+        let result = mgr.archive("DOES-NOT-EXIST").await;
+        let err = result.expect_err("archiving a non-existent workspace must error");
+        assert!(
+            matches!(err, WorkspaceError::Workspace { .. }),
+            "expected WorkspaceError::Workspace, got: {err:?}"
+        );
+        // The reason must mention the non-existence (no opaque ENOTEMPTY leak).
+        let WorkspaceError::Workspace { reason, .. } = &err else {
+            unreachable!()
+        };
+        assert!(
+            reason.contains("non-existent"),
+            "error reason must explain the cause, got: {reason}"
+        );
+    }
+
+    /// Regression for the timestamp-collision bug from #2885: archiving the same
+    /// key twice within the same second previously targeted an identical
+    /// `<key>_archived_<ts>` path; on Linux `rename(2)` returns `ENOTEMPTY` for a
+    /// non-empty target directory, surfacing as an opaque error and discarding
+    /// the second archive. Both archives must now coexist.
+    #[tokio::test]
+    async fn archive_collision_uses_disambiguating_suffix() {
+        let (tmp, mgr) = manager_in_tmp();
+        let env = HashMap::new();
+
+        // Two distinct source workspaces that sanitise to the SAME key.
+        let a = mgr.prepare("COLLIDE-1", &env).await.unwrap();
+        std::fs::write(a.path.join("a.txt"), b"a").unwrap();
+        let first = mgr.archive("COLLIDE-1").await.unwrap();
+
+        // Recreate a workspace with the identical key and archive again immediately.
+        let b = mgr.prepare("COLLIDE-1", &env).await.unwrap();
+        std::fs::write(b.path.join("b.txt"), b"b").unwrap();
+        let second = mgr.archive("COLLIDE-1").await.unwrap();
+
+        // The two archive paths must differ and both survive under root.
+        assert_ne!(
+            first, second,
+            "collision must be disambiguated, not overwrite the first archive"
+        );
+        assert!(first.is_dir(), "first archive must still exist");
+        assert!(second.is_dir(), "second archive must exist");
+        assert!(first.starts_with(tmp.path()));
+        assert!(second.starts_with(tmp.path()));
+
+        // Both archives' content must be intact (no clobber).
+        assert_eq!(
+            std::fs::read(first.join("a.txt")).unwrap(),
+            b"a",
+            "first archive content must survive the second archive"
+        );
+        assert_eq!(std::fs::read(second.join("b.txt")).unwrap(), b"b");
+
+        // The disambiguated name must share the timestamp prefix but carry a
+        // numeric suffix, so both remain sortable/identifiable as archives of the
+        // same key.
+        let first_name = first.file_name().unwrap().to_string_lossy().into_owned();
+        let second_name = second.file_name().unwrap().to_string_lossy().into_owned();
+        let prefix = "COLLIDE-1_archived_";
+        assert!(
+            first_name.starts_with(prefix) && second_name.starts_with(prefix),
+            "both archives must keep the documented prefix; got {first_name:?} / {second_name:?}"
+        );
+        assert_ne!(first_name, second_name);
     }
 }
