@@ -9214,6 +9214,7 @@ dependencies = [
  "symphonia",
  "teloxide",
  "tempfile",
+ "terraphim_mcp_search",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
