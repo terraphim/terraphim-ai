@@ -24,9 +24,47 @@ use terraphim_types::{Document, IndexedDocument, SearchQuery};
 use crate::error::{Result, Status};
 pub type SearchResultsStream = Sender<IndexedDocument>;
 
-/// Health check endpoint
-pub(crate) async fn health() -> impl IntoResponse {
-    (StatusCode::OK, "OK")
+/// Response body of the [`health`] readiness probe.
+///
+/// Deterministic JSON contract so integration test harnesses can parse the
+/// body (not just assert the status code): `{"status":"ok"}`.
+#[derive(Debug, serde::Serialize)]
+pub struct HealthResponse {
+    /// Readiness state of the server.
+    pub status: &'static str,
+}
+
+/// Readiness probe.
+///
+/// Returns HTTP 200 with a fixed JSON body `{"status":"ok"}` once the Axum
+/// router is serving requests. Used by integration tests to wait for startup
+/// instead of a fixed `sleep`, which is the documented root cause of the
+/// `test_default_role_ripgrep_integration` flake (#2998, #2947).
+pub(crate) async fn health() -> Json<HealthResponse> {
+    Json(HealthResponse { status: "ok" })
+}
+
+#[cfg(test)]
+mod health_tests {
+    use super::*;
+
+    /// AC #2998: `GET /health` returns HTTP 200 with body `{"status":"ok"}`.
+    ///
+    /// Locks the JSON body contract (was previously a free-form `"OK"` string
+    /// that could not be parsed by a JSON-asserting harness).
+    #[test]
+    fn health_serialises_to_fixed_json_status_ok() {
+        let body = serde_json::to_string(&HealthResponse { status: "ok" })
+            .expect("HealthResponse must serialise");
+        assert_eq!(body, r#"{"status":"ok"}"#);
+    }
+
+    /// The handler returns the canonical body without allocation surprises.
+    #[tokio::test]
+    async fn health_handler_returns_json_status_ok() {
+        let Json(payload) = health().await;
+        assert_eq!(payload.status, "ok");
+    }
 }
 
 /// Response for creating a document

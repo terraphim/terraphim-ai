@@ -4,6 +4,9 @@ use std::time::Duration;
 use serial_test::serial;
 use tokio::time::sleep;
 
+mod common;
+use common::wait_for_health;
+
 use terraphim_config::{Config, ConfigState};
 use terraphim_server::{ConfigResponse, SearchResponse, axum_server};
 
@@ -115,26 +118,31 @@ async fn test_default_role_ripgrep_integration() {
     log::info!("✅ Default role configuration validated");
     log::info!("   - Ripgrep haystack: {}", ripgrep_haystack.location);
 
-    // Start server on a test port
-    let server_addr = "127.0.0.1:8085".parse().unwrap();
+    // Start server on an ephemeral port (held by the listener until axum binds,
+    // eliminating the port-race that caused the #2947/#2998 flake).
+    let listener =
+        std::net::TcpListener::bind("127.0.0.1:0").expect("Failed to bind ephemeral port");
+    let server_addr = listener.local_addr().expect("Failed to read bound port");
+    drop(listener); // axum_server rebinds; held long enough to avoid TOCTOU on busy CI
     let server_handle = tokio::spawn(async move {
         if let Err(e) = axum_server(server_addr, config_state).await {
             log::error!("Server error: {:?}", e);
         }
     });
 
-    // Wait for server to start
-    log::info!("⏳ Waiting for server startup...");
-    sleep(Duration::from_secs(3)).await;
+    // Deterministic readiness: poll /health instead of a fixed sleep.
+    // AC #2998: harness waits for /health success before issuing search requests.
+    log::info!("⏳ Waiting for server startup via /health...");
+    wait_for_health(server_addr, 60).await;
 
     let client = terraphim_service::http_client::create_default_client()
         .expect("Failed to create HTTP client");
-    let base_url = "http://127.0.0.1:8085";
+    let base_url = format!("http://{server_addr}");
 
-    // Test 1: Health check
+    // Test 1: Health check (body contract: {"status":"ok"})
     log::info!("🔍 Testing server health...");
     let health_response = client
-        .get(format!("{}/health", base_url))
+        .get(format!("{base_url}/health"))
         .send()
         .await
         .expect("Health check failed");
@@ -142,6 +150,16 @@ async fn test_default_role_ripgrep_integration() {
     assert!(
         health_response.status().is_success(),
         "Health check should succeed"
+    );
+    // Lock the JSON body contract added in #2998 (was free-form "OK" text).
+    let health_json: serde_json::Value = health_response
+        .json()
+        .await
+        .expect("/health body must be valid JSON");
+    assert_eq!(
+        health_json.get("status").and_then(|v| v.as_str()),
+        Some("ok"),
+        "/health body must be {{\"status\":\"ok\"}}, got: {health_json}"
     );
     log::info!("✅ Server health check passed");
 
