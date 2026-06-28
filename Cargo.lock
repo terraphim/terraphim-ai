@@ -8677,6 +8677,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_mcp_search"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_automata 1.20.4",
+ "terraphim_types 1.20.4",
+]
+
+[[package]]
+name = "terraphim_mcp_search"
+version = "0.1.0"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "12bc3124d20065a4271a6d3554602af3b3bdef8597aade2886616c28def90f6f"
+dependencies = [
+ "serde",
+ "serde_json",
+ "terraphim_automata 1.20.4",
+ "terraphim_types 1.20.4",
+]
+
+[[package]]
 name = "terraphim_merge_coordinator"
 version = "1.21.0"
 dependencies = [
@@ -8915,6 +8938,7 @@ dependencies = [
  "terraphim_agent_supervisor",
  "terraphim_automata 1.20.4",
  "terraphim_config 1.20.4",
+ "terraphim_mcp_search 0.1.0 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
  "terraphim_rolegraph 1.20.4",
  "terraphim_service",
  "terraphim_types 1.20.4",
@@ -9202,6 +9226,7 @@ dependencies = [
  "symphonia",
  "teloxide",
  "tempfile",
+ "terraphim_mcp_search 0.1.0 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",

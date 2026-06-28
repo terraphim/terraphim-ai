@@ -1,0 +1,29 @@
+[package]
+name = "terraphim_mcp_search"
+# Independent versioning — fresh crate, semver 0.x as we iterate.
+# Bump to 1.x once the API stabilises (after Step 3-4 of issue terraphim-agents#64).
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors = ["Terraphim Team <team@terraphim.ai>"]
+description = "MCP tool index and discovery using terraphim_automata (Aho-Corasick pattern matching)"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["mcp", "model-context-protocol", "tool-discovery", "aho-corasick", "search"]
+license = "Apache-2.0"
+readme = "README.md"
+
+[dependencies]
+# Use the same terraphim_types / terraphim_automata versions as the rest of
+# the terraphim-ai workspace (1.20.4 from crates.io). Mixing registries
+# (e.g. terraphim-registry 1.20.2 here, crates.io 1.20.4 in the workspace)
+# causes Cargo to treat them as separate crates, leading to type-mismatch
+# errors when crossing crate boundaries.
+terraphim_automata = { version = "1.20.4" }
+terraphim_types = { version = "1.20.4" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

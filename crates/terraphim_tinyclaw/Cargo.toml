@@ -74,6 +74,13 @@ whisper-rs = { version = "0.16", optional = true }
 symphonia = { version = "0.5", optional = true, features = ["ogg", "pcm", "mp3", "wav"] }
 hound = { version = "3.5", optional = true }
 
+# MCP search engine. Powers `terraphim-tinyclaw skill search <query>`,
+# which uses `mcp_search_skills` (Aho-Corasick over name + description + tags)
+# to find saved skills by free-text query. Unconditional dep — the crate is
+# tiny and search is a core skill-lifecycle operation. Published as v0.1.0
+# to the terraphim registry (cargo publish --registry terraphim).
+terraphim_mcp_search = { version = "0.1.0", registry = "terraphim" }
+
 [features]
 default = ["telegram"]
 telegram = ["dep:teloxide"]

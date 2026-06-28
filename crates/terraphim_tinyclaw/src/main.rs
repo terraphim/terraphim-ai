@@ -30,6 +30,7 @@ use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use terraphim_mcp_search::{mcp_search_skills, SkillEntry};
 
 /// Multi-channel AI assistant powered by Terraphim.
 #[derive(Parser, Debug)]
@@ -90,6 +91,19 @@ enum SkillCommands {
     },
     /// Cancel the currently running skill.
     Cancel,
+    /// Search saved skills by free-text query.
+    ///
+    /// Uses Aho-Corasick pattern matching over `name + description + tags`
+    /// (the same engine as `mcp_search_skills`). Empty queries return all
+    /// skills (sorted by name). Non-empty queries return skills whose
+    /// search text contains the query keywords.
+    Search {
+        /// Free-text search query (whitespace-split into keywords).
+        query: String,
+        /// Maximum number of results to display. 0 = no limit.
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+    },
 }
 
 #[tokio::main]
@@ -426,6 +440,87 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
         SkillCommands::Cancel => {
             executor.cancel();
             println!("Cancellation signal sent.");
+        }
+
+        SkillCommands::Search { query, limit } => {
+            // Load all saved skills and project each into a SkillEntry for the
+            // search engine. SkillEntry is the discovery projection used by
+            // mcp_search_skills — name + description + version + author + tags.
+            //
+            // Steps/inputs are intentionally NOT included in the search index:
+            // they're workflow-shape, not discoverability-shape. A future
+            // enhancement could add step-content to tags via a `step_indexer`
+            // helper, but that's out of scope for the first cut.
+            let all_skills = executor
+                .list_skills()
+                .map_err(|e| anyhow::anyhow!("Failed to list skills: {}", e))?;
+
+            if all_skills.is_empty() {
+                println!("No skills saved. Use 'skill save <file>' to add one.");
+                return Ok(());
+            }
+
+            // Project to SkillEntry. Tags are derived from step types present
+            // in the workflow, giving a useful discoverability hook without
+            // requiring explicit `tags` field on the Skill struct itself.
+            let entries: Vec<SkillEntry> = all_skills
+                .iter()
+                .map(|s| {
+                    let mut tags: Vec<String> = s
+                        .steps
+                        .iter()
+                        .map(|step| match step {
+                            crate::skills::SkillStep::Tool { tool, .. } => format!("tool:{}", tool),
+                            crate::skills::SkillStep::Llm { .. } => "llm".to_string(),
+                            crate::skills::SkillStep::Shell { .. } => "shell".to_string(),
+                        })
+                        .collect();
+                    if let Some(author) = &s.author {
+                        tags.push(format!("author:{}", author));
+                    }
+                    SkillEntry {
+                        name: s.name.clone(),
+                        description: s.description.clone(),
+                        version: s.version.clone(),
+                        author: s.author.clone(),
+                        tags,
+                    }
+                })
+                .collect();
+
+            let hits = mcp_search_skills(&query, &entries);
+
+            if hits.is_empty() {
+                println!("No skills match query '{}'.", query);
+                return Ok(());
+            }
+
+            let total = hits.len();
+            let display: Vec<&SkillEntry> = if limit > 0 && limit < hits.len() {
+                hits.iter().take(limit).collect()
+            } else {
+                hits.iter().collect()
+            };
+
+            println!(
+                "Skills matching '{}' (showing {} of {}):",
+                query,
+                display.len(),
+                total
+            );
+            for entry in display {
+                println!(
+                    "  - {} (v{}) - {}{}",
+                    entry.name,
+                    entry.version,
+                    entry.description,
+                    if entry.tags.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" [{}]", entry.tags.join(", "))
+                    }
+                );
+            }
         }
     }
 
