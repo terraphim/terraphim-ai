@@ -1,24 +1,43 @@
 //! MCP (Model Context Protocol) tools for RLM operations.
 //!
-//! This module provides 6 specialized MCP tools for RLM:
+//! This module provides 7 specialized MCP tools:
 //! - `rlm_code`: Execute Python code in isolated VM
 //! - `rlm_bash`: Execute bash commands in isolated VM
 //! - `rlm_query`: Query LLM recursively
 //! - `rlm_context`: Get/set context variables
 //! - `rlm_snapshot`: Create/restore snapshots
 //! - `rlm_status`: Get session status
+//! - `mcp_search_tools`: Search a caller-supplied corpus of MCP tools by
+//!   free-text query (powered by `terraphim_mcp_search::mcp_search_tools`)
 
 use std::sync::Arc;
 
 use rmcp::model::{CallToolResult, Content, ErrorData, Tool};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
+use terraphim_mcp_search::mcp_search_tools;
+use terraphim_types::McpToolEntry;
 use tokio::sync::RwLock;
 
 use crate::rlm::TerraphimRlm;
 use crate::types::SessionId;
 
 // Note: McpError is in crate::error but we use RlmError.to_mcp_error()
+
+/// Response payload for the `mcp_search_tools` MCP tool.
+///
+/// Returned as pretty-printed JSON inside a `CallToolResult::success`.
+/// `query` echoes the input for client-side correlation; `count` is
+/// pre-computed so the caller doesn't have to re-walk `tools`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpSearchToolsResponse {
+    /// The original query string (echoed back).
+    pub query: String,
+    /// Number of matching tools returned.
+    pub count: usize,
+    /// The matching tool entries, in original (Aho-Corasick) order.
+    pub tools: Vec<McpToolEntry>,
+}
 
 /// RLM MCP service providing specialized tools for code execution.
 #[derive(Clone)]
@@ -59,6 +78,7 @@ impl RlmMcpService {
             Self::rlm_context_tool(),
             Self::rlm_snapshot_tool(),
             Self::rlm_status_tool(),
+            Self::mcp_search_tools_tool(),
         ]
     }
 
@@ -75,6 +95,7 @@ impl RlmMcpService {
             "rlm_context" => self.handle_rlm_context(arguments).await,
             "rlm_snapshot" => self.handle_rlm_snapshot(arguments).await,
             "rlm_status" => self.handle_rlm_status(arguments).await,
+            "mcp_search_tools" => self.handle_mcp_search_tools(arguments),
             _ => Err(ErrorData::internal_error(
                 format!("Unknown RLM tool: {}", name),
                 None,
@@ -304,6 +325,57 @@ impl RlmMcpService {
             description: Some(
                 "Get the status of an RLM session including budget usage, \
                 VM state, and optionally command history."
+                    .into(),
+            ),
+            input_schema: Arc::new(schema.as_object().unwrap().clone()),
+            output_schema: None,
+            annotations: None,
+            icons: None,
+            meta: None,
+        }
+    }
+
+    /// MCP tool definition for `mcp_search_tools`.
+    ///
+    /// Takes a free-text query and an inline array of tool entries to search
+    /// across. Returns matching entries as JSON. The caller decides which
+    /// corpus to feed; this service is stateless about tools.
+    fn mcp_search_tools_tool() -> Tool {
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Free-text search query (whitespace-split into keywords)"
+                },
+                "tools": {
+                    "type": "array",
+                    "description": "Array of MCP tool entries to search across. \
+                                    Each entry must have at least 'name' and 'description'; \
+                                    'server_name' and 'tags' are optional.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": { "type": "string" },
+                            "description": { "type": "string" },
+                            "server_name": { "type": "string" },
+                            "tags": { "type": "array", "items": { "type": "string" } },
+                            "input_schema": { "type": "object" }
+                        },
+                        "required": ["name", "description"]
+                    }
+                }
+            },
+            "required": ["query", "tools"]
+        });
+
+        Tool {
+            name: "mcp_search_tools".into(),
+            title: Some("Search MCP Tools".into()),
+            description: Some(
+                "Search a caller-supplied corpus of MCP tool entries for \
+                those matching the query. Uses Aho-Corasick pattern matching \
+                over name + description + tags. NFR: < 70ms for 100 tools."
                     .into(),
             ),
             input_schema: Arc::new(schema.as_object().unwrap().clone()),
@@ -745,6 +817,70 @@ impl RlmMcpService {
         }
     }
 
+    /// Handler for the `mcp_search_tools` MCP tool.
+    ///
+    /// Stateless: takes a query string and an inline `tools` array, runs
+    /// `terraphim_mcp_search::mcp_search_tools`, and returns matching entries
+    /// as JSON. The caller decides what corpus to feed; this service does not
+    /// maintain its own registry.
+    ///
+    /// # Arguments
+    ///
+    /// The expected JSON shape is:
+    /// ```json
+    /// {
+    ///   "query": "search",
+    ///   "tools": [
+    ///     {"name": "search_files", "description": "Search for files",
+    ///      "server_name": "filesystem", "tags": ["fs"]}
+    ///   ]
+    /// }
+    /// ```
+    ///
+    /// `tools` is parsed loosely: extra fields are ignored, missing fields
+    /// default sensibly (`tags: []`, `input_schema: None`).
+    fn handle_mcp_search_tools(
+        &self,
+        arguments: Option<Map<String, serde_json::Value>>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let args =
+            arguments.ok_or_else(|| ErrorData::invalid_params("Missing arguments", None))?;
+
+        let query = args
+            .get("query")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter", None))?;
+
+        let tools_value = args
+            .get("tools")
+            .ok_or_else(|| ErrorData::invalid_params("Missing 'tools' parameter", None))?;
+
+        let tools_array = tools_value.as_array().ok_or_else(|| {
+            ErrorData::invalid_params("'tools' must be an array of tool entries", None)
+        })?;
+
+        // Deserialise loosely. We don't require the caller to send every
+        // field on McpToolEntry — only name + description are mandatory.
+        let tools: Vec<McpToolEntry> = tools_array
+            .iter()
+            .cloned()
+            .map(serde_json::from_value::<McpToolEntry>)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| ErrorData::invalid_params(format!("Invalid tool entry: {}", e), None))?;
+
+        let hits = mcp_search_tools(query, tools.as_slice());
+
+        let response = McpSearchToolsResponse {
+            query: query.to_string(),
+            count: hits.len(),
+            tools: hits,
+        };
+
+        Ok(CallToolResult::success(vec![Content::text(
+            serde_json::to_string_pretty(&response).unwrap(),
+        )]))
+    }
+
     // Helper methods
 
     async fn resolve_session_id(
@@ -851,7 +987,7 @@ mod tests {
     #[test]
     fn test_get_tools() {
         let tools = RlmMcpService::get_tools();
-        assert_eq!(tools.len(), 6);
+        assert_eq!(tools.len(), 7);
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"rlm_code"));
@@ -860,6 +996,7 @@ mod tests {
         assert!(names.contains(&"rlm_context"));
         assert!(names.contains(&"rlm_snapshot"));
         assert!(names.contains(&"rlm_status"));
+        assert!(names.contains(&"mcp_search_tools"));
     }
 
     #[test]

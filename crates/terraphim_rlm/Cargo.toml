@@ -32,6 +32,10 @@ terraphim_automata = { version = "1.20.4", optional = true }
 terraphim_types = { version = "1.20.4", optional = true }
 terraphim_rolegraph = { version = "1.20.4", optional = true }
 terraphim_agent_supervisor = { version = "1.19.2", optional = true }
+# Local MCP search engine. Used by the mcp_search_tools tool to look up tools
+# from a caller-supplied corpus. Gated under the same `mcp` feature as rmcp
+# so it only compiles when MCP is enabled.
+terraphim_mcp_search = { path = "../terraphim_mcp_search", optional = true }
 
 # Firecracker-rust core for VM and snapshot management (private repo).
 # Uncomment when building with --features firecracker on a machine with
@@ -76,7 +80,7 @@ llm-bridge = ["dep:hyper", "dep:hyper-util"]
 docker-backend = ["dep:bollard"]
 firecracker = []
 e2b-backend = ["dep:reqwest"]
-mcp = ["dep:rmcp"]
+mcp = ["dep:rmcp", "dep:terraphim_mcp_search", "dep:terraphim_types"]
 cli = ["dep:clap", "dep:env_logger"]
 
 [dev-dependencies]
