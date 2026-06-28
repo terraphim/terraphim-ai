@@ -8683,8 +8683,8 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "terraphim_automata 1.20.2",
- "terraphim_types 1.20.2",
+ "terraphim_automata 1.20.4",
+ "terraphim_types 1.20.4",
 ]
 
 [[package]]
@@ -8926,6 +8926,7 @@ dependencies = [
  "terraphim_agent_supervisor",
  "terraphim_automata 1.20.4",
  "terraphim_config 1.20.4",
+ "terraphim_mcp_search",
  "terraphim_rolegraph 1.20.4",
  "terraphim_service",
  "terraphim_types 1.20.4",

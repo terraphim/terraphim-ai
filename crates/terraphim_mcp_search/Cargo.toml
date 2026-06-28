@@ -15,8 +15,13 @@ license = "Apache-2.0"
 readme = "README.md"
 
 [dependencies]
-terraphim_automata = { version = "1.20.2", registry = "terraphim" }
-terraphim_types = { version = "1.20.2", registry = "terraphim" }
+# Use the same terraphim_types / terraphim_automata versions as the rest of
+# the terraphim-ai workspace (1.20.4 from crates.io). Mixing registries
+# (e.g. terraphim-registry 1.20.2 here, crates.io 1.20.4 in the workspace)
+# causes Cargo to treat them as separate crates, leading to type-mismatch
+# errors when crossing crate boundaries.
+terraphim_automata = { version = "1.20.4" }
+terraphim_types = { version = "1.20.4" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
