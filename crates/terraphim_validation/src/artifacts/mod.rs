@@ -304,4 +304,29 @@ mod tests {
             assert_eq!(variant, &round_tripped);
         }
     }
+
+    #[test]
+    fn test_platform_serde_roundtrip() {
+        // Platform is the key used to select release artefacts per target OS/arch.
+        // A serde regression would silently route the wrong binary to a platform at
+        // release time, so every variant must round-trip identically.
+        let variants = [
+            Platform::LinuxX86_64,
+            Platform::LinuxAarch64,
+            Platform::LinuxArmV7,
+            Platform::MacOSX86_64,
+            Platform::MacOSAarch64,
+            Platform::WindowsX86_64,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).expect("serialise Platform");
+            let round_tripped: Platform =
+                serde_json::from_str(&json).expect("deserialise Platform");
+            assert_eq!(
+                variant, &round_tripped,
+                "round-trip mismatch for {:?}",
+                variant
+            );
+        }
+    }
 }

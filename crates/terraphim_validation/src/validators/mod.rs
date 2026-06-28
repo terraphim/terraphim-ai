@@ -399,4 +399,41 @@ mod tests {
         assert_eq!(stats.passed_validations, 1);
         assert_eq!(stats.success_rate(), 1.0);
     }
+
+    #[test]
+    fn test_validation_status_serde_roundtrip() {
+        // Every variant must survive a JSON serialise/deserialise round-trip.
+        // Regression guard: a derive change or enum edit that breaks serde fidelity
+        // would silently corrupt persisted validation summaries.
+        let variants = [
+            ValidationStatus::Pending,
+            ValidationStatus::InProgress,
+            ValidationStatus::Passed,
+            ValidationStatus::Failed,
+            ValidationStatus::Skipped,
+            ValidationStatus::Error,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).expect("serialise ValidationStatus");
+            let round_tripped: ValidationStatus =
+                serde_json::from_str(&json).expect("deserialise ValidationStatus");
+            assert_eq!(
+                variant, &round_tripped,
+                "round-trip mismatch for {:?}",
+                variant
+            );
+        }
+    }
+
+    #[test]
+    fn test_validation_status_display() {
+        // Display output is consumed by human-readable reports; verify each variant's
+        // exact rendered string to prevent silent drift in report text.
+        assert_eq!(ValidationStatus::Pending.to_string(), "Pending");
+        assert_eq!(ValidationStatus::InProgress.to_string(), "InProgress");
+        assert_eq!(ValidationStatus::Passed.to_string(), "Passed");
+        assert_eq!(ValidationStatus::Failed.to_string(), "Failed");
+        assert_eq!(ValidationStatus::Skipped.to_string(), "Skipped");
+        assert_eq!(ValidationStatus::Error.to_string(), "Error");
+    }
 }
