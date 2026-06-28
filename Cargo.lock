@@ -8677,6 +8677,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_mcp_search"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_automata 1.20.2",
+ "terraphim_types 1.20.2",
+]
+
+[[package]]
 name = "terraphim_merge_coordinator"
 version = "1.21.0"
 dependencies = [
