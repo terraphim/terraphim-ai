@@ -165,6 +165,37 @@ yarn run e2e
 - Frontend components should have corresponding tests
 - Use descriptive test names following Rust conventions
 
+### Debugging Flaky Tests
+
+Flaky tests fail intermittently because `cargo test` / `cargo nextest` run tests in
+parallel with non-deterministic ordering. To reproduce a flake deterministically,
+use the `flaky-repro` nextest profile defined in `.config/nextest.toml`.
+
+**Reproduce locally (deterministic order, up to 5 attempts):**
+
+```bash
+# Full workspace, serial execution with 5 retries:
+cargo nextest run --workspace --profile flaky-repro
+
+# Scoped to a reported flaky test (substring filter):
+cargo nextest run --workspace --profile flaky-repro test_terraphim_graph_search
+```
+
+**How it works:** `[profile.flaky-repro]` sets `test-threads = 1` (serial execution
+is nextest's only determinism primitive — there is no fixed-order seed) and
+`retries = 5` (the "reproduced within 5 attempts" target). It inherits the
+`slow-timeout` and per-test overrides from `[profile.default]`, so hang-class
+tests remain bounded. `fail-fast = true` stops on the first persistent failure.
+
+**Reproduce in CI (manual dispatch):** trigger the **CI PR Validation** workflow
+on a PR that touches test code and provide the optional `test-name` input — this
+runs the `Flaky Test Reproduction` job, which installs `cargo-nextest`, verifies
+the profile config via `scripts/ci-check-flaky-repro-profile.sh`, and runs
+`cargo nextest run --workspace --profile flaky-repro` on a self-hosted runner.
+
+See issue #2999 for the acceptance criteria. (BUILD.md documents the build-runner
+machinery; this is the developer-facing testing reference.)
+
 ## Branch Protection and Naming Conventions
 
 ### Repository Structure

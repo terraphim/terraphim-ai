@@ -14,5 +14,23 @@ slow-timeout = { period = "10s", terminate-after = 1 }
 [[profile.default.overrides]]
 filter = 'test(test_performance_and_limits)'
 slow-timeout = { period = "240s", terminate-after = 2 }
+
 [profile.ci]
 test-threads = 4
+
+# Deterministic flaky-test reproduction profile (issue #2999).
+#
+# Serial execution (test-threads = 1) is nextest's determinism primitive:
+# nextest has no fixed-order seed, so serial order makes runs reproducible
+# across invocations. retries = 5 satisfies the "reproduced within 5 attempts"
+# acceptance criterion. fail-fast = true stops on the first persistent failure
+# so the reproduction is visible immediately.
+#
+# This profile INHERITS slow-timeout from [profile.default] (period 60s,
+# terminate-after 3) and the per-test overrides above, so hang-class tests
+# remain bounded. Invoke with:
+#   cargo nextest run --workspace --profile flaky-repro [optional test filter]
+[profile.flaky-repro]
+test-threads = 1
+retries = 5
+fail-fast = true
