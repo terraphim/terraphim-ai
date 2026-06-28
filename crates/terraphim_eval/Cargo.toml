@@ -1,0 +1,24 @@
+[package]
+name = "terraphim_eval"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description = "Codebase evaluation metrics runner: executes cargo clippy/test, normalises output to JSON MetricRecords"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "terraphim_eval"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror = "1.0"
+jiff = { version = "0.2", features = ["serde"] }
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -17,8 +17,7 @@ exclude = [
     # Empty / residual directories left after polyrepo extraction. They no longer
     # contain a top-level Cargo.toml and must be excluded so `crates/*` does not
     # match them (#2260).
-    # Orphaned eval directory: Cargo.toml never merged into main, only tests/ subdir remains.
-    "crates/terraphim_eval",
+    # (terraphim_eval now implemented — see crates/terraphim_eval, #2990)
     "crates/terraphim_agent",
     "crates/terraphim_agent_evolution",
     "crates/terraphim_automata",
