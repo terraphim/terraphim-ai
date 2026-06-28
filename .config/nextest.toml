@@ -1,6 +1,10 @@
 [profile.default]
 fail-fast = false
-slow-timeout = { period = "60s", terminate-after = 3 }
+# Per-test runaway ceiling (#2997): slow threshold = 60s, terminate-after = 2
+# => runaway test terminated at 120s (60s threshold + 60s grace, <= #2997's
+# 150s ceiling of "threshold + 90s"). Inherited by [profile.ci].
+# Guarded by scripts/ci-check-nextest-timeout.sh.
+slow-timeout = { period = "60s", terminate-after = 2 }
 
 # Tight timeout for the known hang-class tests in terraphim_agent.
 # Issue #1305: these tests spawn `cargo run … chat` via Command::output()
