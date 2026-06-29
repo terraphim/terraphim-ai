@@ -360,7 +360,10 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
             automata_path: None,
             knowledge_graph_local: Some(KnowledgeGraphLocal {
                 input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
-                path: PathBuf::from("docs/src/kg"),
+                path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .parent()
+                    .expect("workspace root")
+                    .join("docs/src/kg"),
             }),
             public: true,
             publish: true,
