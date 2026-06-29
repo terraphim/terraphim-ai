@@ -2,4 +2,4 @@
 
 Session management for RLM query loops with state persistence.
 
-synonyms:: session, query loop, rlm, query, budget, context, SessionId, SessionManager
+synonyms:: session, query loop, rlm, query, budget, context, SessionId, SessionManager, BackendSessionConfig, ClaudeCodeSession, CodexSession, LiveSession, SessionAction, SessionCreateResponse, SessionHistoryTool, SessionInfo, SessionListTool, SessionManagerConfig, SessionModel

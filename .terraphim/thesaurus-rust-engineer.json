@@ -1,585 +1,1973 @@
 {
   "name": "Rust Engineer",
   "data": {
-    "blockerkind": {
+    "agent_system": {
       "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentdefinition": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentdeploymentspec": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentevent": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agenthandle": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentkey": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentlayer": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentmetrics": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentorchestrator": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentpermit": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentpool": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentregistry": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentrunrecord": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentrunrequest": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentscope": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentselectionrule": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentsource": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentspawner": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentsubcommand": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "agentvalidateallreport": {
+      "id": 100,
+      "nterm": "agent_system"
+    },
+    "blockerkind": {
+      "id": 101,
       "nterm": "blockerkind"
     },
     "blocker": {
-      "id": 100,
+      "id": 101,
       "nterm": "blockerkind"
     },
     "ci_failed": {
-      "id": 100,
+      "id": 101,
       "nterm": "blockerkind"
     },
     "ci_pending": {
-      "id": 100,
+      "id": 101,
       "nterm": "blockerkind"
     },
     "ci_no_status": {
-      "id": 100,
+      "id": 101,
       "nterm": "blockerkind"
     },
     "not_mergeable": {
-      "id": 100,
+      "id": 101,
       "nterm": "blockerkind"
     },
     "classification": {
-      "id": 100,
+      "id": 101,
       "nterm": "blockerkind"
     },
-    "concurrency": {
+    "blockerref": {
       "id": 101,
+      "nterm": "blockerkind"
+    },
+    "cli": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "bashcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "cliinterface": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "cliresponse": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "command": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "configsubcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "dispatchcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "filesubcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "markdowncommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "replcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "robotsubcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "rolesubcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "sessionssubcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "updatesubcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "vmsubcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "webconfigsubcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "websubcommand": {
+      "id": 102,
+      "nterm": "cli"
+    },
+    "concurrency": {
+      "id": 103,
       "nterm": "concurrency"
     },
     "arc": {
-      "id": 101,
+      "id": 103,
       "nterm": "concurrency"
     },
     "mutex": {
-      "id": 101,
+      "id": 103,
       "nterm": "concurrency"
     },
     "rwlock": {
-      "id": 101,
+      "id": 103,
       "nterm": "concurrency"
     },
     "cow": {
-      "id": 101,
+      "id": 103,
       "nterm": "concurrency"
     },
     "cell": {
-      "id": 101,
+      "id": 103,
       "nterm": "concurrency"
     },
     "refcell": {
-      "id": 101,
+      "id": 103,
       "nterm": "concurrency"
     },
     "oncecell": {
-      "id": 101,
+      "id": 103,
       "nterm": "concurrency"
     },
     "parking_lot": {
-      "id": 101,
+      "id": 103,
       "nterm": "concurrency"
     },
     "atomics": {
-      "id": 101,
+      "id": 103,
       "nterm": "concurrency"
     },
     "lock": {
-      "id": 101,
+      "id": 103,
       "nterm": "concurrency"
     },
     "thread safety": {
-      "id": 101,
+      "id": 103,
       "nterm": "concurrency"
     },
+    "channelmanager": {
+      "id": 103,
+      "nterm": "concurrency"
+    },
+    "channelsconfig": {
+      "id": 103,
+      "nterm": "concurrency"
+    },
+    "clichannel": {
+      "id": 103,
+      "nterm": "concurrency"
+    },
+    "discordchannel": {
+      "id": 103,
+      "nterm": "concurrency"
+    },
+    "matrixchannel": {
+      "id": 103,
+      "nterm": "concurrency"
+    },
+    "pidlockguard": {
+      "id": 103,
+      "nterm": "concurrency"
+    },
+    "slackchannel": {
+      "id": 103,
+      "nterm": "concurrency"
+    },
+    "telegramchannel": {
+      "id": 103,
+      "nterm": "concurrency"
+    },
+    "config": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "accessibilitytestconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "agentconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "applicationconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "autoupdatertestconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "benchmarkconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "buildconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "circuitbreakerconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "componenttestconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "compoundreviewconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "concurrencyconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "configurationchange": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "configurationchangetype": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "configurationmanager": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "contrastconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "crossplatformtestconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "deploymentconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "desktopuitestconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "desktopuitestsuiteconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "directdispatchconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "directllmconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "discordconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "downloadconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "evolutionconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "externallinkconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "fileoperationconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "focusconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "gateconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "healthconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "hooksconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "hotreloadconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "integrationtestconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "keyboardconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "keyboardshortcutconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "learningconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "legacystatusmirrorconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "linuxconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "linuxtestconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "llmbridgeconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "llmconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "localskillconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "loggingconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "macosconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "macostestconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "matrixconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "memoryconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "mentionconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "metricspersistenceconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "networkconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "nightwatchconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "orchestratorconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "performancegateconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "performancetestconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "platformconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "playwrightconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "policyconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "prdispatchconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "projectadfconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "providerbudgetconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "proxyclientconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "proxyconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "queryloopconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "quickwitconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "reportconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "resourceconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "responsivenessconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "riskassessmentsettings": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "rlmconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "routingconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "runnerconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "serverintegrationconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "serviceconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "settings": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "shelltoolconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "slackconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "startupconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "supervisionconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "swarmconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "telegramconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "testoutputconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "tomlprojectadfconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "toolcallingconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "toolsconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "touchbarconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "trackerconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "trajectoryloggerconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "tuitestconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "updateconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "updaterconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "validatorconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "visualconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "webtoolsconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "webhookconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "windowconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "windowsconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "windowstestconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "workflowconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
+    "workspaceconfig": {
+      "id": 104,
+      "nterm": "config"
+    },
     "error-handling": {
-      "id": 102,
+      "id": 105,
       "nterm": "error-handling"
     },
     "result": {
-      "id": 102,
+      "id": 105,
       "nterm": "error-handling"
     },
     "option": {
-      "id": 102,
+      "id": 105,
       "nterm": "error-handling"
     },
     "thiserror": {
-      "id": 102,
+      "id": 105,
       "nterm": "error-handling"
     },
     "anyhow": {
-      "id": 102,
+      "id": 105,
       "nterm": "error-handling"
     },
     "error handling": {
-      "id": 102,
+      "id": 105,
       "nterm": "error-handling"
     },
     "? operator": {
-      "id": 102,
+      "id": 105,
       "nterm": "error-handling"
     },
     "from trait": {
-      "id": 102,
+      "id": 105,
       "nterm": "error-handling"
     },
     "unwrap": {
-      "id": 102,
+      "id": 105,
       "nterm": "error-handling"
     },
     "expect": {
-      "id": 102,
+      "id": 105,
       "nterm": "error-handling"
     },
     "error propagation": {
-      "id": 102,
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "applicationerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "clierror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "commanderror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "compileerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "error": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "gateerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "githubrunnererror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "jsonrpcerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "kgroutererror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "learningerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "mcperror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "mentionchainerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "metapromptrendererror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "metricspersistenceerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "orchestratorerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "prgatecontexterror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "quickwiterror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "rlmerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "runrecorderror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "runnererror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "spawnererror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "symphonyerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "toolerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "verdictparseerror": {
+      "id": 105,
+      "nterm": "error-handling"
+    },
+    "workspaceerror": {
+      "id": 105,
       "nterm": "error-handling"
     },
     "executor": {
-      "id": 103,
+      "id": 106,
       "nterm": "executor"
     },
     "execution": {
-      "id": 103,
+      "id": 106,
       "nterm": "executor"
     },
     "firecracker": {
-      "id": 103,
+      "id": 106,
       "nterm": "executor"
     },
     "docker": {
-      "id": 103,
+      "id": 106,
       "nterm": "executor"
     },
     "local": {
-      "id": 103,
+      "id": 106,
       "nterm": "executor"
     },
     "sandbox": {
-      "id": 103,
+      "id": 106,
       "nterm": "executor"
     },
     "vm": {
-      "id": 103,
+      "id": 106,
       "nterm": "executor"
     },
     "isolate": {
-      "id": 103,
+      "id": 106,
       "nterm": "executor"
     },
     "localexecutor": {
-      "id": 103,
+      "id": 106,
       "nterm": "executor"
     },
     "dockerexecutor": {
-      "id": 103,
+      "id": 106,
       "nterm": "executor"
     },
     "firecrackerexecutor": {
-      "id": 103,
+      "id": 106,
+      "nterm": "executor"
+    },
+    "executorcapabilities": {
+      "id": 106,
+      "nterm": "executor"
+    },
+    "flowexecutor": {
+      "id": 106,
+      "nterm": "executor"
+    },
+    "hostcommandexecutor": {
+      "id": 106,
+      "nterm": "executor"
+    },
+    "hybridexecutor": {
+      "id": 106,
+      "nterm": "executor"
+    },
+    "mockcommandexecutor": {
+      "id": 106,
+      "nterm": "executor"
+    },
+    "simulatedvmexecutor": {
+      "id": 106,
+      "nterm": "executor"
+    },
+    "sshexecutor": {
+      "id": 106,
+      "nterm": "executor"
+    },
+    "vmcommandexecutor": {
+      "id": 106,
+      "nterm": "executor"
+    },
+    "workflowexecutor": {
+      "id": 106,
+      "nterm": "executor"
+    },
+    "workflowexecutorconfig": {
+      "id": 106,
       "nterm": "executor"
     },
     "merge_coordinator": {
-      "id": 104,
+      "id": 107,
       "nterm": "merge_coordinator"
     },
     "merge": {
-      "id": 104,
+      "id": 107,
       "nterm": "merge_coordinator"
     },
     "coordinator": {
-      "id": 104,
+      "id": 107,
       "nterm": "merge_coordinator"
     },
     "auto-merge": {
-      "id": 104,
+      "id": 107,
       "nterm": "merge_coordinator"
     },
     "pr": {
-      "id": 104,
+      "id": 107,
       "nterm": "merge_coordinator"
     },
     "pull request": {
-      "id": 104,
+      "id": 107,
       "nterm": "merge_coordinator"
     },
     "gitea": {
-      "id": 104,
+      "id": 107,
       "nterm": "merge_coordinator"
     },
     "contamination": {
-      "id": 104,
+      "id": 107,
       "nterm": "merge_coordinator"
     },
     "giteaclient": {
-      "id": 104,
+      "id": 107,
       "nterm": "merge_coordinator"
     },
     "prsummary": {
-      "id": 104,
+      "id": 107,
       "nterm": "merge_coordinator"
     },
     "evaluate_all": {
-      "id": 104,
+      "id": 107,
       "nterm": "merge_coordinator"
     },
+    "automergecriteria": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "automergedecision": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "automergededupeset": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "automergefailurededupe": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "evalverdict": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "giteaoutputconfig": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "giteaprtracker": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "giteapullrequestpayload": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "giteapushcommit": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "giteapushpayload": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "giteapusher": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "gitearepository": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "giteaskillrepoconfig": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "giteatargetreport": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "giteatracker": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "giteauser": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "mergecoordinatorerror": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "mergeoutcome": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "postmergegateconfig": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "prfile": {
+      "id": 107,
+      "nterm": "merge_coordinator"
+    },
+    "orchestrator": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "adfcommand": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "adfcommandparser": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "adfenvelope": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "compoundreviewresult": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "compoundreviewworkflow": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "desktopuitestorchestrator": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "dualmodeorchestrator": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "flowdefinition": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "flowstepdef": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "handoffbuffer": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "handoffcontext": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "handoffledger": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "orchestratorevent": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "parsedworkflow": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "quickwitfleetsink": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "symphonyorchestrator": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "tomladfagent": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "workflowchanged": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "workflowcontext": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "workflowdefinition": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "workflowoptimization": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "workflowparser": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "workflowresult": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "workflowstep": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
+    "workflowwatcher": {
+      "id": 108,
+      "nterm": "orchestrator"
+    },
     "ownership": {
-      "id": 105,
+      "id": 109,
       "nterm": "ownership"
     },
     "borrow checker": {
-      "id": 105,
+      "id": 109,
       "nterm": "ownership"
     },
     "lifetime": {
-      "id": 105,
+      "id": 109,
       "nterm": "ownership"
     },
     "reference": {
-      "id": 105,
+      "id": 109,
       "nterm": "ownership"
     },
     "borrowing": {
-      "id": 105,
+      "id": 109,
       "nterm": "ownership"
     },
     "mutable reference": {
-      "id": 105,
+      "id": 109,
       "nterm": "ownership"
     },
     "zero-copy": {
-      "id": 105,
+      "id": 109,
       "nterm": "ownership"
     },
     "unsafe": {
-      "id": 105,
+      "id": 109,
       "nterm": "ownership"
     },
     "memory safety": {
-      "id": 105,
+      "id": 109,
       "nterm": "ownership"
     },
     "performance": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "flamegraph": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "criterion": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "simd": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "inline": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "pgo": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "profile-guided optimisation": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "heap profiling": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "dhat": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "perf": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "benchmark": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "performance regression": {
-      "id": 106,
+      "id": 110,
       "nterm": "performance"
     },
     "provider": {
-      "id": 107,
+      "id": 111,
       "nterm": "provider"
     },
     "llm backend": {
-      "id": 107,
+      "id": 111,
       "nterm": "provider"
     },
     "anthropic": {
-      "id": 107,
+      "id": 111,
       "nterm": "provider"
     },
     "openai": {
-      "id": 107,
+      "id": 111,
       "nterm": "provider"
     },
     "gemini": {
-      "id": 107,
+      "id": 111,
       "nterm": "provider"
     },
     "model": {
-      "id": 107,
+      "id": 111,
       "nterm": "provider"
     },
     "api": {
-      "id": 107,
+      "id": 111,
       "nterm": "provider"
     },
     "openrouter": {
-      "id": 107,
+      "id": 111,
+      "nterm": "provider"
+    },
+    "exaprovider": {
+      "id": 111,
+      "nterm": "provider"
+    },
+    "kimisearchprovider": {
+      "id": 111,
       "nterm": "provider"
     },
     "rust": {
-      "id": 108,
+      "id": 112,
       "nterm": "rust"
     },
     "serde": {
-      "id": 109,
+      "id": 113,
       "nterm": "serde"
     },
     "serialize": {
-      "id": 109,
+      "id": 113,
       "nterm": "serde"
     },
     "deserialize": {
-      "id": 109,
+      "id": 113,
       "nterm": "serde"
     },
     "serde_json": {
-      "id": 109,
+      "id": 113,
       "nterm": "serde"
     },
     "json": {
-      "id": 109,
+      "id": 113,
       "nterm": "serde"
     },
     "toml": {
-      "id": 109,
+      "id": 113,
       "nterm": "serde"
     },
     "yaml": {
-      "id": 109,
+      "id": 113,
       "nterm": "serde"
     },
     "bincode": {
-      "id": 109,
+      "id": 113,
       "nterm": "serde"
     },
     "serialisation": {
-      "id": 109,
+      "id": 113,
       "nterm": "serde"
     },
     "deserialisation": {
-      "id": 109,
+      "id": 113,
       "nterm": "serde"
     },
     "derive macro": {
-      "id": 109,
+      "id": 113,
       "nterm": "serde"
     },
     "session": {
-      "id": 110,
+      "id": 114,
       "nterm": "session"
     },
     "query loop": {
-      "id": 110,
+      "id": 114,
       "nterm": "session"
     },
     "rlm": {
-      "id": 110,
+      "id": 114,
       "nterm": "session"
     },
     "query": {
-      "id": 110,
+      "id": 114,
       "nterm": "session"
     },
     "budget": {
-      "id": 110,
+      "id": 114,
       "nterm": "session"
     },
     "context": {
-      "id": 110,
+      "id": 114,
       "nterm": "session"
     },
     "sessionid": {
-      "id": 110,
+      "id": 114,
       "nterm": "session"
     },
     "sessionmanager": {
-      "id": 110,
+      "id": 114,
+      "nterm": "session"
+    },
+    "backendsessionconfig": {
+      "id": 114,
+      "nterm": "session"
+    },
+    "claudecodesession": {
+      "id": 114,
+      "nterm": "session"
+    },
+    "codexsession": {
+      "id": 114,
+      "nterm": "session"
+    },
+    "livesession": {
+      "id": 114,
+      "nterm": "session"
+    },
+    "sessionaction": {
+      "id": 114,
+      "nterm": "session"
+    },
+    "sessioncreateresponse": {
+      "id": 114,
+      "nterm": "session"
+    },
+    "sessionhistorytool": {
+      "id": 114,
+      "nterm": "session"
+    },
+    "sessioninfo": {
+      "id": 114,
+      "nterm": "session"
+    },
+    "sessionlisttool": {
+      "id": 114,
+      "nterm": "session"
+    },
+    "sessionmanagerconfig": {
+      "id": 114,
+      "nterm": "session"
+    },
+    "sessionmodel": {
+      "id": 114,
       "nterm": "session"
     },
     "testing": {
-      "id": 111,
+      "id": 115,
       "nterm": "testing"
     },
     "unit test": {
-      "id": 111,
+      "id": 115,
       "nterm": "testing"
     },
     "integration test": {
-      "id": 111,
+      "id": 115,
       "nterm": "testing"
     },
     "doc test": {
-      "id": 111,
+      "id": 115,
       "nterm": "testing"
     },
     "nextest": {
-      "id": 111,
+      "id": 115,
       "nterm": "testing"
     },
     "proptest": {
-      "id": 111,
+      "id": 115,
       "nterm": "testing"
     },
     "coverage": {
-      "id": 111,
+      "id": 115,
       "nterm": "testing"
     },
     "cargo test": {
-      "id": 111,
+      "id": 115,
       "nterm": "testing"
     },
     "property-based testing": {
-      "id": 111,
+      "id": 115,
+      "nterm": "testing"
+    },
+    "mockterminal": {
+      "id": 115,
+      "nterm": "testing"
+    },
+    "testrunoutcome": {
+      "id": 115,
+      "nterm": "testing"
+    },
+    "testserver": {
+      "id": 115,
+      "nterm": "testing"
+    },
+    "testsuiteresults": {
+      "id": 115,
+      "nterm": "testing"
+    },
+    "testtimeouts": {
+      "id": 115,
       "nterm": "testing"
     },
     "tokio": {
-      "id": 112,
+      "id": 116,
       "nterm": "tokio"
     },
     "async runtime": {
-      "id": 112,
+      "id": 116,
       "nterm": "tokio"
     },
     "tokio::spawn": {
-      "id": 112,
+      "id": 116,
       "nterm": "tokio"
     },
     "tokio runtime": {
-      "id": 112,
+      "id": 116,
       "nterm": "tokio"
     },
     "async-std": {
-      "id": 112,
+      "id": 116,
       "nterm": "tokio"
     },
     "glommio": {
-      "id": 112,
+      "id": 116,
       "nterm": "tokio"
     },
     "#[tokio::main]": {
-      "id": 112,
+      "id": 116,
       "nterm": "tokio"
     },
     "tokio::select!": {
-      "id": 112,
+      "id": 116,
       "nterm": "tokio"
     },
     "traits": {
-      "id": 113,
+      "id": 117,
       "nterm": "traits"
     },
     "trait": {
-      "id": 113,
+      "id": 117,
       "nterm": "traits"
     },
     "impl trait": {
-      "id": 113,
+      "id": 117,
       "nterm": "traits"
     },
     "dyn trait": {
-      "id": 113,
+      "id": 117,
       "nterm": "traits"
     },
     "trait bounds": {
-      "id": 113,
+      "id": 117,
       "nterm": "traits"
     },
     "associated type": {
-      "id": 113,
+      "id": 117,
       "nterm": "traits"
     },
     "trait object": {
-      "id": 113,
+      "id": 117,
       "nterm": "traits"
     },
     "send": {
-      "id": 113,
+      "id": 117,
       "nterm": "traits"
     },
     "sync": {
-      "id": 113,
+      "id": 117,
       "nterm": "traits"
     },
     "marker trait": {
-      "id": 113,
+      "id": 117,
       "nterm": "traits"
     },
+    "types": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "agentdeploymentinfo": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "agentid": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "agentinfo": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "agentstatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "apistate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "applicationstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "applicationstatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "artifacttype": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "backendtype": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "budgetstatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "checktype": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "circuitstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "commandhistoryentry": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "commandkind": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "commitcombinedstatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "commitstatusstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "componenttype": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "deploymentstatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "errorkind": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "executionlogentry": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "executionstatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "failurekind": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "flowrunstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "flowrunstatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "githubeventtype": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "healthstatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "issuetype": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "lifecyclestatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "optimizationtype": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "orchestratorruntimestate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "prdispatchentry": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "prgatekind": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "probestatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "projectdispatchstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "providersnapshotentry": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "pullrequestinfo": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "reloadstatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "reloadtype": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "repositoryinfo": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "retryentry": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "runnerinfo": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "runnerstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "runningentry": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "sessionstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "sessionstatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "sharedstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "skillentry": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "snapshotid": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "status": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "statusstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "stepkind": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "stepstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "supervisorinfo": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "systeminfo": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "taskstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "tierkind": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "tomlprdispatchentry": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "uiteststatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "updateavailableinfo": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "updatecheckentry": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "updateinfo": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "updatestatus": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "webhookstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "windowstate": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "workspaceinfo": {
+      "id": 118,
+      "nterm": "types"
+    },
+    "update": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "autoupdatertester": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "compiledsignatures": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "downloadresult": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "providererrorsignatures": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "terraphimupdater": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "updateaction": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "updatecheckresult": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "updatehistory": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "updatelogrequest": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "updatelogresponse": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "updatenotification": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "updatescheduler": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "updatetaskrequest": {
+      "id": 119,
+      "nterm": "update"
+    },
+    "updatetaskresponse": {
+      "id": 119,
+      "nterm": "update"
+    },
     "validator": {
-      "id": 114,
+      "id": 120,
       "nterm": "validator"
     },
     "validation": {
-      "id": 114,
+      "id": 120,
       "nterm": "validator"
     },
     "kg validation": {
-      "id": 114,
+      "id": 120,
       "nterm": "validator"
     },
     "knowledge graph": {
-      "id": 114,
+      "id": 120,
       "nterm": "validator"
     },
     "term matching": {
-      "id": 114,
+      "id": 120,
       "nterm": "validator"
     },
     "aho-corasick": {
-      "id": 114,
+      "id": 120,
       "nterm": "validator"
     },
     "from_config": {
-      "id": 114,
+      "id": 120,
       "nterm": "validator"
     },
     "strictness": {
-      "id": 114,
+      "id": 120,
       "nterm": "validator"
     },
     "knowledgegraphvalidator": {
-      "id": 114,
+      "id": 120,
+      "nterm": "validator"
+    },
+    "agentruntimevalidationreport": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "agentvalidationreport": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "agentvalidator": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "outputvalidator": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "testvalidationresult": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "testvalidationstatus": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationconfig": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationcontext": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationerror": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationevent": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationissue": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationorchestrator": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationreport": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationresult": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationstatistics": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationstatus": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationsummary": {
+      "id": 120,
+      "nterm": "validator"
+    },
+    "validationsystem": {
+      "id": 120,
       "nterm": "validator"
     },
     "webassembly": {
-      "id": 115,
+      "id": 121,
       "nterm": "webassembly"
     },
     "wasm": {
-      "id": 115,
+      "id": 121,
       "nterm": "webassembly"
     },
     "wasm32-unknown-unknown": {
-      "id": 115,
+      "id": 121,
       "nterm": "webassembly"
     },
     "wasm-bindgen": {
-      "id": 115,
+      "id": 121,
       "nterm": "webassembly"
     },
     "wasm-pack": {
-      "id": 115,
+      "id": 121,
       "nterm": "webassembly"
     },
     "wasmtime": {
-      "id": 115,
+      "id": 121,
       "nterm": "webassembly"
     },
     "wasi": {
-      "id": 115,
+      "id": 121,
       "nterm": "webassembly"
     },
     "wasm-opt": {
-      "id": 115,
+      "id": 121,
       "nterm": "webassembly"
+    },
+    "workspace": {
+      "id": 122,
+      "nterm": "workspace"
+    },
+    "workspacemanager": {
+      "id": 122,
+      "nterm": "workspace"
+    },
+    "worktreeguard": {
+      "id": 122,
+      "nterm": "workspace"
+    },
+    "worktreemanager": {
+      "id": 122,
+      "nterm": "workspace"
+    },
+    "worktreemanifest": {
+      "id": 122,
+      "nterm": "workspace"
     }
   }
 }
