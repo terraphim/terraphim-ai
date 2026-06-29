@@ -655,27 +655,36 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
 
     async fn list_snapshots(&self, session_id: &SessionId) -> Result<Vec<SnapshotId>, Self::Error> {
         // Get VM ID for this session
-        let vm_id = self.session_to_vm.read().get(session_id).cloned();
+        let vm_id = match self.session_to_vm.read().get(session_id).cloned() {
+            Some(id) => id,
+            None => {
+                log::debug!(
+                    "No VM assigned to session {}, returning empty snapshot list",
+                    session_id
+                );
+                return Ok(Vec::new());
+            }
+        };
 
-        if vm_id.is_none() {
-            log::debug!(
-                "No VM assigned to session {}, returning empty snapshot list",
-                session_id
-            );
-            return Ok(Vec::new());
+        log::debug!("list_snapshots for session {} (vm={})", session_id, vm_id);
+
+        let mut snapshot_manager_guard = self.snapshot_manager.lock().await;
+        if let Some(snapshot_manager) = &mut *snapshot_manager_guard {
+            let fcctl_snapshots = snapshot_manager
+                .list_snapshots(Some(&vm_id))
+                .await
+                .unwrap_or_default();
+
+            let snapshots = fcctl_snapshots
+                .into_iter()
+                .map(|s| SnapshotId::new(s.id.to_string(), *session_id))
+                .collect();
+
+            Ok(snapshots)
+        } else {
+            log::debug!("SnapshotManager not initialized, returning empty snapshot list");
+            Ok(Vec::new())
         }
-
-        // List snapshots using fcctl-core SnapshotManager
-        // Note: SnapshotManager.list_snapshots requires &mut self
-        // For now, return empty list and log
-        log::debug!(
-            "list_snapshots for session {} (vm={})",
-            session_id,
-            vm_id.unwrap()
-        );
-
-        // TODO: Call snapshot_manager.list_snapshots() when we have mutable access
-        Ok(Vec::new())
     }
 
     async fn delete_snapshot(&self, id: &SnapshotId) -> Result<(), Self::Error> {
