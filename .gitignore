@@ -134,9 +134,10 @@ pi-session-*.html
 projects/odilo/
 # CI test fix verification
 
-# Agent artefact files accidentally committed to repo root (#2342, #2364)
+# Agent artefact files accidentally committed to repo root (#2342, #2364, #2763)
 # These patterns match working-copy snapshots and review outputs from
 # PR-reviewer/verifier/validator agents that should not be committed.
+.pr*/
 /pr_review_*.md
 /*.pr_gate_result*.rs
 /*.reconcile_impl*.rs
