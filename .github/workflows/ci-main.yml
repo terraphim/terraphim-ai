@@ -127,7 +127,28 @@ jobs:
           /home/alex/.local/bin/sccache --zero-stats
 
       - name: Rustfmt Check
-        run: /home/alex/.local/bin/rch exec -- cargo fmt --all -- --check
+        # Fail on drift (#4311) and list affected files in the job summary.
+        # Exit code is preserved: any non-zero cargo fmt exit propagates.
+        run: |
+          set +e
+          diff_output="$(/home/alex/.local/bin/rch exec -- cargo fmt --all -- --check 2>&1)"
+          fmt_exit=$?
+          if [ "$fmt_exit" -ne 0 ]; then
+            affected="$(printf '%s\n' "$diff_output" | grep '^Diff in ' | sed -E 's|^Diff in ||; s|:[0-9]+: *$||' | sort -u)"
+            rel="$(printf '%s\n' "$affected" | sed "s|^${GITHUB_WORKSPACE:-$PWD}/||")"
+            {
+              echo "## 🎨 cargo fmt drift detected"
+              echo ""
+              echo "Run \`cargo fmt --all\` locally and commit the result."
+              echo ""
+              echo "**Affected files ($(printf '%s\n' "$rel" | grep -c .)):**"
+              echo ""
+              printf -- '- \`%s\`\n' $rel
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "$diff_output"
+            exit "$fmt_exit"
+          fi
 
       - name: Clippy Check
         # Soft-fail: terraphim_service registry crate has known compilation errors
