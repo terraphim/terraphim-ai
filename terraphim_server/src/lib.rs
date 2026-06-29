@@ -666,7 +666,7 @@ pub async fn build_router_for_tests() -> Router {
 mod tests {
     use super::*;
 
-    // --- floor_char_boundary ---
+    // --- floor_char_boundary (stdlib str::floor_char_boundary, stable since MSRV 1.91.0) ---
 
     #[test]
     fn floor_char_boundary_index_beyond_len_returns_len() {
