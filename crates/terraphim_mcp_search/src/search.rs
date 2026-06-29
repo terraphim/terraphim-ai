@@ -237,8 +237,7 @@ pub fn mcp_search_skills(query: &str, skills: &[SkillEntry]) -> Vec<SkillEntry> 
 
     // Map the hits (Vec<&McpToolEntry>) back to input positions, then to
     // owned SkillEntry. Preserve input order.
-    let hit_names: std::collections::HashSet<&str> =
-        hits.iter().map(|t| t.name.as_str()).collect();
+    let hit_names: std::collections::HashSet<&str> = hits.iter().map(|t| t.name.as_str()).collect();
     skills
         .iter()
         .filter(|s| hit_names.contains(s.name.as_str()))
@@ -262,8 +261,8 @@ mod tests {
 
     #[test]
     fn test_skill_entry_with_tags() {
-        let entry = SkillEntry::new("test", "Test skill")
-            .with_tags(vec!["a".to_string(), "b".to_string()]);
+        let entry =
+            SkillEntry::new("test", "Test skill").with_tags(vec!["a".to_string(), "b".to_string()]);
         assert_eq!(entry.tags, vec!["a", "b"]);
     }
 
@@ -314,7 +313,10 @@ mod tests {
     fn test_skill_entry_serde_skips_none() {
         let entry = SkillEntry::new("x", "y");
         let json = serde_json::to_string(&entry).unwrap();
-        assert!(!json.contains("author"), "author should be skipped when None");
+        assert!(
+            !json.contains("author"),
+            "author should be skipped when None"
+        );
         // tags serializes as [] when empty (Vec<String> has no
         // skip_serializing_if); the property under test is "no None fields",
         // not "minimal JSON". The minimal-JSON contract is enforced by the
@@ -368,8 +370,7 @@ mod tests {
     #[test]
     fn test_mcp_search_skills_tag_match() {
         let skills = vec![
-            SkillEntry::new("code-review", "review files")
-                .with_tags(vec!["quality".to_string()]),
+            SkillEntry::new("code-review", "review files").with_tags(vec!["quality".to_string()]),
             SkillEntry::new("deploy", "deploy things"),
         ];
         let hits = mcp_search_skills("quality", &skills);

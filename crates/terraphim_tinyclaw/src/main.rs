@@ -30,7 +30,7 @@ use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use terraphim_mcp_search::{mcp_search_skills, SkillEntry};
+use terraphim_mcp_search::{SkillEntry, mcp_search_skills};
 
 /// Multi-channel AI assistant powered by Terraphim.
 #[derive(Parser, Debug)]
