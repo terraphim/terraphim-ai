@@ -291,7 +291,10 @@ mod tests {
     #[test]
     fn position_to_byte_offset_single_line() {
         let text = "hello world";
-        let pos = Position { line: 0, character: 6 };
+        let pos = Position {
+            line: 0,
+            character: 6,
+        };
         assert_eq!(position_to_byte_offset(text, pos), 6);
     }
 
@@ -299,7 +302,10 @@ mod tests {
     fn position_to_byte_offset_multiline() {
         let text = "line one\nline two\nline three";
         // character 5 on line 1 → byte offset 9 (line one\n) + 5 = 14
-        let pos = Position { line: 1, character: 5 };
+        let pos = Position {
+            line: 1,
+            character: 5,
+        };
         assert_eq!(position_to_byte_offset(text, pos), 14);
     }
 
@@ -307,7 +313,10 @@ mod tests {
     fn position_to_byte_offset_clamps_to_line_length() {
         let text = "abc\ndef";
         // character 100 on line 0 → clamped to line length 3
-        let pos = Position { line: 0, character: 100 };
+        let pos = Position {
+            line: 0,
+            character: 100,
+        };
         assert_eq!(position_to_byte_offset(text, pos), 3);
     }
 
@@ -316,14 +325,23 @@ mod tests {
         let text = "only one line";
         // line 5 does not exist; the loop adds +1 per line for a phantom newline,
         // so the returned offset is text.len() + 1.
-        let pos = Position { line: 5, character: 0 };
+        let pos = Position {
+            line: 5,
+            character: 0,
+        };
         assert_eq!(position_to_byte_offset(text, pos), text.len() + 1);
     }
 
     #[test]
     fn byte_offset_to_position_first_char() {
         let pos = byte_offset_to_position("hello", 0);
-        assert_eq!(pos, Position { line: 0, character: 0 });
+        assert_eq!(
+            pos,
+            Position {
+                line: 0,
+                character: 0
+            }
+        );
     }
 
     #[test]
@@ -331,15 +349,33 @@ mod tests {
         let text = "abc\nxyz";
         // byte offset 4 → first char of second line
         let pos = byte_offset_to_position(text, 4);
-        assert_eq!(pos, Position { line: 1, character: 0 });
+        assert_eq!(
+            pos,
+            Position {
+                line: 1,
+                character: 0
+            }
+        );
     }
 
     #[test]
     fn byte_range_to_lsp_range_same_line() {
         let text = "hello world";
         let range = byte_range_to_lsp_range(text, 6, 11);
-        assert_eq!(range.start, Position { line: 0, character: 6 });
-        assert_eq!(range.end, Position { line: 0, character: 11 });
+        assert_eq!(
+            range.start,
+            Position {
+                line: 0,
+                character: 6
+            }
+        );
+        assert_eq!(
+            range.end,
+            Position {
+                line: 0,
+                character: 11
+            }
+        );
     }
 
     #[test]
@@ -347,7 +383,19 @@ mod tests {
         let text = "foo\nbar";
         // byte 0..7 spans both lines
         let range = byte_range_to_lsp_range(text, 0, 7);
-        assert_eq!(range.start, Position { line: 0, character: 0 });
-        assert_eq!(range.end, Position { line: 1, character: 3 });
+        assert_eq!(
+            range.start,
+            Position {
+                line: 0,
+                character: 0
+            }
+        );
+        assert_eq!(
+            range.end,
+            Position {
+                line: 1,
+                character: 3
+            }
+        );
     }
 }

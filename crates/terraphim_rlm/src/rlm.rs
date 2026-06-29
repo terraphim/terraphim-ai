@@ -940,13 +940,15 @@ impl TerraphimRlm {
             }
             let stdin_is_tty = atty::is(atty::Stream::Stdin);
             let stderr_is_tty = atty::is(atty::Stream::Stderr);
-            let has_display = std::env::var("DISPLAY").is_ok()
-                || std::env::var("WAYLAND_DISPLAY").is_ok();
+            let has_display =
+                std::env::var("DISPLAY").is_ok() || std::env::var("WAYLAND_DISPLAY").is_ok();
             if (!stdin_is_tty || !stderr_is_tty) && !has_display {
                 log::debug!(
                     "RLM auto-configure: skipping 1Password (no tty, no display): \
                      stdin_tty={}, stderr_tty={}, has_display={}",
-                    stdin_is_tty, stderr_is_tty, has_display
+                    stdin_is_tty,
+                    stderr_is_tty,
+                    has_display
                 );
                 return None;
             }

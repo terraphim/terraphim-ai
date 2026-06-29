@@ -589,13 +589,7 @@ mod tests {
 
         // A sibling path that shares the root's string prefix but is NOT a child.
         // e.g. root = /tmp/abc  →  sibling = /tmp/abc-evil/payload
-        let root_name = tmp
-            .path()
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_owned();
+        let root_name = tmp.path().file_name().unwrap().to_str().unwrap().to_owned();
         let sibling = tmp
             .path()
             .parent()
