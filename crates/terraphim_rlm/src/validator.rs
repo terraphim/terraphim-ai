@@ -469,6 +469,68 @@ impl KnowledgeGraphValidator {
     pub fn has_role_graph(&self) -> bool {
         self.role_graph.is_some()
     }
+
+    /// Return the strictness level this validator is configured with.
+    pub fn strictness(&self) -> KgStrictness {
+        self.config.strictness
+    }
+
+    /// Build a validator from RLM config fields.
+    ///
+    /// Eliminates the `build_validator()` duplication between rlm.rs and
+    /// executor/mod.rs (GAP-2).  Optionally loads a thesaurus from disk
+    /// so Normal/Strict validation performs real term matching (GAP-1).
+    pub fn from_config(
+        strictness: KgStrictness,
+        max_retries: u32,
+        thesaurus_path: Option<&str>,
+    ) -> Self {
+        let mut vcfg = match strictness {
+            KgStrictness::Permissive => ValidatorConfig::permissive(),
+            KgStrictness::Normal => ValidatorConfig::default(),
+            KgStrictness::Strict => ValidatorConfig::strict(),
+        };
+        vcfg.max_retries = max_retries;
+        let mut validator = Self::new(vcfg);
+
+        match thesaurus_path {
+            Some(path) => match std::fs::read_to_string(path) {
+                Ok(json) => match serde_json::from_str::<Thesaurus>(&json) {
+                    Ok(thesaurus) => {
+                        log::info!(
+                            "KG validator: loaded {} terms from {}",
+                            thesaurus.len(),
+                            path
+                        );
+                        validator = validator.with_thesaurus(thesaurus);
+                    }
+                    Err(e) => log::warn!(
+                        "KG validator: could not parse thesaurus at '{}': {}. \
+                         Real term matching is disabled.",
+                        path,
+                        e
+                    ),
+                },
+                Err(e) => log::warn!(
+                    "KG validator: could not read thesaurus at '{}': {}. \
+                     Real term matching is disabled.",
+                    path,
+                    e
+                ),
+            },
+            None if strictness != KgStrictness::Permissive => {
+                log::warn!(
+                    "KG validator: no thesaurus configured (thesaurus_path is None). \
+                     {:?} mode will not perform real term matching. \
+                     Set thesaurus_path to a JSON thesaurus file to enable.",
+                    strictness
+                );
+            }
+            None => {}
+        }
+
+        validator
+    }
 }
 
 /// Extract words from a command string.
@@ -765,5 +827,60 @@ mod tests {
             "Normal mode must pass when at least one term matches"
         );
         assert!(!result.matched_terms.is_empty());
+    }
+
+    // -- from_config tests (GAP-2: deduplication; GAP-1: thesaurus loading) --
+
+    #[test]
+    fn test_from_config_normal_no_path_has_no_thesaurus() {
+        let v = KnowledgeGraphValidator::from_config(KgStrictness::Normal, 3, None);
+        assert!(!v.has_thesaurus());
+        assert_eq!(v.strictness(), KgStrictness::Normal);
+        assert_eq!(v.config().max_retries, 3);
+    }
+
+    #[test]
+    fn test_from_config_permissive_no_path_passes_silently() {
+        let v = KnowledgeGraphValidator::from_config(KgStrictness::Permissive, 0, None);
+        assert!(!v.has_thesaurus());
+        let result = v.validate("any command here").unwrap();
+        assert!(result.passed);
+    }
+
+    #[test]
+    fn test_from_config_strict_respects_max_retries() {
+        let v = KnowledgeGraphValidator::from_config(KgStrictness::Strict, 5, None);
+        assert_eq!(v.config().max_retries, 5);
+        assert_eq!(v.strictness(), KgStrictness::Strict);
+    }
+
+    #[test]
+    fn test_from_config_bad_path_falls_back_gracefully() {
+        let v = KnowledgeGraphValidator::from_config(
+            KgStrictness::Normal,
+            3,
+            Some("/nonexistent/path/thesaurus.json"),
+        );
+        assert!(!v.has_thesaurus());
+        let result = v.validate("some command").unwrap();
+        assert!(result.passed);
+    }
+
+    #[test]
+    fn test_from_config_valid_thesaurus_json() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("thesaurus.json");
+        let thesaurus_json = r#"{"name":"test","data":{}}"#;
+        let mut f = std::fs::File::create(&path).unwrap();
+        f.write_all(thesaurus_json.as_bytes()).unwrap();
+        drop(f);
+
+        let v = KnowledgeGraphValidator::from_config(
+            KgStrictness::Normal,
+            3,
+            Some(path.to_str().unwrap()),
+        );
+        assert!(v.has_thesaurus());
     }
 }
