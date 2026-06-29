@@ -24,6 +24,7 @@ async fn test_workflow_system_basic() {
                 completed_at: None,
                 result: None,
                 error: None,
+                steps: vec![],
             },
         );
     }
