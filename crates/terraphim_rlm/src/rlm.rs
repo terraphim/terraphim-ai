@@ -938,7 +938,16 @@ impl TerraphimRlm {
                 .unwrap_or_else(|_| "meta-llama/llama-3.2-3b-instruct:free".to_string());
             role.llm_api_key = Some(key.clone());
             role.llm_model = Some(or_model.clone());
-            // Cache for child processes and build_llm_from_role
+            // Cache for child processes and build_llm_from_role.
+            //
+            // SAFETY: `set_var` is only unsafe in Rust 2024 because env vars are
+            // process-global and mutating one can race concurrent readers. This
+            // runs once during `auto_configure_llm` (RLM startup initialisation),
+            // before any worker tasks or child processes are spawned, so there are
+            // no concurrent readers of `OPENROUTER_API_KEY` at this point. The
+            // value is propagated to spawned processes intentionally (see comment
+            // above) and the key originates from a trusted source (env var or
+            // 1Password), not untrusted input.
             unsafe {
                 std::env::set_var("OPENROUTER_API_KEY", key);
             }
