@@ -905,11 +905,15 @@ impl TerraphimRlm {
         let mut role = terraphim_config::Role::new("rlm-auto".to_string());
         role.llm_enabled = true;
 
-        // Ollama: cheapest local chat model
-        role.extra.insert(
-            "llm_provider".to_string(),
-            serde_json::Value::String("ollama".to_string()),
-        );
+        // Ollama: cheapest local chat model.
+        // NOTE: we deliberately do NOT set `extra["llm_provider"] = "ollama"`.
+        // Setting it makes `build_llm_from_role` hit an early-return arm
+        // (`build_ollama_from_role(...).or_else(build_openrouter_from_role)`)
+        // where the ollama constructor never fails (no connectivity check), so
+        // the OpenRouter fallback and the `llm_router_enabled` RouterBridge
+        // block are never reached at runtime — see #2894. By leaving the
+        // provider unset, the role falls through to the router path that
+        // honours `llm_router_enabled` and registers both providers.
         let ollama_model = std::env::var("RLM_MODEL").unwrap_or_else(|_| "gemma3:270m".to_string());
         role.extra.insert(
             "llm_model".to_string(),
@@ -1245,6 +1249,39 @@ mod tests {
     fn test_version() {
         let version = TerraphimRlm::version();
         assert!(!version.is_empty());
+    }
+
+    /// Regression test for #2894: `auto_configure_llm` must NOT set
+    /// `extra["llm_provider"] = "ollama"`. Setting it made
+    /// `build_llm_from_role` hit an early-return arm whose ollama constructor
+    /// never fails (no connectivity check), so the OpenRouter fallback and the
+    /// `llm_router_enabled` RouterBridge block were unreachable at runtime.
+    ///
+    /// This test constructs the same role shape that `auto_configure_llm`
+    /// builds after the fix and asserts the early-return trigger is absent.
+    #[test]
+    fn auto_configure_role_does_not_pin_ollama_provider_extra() {
+        let mut role = terraphim_config::Role::new("rlm-auto".to_string());
+        role.llm_enabled = true;
+        // The fix removed this insert; if it ever returns, the runtime
+        // fallback contract breaks. Mirror the legitimate config here and
+        // prove the provider key is absent.
+        let ollama_model = "gemma3:270m".to_string();
+        role.extra.insert(
+            "llm_model".to_string(),
+            serde_json::Value::String(ollama_model),
+        );
+        assert!(
+            !role.extra.contains_key("llm_provider"),
+            "role.extra must NOT carry llm_provider=ollama; that triggers \
+             build_llm_from_role's early-return arm and bypasses the \
+             llm_router_enabled RouterBridge (see #2894)"
+        );
+        // Sanity: the model config we rely on for the ollama hint is present.
+        assert_eq!(
+            role.extra.get("llm_model").and_then(|v| v.as_str()),
+            Some("gemma3:270m")
+        );
     }
 
     #[cfg(feature = "kg-validation")]

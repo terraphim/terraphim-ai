@@ -26,7 +26,7 @@ anyhow.workspace = true
 log.workspace = true
 
 # Terraphim crates
-terraphim_service = { version = "1.20.4", optional = true }
+terraphim_service = { version = "1.20.4", optional = true, features = ["openrouter"] }
 terraphim_config = { version = "1.20.4", optional = true }
 terraphim_automata = { version = "1.20.4", optional = true }
 terraphim_types = { version = "1.20.4", optional = true }
