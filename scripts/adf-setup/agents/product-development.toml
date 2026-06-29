@@ -42,6 +42,14 @@ task = '''
 source ~/.profile
 cd "$GITEA_WORKING_DIR" && git pull --ff-only
 
+## Step 0: Verify actual test counts (prevents false 'zero unit tests' issues)
+# Using --lib ensures inline #[test] in src/ are counted, not just tests/ directory.
+# A crate showing 0 tests here may still have integration tests in tests/.
+# NEVER file a 'zero unit tests' issue without running this verification first.
+TEST_COUNTS=$(cargo test --workspace --lib 2>&1 | grep -E "^running [0-9]+ test" | sort | uniq || echo "(cargo test --lib not available)")
+echo "--- Verified test counts (cargo test --workspace --lib) ---"
+echo "$TEST_COUNTS"
+
 ## Step 1: Gather candidate inputs
 
 READY=$(gtr ready --owner "$GITEA_OWNER" --repo "$GITEA_REPO" 2>/dev/null)
@@ -55,7 +63,16 @@ KG_CONTEXT=$(terraphim-agent --config "$ROLE_CONFIG_PATH" search "roadmap milest
 ## Step 3: Produce prioritization shortlist
 
 PRIORITIZATION_PROMPT="You are the product-development agent for $GITEA_OWNER/$GITEA_REPO.
-Your job is roadmap and feature prioritization ONLY. You do NOT implement code, create branches, or write PRs.
+Your job is roadmap and feature prioritization ONLY. You do NOT implement code, create branches, write PRs, or create Gitea issues.
+
+STRICT RULES:
+1. Do NOT run cargo test, cargo build, or any long-running command.
+2. Do NOT call gtr create-issue or any issue creation command.
+3. Do NOT claim a crate has '0 unit tests' unless confirmed by the verified test counts below.
+   Test coverage assertions without evidence from the verified counts below are FORBIDDEN.
+
+Verified test counts (from cargo test --workspace --lib -- authoritative, not static analysis):
+$TEST_COUNTS
 
 Current ready issues (highest PageRank first):
 $READY
@@ -77,7 +94,7 @@ Produce a prioritization analysis with:
 5. Suggested sequencing if dependencies exist
 
 Format as a structured comment suitable for posting to Gitea.
-Do NOT create branches, code, or PRs."
+Do NOT create branches, code, PRs, or Gitea issues."
 
 PRIORITIZATION=$(echo "$PRIORITIZATION_PROMPT" | /home/alex/.local/bin/claude -p --model sonnet --allowedTools "Bash,Read,Grep,Glob" 2>&1)
 
