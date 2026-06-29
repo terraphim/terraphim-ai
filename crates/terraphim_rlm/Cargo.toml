@@ -60,6 +60,13 @@ rmcp = { version = "0.9.0", features = ["server"], optional = true }
 # Utilities
 parking_lot = "0.12"
 dashmap = "6.1"
+# Used in auto_configure_llm to bound the 1Password CLI call so that
+# non-tty contexts (CI, agent shells) don't hang on biometric approval
+# that can never arrive. 5s is generous; op read is normally <500ms.
+wait-timeout = "0.2"
+# Used in auto_configure_llm to skip the 1Password lookup entirely in
+# non-interactive contexts where it can never succeed.
+atty = "0.2"
 
 # CLI
 clap = { version = "4.5", features = ["derive"], optional = true }
