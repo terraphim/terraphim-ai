@@ -1,0 +1,349 @@
+//! End-to-end tests for `adf --check <config>` dry-run validation.
+//! Invokes the compiled binary and asserts on exit code + stdout.
+
+use std::path::PathBuf;
+use std::process::Command;
+
+fn adf_bin() -> PathBuf {
+    // `CARGO_BIN_EXE_adf` is set by cargo for the adf integration test target.
+    PathBuf::from(env!("CARGO_BIN_EXE_adf"))
+}
+
+fn fixture(name: &str) -> PathBuf {
+    let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    p.push("tests");
+    p.push("fixtures");
+    p.push("multi_project");
+    p.push(name);
+    p
+}
+
+#[test]
+fn adf_check_succeeds_on_valid_inline_config() {
+    let out = Command::new(adf_bin())
+        .arg("--check")
+        .arg(fixture("base_inline.toml"))
+        .output()
+        .expect("run adf --check");
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "expected success, got {out:?}");
+    assert!(
+        stdout.contains("PROJECT"),
+        "stdout missing header: {stdout}"
+    );
+    assert!(
+        stdout.contains("alpha-watcher"),
+        "stdout missing alpha-watcher: {stdout}"
+    );
+    assert!(
+        stdout.contains("beta-watcher"),
+        "stdout missing beta-watcher: {stdout}"
+    );
+}
+
+#[test]
+fn adf_check_expands_include_and_prints_merged_agents() {
+    let out = Command::new(adf_bin())
+        .arg("--check")
+        .arg(fixture("base_include.toml"))
+        .output()
+        .expect("run adf --check");
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "expected success, got {out:?}");
+    // All three agents from the merged fragments must be present.
+    assert!(stdout.contains("alpha-watcher"));
+    assert!(stdout.contains("beta-watcher"));
+    assert!(stdout.contains("beta-reviewer"));
+    // Model column shows the subscription-allowed model.
+    assert!(stdout.contains("sonnet"));
+}
+
+#[test]
+fn adf_check_fails_on_banned_provider_with_nonzero_exit() {
+    let out = Command::new(adf_bin())
+        .arg("--check")
+        .arg(fixture("invalid_banned.toml"))
+        .output()
+        .expect("run adf --check");
+
+    assert!(!out.status.success(), "expected failure, got success");
+    let code = out.status.code().unwrap_or_default();
+    assert_eq!(code, 1, "expected exit code 1, got {code}");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("FAILED") || stderr.contains("google/gemini-2"),
+        "stderr should mention failure or banned provider: {stderr}"
+    );
+}
+
+#[test]
+fn adf_check_fails_on_missing_file() {
+    let out = Command::new(adf_bin())
+        .arg("--check")
+        .arg("/tmp/definitely-does-not-exist-adf-test.toml")
+        .output()
+        .expect("run adf --check");
+
+    assert!(!out.status.success());
+    assert_eq!(out.status.code(), Some(1));
+}
+
+#[test]
+fn adf_check_table_is_sorted_by_project_then_agent() {
+    let out = Command::new(adf_bin())
+        .arg("--check")
+        .arg(fixture("base_include.toml"))
+        .output()
+        .expect("run adf --check");
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let alpha_idx = stdout.find("alpha-watcher").expect("alpha-watcher present");
+    let beta_rev_idx = stdout.find("beta-reviewer").expect("beta-reviewer present");
+    let beta_watch_idx = stdout.find("beta-watcher").expect("beta-watcher present");
+
+    // alpha project rows first.
+    assert!(alpha_idx < beta_rev_idx);
+    assert!(alpha_idx < beta_watch_idx);
+    // within beta, alphabetical: reviewer before watcher.
+    assert!(beta_rev_idx < beta_watch_idx);
+}
+
+#[test]
+fn adf_local_check_succeeds_on_valid_adf_toml() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("local-test-project");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "local-valid"
+name = "Local Valid"
+
+[[agents]]
+name = "local-safety"
+layer = "Safety"
+cli_tool = "echo"
+task = "Hello"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--check"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --check");
+
+    assert!(out.status.success(), "expected success, got {:?}", out);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("Discovered local-valid"),
+        "stdout: {stdout}"
+    );
+    assert!(stdout.contains("local-safety"), "stdout: {stdout}");
+    assert!(stdout.contains("Safety"), "stdout: {stdout}");
+}
+
+#[test]
+fn adf_local_check_fails_when_no_adf_toml() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("no-adf");
+    std::fs::create_dir_all(project_dir.join("src")).unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--check"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --check");
+
+    assert!(!out.status.success());
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("no .terraphim/adf.toml found"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn adf_local_check_fails_on_invalid_layer() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("bad-layer");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "bad-layer"
+name = "Bad Layer"
+
+[[agents]]
+name = "bad-agent"
+layer = "Review"
+cli_tool = "echo"
+task = "task"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--check"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --check");
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("invalid layer") || stderr.contains("FAILED"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn adf_local_check_requires_both_flags() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("local-test");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "t"
+name = "t"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .arg("--local")
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local only");
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("--local must be followed by --check"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn adf_local_agent_spawns_echo_agent() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("agent-test");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "agent-test"
+name = "Agent Test"
+
+[[agents]]
+name = "echo-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "hello world"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--agent", "echo-agent"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --agent echo-agent");
+
+    assert!(out.status.success(), "expected success, got {:?}", out);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("hello world"),
+        "stdout should contain task output, got: {stdout}"
+    );
+}
+
+#[test]
+fn adf_local_agent_not_found() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("agent-not-found");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "agent-not-found"
+name = "Agent Not Found"
+
+[[agents]]
+name = "actual-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "hello"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--agent", "nonexistent-agent"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --agent nonexistent-agent");
+
+    assert!(!out.status.success());
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("agent not found") && stderr.contains("nonexistent-agent"),
+        "stderr should mention agent not found, got: {stderr}"
+    );
+}
+
+#[test]
+fn adf_local_agent_no_terraphim_dir() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("no-terraphim");
+    std::fs::create_dir_all(project_dir.join("src")).unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--agent", "some-agent"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --agent");
+
+    assert!(!out.status.success());
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("no .terraphim/adf.toml found"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn adf_local_agent_requires_agent_name() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("local-test");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "t"
+name = "t"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--agent"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --agent without name");
+
+    assert!(!out.status.success());
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("--local --agent requires an agent name"),
+        "stderr: {stderr}"
+    );
+}
