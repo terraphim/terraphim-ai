@@ -1,0 +1,22 @@
+[package]
+name = "terraphim_eval_check"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+rust-version = "1.91"
+description = "Deterministic codebase evaluation: Verdict Engine for AI-agent improvement assessment."
+license.workspace = true
+
+[[bin]]
+name = "eval-check"
+path = "src/main.rs"
+
+[lib]
+name = "terraphim_eval_check"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+clap = { version = "4", features = ["derive"] }

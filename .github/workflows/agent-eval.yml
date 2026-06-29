@@ -1,0 +1,68 @@
+name: Agent Codebase Evaluation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: agent-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    name: Evaluate agent changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout base branch (baseline)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: baseline-repo
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry (baseline)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('baseline-repo/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Capture baseline metrics
+        working-directory: baseline-repo
+        run: |
+          mkdir -p ../.eval
+          bash scripts/evaluate-agent.sh --mode baseline --output-dir ../.eval
+
+      - name: Checkout PR branch (candidate)
+        uses: actions/checkout@v4
+        with:
+          path: candidate-repo
+
+      - name: Cache Cargo registry (candidate)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('candidate-repo/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Capture candidate metrics and emit verdict
+        working-directory: candidate-repo
+        run: |
+          bash scripts/evaluate-agent.sh \
+            --mode candidate \
+            --output-dir ../.eval \
+            --baseline-dir ../.eval
+
+      - name: Upload evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-${{ github.event.pull_request.number }}
+          path: .eval/verdict-report.json
+          retention-days: 30
