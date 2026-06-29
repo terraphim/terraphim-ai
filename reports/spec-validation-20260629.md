@@ -2,8 +2,17 @@
 
 **Agent**: spec-validator (Carthos, Domain Architect)
 **Date**: 2026-06-29 05:30 CEST
-**Verdict**: PASS (with one P2 spec-location drift note)
+**Verdict**: CONDITIONAL PASS (1 open tracked gap #2972, re-confirmed)
 **Prior verdict**: CONDITIONAL PASS (2026-06-01)
+
+> **Correction note (05:50 CEST).** My initial verdict on this cycle was PASS. That was
+> **overconfident**: I verified the plan-referenced code exists *somewhere* (the
+> `terraphim-agents` polyrepo) and concluded "navigational drift only." I did **not** check
+> whether stale copies of that code were left stranded in *this* repo. They were. An earlier
+> spec-validator cron run today (04:36 CEST) correctly caught this and filed a recurrence on
+> #2972. After reading that run's handover, I re-measured the stranded source and confirmed it.
+> Verdict corrected to **CONDITIONAL PASS**. The gap is already tracked (#2972, open); the
+> measurement below is this cycle's contribution.
 
 ---
 
@@ -89,23 +98,44 @@ Includes `shared_learning::wiki_sync::tests` and `robot::output::proptests`. Gre
 
 ---
 
-## The One Gap: Spec-Location Drift (P2)
+## The Gap: Stranded Source + Spec-Location Drift (P2, tracked as #2972)
 
-| Severity | Finding |
-|----------|---------|
-| ⚠️ P2 | The six `plans/*.md` documents cite paths like `crates/terraphim_agent/src/learnings/capture.rs` that **no longer exist in this repo** after the E4a extraction. A reader following the plans in `terraphim-ai` will find only a residual/excluded empty `crates/terraphim_agent/` dir and an `src/` containing `client.rs`, `commands/`, `repl/` — no `learnings/`. |
+Two facets of one root cause — the polyrepo extraction (#1910) left debris in this repo.
 
-**Why P2, not P1:** This is documentation drift, not a functional/behavioural spec violation.
-The specified behaviour is fully implemented and tested in `terraphim-agents`; the plans simply
-describe a pre-extraction topology. No acceptance criterion is unmet. The drift is a
-**navigational** defect: it impedes a future implementer who reads the plan in this repo and
-cannot locate the code.
+### Facet A — Stranded source code (re-confirmed this cycle)
 
-**Smallest fix:** add a single banner to each affected plan — e.g.:
+The workspace `exclude` block (Cargo.toml) labels these dirs as "empty/residual." They are
+**not**. Git-tracked Rust source with no workspace build path remains:
 
-> **Note (2026-06-29):** The `learnings/` module referenced herein was extracted to the
-> `terraphim-agents` polyrepo (Gitea #1910, E4a) and is consumed as a registry dependency.
-> Authoritative source: `terraphim-agents/crates/terraphim_agent/src/learnings/`.
+| Directory | Tracked files | LOC (.rs) | Cargo.toml |
+|-----------|--------------|-----------|------------|
+| `crates/terraphim_orchestrator` | 18 | **16,467** | none (orphaned mod roots) |
+| `crates/terraphim_agent` | 7 | **6,819** | none |
+| `crates/terraphim_agent_application` | 9 | **3,265** | **still present** |
+| **subtotal** | **34** | **26,551** | — |
+
+Hazard: dead-but-tracked code that is (a) excluded from the build, (b) superseded by registry
+deps, yet (c) still present and searchable — a maintenance trap and review-noise source. The
+earlier 04:36 run measured "~23,286 LOC"; this cycle's fuller count is **26,551** (the
+difference is `terraphim_agent_application`, which that run may not have included).
+
+### Facet B — Spec-location drift
+
+The six `plans/*.md` cite pre-extraction paths (`crates/terraphim_agent/src/learnings/...`)
+unresolvable in this repo. Behavioural ACs are satisfied in the code's true home
+(`terraphim-agents` + `terraphim-core` registry crates); the plans describe a dead topology.
+
+### Why CONDITIONAL PASS, not FAIL
+
+No behavioural / acceptance-criterion violation exists — every specified function is
+implemented and tested in its polyrepo. The gap is **repository hygiene + spec relocation**,
+already filed as **#2972** (open, assigned quality-coordinator, 21 comments) and recurred by
+the 04:36 run today. This cycle re-confirms it with fresh LOC measurement. No new issue
+warranted; the fix owner is unchanged.
+
+**Smallest fix** (owned by whoever closes #2972): `git rm` the stranded `crates/*` source
+(except any genuinely-shared fixtures), add relocation banners to the 4 code-bearing plans,
+and replace `plans/` with a `RELOCATED.md` index.
 
 ---
 
@@ -125,12 +155,15 @@ To prevent re-work loops, these were considered and ruled out:
 
 ## Verdict
 
-**PASS.** No P0/P1 spec violations. Behavioural acceptance criteria for all six plans are
-satisfied in the code's true home (`terraphim-agents` + `terraphim-core` registry crates).
-The sole finding is a P2 documentation-drift note: the `plans/` artefacts in this repo
-reference pre-extraction paths. This is navigational, not behavioural, and is below the
-cron-report threshold for filing a new Gitea issue (no functional gap; fixable via a
-documentation banner). Per cron protocol, exiting silently after recording this report.
+**CONDITIONAL PASS.** No P0/P1 behavioural spec violations. All six plans' acceptance
+criteria are satisfied in the code's true home (`terraphim-agents` + `terraphim-core` registry
+crates); `terraphim_agent` lib suite = 288 passed. Two carry-forwards from 2026-06-01
+cleared (Phase G shared-learning CLI wired; Phase I evolution mocks confined to tests).
+
+One tracked P2 gap re-confirmed: stranded source (~26,551 LOC across 3 excluded dirs) +
+spec-location drift in `plans/`. Already filed as **#2972** (open) and recurred by an earlier
+cron run today (04:36 CEST). This cycle adds the precise LOC measurement. No new issue filed
+(fix owner unchanged; duplicate noise avoided per cron protocol).
 
 ## Traceability
 
