@@ -23,11 +23,37 @@ pub use zipsign_api::ZipsignError;
 ///
 /// # Returns
 /// Base64-encoded Ed25519 public key bytes
+///
+/// # Key provenance
+///
+/// This is the **production** Ed25519 release-signing key (confirmed, not a placeholder).
+///
+/// - **Algorithm:** Ed25519 (32 bytes, base64-encoded)
+/// - **Generated:** 2025-01-12 via `./scripts/generate-zipsign-keypair.sh` (zipsign `gen-key`)
+/// - **Private key:** stored in 1Password vault `TerraphimPlatform`, item
+///   "Terraphim AI Release Signing Key (Ed25519)" (ID: `jbhgblc7m2pluxe6ahqdfr5b6a`).
+///   The private key is never present on the filesystem or in this repository.
+/// - **Public-key fingerprint** (SHA-256 of the 32 raw key bytes):
+///   `1c78db3c8e1afa3af4fcbaf32ccfa30988c82f9e7d383dfb127ae202732b631a`
+///
+/// # Key rotation procedure
+///
+/// To rotate the release-signing key (rare, coordinated event):
+///
+/// 1. Run `./scripts/generate-zipsign-keypair.sh` on a secure maintainer machine;
+///    it writes `private.key` / `public.key` under `keys/` (gitignored).
+/// 2. Store `private.key` in the 1Password vault `TerraphimPlatform` under a new item,
+///    then delete the file from disk.
+/// 3. Update the literal returned below with the new base64 public key, and refresh
+///    the *Generated* date, 1Password item ID, and SHA-256 fingerprint in this docstring.
+/// 4. Bump `get_active_key_metadata().key_id` to a new identifier (e.g.
+///    `terraphim-release-key-YYYY-MM`) so concurrent key metadata can be distinguished
+///    once multi-key rotation support lands.
+/// 5. Build and ship the next release; old binaries continue to verify against the
+///    previous key until users upgrade past the rotation boundary.
 pub fn get_embedded_public_key() -> &'static str {
-    // Ed25519 public key for verifying Terraphim AI release signatures
-    // Generated: 2025-01-12
-    // Key type: Ed25519 (32 bytes, base64-encoded)
-    // Private key stored in 1Password vault TerraphimPlatform, item jbhgblc7m2pluxe6ahqdfr5b6a
+    // Production Ed25519 public key for verifying Terraphim AI release signatures.
+    // See the docstring above for full provenance, fingerprint, and rotation procedure.
     "1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4="
 }
 
