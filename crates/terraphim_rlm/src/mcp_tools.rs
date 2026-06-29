@@ -425,8 +425,8 @@ impl RlmMcpService {
     /// the caller decides which corpus to feed; this service does not
     /// maintain its own skill registry.
     ///
-    /// `SkillEntry` is a discovery projection (name + description + version
-    /// + author + tags) — `inputs` and `steps` are intentionally NOT part
+    /// `SkillEntry` is a discovery projection (name + description + version +
+    /// author + tags) — `inputs` and `steps` are intentionally NOT part
     /// of the search index because they're workflow-shape, not
     /// discoverability-shape.
     fn mcp_search_skills_tool() -> Tool {
@@ -1012,13 +1012,10 @@ impl RlmMcpService {
             ErrorData::invalid_params("'skills' must be an array of skill entries", None)
         })?;
 
-        // Explicit closure (not function pointer) to avoid stable-Rust
-        // inference quirks with `serde_json::from_value` (consumes its
-        // argument).
         let skills: Vec<SkillEntry> = skills_array
             .iter()
             .cloned()
-            .map(|v| serde_json::from_value::<SkillEntry>(v))
+            .map(serde_json::from_value::<SkillEntry>)
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| ErrorData::invalid_params(format!("Invalid skill entry: {}", e), None))?;
 
