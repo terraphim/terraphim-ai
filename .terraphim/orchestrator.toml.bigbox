@@ -1,4 +1,4 @@
-disk_usage_threshold = 90
+disk_usage_threshold = 95
 flow_state_dir = "/opt/ai-dark-factory/flow-states"
 max_restart_count = 3
 persona_data_dir = "/data/projects/terraphim/terraphim-ai/data/personas"
