@@ -188,6 +188,13 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
+    fn test_new_creates_empty_graph() {
+        let temp_dir = TempDir::new().unwrap();
+        let kg = KnowledgeGraph::new(temp_dir.path().to_path_buf());
+        assert_eq!(kg.concept_count(), 0);
+    }
+
+    #[test]
     fn test_knowledge_graph_loading() {
         let temp_dir = TempDir::new().unwrap();
         let kg_dir = temp_dir.path().join("kg");
@@ -256,5 +263,37 @@ mod tests {
 
         assert!(kg.are_related("auth_module", "security_handler"));
         assert!(!kg.are_related("auth_module", "ui_component"));
+    }
+
+    #[test]
+    fn test_group_by_concept_buckets_modules() {
+        let temp_dir = TempDir::new().unwrap();
+        let kg_dir = temp_dir.path().join("kg");
+        std::fs::create_dir(&kg_dir).unwrap();
+
+        let mut auth_file = std::fs::File::create(kg_dir.join("Authentication.md")).unwrap();
+        writeln!(auth_file, "# Authentication").unwrap();
+        writeln!(auth_file, "synonyms:: auth, login").unwrap();
+
+        let mut kg = KnowledgeGraph::new(kg_dir.clone());
+        kg.load_from_directory(&kg_dir).unwrap();
+
+        let modules = vec![
+            "service::auth_handler".to_string(),
+            "service::login_manager".to_string(),
+            "service::unrelated_utils".to_string(),
+        ];
+        let groups = kg.group_by_concept(&modules);
+
+        assert!(
+            groups.contains_key("Authentication"),
+            "auth modules must be grouped"
+        );
+        assert_eq!(groups["Authentication"].len(), 2);
+        assert!(
+            groups.contains_key("uncategorized"),
+            "unmatched modules go to uncategorized"
+        );
+        assert_eq!(groups["uncategorized"].len(), 1);
     }
 }
