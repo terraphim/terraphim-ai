@@ -290,10 +290,9 @@ mod tests {
 
         // Helper: matches as directory component (starts_with or contains "/.sessions/")
         let is_contaminated = |file: &str| -> bool {
-            patterns.iter().any(|p| {
-                file.starts_with(p)
-                    || file.contains(&["/", p].concat())
-            })
+            patterns
+                .iter()
+                .any(|p| file.starts_with(p) || file.contains(&["/", p].concat()))
         };
 
         // Positive matches — files inside contaminated directories
