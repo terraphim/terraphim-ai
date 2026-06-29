@@ -54,15 +54,16 @@ async fn evaluate_one(
 
     // Check contamination before mergeability to prevent artefact PRs from merging.
     if let Some(c) = gitea
-        && let Err(reason) = check_contamination(c, owner, repo, pr.number).await {
-            return PrEvaluation {
-                pr_index: pr.number,
-                mergeable,
-                fixes_issues,
-                verdict: EvalVerdict::Hold(reason),
-                blocker_kind: None,
-            };
-        }
+        && let Err(reason) = check_contamination(c, owner, repo, pr.number).await
+    {
+        return PrEvaluation {
+            pr_index: pr.number,
+            mergeable,
+            fixes_issues,
+            verdict: EvalVerdict::Hold(reason),
+            blocker_kind: None,
+        };
+    }
 
     let (verdict, blocker_kind) = if !mergeable {
         let kind = classify_blocker(gitea, owner, repo, pr).await;
@@ -89,12 +90,7 @@ async fn check_contamination(
     repo: &str,
     pr_index: u64,
 ) -> Result<(), String> {
-    const CONTAMINATED_PATTERNS: &[&str] = &[
-        ".sessions/",
-        ".review_tmp/",
-        ".handoff/",
-        ".beads/",
-    ];
+    const CONTAMINATED_PATTERNS: &[&str] = &[".sessions/", ".review_tmp/", ".handoff/", ".beads/"];
 
     let files = gitea
         .list_pr_files(owner, repo, pr_index)
@@ -104,9 +100,7 @@ async fn check_contamination(
     for file in &files {
         for pattern in CONTAMINATED_PATTERNS {
             if file.starts_with(pattern) || file.contains(pattern) {
-                return Err(format!(
-                    "contaminated: {file} (pattern: {pattern})"
-                ));
+                return Err(format!("contaminated: {file} (pattern: {pattern})"));
             }
         }
     }
@@ -284,15 +278,35 @@ mod tests {
         let patterns: &[&str] = &[".sessions/", ".review_tmp/", ".handoff/", ".beads/"];
 
         // Positive matches
-        assert!(patterns.iter().any(|p| ".sessions/session-123.md".contains(p)));
-        assert!(patterns.iter().any(|p| ".review_tmp/pr123/file.diff".contains(p)));
-        assert!(patterns.iter().any(|p| ".handoff/pr2664-review.md".contains(p)));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| ".sessions/session-123.md".contains(p))
+        );
+        assert!(
+            patterns
+                .iter()
+                .any(|p| ".review_tmp/pr123/file.diff".contains(p))
+        );
+        assert!(
+            patterns
+                .iter()
+                .any(|p| ".handoff/pr2664-review.md".contains(p))
+        );
         assert!(patterns.iter().any(|p| ".beads/issues.jsonl".contains(p)));
 
         // Negative matches
         assert!(!patterns.iter().any(|p| "src/main.rs".contains(p)));
-        assert!(!patterns.iter().any(|p| "crates/terraphim_rlm/src/lib.rs".contains(p)));
+        assert!(
+            !patterns
+                .iter()
+                .any(|p| "crates/terraphim_rlm/src/lib.rs".contains(p))
+        );
         assert!(!patterns.iter().any(|p| "Cargo.toml".contains(p)));
-        assert!(!patterns.iter().any(|p| ".github/workflows/ci-pr.yml".contains(p)));
+        assert!(
+            !patterns
+                .iter()
+                .any(|p| ".github/workflows/ci-pr.yml".contains(p))
+        );
     }
 }
