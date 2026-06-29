@@ -1,50 +1,585 @@
 {
-  "name": "rust-engineer",
+  "name": "Rust Engineer",
   "data": {
-    "borrow": {"id": 1, "nterm": "ownership", "url": null},
-    "lifetime": {"id": 1, "nterm": "ownership", "url": null},
-    "ownership": {"id": 1, "nterm": "ownership", "url": null},
-    "move": {"id": 1, "nterm": "ownership", "url": null},
-    "reference": {"id": 1, "nterm": "ownership", "url": null},
-    "borrow-checker": {"id": 1, "nterm": "ownership", "url": null},
-    "async": {"id": 2, "nterm": "async-programming", "url": null},
-    "await": {"id": 2, "nterm": "async-programming", "url": null},
-    "future": {"id": 2, "nterm": "async-programming", "url": null},
-    "tokio": {"id": 2, "nterm": "async-programming", "url": null},
-    "runtime": {"id": 2, "nterm": "async-programming", "url": null},
-    "trait": {"id": 3, "nterm": "traits-generics", "url": null},
-    "generic": {"id": 3, "nterm": "traits-generics", "url": null},
-    "impl": {"id": 3, "nterm": "traits-generics", "url": null},
-    "bound": {"id": 3, "nterm": "traits-generics", "url": null},
-    "result": {"id": 4, "nterm": "error-handling", "url": null},
-    "option": {"id": 4, "nterm": "error-handling", "url": null},
-    "unwrap": {"id": 4, "nterm": "error-handling", "url": null},
-    "match": {"id": 4, "nterm": "error-handling", "url": null},
-    "unsafe": {"id": 5, "nterm": "unsafe-rust", "url": null},
-    "raw-pointer": {"id": 5, "nterm": "unsafe-rust", "url": null},
-    "ffi": {"id": 5, "nterm": "unsafe-rust", "url": null},
-    "macro": {"id": 6, "nterm": "macros", "url": null},
-    "macro-rules": {"id": 6, "nterm": "macros", "url": null},
-    "procedural-macro": {"id": 6, "nterm": "macros", "url": null},
-    "derive": {"id": 6, "nterm": "macros", "url": null},
-    "cargo": {"id": 7, "nterm": "cargo-crates", "url": null},
-    "crate": {"id": 7, "nterm": "cargo-crates", "url": null},
-    "crate-io": {"id": 7, "nterm": "cargo-crates", "url": null},
-    "workspace": {"id": 7, "nterm": "cargo-crates", "url": null},
-    "test": {"id": 8, "nterm": "testing", "url": null},
-    "benchmark": {"id": 8, "nterm": "testing", "url": null},
-    "mock": {"id": 8, "nterm": "testing", "url": null},
-    "thread": {"id": 9, "nterm": "concurrency", "url": null},
-    "channel": {"id": 9, "nterm": "concurrency", "url": null},
-    "mutex": {"id": 9, "nterm": "concurrency", "url": null},
-    "arc": {"id": 9, "nterm": "concurrency", "url": null},
-    "atomic": {"id": 9, "nterm": "concurrency", "url": null},
-    "wasm": {"id": 10, "nterm": "webassembly", "url": null},
-    "wasm-bindgen": {"id": 10, "nterm": "webassembly", "url": null},
-    "memory-safety": {"id": 11, "nterm": "memory-safety", "url": null},
-    "data-race": {"id": 11, "nterm": "memory-safety", "url": null},
-    "type": {"id": 12, "nterm": "type-system", "url": null},
-    "pattern-matching": {"id": 12, "nterm": "type-system", "url": null},
-    "inference": {"id": 12, "nterm": "type-system", "url": null}
+    "blockerkind": {
+      "id": 100,
+      "nterm": "blockerkind"
+    },
+    "blocker": {
+      "id": 100,
+      "nterm": "blockerkind"
+    },
+    "ci_failed": {
+      "id": 100,
+      "nterm": "blockerkind"
+    },
+    "ci_pending": {
+      "id": 100,
+      "nterm": "blockerkind"
+    },
+    "ci_no_status": {
+      "id": 100,
+      "nterm": "blockerkind"
+    },
+    "not_mergeable": {
+      "id": 100,
+      "nterm": "blockerkind"
+    },
+    "classification": {
+      "id": 100,
+      "nterm": "blockerkind"
+    },
+    "concurrency": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "arc": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "mutex": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "rwlock": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "cow": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "cell": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "refcell": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "oncecell": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "parking_lot": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "atomics": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "lock": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "thread safety": {
+      "id": 101,
+      "nterm": "concurrency"
+    },
+    "error-handling": {
+      "id": 102,
+      "nterm": "error-handling"
+    },
+    "result": {
+      "id": 102,
+      "nterm": "error-handling"
+    },
+    "option": {
+      "id": 102,
+      "nterm": "error-handling"
+    },
+    "thiserror": {
+      "id": 102,
+      "nterm": "error-handling"
+    },
+    "anyhow": {
+      "id": 102,
+      "nterm": "error-handling"
+    },
+    "error handling": {
+      "id": 102,
+      "nterm": "error-handling"
+    },
+    "? operator": {
+      "id": 102,
+      "nterm": "error-handling"
+    },
+    "from trait": {
+      "id": 102,
+      "nterm": "error-handling"
+    },
+    "unwrap": {
+      "id": 102,
+      "nterm": "error-handling"
+    },
+    "expect": {
+      "id": 102,
+      "nterm": "error-handling"
+    },
+    "error propagation": {
+      "id": 102,
+      "nterm": "error-handling"
+    },
+    "executor": {
+      "id": 103,
+      "nterm": "executor"
+    },
+    "execution": {
+      "id": 103,
+      "nterm": "executor"
+    },
+    "firecracker": {
+      "id": 103,
+      "nterm": "executor"
+    },
+    "docker": {
+      "id": 103,
+      "nterm": "executor"
+    },
+    "local": {
+      "id": 103,
+      "nterm": "executor"
+    },
+    "sandbox": {
+      "id": 103,
+      "nterm": "executor"
+    },
+    "vm": {
+      "id": 103,
+      "nterm": "executor"
+    },
+    "isolate": {
+      "id": 103,
+      "nterm": "executor"
+    },
+    "localexecutor": {
+      "id": 103,
+      "nterm": "executor"
+    },
+    "dockerexecutor": {
+      "id": 103,
+      "nterm": "executor"
+    },
+    "firecrackerexecutor": {
+      "id": 103,
+      "nterm": "executor"
+    },
+    "merge_coordinator": {
+      "id": 104,
+      "nterm": "merge_coordinator"
+    },
+    "merge": {
+      "id": 104,
+      "nterm": "merge_coordinator"
+    },
+    "coordinator": {
+      "id": 104,
+      "nterm": "merge_coordinator"
+    },
+    "auto-merge": {
+      "id": 104,
+      "nterm": "merge_coordinator"
+    },
+    "pr": {
+      "id": 104,
+      "nterm": "merge_coordinator"
+    },
+    "pull request": {
+      "id": 104,
+      "nterm": "merge_coordinator"
+    },
+    "gitea": {
+      "id": 104,
+      "nterm": "merge_coordinator"
+    },
+    "contamination": {
+      "id": 104,
+      "nterm": "merge_coordinator"
+    },
+    "giteaclient": {
+      "id": 104,
+      "nterm": "merge_coordinator"
+    },
+    "prsummary": {
+      "id": 104,
+      "nterm": "merge_coordinator"
+    },
+    "evaluate_all": {
+      "id": 104,
+      "nterm": "merge_coordinator"
+    },
+    "ownership": {
+      "id": 105,
+      "nterm": "ownership"
+    },
+    "borrow checker": {
+      "id": 105,
+      "nterm": "ownership"
+    },
+    "lifetime": {
+      "id": 105,
+      "nterm": "ownership"
+    },
+    "reference": {
+      "id": 105,
+      "nterm": "ownership"
+    },
+    "borrowing": {
+      "id": 105,
+      "nterm": "ownership"
+    },
+    "mutable reference": {
+      "id": 105,
+      "nterm": "ownership"
+    },
+    "zero-copy": {
+      "id": 105,
+      "nterm": "ownership"
+    },
+    "unsafe": {
+      "id": 105,
+      "nterm": "ownership"
+    },
+    "memory safety": {
+      "id": 105,
+      "nterm": "ownership"
+    },
+    "performance": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "flamegraph": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "criterion": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "simd": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "inline": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "pgo": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "profile-guided optimisation": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "heap profiling": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "dhat": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "perf": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "benchmark": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "performance regression": {
+      "id": 106,
+      "nterm": "performance"
+    },
+    "provider": {
+      "id": 107,
+      "nterm": "provider"
+    },
+    "llm backend": {
+      "id": 107,
+      "nterm": "provider"
+    },
+    "anthropic": {
+      "id": 107,
+      "nterm": "provider"
+    },
+    "openai": {
+      "id": 107,
+      "nterm": "provider"
+    },
+    "gemini": {
+      "id": 107,
+      "nterm": "provider"
+    },
+    "model": {
+      "id": 107,
+      "nterm": "provider"
+    },
+    "api": {
+      "id": 107,
+      "nterm": "provider"
+    },
+    "openrouter": {
+      "id": 107,
+      "nterm": "provider"
+    },
+    "rust": {
+      "id": 108,
+      "nterm": "rust"
+    },
+    "serde": {
+      "id": 109,
+      "nterm": "serde"
+    },
+    "serialize": {
+      "id": 109,
+      "nterm": "serde"
+    },
+    "deserialize": {
+      "id": 109,
+      "nterm": "serde"
+    },
+    "serde_json": {
+      "id": 109,
+      "nterm": "serde"
+    },
+    "json": {
+      "id": 109,
+      "nterm": "serde"
+    },
+    "toml": {
+      "id": 109,
+      "nterm": "serde"
+    },
+    "yaml": {
+      "id": 109,
+      "nterm": "serde"
+    },
+    "bincode": {
+      "id": 109,
+      "nterm": "serde"
+    },
+    "serialisation": {
+      "id": 109,
+      "nterm": "serde"
+    },
+    "deserialisation": {
+      "id": 109,
+      "nterm": "serde"
+    },
+    "derive macro": {
+      "id": 109,
+      "nterm": "serde"
+    },
+    "session": {
+      "id": 110,
+      "nterm": "session"
+    },
+    "query loop": {
+      "id": 110,
+      "nterm": "session"
+    },
+    "rlm": {
+      "id": 110,
+      "nterm": "session"
+    },
+    "query": {
+      "id": 110,
+      "nterm": "session"
+    },
+    "budget": {
+      "id": 110,
+      "nterm": "session"
+    },
+    "context": {
+      "id": 110,
+      "nterm": "session"
+    },
+    "sessionid": {
+      "id": 110,
+      "nterm": "session"
+    },
+    "sessionmanager": {
+      "id": 110,
+      "nterm": "session"
+    },
+    "testing": {
+      "id": 111,
+      "nterm": "testing"
+    },
+    "unit test": {
+      "id": 111,
+      "nterm": "testing"
+    },
+    "integration test": {
+      "id": 111,
+      "nterm": "testing"
+    },
+    "doc test": {
+      "id": 111,
+      "nterm": "testing"
+    },
+    "nextest": {
+      "id": 111,
+      "nterm": "testing"
+    },
+    "proptest": {
+      "id": 111,
+      "nterm": "testing"
+    },
+    "coverage": {
+      "id": 111,
+      "nterm": "testing"
+    },
+    "cargo test": {
+      "id": 111,
+      "nterm": "testing"
+    },
+    "property-based testing": {
+      "id": 111,
+      "nterm": "testing"
+    },
+    "tokio": {
+      "id": 112,
+      "nterm": "tokio"
+    },
+    "async runtime": {
+      "id": 112,
+      "nterm": "tokio"
+    },
+    "tokio::spawn": {
+      "id": 112,
+      "nterm": "tokio"
+    },
+    "tokio runtime": {
+      "id": 112,
+      "nterm": "tokio"
+    },
+    "async-std": {
+      "id": 112,
+      "nterm": "tokio"
+    },
+    "glommio": {
+      "id": 112,
+      "nterm": "tokio"
+    },
+    "#[tokio::main]": {
+      "id": 112,
+      "nterm": "tokio"
+    },
+    "tokio::select!": {
+      "id": 112,
+      "nterm": "tokio"
+    },
+    "traits": {
+      "id": 113,
+      "nterm": "traits"
+    },
+    "trait": {
+      "id": 113,
+      "nterm": "traits"
+    },
+    "impl trait": {
+      "id": 113,
+      "nterm": "traits"
+    },
+    "dyn trait": {
+      "id": 113,
+      "nterm": "traits"
+    },
+    "trait bounds": {
+      "id": 113,
+      "nterm": "traits"
+    },
+    "associated type": {
+      "id": 113,
+      "nterm": "traits"
+    },
+    "trait object": {
+      "id": 113,
+      "nterm": "traits"
+    },
+    "send": {
+      "id": 113,
+      "nterm": "traits"
+    },
+    "sync": {
+      "id": 113,
+      "nterm": "traits"
+    },
+    "marker trait": {
+      "id": 113,
+      "nterm": "traits"
+    },
+    "validator": {
+      "id": 114,
+      "nterm": "validator"
+    },
+    "validation": {
+      "id": 114,
+      "nterm": "validator"
+    },
+    "kg validation": {
+      "id": 114,
+      "nterm": "validator"
+    },
+    "knowledge graph": {
+      "id": 114,
+      "nterm": "validator"
+    },
+    "term matching": {
+      "id": 114,
+      "nterm": "validator"
+    },
+    "aho-corasick": {
+      "id": 114,
+      "nterm": "validator"
+    },
+    "from_config": {
+      "id": 114,
+      "nterm": "validator"
+    },
+    "strictness": {
+      "id": 114,
+      "nterm": "validator"
+    },
+    "knowledgegraphvalidator": {
+      "id": 114,
+      "nterm": "validator"
+    },
+    "webassembly": {
+      "id": 115,
+      "nterm": "webassembly"
+    },
+    "wasm": {
+      "id": 115,
+      "nterm": "webassembly"
+    },
+    "wasm32-unknown-unknown": {
+      "id": 115,
+      "nterm": "webassembly"
+    },
+    "wasm-bindgen": {
+      "id": 115,
+      "nterm": "webassembly"
+    },
+    "wasm-pack": {
+      "id": 115,
+      "nterm": "webassembly"
+    },
+    "wasmtime": {
+      "id": 115,
+      "nterm": "webassembly"
+    },
+    "wasi": {
+      "id": 115,
+      "nterm": "webassembly"
+    },
+    "wasm-opt": {
+      "id": 115,
+      "nterm": "webassembly"
+    }
   }
 }
