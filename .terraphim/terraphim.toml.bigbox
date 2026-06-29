@@ -103,8 +103,21 @@ fi
 WORKTREE_SIZE=$(du -sm /data/projects/terraphim/terraphim-ai/.worktrees/ 2>/dev/null | cut -f1 || echo 0)
 if [ "$WORKTREE_SIZE" -gt 10240 ]; then
   echo "WARNING: worktrees using $WORKTREE_SIZE MB (>10GB)"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Worktree disk usage: $WORKTREE_SIZE MB" --body "Worktree directory exceeds 10GB threshold.
+  # Dedup: comment on an existing open alert instead of creating a duplicate.
+  # Mirrors the Theme-ID guard used by security-sentinel / repo-steward /
+  # drift-detector / meta-learning cron agents.
+  DISK_EXISTING=$(gtr list-issues --owner terraphim --repo terraphim-ai --state open 2>/dev/null \
+    | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(i["number"]) for i in d if "Theme-ID: adf-health-alert" in i.get("body","") and "Worktree disk usage" in i.get("title","")]' | head -1)
+  if [ -n "$DISK_EXISTING" ]; then
+    gtr comment --owner terraphim --repo terraphim-ai --index "$DISK_EXISTING" \
+      --body "Recurrence $(date -u +%Y-%m-%dT%H:%M:%SZ): worktrees still using $WORKTREE_SIZE MB (>10GB)."
+  else
+    gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Worktree disk usage: $WORKTREE_SIZE MB" --body "Worktree directory exceeds 10GB threshold.
+
+Consider pruning stale worktrees with: git worktree prune
+
 Theme-ID: adf-health-alert"
+  fi
 fi
 
 ### 4. Binary Version Check
@@ -117,9 +130,42 @@ Theme-ID: adf-health-alert"
 fi
 
 ### 5. Orphaned Worktree Check
-ORPHANS=$(ls /data/projects/terraphim/terraphim-ai/.worktrees/ 2>/dev/null | wc -l)
-if [ "$ORPHANS" -gt 10 ]; then
-  echo "INFO: $ORPHANS worktrees present"
+# A worktree directory is orphaned when it exists on disk but git no longer
+# tracks it in its admin registry (.git/worktrees/). Such dirs survive
+# `git worktree prune` and accumulate; they are the leading cause of the
+# disk-usage alert in section 3.
+WORKTREE_ROOT="/data/projects/terraphim/terraphim-ai/.worktrees"
+GIT_REGISTRY="/data/projects/terraphim/terraphim-ai/.git/worktrees"
+ORPHAN_LIST=""
+if [ -d "$WORKTREE_ROOT" ] && [ -d "$GIT_REGISTRY" ]; then
+  # Directory names present on disk but absent from git's admin registry.
+  ORPHAN_LIST=$(comm -23 \
+    <(ls -1 "$WORKTREE_ROOT" 2>/dev/null | sort) \
+    <(ls -1 "$GIT_REGISTRY" 2>/dev/null | sort))
+fi
+ORPHAN_COUNT=$(printf '%s' "$ORPHAN_LIST" | grep -c . || true)
+if [ "$ORPHAN_COUNT" -gt 0 ]; then
+  echo "WARNING: $ORPHAN_COUNT orphaned worktree dirs (not in git registry):"
+  printf '%s\n' "$ORPHAN_LIST" | head -20
+  ORPHAN_EXISTING=$(gtr list-issues --owner terraphim --repo terraphim-ai --state open 2>/dev/null \
+    | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(i["number"]) for i in d if "Theme-ID: adf-health-alert" in i.get("body","") and "orphaned worktree" in i.get("title","").lower()]' | head -1)
+  if [ -n "$ORPHAN_EXISTING" ]; then
+    gtr comment --owner terraphim --repo terraphim-ai --index "$ORPHAN_EXISTING" \
+      --body "Recurrence $(date -u +%Y-%m-%dT%H:%M:%SZ): $ORPHAN_COUNT orphaned worktree dirs still present."
+  else
+    gtr create-issue --owner terraphim --repo terraphim-ai \
+      --title "[ADF] $ORPHAN_COUNT orphaned worktree dirs" \
+      --body "Worktree directories exist on disk but are no longer registered in git's admin tree (.git/worktrees/). They survive `git worktree prune` and accumulate disk.
+
+Orphaned dirs:
+```
+$(printf '%s\n' "$ORPHAN_LIST" | head -20)
+```
+
+Reclaim with: sudo scripts/adf-setup/adf-cleanup.sh or manual rm -rf of the listed dirs after verification.
+
+Theme-ID: adf-health-alert"
+  fi
 fi
 
 ### 6. Gitea API Health
