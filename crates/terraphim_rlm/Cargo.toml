@@ -40,7 +40,8 @@ terraphim_mcp_search = { version = "0.1.0", registry = "terraphim", optional = t
 # Firecracker-rust core for VM and snapshot management (private repo).
 # Uncomment when building with --features firecracker on a machine with
 # access to the private firecracker-rust repository.
-# fcctl-core = { git = "https://github.com/terraphim/firecracker-rust", branch = "main", optional = true }
+fcctl-core = { path = "/home/alex/projects/terraphim/firecracker-rust/fcctl-core", optional = true }
+terraphim-firecracker = { path = "../../terraphim_firecracker", optional = true, package = "terraphim-firecracker" }
 
 # Async utilities
 tokio-util = "0.7"
@@ -85,7 +86,7 @@ kg-validation = ["dep:terraphim_automata", "dep:terraphim_types", "dep:terraphim
 supervision = ["dep:terraphim_agent_supervisor"]
 llm-bridge = ["dep:hyper", "dep:hyper-util"]
 docker-backend = ["dep:bollard"]
-firecracker = []
+firecracker = ["dep:fcctl-core", "dep:terraphim-firecracker"]
 e2b-backend = ["dep:reqwest"]
 mcp = ["dep:rmcp", "dep:terraphim_mcp_search", "dep:terraphim_types"]
 cli = ["dep:clap", "dep:env_logger"]

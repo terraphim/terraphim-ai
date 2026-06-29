@@ -841,7 +841,7 @@ mod tests {
         }
 
         let config = RlmConfig::default();
-        let executor = FirecrackerExecutor::new(config).unwrap();
+        let executor = FirecrackerExecutor::new(config, None).unwrap();
 
         assert!(executor.has_capability(Capability::VmIsolation));
         assert!(executor.has_capability(Capability::Snapshots));
@@ -857,7 +857,7 @@ mod tests {
         }
 
         let config = RlmConfig::default();
-        let result = FirecrackerExecutor::new(config);
+        let result = FirecrackerExecutor::new(config, None);
         assert!(result.is_err());
     }
 
@@ -869,7 +869,7 @@ mod tests {
         }
 
         let config = RlmConfig::default();
-        let executor = FirecrackerExecutor::new(config).unwrap();
+        let executor = FirecrackerExecutor::new(config, None).unwrap();
         let session_id = SessionId::new();
 
         // Initially no VM assigned
@@ -898,7 +898,7 @@ mod tests {
         }
 
         let config = RlmConfig::default();
-        let executor = FirecrackerExecutor::new(config).unwrap();
+        let executor = FirecrackerExecutor::new(config, None).unwrap();
         let session_id = SessionId::new();
 
         // Initially no current snapshot
@@ -924,7 +924,7 @@ mod tests {
         }
 
         let config = RlmConfig::default();
-        let executor = FirecrackerExecutor::new(config).unwrap();
+        let executor = FirecrackerExecutor::new(config, None).unwrap();
         let session_id = SessionId::new();
 
         // Rollback without any snapshot should be no-op
@@ -940,7 +940,7 @@ mod tests {
         }
 
         let config = RlmConfig::default();
-        let executor = FirecrackerExecutor::new(config).unwrap();
+        let executor = FirecrackerExecutor::new(config, None).unwrap();
 
         // Health check should fail if not initialized
         let result = executor.health_check().await.unwrap();
@@ -955,7 +955,7 @@ mod tests {
         }
 
         let config = RlmConfig::default();
-        let executor = FirecrackerExecutor::new(config).unwrap();
+        let executor = FirecrackerExecutor::new(config, None).unwrap();
 
         let session_id1 = SessionId::new();
         let session_id2 = SessionId::new();
