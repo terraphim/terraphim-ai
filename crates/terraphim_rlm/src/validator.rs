@@ -638,7 +638,7 @@ mod tests {
     #[test]
     fn test_truncate_for_log_multibyte() {
         // Each emoji is 4 bytes; 26 of them = 104 bytes, triggering truncation.
-        // The byte boundary at 97 falls mid-emoji without floor_char_boundary.
+        // The byte boundary at 97 falls mid-emoji; floor_char_boundary aligns to a valid char.
         let emoji_str = "😀".repeat(26);
         let result = truncate_for_log(&emoji_str);
         assert!(result.ends_with("..."));

@@ -761,7 +761,7 @@ mod tests {
     #[test]
     fn test_truncate_multibyte() {
         // Each CJK char is 3 bytes; 200 of them = 600 bytes, > 500 limit.
-        // Without floor_char_boundary, slicing at byte 500 panics mid-char.
+        // str::floor_char_boundary ensures slicing stays on a valid UTF-8 boundary.
         let cjk = "中".repeat(200);
         let result = truncate(&cjk, 500);
         assert!(result.ends_with("..."));
