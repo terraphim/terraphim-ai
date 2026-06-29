@@ -32,7 +32,7 @@ use async_trait::async_trait;
 
 use crate::pr_gate::{CommitStatusState, CommitStatusSummary};
 use crate::pr_gate_result::{self, GateStatus, PrGateResultError};
-use crate::pr_review::{author_is_agent, AutoMergeCriteria};
+use crate::pr_review::{agent_author_rejection_reason, author_is_agent, AutoMergeCriteria};
 
 /// Login that identifies the structural-pr-review agent.
 ///
@@ -322,10 +322,7 @@ pub fn evaluate_pr_gates(
 ) -> EvaluationOutcome {
     if criteria.require_agent_author && !author_is_agent(&pr.author_login) {
         return EvaluationOutcome::HumanReviewNeeded {
-            reason: format!(
-                "author `{}` is not a recognised agent; human-authored PRs require manual merge",
-                pr.author_login
-            ),
+            reason: agent_author_rejection_reason(&pr.author_login),
         };
     }
     if pr.diff_loc > criteria.max_diff_loc {
@@ -700,6 +697,37 @@ mod tests {
             &AutoMergeCriteria::default(),
         );
         assert!(matches!(out, EvaluationOutcome::AwaitingGates { .. }));
+    }
+
+    #[test]
+    fn evaluate_gates_rejection_names_login_and_allowlist_hint() {
+        // AC (#4326): when an unrecognised fleet agent opens a PR, the
+        // rejection reason must contain the exact login and point to the
+        // fleet config allowlist. Kept in sync with pr_review::evaluate via
+        // the shared agent_author_rejection_reason helper.
+        let p = pr(1, "renovate[bot]", "abc", 10);
+        let out = evaluate_pr_gates(
+            &p,
+            &[],
+            &[],
+            "terraphim-core",
+            &AutoMergeCriteria::default(),
+        );
+        let EvaluationOutcome::HumanReviewNeeded { reason } = out else {
+            panic!("unrecognised author must trigger HumanReviewNeeded");
+        };
+        assert!(
+            reason.contains("renovate[bot]"),
+            "reason must name the rejected login, got: {reason}"
+        );
+        assert!(
+            reason.contains("allowlist"),
+            "reason must mention allowlisting, got: {reason}"
+        );
+        assert!(
+            reason.contains("orchestrator.toml"),
+            "reason must point to the fleet config file, got: {reason}"
+        );
     }
 
     #[test]

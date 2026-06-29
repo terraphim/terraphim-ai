@@ -194,12 +194,33 @@ pub fn evaluate(
         ));
     }
     if criteria.require_agent_author && !author_is_agent(&pr.author_login) {
-        return AutoMergeDecision::HumanReviewNeeded(format!(
-            "author `{}` is not a recognised agent; human-authored PRs require manual merge",
-            pr.author_login
+        return AutoMergeDecision::HumanReviewNeeded(agent_author_rejection_reason(
+            &pr.author_login,
         ));
     }
     AutoMergeDecision::Merge
+}
+
+/// Human-readable reason emitted when a PR is rejected because its author is
+/// not a recognised fleet agent.
+///
+/// The message is shared between [`evaluate`] and
+/// [`crate::pr_poller::evaluate_pr_gates`] so both auto-merge rejection paths
+/// report the offending login and the allowlist update location identically —
+/// operators never need to cross-reference PR metadata to find the login, and
+/// the twin gates can never drift out of sync.
+///
+/// The allowlist policy itself is [`author_is_agent`]: a login is recognised
+/// when it is exactly `claude-code` or `root`, or starts with the `adf-` fleet
+/// prefix. To allowlist a new automation account, add it to the orchestrator
+/// fleet config (an `[[agents]]` entry in `orchestrator.toml`).
+pub fn agent_author_rejection_reason(login: &str) -> String {
+    format!(
+        "author `{login}` is not a recognised agent; human-authored PRs require manual merge. \
+         To allowlist, add the login to the orchestrator fleet config \
+         (`[[agents]]` in `orchestrator.toml`); recognised logins are exactly \
+         `claude-code`, `root`, or any `adf-` prefix."
+    )
 }
 
 /// Return `true` when `login` belongs to an automation account authorised to
@@ -354,6 +375,61 @@ mod tests {
         assert!(!author_is_agent("alex"));
         assert!(!author_is_agent("dependabot[bot]"));
         assert!(!author_is_agent("renovate[bot]"));
+    }
+
+    #[test]
+    fn agent_author_rejection_reason_includes_login_and_allowlist_hint() {
+        let reason = agent_author_rejection_reason("dependabot[bot]");
+        // AC: the rejection message contains the exact author login.
+        assert!(
+            reason.contains("author `dependabot[bot]`"),
+            "reason must name the rejected login verbatim, got: {reason}"
+        );
+        // AC: the message indicates the fleet config path for allowlist updates.
+        assert!(
+            reason.contains("allowlist"),
+            "reason must mention allowlisting, got: {reason}"
+        );
+        assert!(
+            reason.contains("orchestrator.toml"),
+            "reason must point to the fleet config file, got: {reason}"
+        );
+        // Hint must mirror the real author_is_agent() policy so operators are
+        // not misled about which logins are already accepted.
+        assert!(reason.contains("adf-"));
+        assert!(reason.contains("claude-code"));
+        assert!(reason.contains("root"));
+    }
+
+    #[test]
+    fn evaluate_rejects_unrecognised_author_with_allowlist_hint() {
+        // A verdict that otherwise clears every gate still fails when the PR
+        // author is not a recognised fleet agent; the resulting reason must
+        // route operators to the allowlist.
+        let verdict = ReviewVerdict {
+            confidence: 5,
+            p0_count: 0,
+            p1_count: 0,
+            p2_count: 0,
+            all_criteria_met: true,
+            comment_id: 1,
+            commit_short_hash: "abc123".to_string(),
+        };
+        let pr = PrMetadata {
+            pr_number: 42,
+            author_login: "renovate[bot]".to_string(),
+            diff_loc: 10,
+            head_sha: "abc123".to_string(),
+            base_branch: "main".to_string(),
+        };
+        let criteria = AutoMergeCriteria::default();
+        let AutoMergeDecision::HumanReviewNeeded(reason) = evaluate(&verdict, &pr, &criteria)
+        else {
+            panic!("unrecognised author must trigger HumanReviewNeeded");
+        };
+        assert!(reason.contains("renovate[bot]"));
+        assert!(reason.contains("allowlist"));
+        assert!(reason.contains("orchestrator.toml"));
     }
 
     #[test]
