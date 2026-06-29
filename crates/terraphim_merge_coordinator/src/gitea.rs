@@ -219,8 +219,13 @@ impl GiteaClient {
                 }
                 Ok(resp) => {
                     let status = resp.status();
+                    let is_client_error = status.is_client_error() && status != reqwest::StatusCode::TOO_MANY_REQUESTS;
                     let body_text = resp.text().await.unwrap_or_default();
                     last_err = Some(format!("status {status}: {body_text}"));
+                    if is_client_error {
+                        warn!(method = %method, url = %redact(url), attempt, %status, "gitea client error (non-retryable); failing immediately");
+                        break;
+                    }
                     warn!(method = %method, url = %redact(url), attempt, %status, "gitea non-success; will retry if attempts remain");
                 }
                 Err(e) => {

@@ -84,6 +84,12 @@ async fn evaluate_one(
 /// Check PR file list for contamination (artefacts, session dumps, etc.).
 ///
 /// Returns `Ok(())` if clean, `Err(reason)` if contaminated.
+///
+/// Patterns match as directory components: a file is contaminated if it
+/// starts with a pattern (e.g. `.sessions/session.md`) or contains the
+/// pattern preceded by `/` (e.g. `path/.sessions/session.md`).  Plain
+/// substring matching is avoided to prevent false positives like
+/// `src/sessions_parser.rs` matching `.sessions/`.
 async fn check_contamination(
     gitea: &GiteaClient,
     owner: &str,
@@ -99,7 +105,12 @@ async fn check_contamination(
 
     for file in &files {
         for pattern in CONTAMINATED_PATTERNS {
-            if file.starts_with(pattern) || file.contains(pattern) {
+            if file.starts_with(pattern) {
+                return Err(format!("contaminated: {file} (pattern: {pattern})"));
+            }
+            // Check for directory-component match: "/.sessions/" within path
+            let component = ["/", pattern].concat();
+            if file.contains(&component) {
                 return Err(format!("contaminated: {file} (pattern: {pattern})"));
             }
         }
@@ -277,36 +288,30 @@ mod tests {
     fn contamination_patterns_match_artefact_files() {
         let patterns: &[&str] = &[".sessions/", ".review_tmp/", ".handoff/", ".beads/"];
 
-        // Positive matches
-        assert!(
-            patterns
-                .iter()
-                .any(|p| ".sessions/session-123.md".contains(p))
-        );
-        assert!(
-            patterns
-                .iter()
-                .any(|p| ".review_tmp/pr123/file.diff".contains(p))
-        );
-        assert!(
-            patterns
-                .iter()
-                .any(|p| ".handoff/pr2664-review.md".contains(p))
-        );
-        assert!(patterns.iter().any(|p| ".beads/issues.jsonl".contains(p)));
+        // Helper: matches as directory component (starts_with or contains "/.sessions/")
+        let is_contaminated = |file: &str| -> bool {
+            patterns.iter().any(|p| {
+                file.starts_with(p)
+                    || file.contains(&["/", p].concat())
+            })
+        };
 
-        // Negative matches
-        assert!(!patterns.iter().any(|p| "src/main.rs".contains(p)));
-        assert!(
-            !patterns
-                .iter()
-                .any(|p| "crates/terraphim_rlm/src/lib.rs".contains(p))
-        );
-        assert!(!patterns.iter().any(|p| "Cargo.toml".contains(p)));
-        assert!(
-            !patterns
-                .iter()
-                .any(|p| ".github/workflows/ci-pr.yml".contains(p))
-        );
+        // Positive matches — files inside contaminated directories
+        assert!(is_contaminated(".sessions/session-123.md"));
+        assert!(is_contaminated("subdir/.sessions/session-123.md"));
+        assert!(is_contaminated(".review_tmp/pr123/file.diff"));
+        assert!(is_contaminated(".handoff/pr2664-review.md"));
+        assert!(is_contaminated(".beads/issues.jsonl"));
+        assert!(is_contaminated("crates/foo/.beads/issues.jsonl"));
+
+        // Negative matches — files NOT in contaminated directories
+        assert!(!is_contaminated("src/main.rs"));
+        assert!(!is_contaminated("crates/terraphim_rlm/src/lib.rs"));
+        assert!(!is_contaminated("Cargo.toml"));
+        assert!(!is_contaminated(".github/workflows/ci-pr.yml"));
+        // False positive prevention: filename containing pattern string but not as directory
+        assert!(!is_contaminated("src/sessions_parser.rs"));
+        assert!(!is_contaminated("docs/review_tmp_guide.md"));
+        assert!(!is_contaminated("tests/handoff_integration_test.rs"));
     }
 }
