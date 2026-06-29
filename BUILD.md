@@ -52,8 +52,8 @@ When `Cargo.toml` is detected:
 ```bash
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo build --workspace --profile ci
-cargo test --workspace --no-fail-fast --profile ci
+cargo build --workspace --profile ci --profile ci
+cargo test --workspace --no-fail-fast --profile ci --profile ci
 ```
 
 ## Command Transformation
@@ -194,7 +194,7 @@ cost:: low|medium|high
 ## Auto-corrected (2026-05-29T22:58:17Z)
 
 Failed: `cargo clippy --workspace --all-targets -- -D warnings`
-CORRECTION: `cargo build --workspace --tests`
+CORRECTION: `cargo build --workspace --profile ci --tests`
 
 REASON: The `terraphim_orchestrator` crate has compilation errors (not clippy warnings) that prevent the build from completing. Clippy cannot run on code that won't compile. Run a plain build to reveal the actual errors before attempting linting.
 
@@ -211,7 +211,7 @@ REASON: View the full clippy warning/error message instead of the truncated outp
 
 After you see the full error, you'll likely need to either:
 - Fix the clippy warning in the code, then re-run with `-D warnings`
-- Or run `cargo build --workspace --profile ci && cargo test --workspace --no-fail-fast --profile ci` first to verify compilation and tests work, then address the specific clippy warning
+- Or run `cargo build --workspace --profile ci --profile ci && cargo test --workspace --no-fail-fast --profile ci --profile ci` first to verify compilation and tests work, then address the specific clippy warning
 
 ## Auto-corrected (2026-05-29T23:02:05Z)
 
@@ -238,8 +238,8 @@ Alternatively, if you intended this as a conditional check that should fail unde
 
 ## Auto-corrected (2026-06-01T05:22:46Z)
 
-Failed: `cargo build --workspace --profile ci --profile ci --profile ci --profile ci`
-CORRECTION: `cargo build --workspace --profile ci`
+Failed: `cargo build --workspace --profile ci --profile ci --profile ci --profile ci --profile ci`
+CORRECTION: `cargo build --workspace --profile ci --profile ci`
 
 REASON: The `--profile` flag was specified 4 times; Cargo only accepts it once. Remove the duplicate flags, keeping a single `--profile ci`.
 
@@ -247,3 +247,35 @@ REASON: The `--profile` flag was specified 4 times; Cargo only accepts it once. 
 
 Failed: `git definitely-not-a-real-subcommand`
 Not logged in · Please run /login
+
+## Auto-corrected (2026-06-02T15:42:19Z)
+
+Failed: `cargo fmt --all -- --check`
+CORRECTION: `cargo fmt --all --check`
+
+REASON: The `--check` flag belongs to `cargo fmt` (not rustfmt), so it should come before the `--` separator. The syntax `cargo fmt --all -- --check` incorrectly passes `--check` as a rustfmt argument after the separator.
+
+## Auto-corrected (2026-06-02T15:42:33Z)
+
+Failed: `cargo clippy --workspace --all-targets -- -D warnings`
+CORRECTION: `cargo clippy --workspace --exclude terraphim_automata --all-targets -- -D warnings`
+
+REASON: The recent commit (E5 cut, #1910) excluded or removed `terraphim_automata` from the workspace, but the root Cargo.toml workspace configuration still references it—use `--exclude` to skip it during linting.
+
+## Auto-corrected (2026-06-02T15:42:41Z)
+
+Failed: `cargo build --workspace --profile ci --profile ci`
+CORRECTION: `cargo build --workspace --profile ci`
+
+REASON: The `--profile ci` argument is specified twice, which cargo doesn't allow. Looking at the memory, there's a known issue where a KG hook re-appends `--profile ci` to BUILD.md on every write — this appears to have affected the CI command generation as well.
+
+## Auto-corrected (2026-06-02T15:42:56Z)
+
+Failed: `cargo test --workspace --no-fail-fast --profile ci --profile ci`
+CORRECTION: `cargo test --workspace --no-fail-fast --profile ci`
+
+REASON: The `--profile ci` argument is specified twice in the original command, which is invalid. Cargo only allows one `--profile` argument.
+
+---
+
+**Note:** This duplication is a known issue in the project—the KG hook in `.claude/hooks/` automatically re-appends `--profile ci` to BUILD.md after writes. Check the source command in your CI config (likely in `BUILD.md` or a workflow file) and ensure it only has `--profile ci` once. The memory documents this as a recurring root cause of merge-queue freezes (see `feedback_kg_hook_corrupts_build_md.md`).
