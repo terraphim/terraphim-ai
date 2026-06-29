@@ -123,23 +123,49 @@ impl GiteaClient {
     }
 
     /// List files changed in a PR by index. Returns the `filename` of each
-    /// changed file.
+    /// changed file, paginating through all pages.  Gitea defaults to 50
+    /// files per page; PRs with more changes would silently miss
+    /// contamination checks without pagination (issue #2409).
     pub async fn list_pr_files(
         &self,
         owner: &str,
         repo: &str,
         index: u64,
     ) -> Result<Vec<String>, MergeCoordinatorError> {
-        let url = format!(
-            "{}/api/v1/repos/{}/{}/pulls/{}/files",
-            self.base_url, owner, repo, index
-        );
-        let resp = self.get_with_retry(&url).await?;
-        let files = resp
-            .json::<Vec<PrFile>>()
-            .await
-            .map_err(|e| MergeCoordinatorError::Api(format!("decode pr files: {e}")))?;
-        Ok(files.into_iter().map(|f| f.filename).collect())
+        const PER_PAGE: u32 = 50;
+        let mut all_files = Vec::new();
+        let mut page: u32 = 1;
+
+        loop {
+            let url = format!(
+                "{}/api/v1/repos/{}/{}/pulls/{}/files?page={page}&limit={PER_PAGE}",
+                self.base_url, owner, repo, index,
+            );
+            let resp = self.get_with_retry(&url).await?;
+
+            // Use X-Total-Count header to detect last page.
+            let total_count: Option<u32> = resp
+                .headers()
+                .get("x-total-count")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse().ok());
+
+            let page_files: Vec<PrFile> = resp
+                .json()
+                .await
+                .map_err(|e| MergeCoordinatorError::Api(format!("decode pr files: {e}")))?;
+
+            let page_len = page_files.len();
+            all_files.extend(page_files.into_iter().map(|f| f.filename));
+
+            // Stop when we've fetched all items or this page was empty.
+            if total_count.is_some_and(|t| all_files.len() as u32 >= t) || page_len == 0 {
+                break;
+            }
+            page += 1;
+        }
+
+        Ok(all_files)
     }
 
     async fn get_with_retry(&self, url: &str) -> Result<reqwest::Response, MergeCoordinatorError> {

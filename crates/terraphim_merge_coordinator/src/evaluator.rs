@@ -42,6 +42,7 @@ pub async fn evaluate_all(
     Ok(out)
 }
 
+#[allow(clippy::collapsible_match)]
 async fn evaluate_one(
     gitea: Option<&GiteaClient>,
     owner: &str,
@@ -50,6 +51,19 @@ async fn evaluate_one(
 ) -> PrEvaluation {
     let mergeable = pr.mergeable.unwrap_or(false);
     let fixes_issues = extract_fixes(pr.body.as_deref().unwrap_or(""));
+
+    // Check contamination before mergeability to prevent artefact PRs from merging.
+    if let Some(c) = gitea
+        && let Err(reason) = check_contamination(c, owner, repo, pr.number).await {
+            return PrEvaluation {
+                pr_index: pr.number,
+                mergeable,
+                fixes_issues,
+                verdict: EvalVerdict::Hold(reason),
+                blocker_kind: None,
+            };
+        }
+
     let (verdict, blocker_kind) = if !mergeable {
         let kind = classify_blocker(gitea, owner, repo, pr).await;
         let reason = format!("not mergeable ({kind})");
@@ -64,6 +78,40 @@ async fn evaluate_one(
         verdict,
         blocker_kind,
     }
+}
+
+/// Check PR file list for contamination (artefacts, session dumps, etc.).
+///
+/// Returns `Ok(())` if clean, `Err(reason)` if contaminated.
+async fn check_contamination(
+    gitea: &GiteaClient,
+    owner: &str,
+    repo: &str,
+    pr_index: u64,
+) -> Result<(), String> {
+    const CONTAMINATED_PATTERNS: &[&str] = &[
+        ".sessions/",
+        ".review_tmp/",
+        ".handoff/",
+        ".beads/",
+    ];
+
+    let files = gitea
+        .list_pr_files(owner, repo, pr_index)
+        .await
+        .map_err(|e| format!("contamination check failed: {e}"))?;
+
+    for file in &files {
+        for pattern in CONTAMINATED_PATTERNS {
+            if file.starts_with(pattern) || file.contains(pattern) {
+                return Err(format!(
+                    "contaminated: {file} (pattern: {pattern})"
+                ));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Query CI status and classify why a PR is blocked.
@@ -229,5 +277,22 @@ mod tests {
         assert_eq!(last.pr_index, 51);
         assert_eq!(last.verdict, EvalVerdict::Merge);
         assert_eq!(last.blocker_kind, None);
+    }
+
+    #[test]
+    fn contamination_patterns_match_artefact_files() {
+        let patterns: &[&str] = &[".sessions/", ".review_tmp/", ".handoff/", ".beads/"];
+
+        // Positive matches
+        assert!(patterns.iter().any(|p| ".sessions/session-123.md".contains(p)));
+        assert!(patterns.iter().any(|p| ".review_tmp/pr123/file.diff".contains(p)));
+        assert!(patterns.iter().any(|p| ".handoff/pr2664-review.md".contains(p)));
+        assert!(patterns.iter().any(|p| ".beads/issues.jsonl".contains(p)));
+
+        // Negative matches
+        assert!(!patterns.iter().any(|p| "src/main.rs".contains(p)));
+        assert!(!patterns.iter().any(|p| "crates/terraphim_rlm/src/lib.rs".contains(p)));
+        assert!(!patterns.iter().any(|p| "Cargo.toml".contains(p)));
+        assert!(!patterns.iter().any(|p| ".github/workflows/ci-pr.yml".contains(p)));
     }
 }
