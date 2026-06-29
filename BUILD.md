@@ -187,6 +187,9 @@ cost:: low|medium|high
 - ADR-001: Build-runner architecture decisions
 - `.docs/research-fast-cheap-build-runner.md`
 - `.docs/design-build-runner-llm.md`
+- **Flaky-test reproduction**: see `CONTRIBUTING.md` → "Debugging Flaky Tests" and
+  `.config/nextest.toml` `[profile.flaky-repro]` (issue #2999). This file documents
+  the build-runner machinery; developer testing guidance lives in CONTRIBUTING.md.
 
 ## Auto-corrected (2026-05-29T22:58:17Z)
 
