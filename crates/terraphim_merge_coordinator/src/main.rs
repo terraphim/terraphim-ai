@@ -2,8 +2,8 @@
 //!
 //! Cron-invoked. Reads env GITEA_URL + GITEA_TOKEN, evaluates open
 //! PRs in OWNER/REPO (default terraphim/terraphim-ai), merges
-//! mergeable ones, auto-closes Fixes #N. Exit codes per
-//! Operational-1: 0 success, 1 evaluation failures, 2 critical.
+//! mergeable ones, auto-closes Fixes #N. Exit codes: 0 success,
+//! 1 evaluation failures, 2 critical.
 
 use std::path::PathBuf;
 use std::process;

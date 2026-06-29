@@ -1,7 +1,8 @@
-//! Merge coordinator -- minimal skeleton (#1805).
+//! Merge coordinator library (#1805).
 //!
-//! Full spec at .docs/spec-merge-coordinator.md will be implemented in
-//! follow-up commits. This skeleton proves the crate scaffolds correctly.
+//! Evaluates open PRs for auto-merge readiness, merges mergeable PRs, and
+//! auto-closes issues referenced via `Fixes #N`. Core logic lives in the
+//! [`evaluator`] module; shared types in [`types`].
 
 pub mod evaluator;
 pub mod gitea;

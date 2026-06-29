@@ -1,8 +1,9 @@
 //! PR evaluation + merge-and-close orchestration (#1805).
 //!
-//! Sequential per spec Concurrency-2. Partial failure handling
-//! (merge ok, close fail -> CRITICAL) per Failure-1. Remediation
-//! atomicity per Failure-2.
+//! PRs are evaluated strictly sequentially within a run (no concurrency).
+//! Partial failure is surfaced as CRITICAL: a merge that succeeds but whose
+//! follow-up close call fails is not silently retried. Remediation
+//! (comment + exit) is applied atomically per PR.
 
 use tracing::{error, info, warn};
 

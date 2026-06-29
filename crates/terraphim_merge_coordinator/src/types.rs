@@ -1,8 +1,5 @@
-//! Core types for merge-coordinator (#1805).
-//!
-//! Mirrors the spec at .docs/spec-merge-coordinator.md. Lib code in
-//! follow-up commits will use these types in evaluate_all and
-//! merge_and_close.
+//! Merge-coordinator shared types (#1805): exit codes, evaluation
+//! verdicts, error variants, and merge outcomes.
 
 use std::fmt;
 
