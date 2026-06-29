@@ -276,6 +276,9 @@ jobs:
           BINARY_SIZE=$(stat -f%z target/${{ matrix.target }}/release/terraphim_server 2>/dev/null || stat -c%s target/${{ matrix.target }}/release/terraphim_server)
           echo "Server binary size: $BINARY_SIZE bytes"
 
+      - name: Verify nextest runaway ceiling (#2997)
+        run: ./scripts/ci-check-nextest-timeout.sh
+
       - name: Install cargo-nextest
         run: |
           if ! command -v cargo-nextest >/dev/null 2>&1; then
@@ -287,7 +290,8 @@ jobs:
         run: |
           # Run unit and integration tests via nextest
           # terraphim_automata/medical required: SHA-256 checksum verification tests
-          # slow-timeout and fail-fast are configured in .config/nextest.toml [profile.ci]
+          # slow-timeout/fail-fast live in .config/nextest.toml [profile.default] (inherited by [profile.ci]).
+          # Runaway ceiling guarded by scripts/ci-check-nextest-timeout.sh (#2997).
           /home/alex/.local/bin/rch exec -- cargo nextest run --release --target ${{ matrix.target }} --workspace --profile ci --features "self_update/signatures,terraphim_automata/medical"
 
       - name: Test terraphim_grep with code-search feature

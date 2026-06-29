@@ -526,6 +526,9 @@ jobs:
             ${{ runner.os }}-cargo-pr-
             ${{ runner.os }}-cargo-
 
+      - name: Verify nextest runaway ceiling (#2997)
+        run: ./scripts/ci-check-nextest-timeout.sh
+
       - name: Install cargo-nextest
         run: |
           if ! command -v cargo-nextest >/dev/null 2>&1; then
@@ -536,7 +539,8 @@ jobs:
       - name: Run unit tests
         run: |
           # Run unit tests via nextest (rocksdb feature disabled in CI, zlob enabled for fff-search)
-          # slow-timeout and fail-fast are configured in .config/nextest.toml [profile.ci]
+          # slow-timeout/fail-fast live in .config/nextest.toml [profile.default] (inherited by [profile.ci]).
+          # Runaway ceiling guarded by scripts/ci-check-nextest-timeout.sh (#2997).
           /home/alex/.local/bin/rch exec -- cargo nextest run --workspace --profile ci --lib --bins --features zlob
 
       - name: sccache stats
