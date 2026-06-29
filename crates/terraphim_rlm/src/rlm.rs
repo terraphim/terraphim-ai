@@ -921,20 +921,113 @@ impl TerraphimRlm {
         );
         log::info!("RLM auto-configure: ollama model={}", ollama_model);
 
-        // OpenRouter: API key from env or 1Password, free tier model
+        // OpenRouter: API key from env or 1Password, free tier model.
+        //
+        // Two-stage guard against the 1Password-hang trap that affected non-tty
+        // shells (agent contexts, CI, `... | terraphim_rlm`):
+        //   1. Skip entirely if stdin/stderr aren't ttys AND no GUI display is
+        //      available. 1Password's desktop daemon cannot prompt for biometric
+        //      approval in such contexts, so the call would block forever.
+        //   2. If we do try, bound the wait with `wait_timeout` (5s, generous —
+        //      `op read` is normally <500ms) so a hung daemon doesn't hang us.
+        //
+        // Set `RLM_OP_TIMEOUT_SECS=0` to disable the timeout (debugging only).
+        // Set `RLM_SKIP_OP=1` to force-skip the 1Password lookup.
         let or_api_key = std::env::var("OPENROUTER_API_KEY").ok().or_else(|| {
-            let output = std::process::Command::new("op")
+            if std::env::var("RLM_SKIP_OP").ok().as_deref() == Some("1") {
+                log::debug!("RLM auto-configure: RLM_SKIP_OP=1 set, skipping 1Password");
+                return None;
+            }
+            let stdin_is_tty = atty::is(atty::Stream::Stdin);
+            let stderr_is_tty = atty::is(atty::Stream::Stderr);
+            let has_display = std::env::var("DISPLAY").is_ok()
+                || std::env::var("WAYLAND_DISPLAY").is_ok();
+            if (!stdin_is_tty || !stderr_is_tty) && !has_display {
+                log::debug!(
+                    "RLM auto-configure: skipping 1Password (no tty, no display): \
+                     stdin_tty={}, stderr_tty={}, has_display={}",
+                    stdin_is_tty, stderr_is_tty, has_display
+                );
+                return None;
+            }
+            use std::io::Read;
+            use std::process::Stdio;
+            use std::time::Duration;
+            use wait_timeout::ChildExt;
+
+            let timeout_secs: u64 = std::env::var("RLM_OP_TIMEOUT_SECS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(5);
+            if timeout_secs == 0 {
+                log::debug!("RLM auto-configure: RLM_OP_TIMEOUT_SECS=0, no timeout");
+            }
+
+            let mut child = match std::process::Command::new("op")
                 .args([
                     "read",
                     "--account",
                     "my.1password.com",
                     "op://Terraphim/OpenRouterTesting-api-key/password",
                 ])
-                .output()
-                .ok()?;
-            String::from_utf8(output.stdout)
-                .ok()
-                .map(|s| s.trim().to_string())
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    log::warn!("RLM auto-configure: failed to spawn `op`: {}", e);
+                    return None;
+                }
+            };
+
+            // Returns Some(ExitStatus) on completion, None on timeout.
+            // wait_timeout returns Result<Option<ExitStatus>, io::Error>;
+            // the inner Option distinguishes "still running" (Some(None)) from
+            // "errored" (Err). We collapse all "no usable status" cases to None.
+            // Plain wait() returns Result<ExitStatus, io::Error>; lift to Option.
+            let status_result: Option<std::process::ExitStatus> = if timeout_secs == 0 {
+                child.wait().ok()
+            } else {
+                match child.wait_timeout(Duration::from_secs(timeout_secs)) {
+                    Ok(Some(status)) => Some(status),
+                    Ok(None) => {
+                        // Shouldn't happen with our usage but handle defensively
+                        log::warn!("RLM auto-configure: wait_timeout returned no status");
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        None
+                    }
+                    Err(e) => {
+                        log::warn!("RLM auto-configure: wait_timeout error: {}", e);
+                        let _ = child.kill();
+                        None
+                    }
+                }
+            };
+            match status_result {
+                Some(status) if status.success() => {
+                    let mut s = String::new();
+                    if let Some(mut stdout) = child.stdout.take() {
+                        let _ = stdout.read_to_string(&mut s);
+                    }
+                    Some(s.trim().to_string())
+                }
+                Some(_) => {
+                    log::warn!("RLM auto-configure: `op read` exited non-zero");
+                    None
+                }
+                None => {
+                    log::warn!(
+                        "RLM auto-configure: `op read` exceeded {}s timeout, killing",
+                        timeout_secs
+                    );
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    None
+                }
+            }
         });
 
         if let Some(ref key) = or_api_key {
