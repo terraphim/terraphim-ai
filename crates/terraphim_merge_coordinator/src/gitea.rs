@@ -43,6 +43,18 @@ pub struct PrSummary {
     pub mergeable: Option<bool>,
 }
 
+/// A single file entry from Gitea's `/pulls/{index}/files` response.
+///
+/// Gitea returns many fields per entry; only `filename` is used here.
+/// Unknown fields are silently ignored by serde, so API additions do not break
+/// deserialization.  If Gitea ever renames the field to `name` or `file_path`
+/// the tests below will catch it before it silently produces empty strings.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PrFile {
+    /// Path of the changed file relative to the repository root.
+    pub filename: String,
+}
+
 impl GiteaClient {
     /// Build a client. `base_url` is e.g. `https://git.terraphim.cloud`.
     /// `token` is the Gitea API token; treated as opaque.
@@ -105,6 +117,26 @@ impl GiteaClient {
         let body = serde_json::json!({"state": "closed"});
         self.patch_with_retry(&url, &body).await?;
         Ok(())
+    }
+
+    /// List files changed in a PR by index. Returns the `filename` of each
+    /// changed file.
+    pub async fn list_pr_files(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<Vec<String>, MergeCoordinatorError> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/pulls/{}/files",
+            self.base_url, owner, repo, index
+        );
+        let resp = self.get_with_retry(&url).await?;
+        let files = resp
+            .json::<Vec<PrFile>>()
+            .await
+            .map_err(|e| MergeCoordinatorError::Api(format!("decode pr files: {e}")))?;
+        Ok(files.into_iter().map(|f| f.filename).collect())
     }
 
     async fn get_with_retry(&self, url: &str) -> Result<reqwest::Response, MergeCoordinatorError> {
@@ -246,5 +278,33 @@ mod tests {
             "all 51 PRs must be present after deserialisation"
         );
         assert_eq!(prs[50].number, 51, "PR at position 51 must be present");
+    }
+
+    #[test]
+    fn pr_file_deserialises_filename() {
+        let json = r#"{"filename":"src/main.rs"}"#;
+        let f: PrFile = serde_json::from_str(json).unwrap();
+        assert_eq!(f.filename, "src/main.rs");
+    }
+
+    #[test]
+    fn pr_file_list_extracts_filenames() {
+        // Mirrors exactly what list_pr_files receives from the Gitea API.
+        let json = r#"[{"filename":"src/main.rs"},{"filename":"Cargo.toml"}]"#;
+        let files: Vec<PrFile> = serde_json::from_str(json).unwrap();
+        let names: Vec<String> = files.into_iter().map(|f| f.filename).collect();
+        assert_eq!(names, vec!["src/main.rs", "Cargo.toml"]);
+    }
+
+    #[test]
+    fn pr_file_unknown_fields_ignored() {
+        // Gitea returns many fields per file entry; only filename is used.
+        // If Gitea ever renames the field to "name" or "file_path" the
+        // missing-field error surfaces here rather than silently producing
+        // empty strings.
+        let json =
+            r#"{"filename":"docs/README.md","status":"modified","additions":5,"deletions":2}"#;
+        let f: PrFile = serde_json::from_str(json).unwrap();
+        assert_eq!(f.filename, "docs/README.md");
     }
 }
