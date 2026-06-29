@@ -1,0 +1,682 @@
+# orchestrator.example.toml -- AI Dark Factory Agent Fleet
+#
+# Copy to orchestrator.toml and adjust paths for your environment.
+# Full 13-agent fleet with persona-specific knowledge graphs,
+# terraphim-agent pre-checks, and disciplined engineering skill chains.
+#
+# SECURITY: After copying, restrict permissions on this file and on the
+# agent tokens file. Both contain secrets (webhook HMAC secret and API tokens).
+#
+#   chmod 600 orchestrator.toml
+#   chmod 600 /opt/ai-dark-factory/agent_tokens.json
+#
+# The orchestrator logs an error at startup if either file is world-readable.
+
+working_dir = "/opt/ai-dark-factory/workspace"
+persona_data_dir = "/opt/ai-dark-factory/personas"
+skill_data_dir = "/opt/ai-dark-factory/skills"
+role_config_path = "/opt/ai-dark-factory/persona_roles_config.json"
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.10
+moderate_threshold = 0.20
+severe_threshold = 0.40
+critical_threshold = 0.70
+
+[compound_review]
+schedule = "0 2 * * *"
+max_duration_secs = 1800
+repo_path = "/opt/ai-dark-factory/workspace"
+create_prs = false
+
+# =============================================================================
+# ROUTING (telemetry-aware model selection)
+# =============================================================================
+# Uncomment to enable KG-driven and telemetry-aware model routing.
+# Requires taxonomy markdown files in the taxonomy_path directory.
+# When use_routing_engine is true, the control-plane routing engine
+# combines KG routing, keyword routing, provider health, budget pressure,
+# and live telemetry signals for model selection.
+#
+# [routing]
+# taxonomy_path = "/opt/ai-dark-factory/kg/routing"
+# probe_ttl_secs = 300
+# probe_on_startup = true
+# use_routing_engine = false
+
+# =============================================================================
+# SAFETY LAYER (always running)
+# =============================================================================
+
+[[agents]]
+name = "security-sentinel"
+layer = "Safety"
+cli_tool = "claude"
+persona = "vigil"
+terraphim_role = "Vigil Security"
+skill_chain = ["disciplined-verification", "disciplined-validation"]
+task = """Continuously scan for CVEs and security vulnerabilities in dependencies.
+Run cargo audit, check for OWASP Top 10 issues, and report findings.
+
+## Domain Knowledge Search
+When you need security context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Vigil Security"
+
+## MANDATORY: Post verdict to Gitea
+Post your security verdict to the relevant Gitea issue.
+- PASS if no critical security issues found
+- FAIL if critical vulnerabilities or issues found
+
+Post verdict with @adf:merge-coordinator trigger.
+Replace ISSUE_NUMBER with the issue from mention context, or the default tracking issue if no mention context.
+"""
+capabilities = ["security", "vulnerability-scanning", "supply-chain"]
+max_memory_bytes = 2147483648
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "CVE vulnerability dependency audit supply chain" --role "Vigil Security" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "drift-detector"
+layer = "Safety"
+cli_tool = "claude"
+persona = "echo"
+terraphim_role = "Echo QA"
+skill_chain = ["disciplined-verification", "disciplined-validation"]
+task = """Monitor for configuration drift, test failures, and quality regressions.
+Compare current state against known-good baselines and report deviations.
+
+## Domain Knowledge Search
+When you need QA context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Echo QA"
+"""
+capabilities = ["drift-detection", "quality-monitoring", "regression-detection"]
+max_memory_bytes = 2147483648
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "regression drift quality baseline test failure" --role "Echo QA" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+# =============================================================================
+# CORE LAYER (scheduled)
+# =============================================================================
+
+[[agents]]
+name = "test-guardian"
+layer = "Core"
+cli_tool = "claude"
+persona = "echo"
+terraphim_role = "Echo QA"
+skill_chain = ["disciplined-verification", "disciplined-validation", "testing", "acceptance-testing"]
+schedule = "15 */8 * * *"
+capabilities = ["testing", "coverage", "quality"]
+max_cpu_seconds = 3600
+grace_period_secs = 30
+task = """Run comprehensive test suite and quality analysis:
+1. cd to the workspace
+2. cargo test --workspace 2>&1 | tee /tmp/test-guardian-results.txt
+3. Identify failing or flaky tests
+4. Check for untested critical code paths
+5. Run: cargo clippy -- -D warnings 2>&1
+6. Summarise findings as a test report
+
+## MANDATORY: Post verdict to Gitea
+Post your verdict to the relevant Gitea issue. Use:
+- PASS if all tests pass and no critical quality issues
+- FAIL if tests fail or critical quality issues found
+
+Post verdict with @adf:merge-coordinator trigger.
+Replace ISSUE_NUMBER with the issue from mention context, or the default tracking issue if no mention context.
+
+## Domain Knowledge Search
+When you need QA context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Echo QA"
+"""
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "test quality regression flaky coverage" --role "Echo QA" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "implementation-swarm"
+layer = "Core"
+cli_tool = "claude"
+persona = "ferrox"
+terraphim_role = "Ferrox Rust"
+skill_chain = ["disciplined-research", "disciplined-design", "disciplined-implementation", "disciplined-verification", "disciplined-validation"]
+task = """Implement the highest-priority unblocked Gitea issue:
+1. Run: gitea-robot ready --owner terraphim --repo terraphim-ai
+2. Pick the highest PageRank unblocked issue (is_blocked=false)
+3. Read the full issue details
+4. Create branch: git checkout -b task/<IDX>-<short-title>
+5. Implement following the issue spec
+6. Run: cargo check && cargo clippy -- -D warnings && cargo fmt --all -- --check
+7. Run: cargo test (for the affected package)
+8. Quality check the changes for correctness, security, and idiomatic Rust
+9. If quality check passes, commit with Refs #<IDX> and push branch:
+   git add -A && git commit -m "feat: implement #<IDX> - <short-title> Refs #<IDX>" && git push -u origin task/<IDX>-<short-title>
+10. Create PR:
+   gitea-robot create-pull --owner terraphim --repo terraphim-ai --title "Fix #<IDX>: <short-title>" --base main --head task/<IDX>-<short-title>
+11. Post comment to trigger review chain:
+   gitea-robot comment --owner terraphim --repo terraphim-ai --index <IDX> --body "Implementation complete. Quality check passed. PR created from branch task/<IDX>-<short-title>.
+   @adf:quality-coordinator please review this implementation for issue #<IDX>"
+12. DO NOT close the issue. The merge-coordinator will close it after all reviews pass.
+
+If quality check fails, fix the issues and re-run steps 6-8.
+
+## Domain Knowledge Search
+When you need Rust context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Ferrox Rust"
+"""
+schedule = "0 1 * * *"
+capabilities = ["implementation", "rust-development", "tdd"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "implementation async ownership error handling" --role "Ferrox Rust" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "product-development"
+layer = "Core"
+cli_tool = "claude"
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-design", "documentation"]
+task = """You are the product-development agent. Your job is roadmap and feature prioritization ONLY.
+You do NOT implement code, create branches, or write PRs.
+
+## Workflow
+1. Gather ready issues: gtr ready --owner $GITEA_OWNER --repo $GITEA_REPO
+2. Search prior learnings: terraphim-agent learn query "roadmap prioritization"
+3. Search KG context: terraphim-agent --config $ROLE_CONFIG_PATH search "roadmap milestone" --role $TERRAPHIM_ROLE
+4. Produce prioritization analysis:
+   - Top 3-5 candidate features from ready issues
+   - Rank by: reach, impact, confidence, effort, dependencies
+   - Explicit prioritization rationale
+   - Recommended next action (ready for implementation / needs research / blocked)
+5. Post analysis as comment to top ready issue
+6. Capture learning
+
+## Rules
+- Do NOT create branches, code, or PRs
+- Do NOT run cargo build/test/check
+- Planning output only
+
+## Domain Knowledge Search
+When you need architecture context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Carthos Architecture"
+"""
+schedule = "0 2 * * *"
+capabilities = ["product-development", "roadmap-prioritization", "feature-prioritization", "backlog-shaping"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "roadmap feature prioritization backlog" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "meta-coordinator"
+layer = "Core"
+cli_tool = "claude"
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Coordinate agent activities, review architectural decisions, ensure
+bounded contexts are respected, and maintain system coherence.
+
+## Domain Knowledge Search
+When you need architecture context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Carthos Architecture"
+"""
+schedule = "0 0 * * *"
+capabilities = ["coordination", "architecture-review", "system-design"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "bounded context architecture decision API design" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+# -----------------------------------------------------------------------------
+# PROJECT-META (per-project coordinator). One instance per project; dispatches
+# the next unblocked Gitea issue to the appropriate role. Uses env variables
+# injected by the orchestrator at spawn time ($ADF_PROJECT_ID, $ADF_WORKING_DIR,
+# $GITEA_OWNER, $GITEA_REPO) so the same prompt works across all projects.
+# -----------------------------------------------------------------------------
+
+[[agents]]
+name = "project-meta"
+layer = "Core"
+cli_tool = "claude"
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+schedule = "*/15 * * * *"
+# NOTE: set `project = "<id>"` per-project override, or duplicate this agent
+# as `project-meta-<id>` to run one instance per project.
+capabilities = ["coordination", "dispatch", "project-health"]
+task = """You are the per-project coordinator for `$ADF_PROJECT_ID`.
+
+Working dir: `$ADF_WORKING_DIR`
+Gitea target: `$GITEA_OWNER/$GITEA_REPO`
+
+## Step 1 -- health check the project
+Run from `$ADF_WORKING_DIR`:
+  cd "$ADF_WORKING_DIR"
+  git status --porcelain | head -20
+  cargo check --workspace 2>&1 | tail -20
+
+## Step 2 -- find the next unblocked issue
+Use the gitea-robot CLI with $GITEA_OWNER/$GITEA_REPO:
+  gtr ready --owner "$GITEA_OWNER" --repo "$GITEA_REPO"
+
+Pick the single highest-PageRank unblocked issue. Do NOT dispatch more than one.
+
+## Step 3 -- route to the right role
+Inspect the issue title, body, and labels to choose one of the standard roles:
+- implementation-swarm (default for feature/bugfix)
+- test-guardian (issues tagged quality/testing)
+- security-sentinel (issues tagged security/*)
+- spec-validator (issues tagged spec/*)
+- documentation-generator (issues tagged docs/*)
+
+Post a claiming comment on the issue using gtr:
+  gtr comment --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --issue <N> \\
+    --body "project-meta ($ADF_PROJECT_ID) dispatching @adf:<role> for this issue"
+
+## Step 4 -- emit a journal event so the fleet-meta can tally work
+Print exactly this line to stdout as the last line of your output:
+  project_meta: project=$ADF_PROJECT_ID dispatched=<role> issue=<N>
+
+If nothing is unblocked, print:
+  project_meta: project=$ADF_PROJECT_ID dispatched=none issue=none
+
+## Domain Knowledge Search
+When you need architecture context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Carthos Architecture"
+"""
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "coordination dispatch project ready queue" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "spec-validator"
+layer = "Core"
+cli_tool = "claude"
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Validate specifications and design documents against implementation.
+Ensure requirements traceability and design consistency.
+
+## Domain Knowledge Search
+When you need architecture context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Carthos Architecture"
+
+## MANDATORY: Post verdict to Gitea
+Post your spec validation verdict to the relevant Gitea issue.
+- PASS if specs match implementation
+- FAIL if spec violations found
+
+Post verdict with @adf:merge-coordinator trigger.
+Replace ISSUE_NUMBER with the issue from mention context, or the default tracking issue if no mention context.
+"""
+schedule = "0 4 * * *"
+capabilities = ["specification-validation", "requirements-traceability", "design-review"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "specification requirement invariant domain model" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "compliance-watchdog"
+layer = "Core"
+cli_tool = "claude"
+persona = "vigil"
+terraphim_role = "Vigil Security"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Monitor compliance with security policies, coding standards, and
+regulatory requirements. Flag violations and suggest remediation.
+
+## Domain Knowledge Search
+When you need security/compliance context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Vigil Security"
+
+## MANDATORY: Post verdict to Gitea
+Post your compliance verdict to the relevant Gitea issue.
+- PASS if no compliance issues found
+- FAIL if compliance violations found
+
+Post verdict with @adf:merge-coordinator trigger.
+Replace ISSUE_NUMBER with the issue from mention context, or the default tracking issue if no mention context.
+"""
+schedule = "0 5 * * *"
+capabilities = ["compliance", "policy-enforcement", "standards-checking"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "compliance policy secrets credential authentication" --role "Vigil Security" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "upstream-synchronizer"
+layer = "Core"
+cli_tool = "claude"
+persona = "conduit"
+terraphim_role = "Conduit DevOps"
+skill_chain = ["disciplined-implementation", "disciplined-verification"]
+task = """Sync with upstream repositories. Check for new releases of key
+dependencies, update lockfiles, and verify compatibility.
+
+## Domain Knowledge Search
+When you need DevOps context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Conduit DevOps"
+"""
+schedule = "0 3 * * *"
+capabilities = ["sync", "dependency-management", "upstream-tracking"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "deployment dependency container infrastructure" --role "Conduit DevOps" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "documentation-generator"
+layer = "Core"
+cli_tool = "claude"
+persona = "mneme"
+terraphim_role = "Mneme Knowledge"
+skill_chain = ["disciplined-implementation", "disciplined-verification"]
+task = """Generate and maintain documentation. Update API docs, README files,
+and knowledge base entries based on recent code changes.
+
+## Domain Knowledge Search
+When you need knowledge management context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Mneme Knowledge"
+"""
+schedule = "0 6 * * *"
+capabilities = ["documentation", "knowledge-management", "api-docs"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "documentation knowledge management learning pattern" --role "Mneme Knowledge" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+# =============================================================================
+# GROWTH LAYER (on-demand / scheduled)
+# =============================================================================
+
+[[agents]]
+name = "compound-review"
+layer = "Growth"
+cli_tool = "claude"
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Perform compound reviews of recent changes across the codebase.
+Identify cross-cutting concerns, architectural drift, and integration issues.
+
+## Domain Knowledge Search
+When you need architecture context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Carthos Architecture"
+"""
+schedule = "0 2 * * *"
+capabilities = ["code-review", "architecture-review", "cross-cutting-analysis"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "architecture review quality attribute trade-off" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "quality-coordinator"
+layer = "Growth"
+cli_tool = "claude"
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Run compound code review for the issue referenced in Mention Context.
+Post verdict as "compound-review verdict: GO" or "compound-review verdict: NO-GO".
+
+If GO, trigger the 4 remaining reviewers via @adf: mentions:
+@adf:test-guardian, @adf:security-sentinel, @adf:spec-validator, @adf:compliance-watchdog.
+
+Replace ISSUE_NUMBER with the issue from mention context.
+"""
+capabilities = ["code-review", "quality-gate", "review-coordination"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "code review quality gate architecture" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "browser-qa"
+layer = "Growth"
+cli_tool = "claude"
+persona = "lux"
+terraphim_role = "Lux Frontend"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Test frontend features in the browser. Verify accessibility,
+responsive design, and visual consistency across viewports.
+
+## Domain Knowledge Search
+When you need frontend context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Lux Frontend"
+"""
+capabilities = ["browser-testing", "accessibility-audit", "visual-qa"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "accessibility component responsive visual Svelte" --role "Lux Frontend" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "merge-coordinator"
+layer = "Growth"
+cli_tool = "claude"
+persona = "conduit"
+terraphim_role = "Conduit DevOps"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Evaluate whether all 5 required code reviews have been posted on a Gitea issue,
+and if all reviews are positive, merge the linked PR.
+
+Required reviewers: compound-review, test-guardian, spec-validator, compliance-watchdog, security-sentinel.
+Read all comments, parse verdicts (GO/PASS = positive, NO-GO/FAIL = negative).
+If all 5 passed: merge PR and close issue.
+If any missing or failed: post status summary and wait.
+
+Replace ISSUE_NUMBER with the issue from mention context.
+"""
+capabilities = ["merge-coordination", "ci-cd", "conflict-resolution"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "deployment pipeline CI merge release" --role "Conduit DevOps" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "market-analyst"
+layer = "Growth"
+cli_tool = "claude"
+persona = "meridian"
+terraphim_role = "Meridian Research"
+skill_chain = ["disciplined-research"]
+task = """Research market trends, competitive landscape, and user needs.
+Produce insights for product roadmap decisions.
+
+## Domain Knowledge Search
+When you need market research context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Meridian Research"
+"""
+schedule = "0 7 * * *"
+capabilities = ["market-research", "competitive-analysis", "user-research"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "market research product strategy competitive analysis" --role "Meridian Research" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "knowledge-curator"
+layer = "Growth"
+cli_tool = "claude"
+persona = "mneme"
+terraphim_role = "Mneme Knowledge"
+skill_chain = ["disciplined-research"]
+task = """Curate and improve the knowledge graph. Identify gaps in domain
+terminology, add new synonyms, and maintain KG quality.
+
+## Domain Knowledge Search
+When you need knowledge management context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Mneme Knowledge"
+"""
+schedule = "0 8 * * *"
+capabilities = ["knowledge-curation", "kg-maintenance", "terminology-management"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "knowledge graph learning pattern decision framework" --role "Mneme Knowledge" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+# =============================================================================
+# FLEET-META (global, cron-only). Shell-script agent that reports fleet health,
+# subscription budget, and per-project status to a daily coordination report
+# and opens [ADF] Gitea issues for threshold breaches. No mentions.
+# =============================================================================
+
+[[agents]]
+name = "fleet-meta"
+layer = "Growth"
+cli_tool = "/bin/bash"
+schedule = "0 * * * *"
+capabilities = ["fleet-health", "budget", "coordination-report"]
+task = """
+set -u
+
+DATE=$(date +%Y-%m-%d)
+HOUR=$(date +%H)
+REPORT_DIR="/opt/ai-dark-factory/workspace/reports"
+REPORT="${REPORT_DIR}/coordination-${DATE}.md"
+BUDGET_DIR="/opt/ai-dark-factory/data/budget"
+PAUSE_DIR="/opt/ai-dark-factory/data/pause"
+OWNER="${GITEA_OWNER:-terraphim}"
+REPO="${GITEA_REPO:-adf-fleet}"
+
+mkdir -p "${REPORT_DIR}"
+
+{
+  echo "# ADF coordination report -- ${DATE} ${HOUR}:00"
+  echo
+  echo "## Fleet health"
+  echo
+  echo "### Recent service journal (last hour)"
+  echo '```'
+  journalctl -u adf-orchestrator.service --since "1 hour ago" --no-pager 2>/dev/null | tail -40 || echo "journalctl unavailable"
+  echo '```'
+  echo
+  echo "### Orchestrator processes"
+  echo '```'
+  ps -o pid,etime,rss,cmd -C terraphim_orchestrator 2>/dev/null || echo "no orchestrator process running"
+  echo '```'
+  echo
+  echo "### Disk"
+  echo '```'
+  df -h /opt/ai-dark-factory 2>/dev/null || df -h /
+  echo '```'
+  echo
+  echo "### Memory"
+  echo '```'
+  free -h
+  echo '```'
+  echo
+  echo "## Subscription budgets"
+  echo
+  if [ -d "${BUDGET_DIR}" ]; then
+    for f in "${BUDGET_DIR}"/*.json; do
+      [ -e "$f" ] || continue
+      echo "### $(basename "$f")"
+      echo '```json'
+      cat "$f"
+      echo '```'
+      echo
+    done
+  else
+    echo "_no budget directory_"
+  fi
+  echo
+  echo "## Paused projects"
+  if [ -d "${PAUSE_DIR}" ]; then
+    ls -1 "${PAUSE_DIR}" 2>/dev/null | sed 's/^/  - /' || echo "  (none)"
+  else
+    echo "  (pause directory absent)"
+  fi
+  echo
+} > "${REPORT}"
+
+echo "wrote ${REPORT}"
+
+# Threshold-breach escalation: if any paused project exists, open an [ADF] issue.
+if [ -d "${PAUSE_DIR}" ] && [ -n "$(ls -A "${PAUSE_DIR}" 2>/dev/null)" ]; then
+  PAUSED=$(ls -1 "${PAUSE_DIR}" | tr '\\n' ' ')
+  TITLE="[ADF] paused projects detected: ${PAUSED}"
+  BODY=$(printf 'One or more projects are paused by the circuit breaker.\\n\\nPaused: %s\\n\\nSee: %s\\n' "${PAUSED}" "${REPORT}")
+  gtr create-issue --owner "${OWNER}" --repo "${REPO}" \\
+    --title "${TITLE}" --body "${BODY}" --labels "adf,fleet-meta,priority/high" \\
+    2>&1 || echo "gtr create-issue failed (continuing)"
+fi
+"""
+
+# =============================================================================
+# FLOW DAG -- Compound Review v2
+# =============================================================================
+
+[[flows]]
+name = "compound-review-v2"
+project = "default"
+schedule = "0 2 * * *"
+repo_path = "/opt/ai-dark-factory/workspace"
+base_branch = "main"
+timeout_secs = 7200
+
+[[flows.steps]]
+name = "gather-changes"
+kind = "action"
+command = "git diff main..HEAD --name-only > /tmp/changed_files.txt && cat /tmp/changed_files.txt"
+timeout_secs = 300
+on_fail = "abort"
+
+[[flows.steps]]
+name = "analyze-architecture"
+kind = "agent"
+cli_tool = "claude"
+model = "sonnet"
+task = "Review the architecture changes in the modified files. Focus on design patterns, API contracts, and system boundaries."
+timeout_secs = 900
+on_fail = "skip_failed"
+
+[[flows.steps]]
+name = "check-security"
+kind = "agent"
+cli_tool = "claude"
+model = "sonnet"
+task = "Perform a security audit on the changed code. Look for injection vulnerabilities, unsafe deserialization, and authentication bypasses."
+timeout_secs = 600
+on_fail = "continue"
+
+[[flows.steps]]
+name = "gate-approval"
+kind = "gate"
+condition = "{{steps.analyze-architecture.exit_code}} == 0"
+
+[[flows.steps]]
+name = "checkpoint-completed"
+kind = "checkpoint"

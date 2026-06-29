@@ -18,14 +18,12 @@ poll_modulo = 2
 max_dispatches_per_tick = 3
 max_concurrent_mention_agents = 8
 [[agents]]
-evolution_enabled = true
 name = "security-sentinel"
 layer = "Core"
 schedule = "0 */6 * * *"
 cli_tool = "/home/alex/.bun/bin/opencode"
-model = "kimi-for-coding/k2p6"
 fallback_provider = "/home/alex/.bun/bin/opencode"
-fallback_model = "kimi-for-coding/k2p6"
+fallback_model = "kimi-for-coding/k2p5"
 persona = "Vigil"
 skill_chain = [
     "security-audit",
@@ -33,7 +31,7 @@ skill_chain = [
     "disciplined-verification",
     "disciplined-validation",
 ]
-max_cpu_seconds = 1800
+max_cpu_seconds = 1200
 max_ticks = 24
 grace_period_secs = 30
 task = "\nexport GITEA_URL=https://git.terraphim.cloud\nexport PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH\n## Session Start -- Read Before Working\nBefore doing ANY work, check for learnings from previous agent runs:\n1. Check terraphim-agent learnings for known security patterns:\n   ~/.cargo/bin/terraphim-agent learn query \"security vulnerability CVE unsafe\"\n2. Read any relevant wiki learnings:\n   gtr wiki-list --owner terraphim --repo terraphim-ai | grep -i \"Learning-security\"\n---\n## Security Scan\ncd /data/projects/terraphim/terraphim-ai\n### 1. CVE and dependency audit\ncargo audit 2>&1 | tee /tmp/security-sentinel-cargo-audit.txt\n### 2. Secret and credential scan\ngrep -rn \\\n  --include=\"*.rs\" --include=\"*.toml\" --include=\"*.json\" --include=\"*.env\" \\\n  -e \"sk-\" -e \"api_key\\s*=\" -e \"secret\\s*=\" -e \"password\\s*=\" \\\n  crates/ scripts/ terraphim_server/ 2>/dev/null \\\n  | grep -v \"test\\|example\\|\\.lock\\|_test\\.\" \\\n  | tee /tmp/security-sentinel-secrets.txt\n### 3. Unsafe block audit\ngrep -rn \"unsafe\" crates/ \\\n  | grep -v \"test\\|#\\[allow\\|//.*unsafe\" \\\n  | tee /tmp/security-sentinel-unsafe.txt\n### 4. UBS static analysis (if available)\nif command -v ubs >/dev/null 2>&1 || [ -f \"$HOME/.local/bin/ubs\" ]; then\n  UBS_CMD=$(command -v ubs 2>/dev/null || echo \"$HOME/.local/bin/ubs\")\n  UBS_MAX_DIR_SIZE_MB=0 \"$UBS_CMD\" . 2>&1 | tail -60 | tee /tmp/security-sentinel-ubs.txt\nelse\n  echo \"UBS not installed -- skipping AST-based scan\" | tee /tmp/security-sentinel-ubs.txt\nfi\n### 5. Port exposure\nss -tlnp 2>/dev/null | tee /tmp/security-sentinel-ports.txt\n### 6. Recent security-relevant commits (last 24h)\ngit log --since=\"24 hours ago\" --oneline -- \"*.rs\" \"*.toml\" | tee /tmp/security-sentinel-commits.txt\n---\n## Verdict\nAnalyse the scan outputs above. Apply security-audit and via-negativa-analysis skill guidance.\nClassify findings:\n- P0: exploitable remotely or exposes credentials\n- P1: high severity CVE or unsafe block with unsafe assumption\n- P2: medium CVE or UBS high-confidence finding\n- P3: low severity / informational\n## Post verdict to Gitea\nIf dispatched via @adf:security-sentinel mention on ISSUE_NUMBER:\ngtr comment --owner terraphim --repo terraphim-ai --index ISSUE_NUMBER \\\n  --body \"security-sentinel verdict: PASS/FAIL\n<structured findings by priority>\"\nIf running on cron schedule and P0 or P1 findings exist:\nEXISTING=$(gtr list-issues --owner terraphim --repo terraphim-ai --state open 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(i[\"number\"]) for i in d if \"Theme-ID: security-finding\" in i.get(\"body\",\"\")]' | head -1)\nif [ -n \"$EXISTING\" ]; then\n  gtr comment --owner terraphim --repo terraphim-ai --index \"$EXISTING\" --body \"Recurrence $(date -u +%Y-%m-%dT%H:%M:%SZ): <summary>\"\nelse\n  gtr create-issue --owner terraphim --repo terraphim-ai --title \"[Security] Findings $(date +%Y-%m-%d)\" --body \"<findings>\nTheme-ID: security-finding\n@adf:meta-coordinator please action this finding.\"\nfi\nIf cron run and no P0/P1 findings: exit 0 silently.\nIMPORTANT: Do NOT mention @adf:merge-coordinator or any other agent in your verdict comment.\n---\n## Session Handover\ngtr wiki-create --owner terraphim --repo terraphim-ai \\\n  --title \"Learning-$(date +%Y%m%d)-security-sentinel\" \\\n  --content \"## Session Summary\n**Agent**: security-sentinel\n**Outcome**: PASS/FAIL\n### Findings\n- ...\n### What to check next time\n- ...\" \\\n  --message \"Session learning from security-sentinel\"\n"
@@ -43,115 +41,38 @@ capabilities = [
     "compliance",
 ]
 project = "terraphim-ai"
+# [[agents]]
+# name = "meta-coordinator"
+# layer = "Core"
+# cli_tool = "/home/alex/.local/bin/claude"
+# persona = "Ferrox"
+# skill_chain = [
+#     "disciplined-research",
+#     "disciplined-verification",
+#     "devops",
+#     "quality-oversight",
+# ]
+# schedule = "0 0-10 * * *"
+# task = '''
+# source ~/.profile
+# bash /opt/ai-dark-factory/meta-coordinator/dispatch.sh
+# '''
+# capabilities = [
+#     "coordination",
+#     "dispatch",
+#     "scope-gate",
+# ]
+# max_cpu_seconds = 1200
+# max_ticks = 24
+# grace_period_secs = 30
+# project = "terraphim-ai"
 [[agents]]
-name = "meta-coordinator"
-layer = "Core"
-cli_tool = "/home/alex/.local/bin/claude"
-model = "sonnet"
-persona = "Ferrox"
-skill_chain = [
-    "disciplined-research",
-    "disciplined-verification",
-    "devops",
-    "quality-oversight",
-]
-schedule = "0 */4 * * *"
-task = """
-export GITEA_URL=https://git.terraphim.cloud
-export PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH
-# GITEA_TOKEN lives in ~/.profile (not exported by the orchestrator env).
-# Source it before any Gitea API call so sections 1-6 authenticate correctly.
-# Mirrors the established guard in scripts/ci/runner-health-check.sh and
-# scripts/ci/memory-alert.sh. No-op when GITEA_TOKEN is already in the env.
-if [ -z "${GITEA_TOKEN:-}" ] && [ -f ~/.profile ]; then
-  source ~/.profile
-fi
-## ADF Meta-Coordinator: Monitoring and Health Checks
-
-### 1. Tick-Stall Detection
-STALL_COUNT=$(sudo journalctl -u adf-orchestrator --since '4 hours ago' | grep -c 'reconcile_tick SLOW' || true)
-if [ "$STALL_COUNT" -gt 0 ]; then
-  echo "WARNING: $STALL_COUNT tick stalls detected in last 4h"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Tick-stall detected: $STALL_COUNT in 4h" --body "$STALL_COUNT reconcile_tick SLOW events detected.
-Theme-ID: adf-health-alert"
-fi
-
-### 2. Agent Failure Report
-FAILURES=$(sudo journalctl -u adf-orchestrator --since '4 hours ago' | grep 'exit classified' | grep -v 'success' | grep -v 'empty_success' || true)
-FAILURE_COUNT=$(echo "$FAILURES" | grep -c 'exit_class=' || true)
-if [ "$FAILURE_COUNT" -gt 3 ]; then
-  echo "WARNING: $FAILURE_COUNT non-success agent exits in last 4h"
-  echo "$FAILURES" | tail -20 > /tmp/adf-failures.txt
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] $FAILURE_COUNT agent failures in 4h" --body "$(cat /tmp/adf-failures.txt)
-Theme-ID: adf-health-alert"
-fi
-
-### 2b. Agents Exceeding max_cpu_seconds
-TIMEOUTS=$(sudo journalctl -u adf-orchestrator --since '4 hours ago' | grep 'AGENT EXCEEDED max_cpu_seconds' || true)
-TIMEOUT_COUNT=$(echo "$TIMEOUTS" | grep -c 'AGENT EXCEEDED' || true)
-if [ "$TIMEOUT_COUNT" -gt 0 ]; then
-  echo "WARNING: $TIMEOUT_COUNT agents exceeded max_cpu_seconds in last 4h"
-  echo "$TIMEOUTS" | tail -10 > /tmp/adf-timeouts.txt
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] $TIMEOUT_COUNT agents exceeded max_cpu_seconds" --body "Agents killed after exceeding their configured max_cpu_seconds:
-$(cat /tmp/adf-timeouts.txt)
-
-Consider increasing max_cpu_seconds or investigating why these agents are running long.
-Theme-ID: adf-health-alert"
-fi
-
-### 3. Disk Usage Check (worktrees)
-WORKTREE_SIZE=$(du -sm /data/projects/terraphim/terraphim-ai/.worktrees/ 2>/dev/null | cut -f1 || echo 0)
-if [ "$WORKTREE_SIZE" -gt 10240 ]; then
-  echo "WARNING: worktrees using $WORKTREE_SIZE MB (>10GB)"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Worktree disk usage: $WORKTREE_SIZE MB" --body "Worktree directory exceeds 10GB threshold.
-Theme-ID: adf-health-alert"
-fi
-
-### 4. Binary Version Check
-ADF_VERSION=$(/usr/local/bin/adf --version 2>/dev/null || echo 'unknown')
-if [ "$ADF_VERSION" != 'adf 1.20.2' ]; then
-  echo "WARNING: adf binary version mismatch: $ADF_VERSION"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Binary version mismatch: $ADF_VERSION" --body "Expected: adf 1.20.2
-Actual: $ADF_VERSION
-Theme-ID: adf-health-alert"
-fi
-
-### 5. Orphaned Worktree Check
-ORPHANS=$(ls /data/projects/terraphim/terraphim-ai/.worktrees/ 2>/dev/null | wc -l)
-if [ "$ORPHANS" -gt 10 ]; then
-  echo "INFO: $ORPHANS worktrees present"
-fi
-
-### 6. Gitea API Health
-GITEA_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: token $GITEA_TOKEN" "$GITEA_URL/api/v1/user" || echo 000)
-if [ "$GITEA_STATUS" != '200' ]; then
-  echo "WARNING: Gitea API returned HTTP $GITEA_STATUS"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Gitea API unhealthy: HTTP $GITEA_STATUS" --body "Gitea API health check failed.
-Theme-ID: adf-health-alert"
-fi
-
-echo "=== Meta-coordinator health check complete ==="
-"""
-capabilities = [
-    "coordination",
-    "dispatch",
-    "scope-gate",
-    "monitoring",
-]
-max_cpu_seconds = 1800
-max_ticks = 12
-grace_period_secs = 30
-project = "terraphim-ai"
-[[agents]]
-evolution_enabled = true
 name = "compliance-watchdog"
-enabled = false
 layer = "Core"
 schedule = "5 0-10 * * *"
 cli_tool = "/home/alex/.bun/bin/opencode"
-model = "kimi-for-coding/k2p6"
 fallback_provider = "/home/alex/.bun/bin/opencode"
-fallback_model = "kimi-for-coding/k2p6"
+fallback_model = "kimi-for-coding/k2p5"
 persona = "Vigil"
 skill_chain = [
     "disciplined-research",
@@ -166,7 +87,7 @@ capabilities = [
     "licence-audit",
     "supply-chain",
 ]
-max_cpu_seconds = 1800
+max_cpu_seconds = 7200
 max_ticks = 24
 grace_period_secs = 30
 project = "terraphim-ai"
@@ -176,7 +97,7 @@ project = "terraphim-ai"
 # schedule = "0 */6 * * *"
 # cli_tool = "/home/alex/.bun/bin/opencode"
 # fallback_provider = "/home/alex/.bun/bin/opencode"
-# fallback_model = "kimi-for-coding/k2p6"
+# fallback_model = "kimi-for-coding/k2p5"
 # persona = "Conduit"
 # terraphim_role = "DevOps Engineer"
 # skill_chain = [
@@ -197,7 +118,7 @@ project = "terraphim-ai"
 # layer = "Core"
 # cli_tool = "/home/alex/.bun/bin/opencode"
 # fallback_provider = "/home/alex/.bun/bin/opencode"
-# fallback_model = "kimi-for-coding/k2p6"
+# fallback_model = "kimi-for-coding/k2p5"
 # persona = "Ferrox"
 # terraphim_role = "DevOps Engineer"
 # skill_chain = [
@@ -229,7 +150,7 @@ project = "terraphim-ai"
 # else
 #   echo "WARNING: No upstream sync completion marker found -- upstream-synchronizer may not have run yet"
 # fi
-# 
+#
 # ## Part 1: Infrastructure Health Check
 # 1. Disk usage (alert if > 80%):
 #    df -h / | tail -1
@@ -321,15 +242,14 @@ project = "terraphim-ai"
 # grace_period_secs = 30
 # project = "terraphim-ai"
 [[agents]]
-evolution_enabled = true
 name = "product-development"
 layer = "Core"
 cli_tool = "/home/alex/.local/bin/claude"
-fallback_provider = "/home/alex/.bun/bin/opencode"
 model = "haiku"
-fallback_model = "kimi-for-coding/k2p6"
+fallback_model = "kimi-for-coding/k2p5"
+fallback_provider = "/home/alex/.bun/bin/opencode"
 persona = "Ferrox"
-terraphim_role = "Terraphim AI Developer"
+terraphim_role = "Rust Engineer"
 skill_chain = [
     "disciplined-research",
     "disciplined-design",
@@ -353,7 +273,6 @@ max_ticks = 24
 grace_period_secs = 30
 project = "terraphim-ai"
 [[agents]]
-evolution_enabled = true
 name = "spec-validator"
 layer = "Core"
 cli_tool = "/home/alex/.local/bin/claude"
@@ -376,15 +295,13 @@ max_ticks = 24
 grace_period_secs = 30
 project = "terraphim-ai"
 [[agents]]
-evolution_enabled = true
 name = "test-guardian"
 layer = "Core"
 cli_tool = "/home/alex/.bun/bin/opencode"
-model = "kimi-for-coding/k2p6"
 fallback_provider = "/home/alex/.local/bin/claude"
 fallback_model = "sonnet"
 persona = "Echo"
-terraphim_role = "Terraphim AI Developer"
+terraphim_role = "Echo QA"
 skill_chain = [
     "disciplined-verification",
     "disciplined-validation",
@@ -403,15 +320,13 @@ grace_period_secs = 30
 task = "\nexport GITEA_URL=https://git.terraphim.cloud\nexport PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH\n## Session Start -- Read Before Working\nBefore doing ANY work, check for learnings from previous agent runs:\n1. List wiki pages for relevant learnings:\n   gtr wiki-list --owner terraphim --repo terraphim-ai | grep -i \"Learning-\"\n2. Read any learning pages matching your current task:\n   gtr wiki-get --owner terraphim --repo terraphim-ai --name \"Learning-<relevant>\"\n3. Check terraphim-agent learnings for known mistakes:\n   ~/.cargo/bin/terraphim-agent learn query \"<keywords from your task>\"\n4. Apply any relevant learnings to avoid repeating past mistakes.\n   If a learning says \"don't do X\", do NOT do X.\n---\nexport GITEA_URL=https://git.terraphim.cloud\nRun comprehensive test suite and quality analysis:\n1. cd /data/projects/terraphim/terraphim-ai\n2. cargo test --workspace 2>&1 | tee /tmp/test-guardian-results.txt\n3. Identify failing or flaky tests\n4. Check for untested critical code paths\n5. Run: cargo clippy -- -D warnings 2>&1\n6. Summarise findings as a test report\n## MANDATORY: Post verdict to Gitea\nPost your verdict to the relevant Gitea issue. Use:\n- PASS if all tests pass and no critical quality issues\n- FAIL if tests fail or critical quality issues found\nIf you were dispatched via @adf:test-guardian mention on a specific issue, use that issue number AND include the merge-coordinator trigger:\n/home/alex/go/bin/gitea-robot comment --owner terraphim --repo terraphim-ai --index ISSUE_NUMBER --body 'test-guardian verdict: PASS/FAIL\n<your detailed test report>\nIf you are running on cron schedule (no mention context) and tests fail or clippy has warnings:\n## Report Findings\nEXISTING=$(gtr list-issues --owner terraphim --repo terraphim-ai --state open 2>/dev/null | python3 -c 'import sys,json,os; d=json.load(sys.stdin); [print(str(i[\"number\"])) for i in d if \"Theme-ID: test-failure\" in i.get(\"body\",\"\")]' | head -1)\nif [ -n \"$EXISTING\" ]; then\n  gtr comment --owner terraphim --repo terraphim-ai --index \"$EXISTING\" --body \"Recurrence $(date -u +%Y-%m-%dT%H:%M:%SZ): $FINDING_DETAILS\"\nelse\n  gtr create-issue --owner terraphim --repo terraphim-ai --title \"fix(tests): test failures $(date +%Y-%m-%d)\" --body \"$FINDING_DETAILS\nTheme-ID: test-failure\n@adf:implementation-swarm please action this finding.\"\nfi\n# If nothing found, exit 0 silently.\nIf all tests pass and clippy is clean, exit 0 silently.\n---\n## Session Handover -- Write Before Exiting\nBefore you finish, write a handover:\n1. Create/update a wiki page with your session summary:\n   gtr wiki-create --owner terraphim --repo terraphim-ai --title \"Learning-$(date +%Y%m%d)-test-guardian-ISSUE_NUMBER\" --content \"## Session Summary\n   **Agent**: test-guardian\n   **Issue**: #ISSUE_NUMBER\n   **Outcome**: SUCCESS/FAIL\n   ### What Worked\n   - ...\n   ### What Failed (avoid next time)\n   - ...\n   ### Key Decisions\n   - ...\n   \" --message \"Session learning from test-guardian\"\n2. If you encountered errors, capture them:\n   ~/.cargo/bin/terraphim-agent learn capture \"command that failed\" --error \"error message\" --exit-code 1\n3. IMPORTANT: Do NOT mention @adf: agents in your handover.\n"
 project = "terraphim-ai"
 [[agents]]
-evolution_enabled = true
 name = "documentation-generator"
 layer = "Core"
 cli_tool = "/home/alex/.bun/bin/opencode"
-model = "kimi-for-coding/k2p6"
 fallback_provider = "/home/alex/.local/bin/claude"
 fallback_model = "sonnet"
 persona = "Ferrox"
-terraphim_role = "Terraphim AI Developer"
+terraphim_role = "Rust Engineer"
 skill_chain = [
     "disciplined-implementation",
     "disciplined-verification",
@@ -430,11 +345,215 @@ grace_period_secs = 30
 project = "terraphim-ai"
 
 [[agents]]
-evolution_enabled = true
+name = "implementation-swarm-A"
+layer = "Core"
+cli_tool = "/home/alex/.bun/bin/opencode"
+fallback_provider = "/home/alex/.local/bin/claude"
+fallback_model = "sonnet"
+persona = "Echo"
+terraphim_role = "Rust Engineer"
+skill_chain = [
+    "disciplined-research",
+    "disciplined-design",
+    "disciplined-implementation",
+    "disciplined-verification",
+    "rust-mastery",
+    "testing",
+]
+schedule = "45 0-10 * * *"
+task = """export GITEA_URL=https://git.terraphim.cloud
+export PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH
+## Session Start -- Read Before Working
+Before doing ANY work, check for learnings from previous agent runs:
+1. List wiki pages for relevant learnings:
+   gtr wiki-list --owner terraphim --repo terraphim-ai | grep -i "Learning-"
+2. Read any learning pages matching your current task:
+   gtr wiki-get --owner terraphim --repo terraphim-ai --name "Learning-<relevant>"
+3. Check terraphim-agent learnings for known mistakes:
+   ~/.cargo/bin/terraphim-agent learn query "<keywords from your task>"
+4. Apply any relevant learnings to avoid repeating past mistakes.
+   If a learning says "don't do X", do NOT do X.
+---
+## Phase 1: Disciplined Research (understand the problem)
+export GITEA_URL=https://git.terraphim.cloud
+git stash && git fetch origin && git merge origin/main --no-edit
+1. Identify your assignment:
+   gtr ready --owner terraphim --repo terraphim-ai | python3 -c '
+import sys,json
+items=json.load(sys.stdin)
+unblocked=[i for i in items if not i.get("is_blocked",True)]
+if not unblocked:
+    print("no unblocked tasks"); sys.exit(1)
+print(unblocked[0]["number"])
+print(unblocked[0]["title"])
+'
+2. Read the issue: gtr view-issue --owner terraphim --repo terraphim-ai --issue <IDX>
+3. Understand the problem deeply before writing a single line of code.
+4. Read relevant source files to understand existing patterns.
+---
+## Phase 2: Disciplined Design (plan the implementation)
+1. Create an implementation plan in your response:
+   - Which files will change and why
+   - Function signatures for new public API
+   - Test strategy (what tests to write)
+2. Design for correctness, safety, and idiomatic Rust.
+---
+## Phase 3: Disciplined Implementation (write code with tests)
+1. Create branch: git checkout -b task/<IDX>-<short-title>
+2. Implement following your design. Write tests FIRST.
+3. Run quality gates:
+   cargo check && cargo clippy -- -D warnings && cargo fmt --all -- --check
+4. Run tests: cargo test -p <affected_crate>
+---
+## Phase 4: Disciplined Verification (self-review)
+1. Review your own changes for correctness, security, and completeness.
+2. Run the full test suite for the affected crate.
+3. If quality gates fail, fix and re-run steps 3-4.
+---
+## Phase 5: Submit
+1. Commit: git add -A && git commit -m "feat(<scope>): <description> Refs #<IDX>"
+2. Push: git push -u origin task/<IDX>-<short-title>
+3. Create PR:
+   gtr create-pull --owner terraphim --repo terraphim-ai --title "Fix #<IDX>: <short-title>" --base main --head task/<IDX>-<short-title>
+4. Post handover comment:
+   gtr comment --owner terraphim --repo terraphim-ai --index <IDX> --body "Implementation complete. PR created from branch task/<IDX>-<short-title>.
+@adf:quality-coordinator please review this implementation for issue #<IDX>"
+5. DO NOT close the issue. The merge-coordinator will close it.
+---
+## Session Handover -- Write Before Exiting
+1. Create wiki page with session summary:
+   gtr wiki-create --owner terraphim --repo terraphim-ai --title "Learning-$(date +%Y%m%d)-implementation-swarm-A-ISSUE_NUMBER" --content "## Session Summary
+**Agent**: implementation-swarm-A
+**Issue**: #ISSUE_NUMBER
+**Outcome**: SUCCESS/FAIL
+### What Worked
+- ...
+### What Failed (avoid next time)
+- ...
+### Key Decisions
+- ...
+" --message "Session learning from implementation-swarm-A"
+2. If you encountered errors, capture them:
+   ~/.cargo/bin/terraphim-agent learn capture "command that failed" --error "error message" --exit-code 1
+3. IMPORTANT: Do NOT mention @adf: agents in your handover.
+"""
+capabilities = [
+    "implementation",
+    "coding",
+    "tdd",
+]
+max_cpu_seconds = 7200
+max_ticks = 24
+grace_period_secs = 30
+project = "terraphim-ai"
+
+[[agents]]
+name = "implementation-swarm-B"
+layer = "Core"
+cli_tool = "/home/alex/.bun/bin/opencode"
+fallback_provider = "/home/alex/.local/bin/claude"
+fallback_model = "sonnet"
+persona = "Echo"
+terraphim_role = "Rust Engineer"
+skill_chain = [
+    "disciplined-research",
+    "disciplined-design",
+    "disciplined-implementation",
+    "disciplined-verification",
+    "rust-mastery",
+    "testing",
+]
+schedule = "50 0-10 * * *"
+task = """export GITEA_URL=https://git.terraphim.cloud
+export PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH
+## Session Start -- Read Before Working
+Before doing ANY work, check for learnings from previous agent runs:
+1. List wiki pages for relevant learnings:
+   gtr wiki-list --owner terraphim --repo terraphim-ai | grep -i "Learning-"
+2. Read any learning pages matching your current task:
+   gtr wiki-get --owner terraphim --repo terraphim-ai --name "Learning-<relevant>"
+3. Check terraphim-agent learnings for known mistakes:
+   ~/.cargo/bin/terraphim-agent learn query "<keywords from your task>"
+4. Apply any relevant learnings to avoid repeating past mistakes.
+   If a learning says "don't do X", do NOT do X.
+---
+## Phase 1: Disciplined Research (understand the problem)
+export GITEA_URL=https://git.terraphim.cloud
+git stash && git fetch origin && git merge origin/main --no-edit
+1. Identify your assignment:
+   gtr ready --owner terraphim --repo terraphim-ai | python3 -c '
+import sys,json
+items=json.load(sys.stdin)
+unblocked=[i for i in items if not i.get("is_blocked",True)]
+if not unblocked:
+    print("no unblocked tasks"); sys.exit(1)
+print(unblocked[1]["number"])
+print(unblocked[1]["title"])
+'
+2. Read the issue: gtr view-issue --owner terraphim --repo terraphim-ai --issue <IDX>
+3. Understand the problem deeply before writing a single line of code.
+4. Read relevant source files to understand existing patterns.
+---
+## Phase 2: Disciplined Design (plan the implementation)
+1. Create an implementation plan in your response:
+   - Which files will change and why
+   - Function signatures for new public API
+   - Test strategy (what tests to write)
+2. Design for correctness, safety, and idiomatic Rust.
+---
+## Phase 3: Disciplined Implementation (write code with tests)
+1. Create branch: git checkout -b task/<IDX>-<short-title>
+2. Implement following your design. Write tests FIRST.
+3. Run quality gates:
+   cargo check && cargo clippy -- -D warnings && cargo fmt --all -- --check
+4. Run tests: cargo test -p <affected_crate>
+---
+## Phase 4: Disciplined Verification (self-review)
+1. Review your own changes for correctness, security, and completeness.
+2. Run the full test suite for the affected crate.
+3. If quality gates fail, fix and re-run steps 3-4.
+---
+## Phase 5: Submit
+1. Commit: git add -A && git commit -m "feat(<scope>): <description> Refs #<IDX>"
+2. Push: git push -u origin task/<IDX>-<short-title>
+3. Create PR:
+   gtr create-pull --owner terraphim --repo terraphim-ai --title "Fix #<IDX>: <short-title>" --base main --head task/<IDX>-<short-title>
+4. Post handover comment:
+   gtr comment --owner terraphim --repo terraphim-ai --index <IDX> --body "Implementation complete. PR created from branch task/<IDX>-<short-title>.
+@adf:quality-coordinator please review this implementation for issue #<IDX>"
+5. DO NOT close the issue. The merge-coordinator will close it.
+---
+## Session Handover -- Write Before Exiting
+1. Create wiki page with session summary:
+   gtr wiki-create --owner terraphim --repo terraphim-ai --title "Learning-$(date +%Y%m%d)-implementation-swarm-B-ISSUE_NUMBER" --content "## Session Summary
+**Agent**: implementation-swarm-B
+**Issue**: #ISSUE_NUMBER
+**Outcome**: SUCCESS/FAIL
+### What Worked
+- ...
+### What Failed (avoid next time)
+- ...
+### Key Decisions
+- ...
+" --message "Session learning from implementation-swarm-B"
+2. If you encountered errors, capture them:
+   ~/.cargo/bin/terraphim-agent learn capture "command that failed" --error "error message" --exit-code 1
+3. IMPORTANT: Do NOT mention @adf: agents in your handover.
+"""
+capabilities = [
+    "implementation",
+    "coding",
+    "tdd",
+]
+max_cpu_seconds = 7200
+max_ticks = 24
+grace_period_secs = 30
+project = "terraphim-ai"
+
+[[agents]]
 name = "quality-coordinator"
 layer = "Growth"
 cli_tool = "/home/alex/.bun/bin/opencode"
-model = "kimi-for-coding/k2p6"
 fallback_provider = "/home/alex/.local/bin/claude"
 fallback_model = "sonnet"
 persona = "Carthos"
@@ -456,13 +575,11 @@ max_ticks = 24
 grace_period_secs = 30
 project = "terraphim-ai"
 [[agents]]
-evolution_enabled = true
 name = "browser-qa"
 layer = "Growth"
 cli_tool = "/home/alex/.bun/bin/opencode"
-model = "kimi-for-coding/k2p6"
 persona = "Echo"
-terraphim_role = "Terraphim AI Developer"
+terraphim_role = "QA Engineer"
 skill_chain = [
     "disciplined-research",
     "disciplined-verification",
@@ -478,16 +595,13 @@ capabilities = [
 ]
 project = "terraphim-ai"
 [[agents]]
-evolution_enabled = true
 name = "merge-coordinator"
-enabled = false  # Replaced by Rust binary at /usr/local/bin/merge-coordinator (cron /etc/cron.d/merge-coordinator). PR #1823. 2026-05-23.
 layer = "Growth"
 schedule = "0 */4 * * *"
 wall_time_secs = 900
 cli_tool = "/home/alex/.bun/bin/opencode"
-model = "kimi-for-coding/k2p6"
 fallback_provider = "/home/alex/.bun/bin/opencode"
-fallback_model = "kimi-for-coding/k2p6"
+fallback_model = "kimi-for-coding/k2p5"
 max_cpu_seconds = 7200
 max_ticks = 24
 grace_period_secs = 30
@@ -694,10 +808,10 @@ project = "terraphim-ai"
 # [[agents]]
 # name = "log-analyst"
 # layer = "Core"
-# schedule = "* * * * *"
+# schedule = "50 0-10 * * *"
 # cli_tool = "/home/alex/.bun/bin/opencode"
 # fallback_provider = "/home/alex/.bun/bin/opencode"
-# fallback_model = "kimi-for-coding/k2p6"
+# fallback_model = "kimi-for-coding/k2p5"
 # max_cpu_seconds = 7200
 # max_ticks = 24
 # grace_period_secs = 30
@@ -706,12 +820,11 @@ project = "terraphim-ai"
 # task = "## Session Start -- Read Before Working\nBefore doing ANY work, check for learnings from previous agent runs:\n1. List wiki pages for relevant learnings:\n   gtr wiki-list --owner terraphim --repo terraphim-ai | grep -i \"Learning-\"\n2. Read any learning pages matching your current task:\n   gtr wiki-get --owner terraphim --repo terraphim-ai --name \"Learning-<relevant>\"\n3. Check terraphim-agent learnings for known mistakes:\n   ~/.cargo/bin/terraphim-agent learn query \"<keywords from your task>\"\n4. Apply any relevant learnings to avoid repeating past mistakes.\n   If a learning says \"don't do X\", do NOT do X.\n---\nYou are a log analyst for the AI Dark Factory orchestrator.\nYou have access to the adf-logs Quickwit index containing all agent stdout/stderr and orchestrator lifecycle events.\nYour responsibilities:\n1. Search recent logs for failure patterns (exit_code != 0, level:WARN)\n2. Cluster failures by root cause (API rate limits, compilation errors, model timeouts, OOM)\n3. Identify agents with degrading success rates\n4. Detect anomalies (agents that stopped producing output, unusual wall_time patterns)\n5. Propose remediation actions (config changes, model swaps, schedule adjustments)\nQuery the Quickwit search API at http://127.0.0.1:7280/api/v1/adf-logs/search\nExample queries:\n- All failures last 6h: ?query=exit_code:>0&max_hits=100&sort_by=-timestamp\n- Agent-specific: ?query=agent_name:security-sentinel AND source:stderr&max_hits=50\n- Timeouts: ?query=message:\"timed out\"&max_hits=50\n- All lifecycle events: ?query=source:orchestrator&max_hits=100&sort_by=-timestamp\n- Wall time outliers: ?query=wall_time_secs:>300&max_hits=50\nOutput a structured analysis report with:\n- Failure clusters (root cause, affected agents, count, severity)\n- Trend comparison (this period vs previous period)\n- Top 3 remediation recommendations with confidence levels\n- Any agents that should be disabled or have their schedule adjusted\nPost your analysis to Gitea issue #328 (ADF Quickwit logging epic) as a comment using:\ngtr comment --owner terraphim --repo terraphim-ai --issue 328 --body 'your analysis here'\n---\n## Session Handover -- Write Before Exiting\nBefore you finish, write a handover:\n1. Create/update a wiki page with your session summary:\n   gtr wiki-create --owner terraphim --repo terraphim-ai --title \"Learning-$(date +%Y%m%d)-log-analyst-ISSUE_NUMBER\" --content \"## Session Summary\n   **Agent**: log-analyst\n   **Issue**: #ISSUE_NUMBER\n   **Outcome**: SUCCESS/FAIL\n   ### What Worked\n   - ...\n   ### What Failed (avoid next time)\n   - ...\n   ### Key Decisions\n   - ...\n   \" --message \"Session learning from log-analyst\"\n2. If you encountered errors, capture them:\n   ~/.cargo/bin/terraphim-agent learn capture \"command that failed\" --error \"error message\" --exit-code 1\n3. IMPORTANT: Do NOT mention @adf: agents in your handover.\n"
 # project = "terraphim-ai"
 [[agents]]
-evolution_enabled = true
 name = "product-owner"
 layer = "Core"
 cli_tool = "/home/alex/.local/bin/claude"
 persona = "Themis"
-terraphim_role = "Terraphim AI Developer"
+terraphim_role = "Product Manager"
 skill_chain = [
     "disciplined-research",
     "disciplined-design",
@@ -734,22 +847,21 @@ task = "\nexport GITEA_URL=https://git.terraphim.cloud\nexport PATH=$HOME/.cargo
 project = "terraphim-ai"
 
 [[agents]]
-evolution_enabled = true
 name = "roadmap-planner"
 layer = "Core"
 cli_tool = "/home/alex/.local/bin/claude"
 model = "sonnet"
-fallback_model = "kimi-for-coding/k2p6"
+fallback_model = "kimi-for-coding/k2p5"
 fallback_provider = "/home/alex/.bun/bin/opencode"
 persona = "Carthos"
-terraphim_role = "Terraphim AI Developer"
+terraphim_role = "Carthos Architecture"
 skill_chain = [
   "disciplined-research",
   "disciplined-design",
   "documentation"
 ]
 schedule = "0 2 * * *"
-max_cpu_seconds = 1800
+max_cpu_seconds = 1200
 grace_period_secs = 30
 capabilities = [
   "product-development",
@@ -765,10 +877,10 @@ project = "terraphim-ai"
 # layer = "Growth"
 # cli_tool = "/home/alex/.local/bin/claude"
 # model = "sonnet"
-# fallback_model = "kimi-for-coding/k2p6"
+# fallback_model = "kimi-for-coding/k2p5"
 # persona = "Carthos"
 # fallback_provider = "/home/alex/.bun/bin/opencode"
-# terraphim_role = "Terraphim AI Developer"
+# terraphim_role = "Carthos Architecture"
 # skill_chain = [
 #   "disciplined-research",
 #   "disciplined-design",
@@ -786,22 +898,21 @@ project = "terraphim-ai"
 # ]
 # task = "\nexport GITEA_URL=https://git.terraphim.cloud\nexport PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH\ncd \"$ADF_WORKING_DIR\" && git pull --ff-only\n## Step 1: Gather evidence bundle\nREADY=$(gtr ready --owner \"$GITEA_OWNER\" --repo \"$GITEA_REPO\" 2>/dev/null)\nTRIAGE=$(gtr triage --owner \"$GITEA_OWNER\" --repo \"$GITEA_REPO\" 2>/dev/null || echo \"{}\")\n# Recent issues (last 7 days)\nRECENT_ISSUES=$(curl -sf -H \"Authorization: token $GITEA_TOKEN\" \\\n  \"$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues?state=open&since=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)\" 2>/dev/null \\\n  | python3 -c 'import json,sys; issues=json.load(sys.stdin); print(json.dumps([{\"number\":i[\"number\"],\"title\":i[\"title\"],\"labels\":[l[\"name\"] for l in i.get(\"labels\",[])]} for i in issues[:20]]))' 2>/dev/null || echo \"[]\")\n# Quickwit query (fail-open)\nQUICKWIT_ERRORS=\"\"\nif [ -n \"${QUICKWIT_ENDPOINT:-}\" ]; then\n  QUICKWIT_ERRORS=$(curl -sf \"$QUICKWIT_ENDPOINT/api/v1/terraphim-ai/search?q=ERROR&max_hits=10\" 2>/dev/null \\\n    | python3 -c 'import json,sys; d=json.load(sys.stdin); hits=d.get(\"hits\",[]); print(json.dumps([{\"message\":h.get(\"message\",\"\")[:200]} for h in hits[:5]]))' 2>/dev/null || echo \"\")\nfi\n# Repo friction scan\nFRICTION=$(rg -n \"workaround|manual|TODO|FIXME|known issue|not supported|confusing|unclear\" README.md docs .docs crates scripts 2>/dev/null | head -20 || echo \"\")\n# KG and learnings\nLEARNINGS=$(terraphim-agent learn query \"repo-stewardship stability usefulness\" 2>/dev/null || echo \"\")\nKG_CONTEXT=$(terraphim-agent --config \"$ROLE_CONFIG_PATH\" search \"stability debt usefulness friction\" --role \"$TERRAPHIM_ROLE\" --limit 10 2>/dev/null || echo \"[]\")\n## Step 2: Synthesize up to 3 candidate themes\nSYNTHESIS_PROMPT=\"You are the repo-steward agent for $GITEA_OWNER/$GITEA_REPO.\nYour job is repository stewardship synthesis ONLY. You do NOT implement code, create branches, merge PRs, or run tests.\nEvidence bundle:\n- Ready issues: $READY\n- Triage: $TRIAGE\n- Recent issues (7d): $RECENT_ISSUES\n- Quickwit errors: $QUICKWIT_ERRORS\n- Repo friction scan: $FRICTION\n- Prior learnings: $LEARNINGS\n- KG context: $KG_CONTEXT\nProduce up to 3 candidate themes. For each theme:\n1. Compute Stability score (0-5) based on: error frequency, test failures, reviewer findings, safety verdicts, repeated regressions\n2. Compute Usefulness score (0-5) based on: recurring issue themes, docs friction, onboarding pain, workaround language, repeated manual remediation\n3. Check for duplicate: look for Theme-ID in existing open issues\n4. Only recommend action if:\n   - A panel score is >= 4\n   - Evidence comes from at least 2 sources\nOutput format for each theme:\n```\nTheme: <short name>\nTheme-ID: <stable-slug>\nStability: <score>/5\nUsefulness: <score>/5\nEvidence:\n- [Source 1: description]\n- [Source 2: description]\nRecommendation: [concrete backlog action]\nSuggested next agent: @adf:<agent-name> (only if remediation is concrete)\n```\nIf no themes meet the threshold, output: NO_ACTION_NEEDED\"\nSYNTHESIS=$(echo \"$SYNTHESIS_PROMPT\" | /home/alex/.local/bin/claude -p --model sonnet --allowedTools \"Bash,Read,Grep,Glob\" 2>&1)\n## Step 3: Check for duplicates and create issues\nif echo \"$SYNTHESIS\" | grep -q \"NO_ACTION_NEEDED\"; then\n  echo \"No themes meet threshold; capturing learning only\"\n  terraphim-agent learn capture --type friction \\\n    --context \"repo-steward/$GITEA_REPO\" \\\n    --description \"No stewardship themes met threshold this cycle\" \\\n    2>/dev/null || true\n  exit 0\nfi\n# Extract themes and Theme-IDs\nTHEMES=$(echo \"$SYNTHESIS\" | python3 -c '\nimport json, sys, re\ntext = sys.stdin.read()\nthemes = []\nfor block in re.split(r\"\\nTheme:\", text):\n    if \"Theme-ID:\" not in block:\n        continue\n    theme_id = re.search(r\"Theme-ID:\\s*(\\S+)\", block)\n    stability = re.search(r\"Stability:\\s*(\\d+)\", block)\n    usefulness = re.search(r\"Usefulness:\\s*(\\d+)\", block)\n    if theme_id:\n        themes.append({\n            \"id\": theme_id.group(1),\n            \"stability\": int(stability.group(1)) if stability else 0,\n            \"usefulness\": int(usefulness.group(1)) if usefulness else 0,\n            \"block\": block\n        })\nprint(json.dumps(themes))\n' 2>/dev/null || echo \"[]\")\n# Process each theme\nfor theme in $(echo \"$THEMES\" | python3 -c 'import json,sys; print(\"\\n\".join([t[\"id\"] for t in json.load(sys.stdin)]))'); do\n  # Check for existing issue with this Theme-ID in last 24h\n  EXISTING=$(curl -sf -H \"Authorization: token $GITEA_TOKEN\" \\\n    \"$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues?state=open&labels=98\" 2>/dev/null \\\n    | python3 -c \"import json,sys,datetime; issues=json.load(sys.stdin); now=datetime.datetime.now(datetime.timezone.utc); recent=[i for i in issues if 'Theme-ID: $theme' in i.get('body','') and (now - datetime.datetime.fromisoformat(i['created_at'].replace('Z','+00:00'))).total_seconds() < 86400]; print('yes' if recent else 'no')\" 2>/dev/null || echo \"no\")\n  if [ \"$EXISTING\" = \"yes\" ]; then\n    echo \"Theme $theme already has open issue in last 24h; skipping\"\n    continue\n  fi\n  # Determine panel and title\n  PANEL=\"\"\n  if echo \"$THEMES\" | grep -A5 \"$theme\" | grep -q \"Stability: [4-5]\"; then\n    PANEL=\"Stability\"\n  elif echo \"$THEMES\" | grep -A5 \"$theme\" | grep -q \"Usefulness: [4-5]\"; then\n    PANEL=\"Usefulness\"\n  fi\n  if [ -z \"$PANEL\" ]; then\n    echo \"Theme $theme does not meet threshold; skipping\"\n    continue\n  fi\n  # Extract theme block for issue body\n  THEME_BLOCK=$(echo \"$SYNTHESIS\" | awk \"/Theme-ID: $theme/{flag=1;print;next} /^Theme:/{flag=0} flag\")\n  # Create issue\n  TITLE=\"[Repo Stewardship][$PANEL] $theme\"\n  BODY=\"## Why Now\n$THEME_BLOCK\n## Evidence\nSee issue body above for evidence sources.\n## KG Cross-Check\n- Search query: repo-stewardship stability usefulness\n- Similar learnings: $LEARNINGS\n## Recommendation\nSee synthesis output above.\n## Suggested Next Agent\nSee synthesis output above.\nTheme-ID: $theme\"\n  gtr create-issue --owner \"$GITEA_OWNER\" --repo \"$GITEA_REPO\" \\\n    --title \"$TITLE\" --body \"$BODY\" --labels \"repo-steward,$(echo $PANEL | tr '[:upper:]' '[:lower:]')-debt\" \\\n    2>&1 || echo \"Failed to create issue for theme $theme\"\n  echo \"Created issue for theme $theme ($PANEL)\"\ndone\n## Step 4: Capture learning\nterraphim-agent learn capture --type insight \\\n  --context \"repo-steward/$GITEA_REPO\" \\\n  --description \"Completed stewardship synthesis cycle for $GITEA_REPO\" \\\n  2>/dev/null || true\n"
 # project = "terraphim-ai"
-# 
+#
 [[agents]]
-evolution_enabled = true
 name = "upstream-synchronizer"
 layer = "Core"
 schedule = "0 0 * * *"
-model = "haiku"
-fallback_model = "kimi-for-coding/k2p6"
 cli_tool = "/home/alex/.local/bin/claude"
+model = "haiku"
+fallback_model = "kimi-for-coding/k2p5"
 fallback_provider = "/home/alex/.bun/bin/opencode"
 persona = "Conduit"
 skill_chain = [
     "devops",
     "git-safety-guard",
 ]
-max_cpu_seconds = 1800
+max_cpu_seconds = 600
 grace_period_secs = 30
 capabilities = [
     "upstream-sync",
@@ -811,20 +922,19 @@ capabilities = [
 project = "terraphim-ai"
 task = "\nexport GITEA_URL=https://git.terraphim.cloud\nexport PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH\nexport GITEA_URL=https://git.terraphim.cloud\nGITEA_FORK=\"/home/alex/projects/terraphim/gitea\"\nUPSTREAM_URL=\"https://github.com/go-gitea/gitea.git\"\necho \"=== Gitea Fork Upstream Sync Check ===\"\necho \"Fork: $GITEA_FORK\"\necho \"Upstream: $UPSTREAM_URL\"\necho \"Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)\"\nif [ ! -d \"$GITEA_FORK/.git\" ]; then\n  echo \"ERROR: Gitea fork not found at $GITEA_FORK\"\n  exit 1\nfi\ncd \"$GITEA_FORK\"\nif ! git remote | grep -q \"^upstream$\"; then\n  git remote add upstream \"$UPSTREAM_URL\"\n  echo \"Added upstream remote: $UPSTREAM_URL\"\nelse\n  echo \"Upstream remote already configured\"\nfi\necho \"\"\necho \"Fetching upstream...\"\ngit fetch upstream --depth=200 2>&1 | tail -5 || {\n  echo \"ERROR: git fetch upstream failed -- check network or URL\"\n  exit 1\n}\nBEHIND=$(git log HEAD..upstream/main --oneline 2>/dev/null | wc -l | tr -d ' ')\nAHEAD=$(git log upstream/main..HEAD --oneline 2>/dev/null | wc -l | tr -d ' ')\necho \"\"\necho \"=== Divergence Summary ===\"\necho \"Fork is $AHEAD commits ahead of upstream/main (our custom Robot API additions)\"\necho \"Fork is $BEHIND commits behind upstream/main (unmerged upstream changes)\"\necho \"\"\necho \"Our custom commits (top 10):\"\ngit log upstream/main..HEAD --oneline 2>/dev/null | head -10\nSECURITY_COMMITS=\"\"\nif [ \"$BEHIND\" -gt 0 ]; then\n  echo \"\"\n  echo \"=== Upstream commits we are missing (top 20) ===\"\n  git log HEAD..upstream/main --oneline 2>/dev/null | head -20\n  SECURITY_COMMITS=$(git log HEAD..upstream/main --oneline 2>/dev/null \\\n    | grep -iE \"CVE|security|vuln|fix.*(sec|auth|xss|sqli|csrf|injection|bypass|escalat)\" \\\n    | head -10)\n  if [ -n \"$SECURITY_COMMITS\" ]; then\n    echo \"\"\n    echo \"=== SECURITY-RELEVANT UPSTREAM COMMITS ===\"\n    echo \"$SECURITY_COMMITS\"\n  else\n    echo \"\"\n    echo \"No security-relevant commits in upstream gap\"\n  fi\nfi\nif [ \"$BEHIND\" -gt 50 ] && [ -n \"$SECURITY_COMMITS\" ]; then\n  EXISTING=$(gtr list-issues --owner terraphim --repo terraphim-ai --state open 2>/dev/null \\\n    | python3 -c 'import json,sys; issues=json.load(sys.stdin); [print(i[\"number\"]) for i in issues if \"Theme-ID: gitea-upstream-drift\" in i.get(\"body\",\"\")]' \\\n    | head -1)\n  if [ -n \"$EXISTING\" ]; then\n    gtr comment --owner terraphim --repo terraphim-ai --index \"$EXISTING\" \\\n      --body \"Upstream drift update $(date -u +%Y-%m-%dT%H:%M:%SZ): fork is now $BEHIND commits behind.\nSecurity-relevant upstream commits:\n$SECURITY_COMMITS\"\n  else\n    gtr create-issue --owner terraphim --repo terraphim-ai \\\n      --title \"[Infra] gitea fork $BEHIND commits behind upstream go-gitea\" \\\n      --body \"## Problem\nThe terraphim gitea fork (/home/alex/projects/terraphim/gitea) is $BEHIND commits behind go-gitea/gitea main branch.\n## Security-Relevant Commits Missing\n$SECURITY_COMMITS\n## Context\nThe fork is $AHEAD commits ahead (our custom Robot API additions). These custom commits must be preserved when cherry-picking upstream security fixes.\n## Recommended Action\nReview each security commit above and cherry-pick if applicable.\nTheme-ID: gitea-upstream-drift\"\n  fi\nelif [ \"$BEHIND\" -gt 0 ]; then\n  echo \"Fork is $BEHIND commits behind but no security commits found -- informational only\"\nelse\n  echo \"Fork is up to date with upstream go-gitea -- no action needed\"\nfi\necho \"\"\necho \"=== Sync check complete ===\" "
 [[agents]]
-evolution_enabled = true
 name = "meta-learning"
 layer = "Core"
 schedule = "0 11 * * *"
 cli_tool = "/home/alex/.local/bin/claude"
 model = "sonnet"
-fallback_model = "kimi-for-coding/k2p6"
+fallback_model = "kimi-for-coding/k2p5"
 fallback_provider = "/home/alex/.bun/bin/opencode"
 persona = "Mneme"
 skill_chain = [
     "disciplined-research",
     "disciplined-verification",
 ]
-max_cpu_seconds = 1800
+max_cpu_seconds = 1200
 grace_period_secs = 30
 capabilities = [
     "meta-learning",
@@ -849,7 +959,6 @@ task = "\nexport GITEA_URL=https://git.terraphim.cloud\nexport PATH=$HOME/.cargo
 #
 # NO schedule field -- the dispatcher invokes this on demand.
 [[agents]]
-evolution_enabled = true
 name = "build-runner"
 layer = "Growth"
 cli_tool = "/bin/bash"
@@ -872,23 +981,12 @@ if [ -z ${ADF_PUSH_REF:-} ]; then
   exit 1
 fi
 
-export ADF_WORKING_DIR=${ADF_WORKING_DIR:-/data/projects/terraphim/terraphim-ai}
-export ADF_WORKING_DIR=${ADF_WORKING_DIR:-/data/projects/terraphim/terraphim-ai}
 cd $ADF_WORKING_DIR
-git fetch --depth=1 gitea $ADF_PUSH_REF 2>/dev/null || true
+git fetch --prune origin $ADF_PUSH_REF 2>/dev/null || true
 git checkout -f $ADF_PUSH_SHA
 
-# Build optimisation (Refs #1911, disk 79%->43%)
-export RUSTC_WRAPPER="${RUSTC_WRAPPER:-sccache}"
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=lld"
-# Patch build commands with --profile ci (survives git checkout -f)
-sed -i "s|cargo build --workspace|cargo build --workspace --profile ci|" $ADF_WORKING_DIR/BUILD.md
-sed -i "s|cargo test --workspace --no-fail-fast|cargo test --workspace --no-fail-fast --profile ci|" $ADF_WORKING_DIR/BUILD.md
-sed -i "s|cargo build --workspace\\"|cargo build --workspace --profile ci\\"|" $ADF_WORKING_DIR/scripts/build-runner-llm.sh
-sed -i "s|cargo test --workspace --no-fail-fast\\"|cargo test --workspace --no-fail-fast --profile ci\\"|" $ADF_WORKING_DIR/scripts/build-runner-llm.sh
-
 # Execute new build-runner-llm script
-bash $ADF_WORKING_DIR/scripts/build-runner-llm.sh
+bash /home/alex/projects/terraphim/terraphim-ai/scripts/build-runner-llm.sh
 '''
 
 # ----- pr-reviewer -----
@@ -903,13 +1001,12 @@ bash $ADF_WORKING_DIR/scripts/build-runner-llm.sh
 # NO schedule field -- this is event-driven, not cron.
 # Subscription-only models only (C1 constraint).
 [[agents]]
-evolution_enabled = true
 project = "terraphim-ai"
 name = "pr-reviewer"
 layer = "Growth"
 cli_tool = "/home/alex/.local/bin/claude"
 model = "sonnet"
-fallback_model = "kimi-for-coding/k2p6"
+fallback_model = "kimi-for-coding/k2p5"
 persona = "Carthos"
 skill_chain = ["structural-pr-review"]
 max_cpu_seconds = 1800
@@ -1090,7 +1187,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 # layer = "Safety"
 # cli_tool = "/home/alex/.local/bin/claude"
 # model = "sonnet"
-# fallback_model = "kimi-for-coding/k2p6"
+# fallback_model = "kimi-for-coding/k2p5"
 # persona = "Carthos"
 # skill_chain = ["requirements-traceability"]
 # max_cpu_seconds = 1800
@@ -1100,7 +1197,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 # task = '''
 # export GITEA_URL=https://git.terraphim.cloud
 # export PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH
-# 
+#
 # # Context injected by handle_review_pr (Phase 2 fan-out):
 # #   ADF_PR_NUMBER, ADF_PR_HEAD_SHA, ADF_PR_PROJECT, ADF_PR_AUTHOR,
 # #   ADF_PR_DIFF_LOC, ADF_PR_TITLE
@@ -1109,7 +1206,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 #   exit 1
 # fi
 # HEAD_SHORT=$(echo "$ADF_PR_HEAD_SHA" | cut -c1-7)
-# 
+#
 # # POST_STATUS posts to the Gitea Commit Status API. Best-effort -- the
 # # agent never fails because the status post hit a transient network
 # # error. Mirrors the helper used by build-runner.toml.
@@ -1124,7 +1221,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 #     >/dev/null 2>&1 || \
 #     echo "pr-spec-validator: status post failed (state=$STATE) -- non-fatal" >&2
 # }
-# 
+#
 # # Idempotency: skip re-validation if a comment referencing the same
 # # head_sha already exists within the last 2 hours. Mirrors the
 # # pr-reviewer pattern; uses the agent-scoped marker to avoid
@@ -1149,11 +1246,11 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 #   echo "pr-spec-validator: same head_sha already validated in last 2h; skip; exit"
 #   exit 0
 # fi
-# 
+#
 # # Fetch the PR diff once (cap to avoid blowing the LLM context window).
 # cd "$ADF_WORKING_DIR"
 # git fetch gitea "pull/$ADF_PR_NUMBER/head:pr-$ADF_PR_NUMBER" 2>/dev/null || true
-# 
+#
 # # === PATH FILTER (early exit -- happy path for docs-only / CI-only PRs) ===
 # #
 # # requirements-traceability only matters when the PR touches the
@@ -1210,7 +1307,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 # REVIEW_OUTPUT=$(echo "$REVIEW_PROMPT" | /home/alex/.local/bin/claude -p --output-format text \
 #   --allowedTools "Bash,Read,Grep,Glob" \
 #   2>&1)
-# 
+#
 # # Filter out JSON tool-use events from Claude/opencode output, keeping only human-readable text
 # # Handles both Claude --output-format text and opencode --format json
 # FILTERED_OUTPUT=$(echo "$REVIEW_OUTPUT" | python3 -c '
@@ -1239,7 +1336,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 # ' || true)
 # echo "$FILTERED_OUTPUT"
 # echo "pr-spec-validator: verdict posted on PR #$ADF_PR_NUMBER"
-# 
+#
 # # Derive the commit-status verdict from the agent output (or the
 # # rendered review file, whichever is available). Mirrors the
 # # pr-reviewer Confidence-Score parsing pattern; falls back to a
@@ -1272,7 +1369,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 # POST_STATUS "$STATE" "$DESC"
 # echo "pr-spec-validator: posted adf/spec status state=$STATE"
 # '''
-# 
+#
 # # ----- pr-security-sentinel -----
 # # pr-security-sentinel agent template
 # #
@@ -1309,7 +1406,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 # layer = "Safety"
 # cli_tool = "/home/alex/.local/bin/claude"
 # model = "sonnet"
-# fallback_model = "kimi-for-coding/k2p6"
+# fallback_model = "kimi-for-coding/k2p5"
 # persona = "Carthos"
 # skill_chain = ["security-audit"]
 # max_cpu_seconds = 1800
@@ -1319,7 +1416,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 # task = '''
 # export GITEA_URL=https://git.terraphim.cloud
 # export PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH
-# 
+#
 # # Context injected by handle_review_pr (Phase 2 fan-out):
 # #   ADF_PR_NUMBER, ADF_PR_HEAD_SHA, ADF_PR_PROJECT, ADF_PR_AUTHOR,
 # #   ADF_PR_DIFF_LOC, ADF_PR_TITLE
@@ -1328,7 +1425,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 #   exit 1
 # fi
 # HEAD_SHORT=$(echo "$ADF_PR_HEAD_SHA" | cut -c1-7)
-# 
+#
 # # POST_STATUS posts to the Gitea Commit Status API. Best-effort -- the
 # # agent never fails because the status post hit a transient network
 # # error. Mirrors the helper used by build-runner.toml and
@@ -1344,7 +1441,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 #     >/dev/null 2>&1 || \
 #     echo "pr-security-sentinel: status post failed (state=$STATE) -- non-fatal" >&2
 # }
-# 
+#
 # # Idempotency: skip re-audit if a comment referencing the same head_sha
 # # already exists within the last 2 hours. Mirrors the pr-reviewer
 # # pattern; uses the agent-scoped marker to avoid false-matching against
@@ -1369,11 +1466,11 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 #   echo "pr-security-sentinel: same head_sha already audited in last 2h; skip; exit"
 #   exit 0
 # fi
-# 
+#
 # # Fetch the PR diff once (cap to avoid blowing the LLM context window).
 # cd "$ADF_WORKING_DIR"
 # git fetch gitea "pull/$ADF_PR_NUMBER/head:pr-$ADF_PR_NUMBER" 2>/dev/null || true
-# 
+#
 # # === PATH FILTER (early exit -- happy path for docs-only / CI-only PRs) ===
 # #
 # # security-audit only matters when the PR touches dependencies
@@ -1394,7 +1491,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 #   echo "pr-security-sentinel: empty diff; posted success n/a"
 #   exit 0
 # fi
-# 
+#
 # # Match: exactly Cargo.toml or Cargo.lock at any path depth (workspace
 # # root or per-crate manifests both count); any path under a
 # # `crates/<name>/src/` directory; any path containing a `secrets/`
@@ -1438,7 +1535,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 # REVIEW_OUTPUT=$(echo "$REVIEW_PROMPT" | /home/alex/.local/bin/claude -p --output-format text \
 #   --allowedTools "Bash,Read,Grep,Glob" \
 #   2>&1)
-# 
+#
 # # Filter out JSON tool-use events from Claude/opencode output, keeping only human-readable text
 # # Handles both Claude --output-format text and opencode --format json
 # FILTERED_OUTPUT=$(echo "$REVIEW_OUTPUT" | python3 -c '
@@ -1467,7 +1564,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 # ' || true)
 # echo "$FILTERED_OUTPUT"
 # echo "pr-security-sentinel: verdict posted on PR #$ADF_PR_NUMBER"
-# 
+#
 # # Derive the commit-status verdict from the agent output (or the
 # # rendered review file, whichever is available). Prefers an explicit
 # # `Verdict:` line; falls back to a `Risk:` line (critical/high → fail,
@@ -1512,7 +1609,7 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 # POST_STATUS "$STATE" "$DESC"
 # echo "pr-security-sentinel: posted adf/security status state=$STATE"
 # '''
-# 
+#
 # # ----- pr-compliance-watchdog -----
 # # pr-compliance-watchdog agent template
 # #
@@ -1540,12 +1637,11 @@ echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 # # NO `schedule` field -- the dispatcher invokes this on demand.
 # # Subscription-only models only (C1 constraint).
 [[agents]]
-evolution_enabled = true
 name = "pr-compliance-watchdog"
 layer = "Growth"
 cli_tool = "/home/alex/.local/bin/claude"
 model = "sonnet"
-fallback_model = "kimi-for-coding/k2p6"
+fallback_model = "kimi-for-coding/k2p5"
 skill_chain = ["responsible-ai"]
 max_cpu_seconds = 1800
 grace_period_secs = 30
@@ -1735,119 +1831,167 @@ echo "pr-compliance-watchdog: posted adf/compliance status state=$STATE"
 # NO schedule field -- this is event-driven, not cron.
 # Subscription-only models only (C1 constraint).
 [[agents]]
-evolution_enabled = true
-name = "implementation-swarm"
-layer = "Core"
-cli_tool = "/home/alex/.local/bin/pi-rust"
-fallback_provider = "/home/alex/.bun/bin/opencode"
-fallback_model = "kimi-for-coding/k2p6"
-provider = "zai-coding-plan"
-model = "zai-coding-plan/glm-5.1"
-persona = "Echo"
-terraphim_role = "Terraphim AI Developer"
-skill_chain = [
-    "disciplined-research",
-    "disciplined-design",
-    "disciplined-implementation",
-    "disciplined-verification",
-    "rust-mastery",
-    "testing",
-]
-schedule = "0 * * * *"
-task = """export GITEA_URL=https://git.terraphim.cloud
-export PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH
-## SESSION CHECKPOINT (MANDATORY -- prevents re-work on completed issues)
-# 1. git fetch origin 2>/dev/null
-# 2. echo "=== Existing task branches ===" && git branch -r | grep "task/" || true
-# 3. echo "=== Open PRs ===" && gtr list-pulls --owner terraphim --repo terraphim-ai --state open 2>/dev/null | head -30
-# 4. SKIP any issue where a remote branch or open PR already exists -- pick the NEXT unblocked issue from gtr ready
-# 5. NEVER re-create a PR that already exists (409 Conflict = skip). Comment on existing PR instead.
-# 6. Run /session-start with the selected issue title to create a session file, capture context, and initialise task tracking. This creates .sessions/session-*.md that the next agent session will read to prevent re-work.
-/session-start <issue description from gtr ready output>
-
-## Session Start -- Read Before Working
-Before doing ANY work, check for learnings from previous agent runs:
-1. List wiki pages for relevant learnings:
-   gtr wiki-list --owner terraphim --repo terraphim-ai | grep -i "Learning-"
-2. Read any learning pages matching your current task:
-   gtr wiki-get --owner terraphim --repo terraphim-ai --name "Learning-<relevant>"
-3. Check terraphim-agent learnings for known mistakes:
-   ~/.cargo/bin/terraphim-agent learn query "<keywords from your task>"
-4. Apply any relevant learnings to avoid repeating past mistakes.
-   If a learning says "don't do X", do NOT do X.
----
-## Phase 1: Disciplined Research (understand the problem)
-export GITEA_URL=https://git.terraphim.cloud
-git stash && git fetch origin && git merge origin/main --no-edit
-1. Identify your assignment:
-   gtr ready --owner terraphim --repo terraphim-ai | python3 -c '
-import sys,json
-items=json.load(sys.stdin)
-unblocked=[i for i in items if not i.get("is_blocked",True)]
-if not unblocked:
-    print("no unblocked tasks"); sys.exit(1)
-print(unblocked[0]["number"])
-print(unblocked[0]["title"])
-'
-2. Read the issue: gtr view-issue --owner terraphim --repo terraphim-ai --issue <IDX>
-3. Understand the problem deeply before writing a single line of code.
-4. Read relevant source files to understand existing patterns.
----
-## Phase 2: Disciplined Design (plan the implementation)
-1. Create an implementation plan in your response:
-   - Which files will change and why
-   - Function signatures for new public API
-   - Test strategy (what tests to write)
-2. Design for correctness, safety, and idiomatic Rust.
----
-## Phase 3: Disciplined Implementation (write code with tests)
-1. Create branch: git checkout -b task/<IDX>-<short-title>
-2. Implement following your design. Write tests FIRST.
-3. Run quality gates:
-   cargo check && cargo clippy -- -D warnings && cargo fmt --all -- --check
-4. Run tests: cargo test -p <affected_crate>
----
-## Phase 4: Disciplined Verification (self-review)
-1. Review your own changes for correctness, security, and completeness.
-2. Run the full test suite for the affected crate.
-3. If quality gates fail, fix and re-run steps 3-4.
----
-## Phase 5: Submit
-1. Commit: git add -A && git commit -m "feat(<scope>): <description> Refs #<IDX>"
-2. Push: git push -u origin task/<IDX>-<short-title>
-3. Create PR:
-   gtr create-pull --owner terraphim --repo terraphim-ai --title "Fix #<IDX>: <short-title>" --base main --head task/<IDX>-<short-title>
-4. Post handover comment:
-   gtr comment --owner terraphim --repo terraphim-ai --index <IDX> --body "Implementation complete. PR created from branch task/<IDX>-<short-title>.
-@adf:quality-coordinator please review this implementation for issue #<IDX>"
-5. DO NOT close the issue. The merge-coordinator will close it.
----
-## Session Handover -- Write Before Exiting
-1. Create wiki page with session summary:
-   gtr wiki-create --owner terraphim --repo terraphim-ai --title "Learning-$(date +%Y%m%d)-implementation-swarm-A-ISSUE_NUMBER" --content "## Session Summary
-**Agent**: implementation-swarm-A
-**Issue**: #ISSUE_NUMBER
-**Outcome**: SUCCESS/FAIL
-### What Worked
-- ...
-### What Failed (avoid next time)
-- ...
-### Key Decisions
-- ...
-" --message "Session learning from implementation-swarm-A"
-2. If you encountered errors, capture them:
-   ~/.cargo/bin/terraphim-agent learn capture "command that failed" --error "error message" --exit-code 1
-3. IMPORTANT: Do NOT mention @adf: agents in your handover.
-
-## Before exiting, run /handover to persist session context
-/handover
-"""
-capabilities = [
-    "implementation",
-    "coding",
-    "tdd",
-]
-max_cpu_seconds = 7200
-max_ticks = 24
-grace_period_secs = 30
+name = "pr-test-guardian"
+layer = "Growth"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Carthos"
+skill_chain = ["testing"]
 project = "terraphim-ai"
+max_cpu_seconds = 1800
+grace_period_secs = 30
+task = '''
+export GITEA_URL=https://git.terraphim.cloud
+export PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH
+
+# Context injected by handle_review_pr (ROC v1 Step D):
+#   ADF_PR_NUMBER, ADF_PR_HEAD_SHA, ADF_PR_PROJECT, ADF_PR_AUTHOR,
+#   ADF_PR_DIFF_LOC, ADF_PR_TITLE
+if [ -z "${ADF_PR_NUMBER:-}" ] || [ -z "${ADF_PR_PROJECT:-}" ] \
+  || [ -z "${ADF_PR_HEAD_SHA:-}" ]; then
+  echo "pr-test-guardian: missing ADF_PR_NUMBER/ADF_PR_PROJECT/ADF_PR_HEAD_SHA; exit" >&2
+  exit 1
+fi
+HEAD_SHORT=$(echo "$ADF_PR_HEAD_SHA" | cut -c1-7)
+
+# Idempotency: skip re-review if a comment referencing the same head_sha
+# already exists within the last 2 hours.
+EXISTING=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+  "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ADF_PR_NUMBER/comments" 2>/dev/null \
+  | python3 -c '
+import json, sys, datetime, os
+head_short = os.environ.get("HEAD_SHORT", "")
+cs = json.load(sys.stdin)
+now = datetime.datetime.now(datetime.timezone.utc)
+recent = [
+  c for c in cs
+  if ("Last test-reviewed commit: " + head_short) in c.get("body", "")
+  and (now - datetime.datetime.fromisoformat(
+    c["created_at"].replace("Z", "+00:00")
+  )).total_seconds() < 7200
+]
+print("yes" if recent else "no")
+' 2>/dev/null || echo "no")
+if [ "$EXISTING" = "yes" ]; then
+  echo "pr-test-guardian: same head_sha already test-reviewed in last 2h; skip; exit"
+  exit 0
+fi
+
+# Fetch the PR diff (capped at 2000 lines to bound the prompt).
+cd "$ADF_WORKING_DIR"
+git fetch gitea "pull/$ADF_PR_NUMBER/head:pr-$ADF_PR_NUMBER" 2>/dev/null || true
+PR_DIFF=$(git diff "main...pr-$ADF_PR_NUMBER" 2>/dev/null | head -2000)
+
+# === PATH FILTER ===
+# List files touched by the PR. If none match `**/tests/**` or
+# `crates/**/src/**`, skip-with-success: post adf/test=success and exit 0
+# so branch protection on adf/test does not wedge pure-docs/pure-config PRs.
+CHANGED_FILES=$(git diff --name-only "main...pr-$ADF_PR_NUMBER" 2>/dev/null)
+TEST_RELEVANT=$(echo "$CHANGED_FILES" | grep -E '(^|/)tests/|^crates/[^/]+/src/' || true)
+if [ -z "$TEST_RELEVANT" ]; then
+  echo "pr-test-guardian: no test-relevant paths touched; posting skip-with-success"
+  curl -fsS -X POST \
+    -H "Authorization: token $GITEA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"state":"success","context":"adf/test","description":"n/a — no test-relevant changes"}' \
+    "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PR_HEAD_SHA" \
+    >/dev/null 2>&1 || \
+    echo "pr-test-guardian: status post failed (skip-with-success) -- non-fatal" >&2
+  exit 0
+fi
+REVIEW_PROMPT="You are reviewing tests in PR #$ADF_PR_NUMBER on $GITEA_OWNER/$GITEA_REPO. Apply the testing skill.
+PR metadata:
+- Title: $ADF_PR_TITLE
+- Author: $ADF_PR_AUTHOR
+- Head SHA: $ADF_PR_HEAD_SHA
+- Diff LOC: $ADF_PR_DIFF_LOC
+Test-relevant files changed:
+$TEST_RELEVANT
+PR diff (first 2000 lines):
+\`\`\`diff
+$PR_DIFF
+\`\`\`
+Post your test review as a single gtr comment on PR #$ADF_PR_NUMBER. Required structure:
+- <h3>Test Review Summary</h3>
+- <h3>Coverage: present|partial|missing</h3>
+- <h3>Verdict: pass|concerns|fail</h3>
+- <h3>Findings</h3> (with P0/P1/P2 prefixes)
+- <sub>Last test-reviewed commit: $HEAD_SHORT | Test Reviews (1)</sub>
+Rules:
+- Do NOT use --dangerously-skip-permissions
+- Do NOT mention agent handles with the adf colon prefix
+- Do NOT mock, bypass tests, or skip hooks
+- One comment per round; batch all findings
+Post the completed review with:
+  gtr comment --owner \"\$GITEA_OWNER\" --repo \"\$GITEA_REPO\" --issue \"$ADF_PR_NUMBER\" --body-file /tmp/pr-test-review-$ADF_PR_NUMBER.md"
+REVIEW_OUTPUT=$(echo "$REVIEW_PROMPT" | /home/alex/.local/bin/claude -p --output-format text \
+  --allowedTools "Bash,Read,Grep,Glob" \
+  2>&1)
+
+# Filter out JSON tool-use events from Claude/opencode output, keeping only human-readable text
+# Handles both Claude --output-format text and opencode --format json
+FILTERED_OUTPUT=$(echo "$REVIEW_OUTPUT" | python3 -c '
+import json, sys
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    if line.startswith("{"):
+        try:
+            d = json.loads(line)
+            if d.get("type") == "text":
+                text = d.get("part", {}).get("text", "")
+                if text:
+                    print(text)
+            elif d.get("type") == "step_finish":
+                pass  # Skip metadata
+            elif d.get("type") == "step_start":
+                pass  # Skip metadata
+            else:
+                print(line)  # Unknown JSON, keep it
+        except json.JSONDecodeError:
+            print(line)  # Not valid JSON, keep it
+    else:
+        print(line)
+' || true)
+echo "$FILTERED_OUTPUT"
+echo "pr-test-guardian: verdict posted on PR #$ADF_PR_NUMBER"
+
+# Derive the verdict from the rendered review file or the raw output.
+REVIEW_FILE="/tmp/pr-test-review-$ADF_PR_NUMBER.md"
+SCORE_TEXT=""
+if [ -f "$REVIEW_FILE" ]; then
+  SCORE_TEXT=$(cat "$REVIEW_FILE")
+fi
+SCORE_TEXT="$SCORE_TEXT
+$REVIEW_OUTPUT"
+VERDICT=$(echo "$SCORE_TEXT" \
+  | grep -oiE 'Verdict:[[:space:]]*(pass|concerns|fail)' \
+  | grep -oiE '(pass|concerns|fail)' \
+  | head -1 \
+  | tr '[:upper:]' '[:lower:]')
+if [ -z "$VERDICT" ]; then
+  STATE=success
+  DESC="test review posted; manual gate"
+elif [ "$VERDICT" = "pass" ]; then
+  STATE=success
+  DESC="tests look good"
+elif [ "$VERDICT" = "concerns" ]; then
+  STATE=success
+  DESC="tests reviewed -- concerns flagged"
+else
+  STATE=failure
+  DESC="tests failed review -- blocking"
+fi
+
+# Best-effort: never fail the agent run if the status post errors.
+curl -fsS -X POST \
+  -H "Authorization: token $GITEA_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"state\":\"$STATE\",\"context\":\"adf/test\",\"description\":\"$DESC\"}" \
+  "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PR_HEAD_SHA" \
+  >/dev/null 2>&1 || \
+  echo "pr-test-guardian: status post failed (state=$STATE) -- non-fatal" >&2
+echo "pr-test-guardian: posted adf/test status state=$STATE"
+'''

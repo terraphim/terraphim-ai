@@ -1,0 +1,4 @@
+warn: glm-4.5-air upstream read timeout after 75s
+warn: connection reset by peer (glm-pool-07)
+retrying with next pool entry...
+error: session aborted due to timeout, session_id=sess_9f3a

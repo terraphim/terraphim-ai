@@ -1,0 +1,23 @@
+working_dir = "/tmp/t"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/repo"
+
+[[agents]]
+name = "legacy-agent"
+layer = "Safety"
+cli_tool = "claude"
+task = "t"
+
+[[flows]]
+name = "orphan-flow"
+project = "nonexistent"
+repo_path = "/tmp/repo"
+
+[[flows.steps]]
+name = "build"
+kind = "action"
+command = "cargo build"

@@ -1,0 +1,164 @@
+# ============================================================
+# Project: gitea-robot
+# Description: Terraphim Gitea automation robot (CLI + MCP server)
+# Languages: Go (100%)
+# Disciplined Engineering: Required for all features
+# Status: Original project (not a fork)
+# ============================================================
+
+[[projects]]
+id = "gitea-robot"
+name = "Gitea Robot"
+working_dir = "/home/alex/projects/terraphim/gitea-robot"
+gitea = { owner = "terraphim", repo = "gitea-robot", base_url = "https://git.terraphim.cloud", token = "5d663368d955953ddf900ff33420fcabebfbfb4b" }
+
+# ---------------------------------------------------------------
+# Agent 1: gitea-robot-developer
+# Reuses: terraphim-developer pattern
+# V-Model Phases: Research -> Design -> Implementation
+# ---------------------------------------------------------------
+[[agents]]
+name = "gitea-robot-developer"
+layer = "Core"
+cli_tool = "/home/alex/.bun/bin/opencode"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "ferrox"
+terraphim_role = "Backend Developer"
+skill_chain = [
+    "disciplined-research",
+    "disciplined-design",
+    "disciplined-implementation",
+    "testing",
+]
+capabilities = [
+    "implementation",
+    "go",
+    "tdd",
+    "cli-builder",
+]
+max_cpu_seconds = 7200
+max_ticks = 24
+grace_period_secs = 30
+project = "gitea-robot"
+task = '''
+source ~/.profile
+
+export GITEA_TOKEN=<token>
+export GITEA_URL=https://git.terraphim.cloud
+
+cd "$GITEA_WORKING_DIR" && git pull --ff-only
+
+## Pick highest-priority unblocked issue
+READY=$(gtr ready --owner terraphim --repo gitea-robot 2>/dev/null)
+if [ -z "$READY" ] || [ "$READY" = "null" ]; then
+  echo "No ready issues"
+  exit 0
+fi
+
+## IMPLEMENTATION PROTOCOL (V-Model):
+## 1. RESEARCH: Read issue, explore codebase
+##    - Skill: disciplined-research
+##    - Output: .docs/research-ISSUE.md
+## 2. DESIGN: Architecture decision + file changes + test strategy
+##    - Skill: disciplined-design
+##    - Output: .docs/design-ISSUE.md
+## 3. IMPLEMENT: Code following design doc
+##    - Skill: disciplined-implementation
+##    - Run: gofmt -w . && go vet ./...
+##    - Run: go test ./...
+## 4. COMMIT: git commit -m "[agent] feat: description. Refs terraphim/gitea-robot#IDX"
+## 5. PUSH + PR: Create PR, comment @adf:gitea-robot-reviewer
+'''
+
+# ---------------------------------------------------------------
+# Agent 2: gitea-robot-reviewer
+# Reuses: terraphim-reviewer pattern
+# V-Model Phase: PR Review Gate
+# ---------------------------------------------------------------
+[[agents]]
+name = "gitea-robot-reviewer"
+layer = "Core"
+cli_tool = "/home/alex/.bun/bin/opencode"
+model = "haiku"
+persona = "echo"
+terraphim_role = "Code Reviewer"
+skill_chain = [
+    "structural-pr-review",
+    "code-review",
+]
+capabilities = ["review", "go", "cli-builder"]
+max_cpu_seconds = 1800
+project = "gitea-robot"
+task = '''
+# PR Review Agent for gitea-robot
+# Applies structural-pr-review skill chain
+# Checks: Go idioms, error handling, test coverage, CLI patterns
+# Verdict: GO / NO-GO with specific findings
+# Comments posted via gtr on PR
+'''
+
+# ---------------------------------------------------------------
+# Agent 3: gitea-robot-build-runner
+# Reuses: terraphim-build-runner pattern
+# V-Model Phase: Verification (build + test)
+# ---------------------------------------------------------------
+[[agents]]
+name = "gitea-robot-build-runner"
+layer = "Growth"
+cli_tool = "/bin/bash"
+max_cpu_seconds = 1800
+capabilities = ["build", "test", "deterministic-ci"]
+event_only = true
+project = "gitea-robot"
+task = '''
+source ~/.profile
+
+# Defence-in-depth: build-runner must be spawned by handle_push with full
+# ADF_PUSH_* env. The orchestrator's event_only gate prevents mention
+# dispatch; this guard catches any future dispatch path that forgets.
+if [ -z "${ADF_PUSH_SHA:-}" ]; then
+  echo "build-runner: missing ADF_PUSH_SHA; cannot post commit status; exit" >&2
+  exit 1
+fi
+if [ -z "${ADF_PUSH_REF:-}" ]; then
+  echo "build-runner: ADF_PUSH_SHA=$ADF_PUSH_SHA but ADF_PUSH_REF missing" >&2
+  curl -fsS -X POST \
+    -H "Authorization: token $GITEA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"state\":\"error\",\"context\":\"adf/build\",\"description\":\"build-runner spawned without REF\"}" \
+    "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PUSH_SHA" \
+    >/dev/null 2>&1 || true
+  exit 1
+fi
+
+cd "$GITEA_WORKING_DIR"
+git fetch origin "$ADF_PUSH_REF"
+git checkout "$ADF_PUSH_SHA"
+
+POST_STATUS() {
+  local STATE="$1"
+  local DESC="$2"
+  curl -fsS -X POST \
+    -H "Authorization: token $GITEA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"state\":\"$STATE\",\"context\":\"adf/build\",\"description\":\"$DESC\"}" \
+    "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PUSH_SHA" \
+    >/dev/null 2>&1 || true
+}
+
+POST_STATUS pending "build started"
+
+set -e
+trap 'POST_STATUS failure "build failed"; exit 1' ERR
+
+# Go verification
+gofmt -w .
+go vet ./...
+go test ./...
+
+# Build check
+go build -o /dev/null ./...
+
+POST_STATUS success "fmt+vet+test+build pass"
+'''

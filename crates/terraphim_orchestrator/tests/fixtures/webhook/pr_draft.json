@@ -1,0 +1,48 @@
+{
+  "action": "opened",
+  "number": 43,
+  "pull_request": {
+    "id": 1000043,
+    "number": 43,
+    "title": "WIP: refactor storage layer",
+    "body": "Work in progress, do not merge.",
+    "draft": true,
+    "state": "open",
+    "additions": 50,
+    "deletions": 5,
+    "head": {
+      "sha": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+      "ref": "task/43-storage-refactor",
+      "repo": {
+        "name": "terraphim-ai",
+        "full_name": "terraphim/terraphim-ai"
+      }
+    },
+    "base": {
+      "sha": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+      "ref": "main",
+      "repo": {
+        "name": "terraphim-ai",
+        "full_name": "terraphim/terraphim-ai"
+      }
+    },
+    "user": {
+      "id": 7,
+      "login": "alex"
+    },
+    "merged": false,
+    "merged_by": null
+  },
+  "repository": {
+    "id": 1,
+    "name": "terraphim-ai",
+    "full_name": "terraphim/terraphim-ai",
+    "owner": {
+      "login": "terraphim"
+    }
+  },
+  "sender": {
+    "id": 7,
+    "login": "alex"
+  }
+}
