@@ -106,6 +106,48 @@ mod tests {
             _ => panic!("expected Merged"),
         }
     }
+
+    #[test]
+    fn blocker_kind_display_and_serde() {
+        assert_eq!(BlockerKind::CiFailed.to_string(), "ci_failed");
+        assert_eq!(BlockerKind::CiPending.to_string(), "ci_pending");
+        assert_eq!(BlockerKind::CiNoStatus.to_string(), "ci_no_status");
+        assert_eq!(BlockerKind::NotMergeable.to_string(), "not_mergeable");
+
+        let json = serde_json::to_string(&BlockerKind::CiFailed).unwrap();
+        assert_eq!(json, "\"ci_failed\"");
+        let json = serde_json::to_string(&BlockerKind::CiPending).unwrap();
+        assert_eq!(json, "\"ci_pending\"");
+    }
+}
+
+/// Classifies why a PR is blocked from auto-merge.
+///
+/// Enables operators and ADF monitors to distinguish CI failures
+/// (which may self-resolve on retry) from policy/confidence holds
+/// (which need human intervention) at a glance in logs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BlockerKind {
+    /// CI status returned "failure" — the PR has a failing check.
+    CiFailed,
+    /// CI status returned "pending" — the check hasn't started or is running.
+    CiPending,
+    /// No CI status was found for the head commit.
+    CiNoStatus,
+    /// PR is not mergeable but CI is green — blocked by policy/confidence.
+    NotMergeable,
+}
+
+impl fmt::Display for BlockerKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BlockerKind::CiFailed => write!(f, "ci_failed"),
+            BlockerKind::CiPending => write!(f, "ci_pending"),
+            BlockerKind::CiNoStatus => write!(f, "ci_no_status"),
+            BlockerKind::NotMergeable => write!(f, "not_mergeable"),
+        }
+    }
 }
 
 /// Error type for the merge-coordinator surface.

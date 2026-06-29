@@ -9,7 +9,7 @@ use tracing::{error, info, warn};
 
 use crate::extract_fixes;
 use crate::gitea::{GiteaClient, PrSummary};
-use crate::types::{EvalVerdict, MergeCoordinatorError, MergeOutcome};
+use crate::types::{BlockerKind, EvalVerdict, MergeCoordinatorError, MergeOutcome};
 
 /// One evaluation of one open PR.
 #[derive(Debug, Clone)]
@@ -22,6 +22,8 @@ pub struct PrEvaluation {
     pub fixes_issues: Vec<u64>,
     /// Verdict reached during evaluation.
     pub verdict: EvalVerdict,
+    /// Classified blocker kind when verdict is Hold (None for Merge).
+    pub blocker_kind: Option<BlockerKind>,
 }
 
 /// Evaluate all open PRs in `owner/repo`, sequentially. Each PR gets
@@ -34,28 +36,63 @@ pub async fn evaluate_all(
     let prs = gitea.list_open_prs(owner, repo).await?;
     let mut out = Vec::with_capacity(prs.len());
     for pr in prs {
-        out.push(evaluate_one(&pr));
+        out.push(evaluate_one(Some(gitea), owner, repo, &pr).await);
     }
     info!(count = out.len(), owner, repo, "evaluated open PRs");
     Ok(out)
 }
 
-fn evaluate_one(pr: &PrSummary) -> PrEvaluation {
+async fn evaluate_one(
+    gitea: Option<&GiteaClient>,
+    owner: &str,
+    repo: &str,
+    pr: &PrSummary,
+) -> PrEvaluation {
     let mergeable = pr.mergeable.unwrap_or(false);
     let fixes_issues = extract_fixes(pr.body.as_deref().unwrap_or(""));
-    let verdict = if !mergeable {
-        EvalVerdict::Hold("not mergeable".into())
-    } else if fixes_issues.is_empty() {
-        // No Fixes #N -> safe to merge but nothing to auto-close.
-        EvalVerdict::Merge
+    let (verdict, blocker_kind) = if !mergeable {
+        let kind = classify_blocker(gitea, owner, repo, pr).await;
+        let reason = format!("not mergeable ({kind})");
+        (EvalVerdict::Hold(reason), Some(kind))
     } else {
-        EvalVerdict::Merge
+        (EvalVerdict::Merge, None)
     };
     PrEvaluation {
         pr_index: pr.number,
         mergeable,
         fixes_issues,
         verdict,
+        blocker_kind,
+    }
+}
+
+/// Query CI status and classify why a PR is blocked.
+async fn classify_blocker(
+    gitea: Option<&GiteaClient>,
+    owner: &str,
+    repo: &str,
+    pr: &PrSummary,
+) -> BlockerKind {
+    let gitea = match gitea {
+        Some(c) => c,
+        None => return BlockerKind::CiNoStatus,
+    };
+    let sha = match pr.head_sha.as_deref() {
+        Some(s) if !s.is_empty() => s,
+        _ => return BlockerKind::CiNoStatus,
+    };
+
+    match gitea.get_commit_status(owner, repo, sha).await {
+        Ok(Some(combined)) => match combined.state.as_str() {
+            "failure" | "error" => BlockerKind::CiFailed,
+            "pending" => BlockerKind::CiPending,
+            _ => BlockerKind::NotMergeable,
+        },
+        Ok(None) => BlockerKind::CiNoStatus,
+        Err(e) => {
+            warn!(pr = pr.number, error = %e, "failed to query CI status");
+            BlockerKind::CiNoStatus
+        }
     }
 }
 
@@ -126,65 +163,71 @@ mod tests {
             body: Some(body.into()),
             state: "open".into(),
             mergeable: Some(mergeable),
+            head_sha: None,
         }
     }
 
-    #[test]
-    fn evaluate_one_holds_when_not_mergeable() {
+    #[tokio::test]
+    async fn evaluate_one_holds_when_not_mergeable() {
         let p = pr(1, "Fixes #2", false);
-        let e = evaluate_one(&p);
+        let e = evaluate_one(None, "o", "r", &p).await;
         assert!(matches!(e.verdict, EvalVerdict::Hold(_)));
         assert_eq!(e.fixes_issues, vec![2]);
+        assert_eq!(e.blocker_kind, Some(BlockerKind::CiNoStatus));
     }
 
-    #[test]
-    fn evaluate_one_merge_with_fixes() {
+    #[tokio::test]
+    async fn evaluate_one_merge_with_fixes() {
         // Both "Fixes #42" and "Closes #43" are now recognised closing keywords.
         let p = pr(7, "Fixes #42 Closes #43", true);
-        let e = evaluate_one(&p);
+        let e = evaluate_one(None, "o", "r", &p).await;
         assert_eq!(e.verdict, EvalVerdict::Merge);
         assert_eq!(e.fixes_issues, vec![42, 43]);
+        assert_eq!(e.blocker_kind, None);
     }
 
-    #[test]
-    fn evaluate_one_merge_no_fixes_still_merges() {
+    #[tokio::test]
+    async fn evaluate_one_merge_no_fixes_still_merges() {
         let p = pr(9, "feat: refactor", true);
-        let e = evaluate_one(&p);
+        let e = evaluate_one(None, "o", "r", &p).await;
         assert_eq!(e.verdict, EvalVerdict::Merge);
         assert!(e.fixes_issues.is_empty());
+        assert_eq!(e.blocker_kind, None);
     }
 
-    #[test]
-    fn evaluate_one_handles_missing_body() {
+    #[tokio::test]
+    async fn evaluate_one_handles_missing_body() {
         let p = PrSummary {
             number: 11,
             title: "x".into(),
             body: None,
             state: "open".into(),
             mergeable: Some(true),
+            head_sha: None,
         };
-        let e = evaluate_one(&p);
+        let e = evaluate_one(None, "o", "r", &p).await;
         assert_eq!(e.verdict, EvalVerdict::Merge);
         assert!(e.fixes_issues.is_empty());
+        assert_eq!(e.blocker_kind, None);
     }
 
-    #[test]
-    fn evaluate_one_processes_51_prs_without_truncation() {
-        // Regression test for issue #2850: ensure the evaluation loop does not
-        // impose an artificial cap at position 50.  With list_open_prs returning
-        // up to OPEN_PRS_LIMIT (300) items, all PRs must receive a verdict.
+    #[tokio::test]
+    async fn evaluate_one_processes_51_prs_without_truncation() {
         let prs: Vec<PrSummary> = (1u64..=51)
             .map(|n| pr(n, &format!("Fixes #{n}"), true))
             .collect();
-        let evaluations: Vec<_> = prs.iter().map(evaluate_one).collect();
+        let mut evaluations = Vec::with_capacity(prs.len());
+        for p in &prs {
+            evaluations.push(evaluate_one(None, "o", "r", p).await);
+        }
         assert_eq!(
             evaluations.len(),
             51,
             "all 51 PRs must receive an evaluation verdict"
         );
-        // Spot-check: the PR at position 51 gets Merge (it is mergeable, clean)
         let last = &evaluations[50];
         assert_eq!(last.pr_index, 51);
         assert_eq!(last.verdict, EvalVerdict::Merge);
+        assert_eq!(last.blocker_kind, None);
     }
 }

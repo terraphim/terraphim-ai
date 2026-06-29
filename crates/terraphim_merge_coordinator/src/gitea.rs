@@ -41,6 +41,9 @@ pub struct PrSummary {
     pub state: String,
     /// Whether Gitea considers this PR mergeable; `None` if unknown.
     pub mergeable: Option<bool>,
+    /// Head commit SHA (for CI status lookups).
+    #[serde(default)]
+    pub head_sha: Option<String>,
 }
 
 /// A single file entry from Gitea's `/pulls/{index}/files` response.
@@ -206,6 +209,41 @@ impl GiteaClient {
             last_err.unwrap_or_else(|| "no error captured".into())
         )))
     }
+
+    /// Query CI status for a head commit.
+    ///
+    /// Returns `None` when Gitea has no status data for the commit
+    /// (e.g. the repo has no Actions enabled, or the commit predates
+    /// CI instrumentation).  A present but empty `statuses` list is
+    /// treated as `CiNoStatus`, not as an error.
+    pub async fn get_commit_status(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+    ) -> Result<Option<CommitCombinedStatus>, MergeCoordinatorError> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/commits/{}/status",
+            self.base_url, owner, repo, sha
+        );
+        let resp = self.get_with_retry(&url).await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        let combined: CommitCombinedStatus = resp
+            .json()
+            .await
+            .map_err(|e| MergeCoordinatorError::Api(format!("decode commit status: {e}")))?;
+        Ok(Some(combined))
+    }
+}
+
+/// Gitea commit combined-status response.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CommitCombinedStatus {
+    pub state: String,
+    #[serde(default)]
+    pub statuses: Vec<serde_json::Value>,
 }
 
 /// Redact the token if a URL contains one inline (defence in depth).
