@@ -585,7 +585,6 @@ jobs:
   # Security scanning
   security-scan:
     name: Security Scan
-    continue-on-error: true
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 5
     needs: setup
@@ -605,12 +604,21 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run cargo audit
-        # Soft-fail: known pre-existing audit issues being tracked separately
-        continue-on-error: true
+      - name: Install cargo-audit
         run: |
-          cargo install cargo-audit --locked
-          cargo audit || echo "::warning::cargo audit found issues or had parsing errors"
+          if ! command -v cargo-audit 2>/dev/null; then
+            AUDIT_VERSION="0.22.1"
+            curl -sSL "https://github.com/rustsec/rustsec/releases/download/cargo-audit/v${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-gnu-v${AUDIT_VERSION}.tgz" \
+              | tar xz --strip-components=1 -C "${CARGO_HOME:-$HOME/.cargo}/bin/" --wildcards '*/cargo-audit'
+          fi
+          cargo-audit --version
+
+      - name: Run cargo audit
+        run: |
+          # Uses .cargo/audit.toml for documented exceptions (each RUSTSEC ID has rationale).
+          # --deny warnings: also fails on unmaintained/unsound warnings not in the ignore list.
+          # Failures include advisory ID and affected crate name.
+          cargo audit --deny warnings
 
       - name: Run cargo deny
         continue-on-error: true
