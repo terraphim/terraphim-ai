@@ -2,5 +2,35 @@
   "global_shortcut": "Ctrl+Shift+T",
   "default_role": "Rust Engineer",
   "selected_role": "Rust Engineer",
-  "roles": {}
+  "roles": {
+    "Rust Engineer": {
+      "shortname": "rust-engineer",
+      "name": "Rust Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "united",
+      "kg": {
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": ".terraphim/kg/rust-engineer"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": ".",
+          "service": "Ripgrep",
+          "read_only": true,
+          "extra_parameters": {
+            "extensions": "rs,toml,md,json"
+          }
+        }
+      ],
+      "llm_enabled": true,
+      "llm_provider": "ollama",
+      "ollama_model": "llama3.2:3b",
+      "ollama_base_url": "http://127.0.0.1:11434"
+    }
+  }
 }
