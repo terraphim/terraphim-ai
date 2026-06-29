@@ -139,10 +139,11 @@ mod tests {
 
     #[test]
     fn evaluate_one_merge_with_fixes() {
+        // Both "Fixes #42" and "Closes #43" are now recognised closing keywords.
         let p = pr(7, "Fixes #42 Closes #43", true);
         let e = evaluate_one(&p);
         assert_eq!(e.verdict, EvalVerdict::Merge);
-        assert_eq!(e.fixes_issues, vec![42]);
+        assert_eq!(e.fixes_issues, vec![42, 43]);
     }
 
     #[test]
