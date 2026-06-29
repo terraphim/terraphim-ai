@@ -59,6 +59,13 @@ schedule = "0 */4 * * *"
 task = """
 export GITEA_URL=https://git.terraphim.cloud
 export PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH
+# GITEA_TOKEN lives in ~/.profile (not exported by the orchestrator env).
+# Source it before any Gitea API call so sections 1-6 authenticate correctly.
+# Mirrors the established guard in scripts/ci/runner-health-check.sh and
+# scripts/ci/memory-alert.sh. No-op when GITEA_TOKEN is already in the env.
+if [ -z "${GITEA_TOKEN:-}" ] && [ -f ~/.profile ]; then
+  source ~/.profile
+fi
 ## ADF Meta-Coordinator: Monitoring and Health Checks
 
 ### 1. Tick-Stall Detection
