@@ -29,7 +29,7 @@ use std::sync::Arc;
 use rmcp::model::{CallToolResult, Content, ErrorData, Tool};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
-use terraphim_mcp_search::{mcp_search_skills, mcp_search_tools, SkillEntry};
+use terraphim_mcp_search::{SkillEntry, mcp_search_skills, mcp_search_tools};
 use terraphim_types::McpToolEntry;
 use tokio::sync::RwLock;
 
@@ -932,8 +932,7 @@ impl RlmMcpService {
         &self,
         arguments: Option<Map<String, serde_json::Value>>,
     ) -> Result<CallToolResult, ErrorData> {
-        let args =
-            arguments.ok_or_else(|| ErrorData::invalid_params("Missing arguments", None))?;
+        let args = arguments.ok_or_else(|| ErrorData::invalid_params("Missing arguments", None))?;
 
         let query = args
             .get("query")
@@ -996,8 +995,7 @@ impl RlmMcpService {
         &self,
         arguments: Option<Map<String, serde_json::Value>>,
     ) -> Result<CallToolResult, ErrorData> {
-        let args =
-            arguments.ok_or_else(|| ErrorData::invalid_params("Missing arguments", None))?;
+        let args = arguments.ok_or_else(|| ErrorData::invalid_params("Missing arguments", None))?;
 
         let query = args
             .get("query")
@@ -1167,13 +1165,12 @@ mod tests {
         ];
 
         // Invoke via the public dispatch path
-        let args: serde_json::Map<String, serde_json::Value> = serde_json::from_value(
-            serde_json::json!({
+        let args: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_value(serde_json::json!({
                 "query": "file",
                 "tools": tools,
-            }),
-        )
-        .unwrap();
+            }))
+            .unwrap();
 
         let result = service
             .call_tool("mcp_search_tools", Some(args))
@@ -1203,13 +1200,12 @@ mod tests {
             SkillEntry::new("deploy", "Deploy to staging"),
         ];
 
-        let args: serde_json::Map<String, serde_json::Value> = serde_json::from_value(
-            serde_json::json!({
+        let args: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_value(serde_json::json!({
                 "query": "review",
                 "skills": skills,
-            }),
-        )
-        .unwrap();
+            }))
+            .unwrap();
 
         let result = service
             .call_tool("mcp_search_skills", Some(args))
@@ -1231,10 +1227,8 @@ mod tests {
         let service = RlmMcpService::new();
 
         // Missing 'tools' parameter.
-        let args: serde_json::Map<String, serde_json::Value> = serde_json::from_value(
-            serde_json::json!({"query": "anything"}),
-        )
-        .unwrap();
+        let args: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_value(serde_json::json!({"query": "anything"})).unwrap();
         let result = service.call_tool("mcp_search_tools", Some(args)).await;
         assert!(result.is_err(), "expected error for missing 'tools' param");
 

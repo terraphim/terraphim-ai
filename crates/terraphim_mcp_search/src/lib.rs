@@ -60,4 +60,4 @@ pub mod mcp_tool_index;
 pub mod search;
 
 pub use mcp_tool_index::McpToolIndex;
-pub use search::{mcp_search_skills, mcp_search_tools, SkillEntry};
+pub use search::{SkillEntry, mcp_search_skills, mcp_search_tools};
