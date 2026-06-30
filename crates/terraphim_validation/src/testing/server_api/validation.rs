@@ -184,6 +184,39 @@ pub fn validate_json_schema<T: DeserializeOwned>(
     serde_json::from_value(body_value).map_err(ValidationError::Json)
 }
 
+/// Assert that two JSON values are equal (ignoring ordering)
+pub fn assert_json_equal<T: serde::Serialize + serde::de::DeserializeOwned>(
+    actual: &T,
+    expected: &T,
+) {
+    let actual_json = serde_json::to_value(actual).unwrap();
+    let expected_json = serde_json::to_value(expected).unwrap();
+
+    if actual_json != expected_json {
+        panic!(
+            "JSON mismatch:\nExpected: {}\nActual: {}",
+            serde_json::to_string_pretty(&expected_json).unwrap(),
+            serde_json::to_string_pretty(&actual_json).unwrap()
+        );
+    }
+}
+
+/// Validate response headers
+pub fn validate_response_headers(response: &Response, expected_headers: &[(&str, &str)]) {
+    for (key, expected_value) in expected_headers {
+        let actual_value = response.headers().get(*key).and_then(|v| v.to_str().ok());
+
+        match actual_value {
+            Some(value) if value == *expected_value => continue,
+            Some(value) => panic!(
+                "Header '{}' mismatch: expected '{}', got '{}'",
+                key, expected_value, value
+            ),
+            None => panic!("Missing expected header: {}", key),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,38 +277,5 @@ mod tests {
             "error message should describe the violation: {}",
             msg
         );
-    }
-}
-
-/// Assert that two JSON values are equal (ignoring ordering)
-pub fn assert_json_equal<T: serde::Serialize + serde::de::DeserializeOwned>(
-    actual: &T,
-    expected: &T,
-) {
-    let actual_json = serde_json::to_value(actual).unwrap();
-    let expected_json = serde_json::to_value(expected).unwrap();
-
-    if actual_json != expected_json {
-        panic!(
-            "JSON mismatch:\nExpected: {}\nActual: {}",
-            serde_json::to_string_pretty(&expected_json).unwrap(),
-            serde_json::to_string_pretty(&actual_json).unwrap()
-        );
-    }
-}
-
-/// Validate response headers
-pub fn validate_response_headers(response: &Response, expected_headers: &[(&str, &str)]) {
-    for (key, expected_value) in expected_headers {
-        let actual_value = response.headers().get(*key).and_then(|v| v.to_str().ok());
-
-        match actual_value {
-            Some(value) if value == *expected_value => continue,
-            Some(value) => panic!(
-                "Header '{}' mismatch: expected '{}', got '{}'",
-                key, expected_value, value
-            ),
-            None => panic!("Missing expected header: {}", key),
-        }
     }
 }

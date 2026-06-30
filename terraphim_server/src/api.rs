@@ -24,9 +24,48 @@ use terraphim_types::{Document, IndexedDocument, SearchQuery};
 use crate::error::{Result, Status};
 pub type SearchResultsStream = Sender<IndexedDocument>;
 
-/// Health check endpoint
-pub(crate) async fn health() -> impl IntoResponse {
-    (StatusCode::OK, "OK")
+/// Response body of the [`health`] readiness probe.
+///
+/// Deterministic JSON contract so integration test harnesses (and Tauri
+/// parity checks) can parse the body rather than only assert the status code:
+/// `{"status":"ok"}`. Guards the contract requested by issue #3010.
+#[derive(Debug, Serialize)]
+pub struct HealthResponse {
+    /// Readiness state of the server. Always `"ok"` while the router serves.
+    pub status: &'static str,
+}
+
+/// Readiness probe.
+///
+/// Returns HTTP 200 with a fixed JSON body `{"status":"ok"}` and
+/// `Content-Type: application/json` once the Axum router is serving requests.
+///
+/// Used by integration tests to wait for startup instead of a fixed `sleep`.
+pub(crate) async fn health() -> Json<HealthResponse> {
+    Json(HealthResponse { status: "ok" })
+}
+
+#[cfg(test)]
+mod health_tests {
+    use super::*;
+
+    /// AC #3010: the readiness body serialises to exactly `{"status":"ok"}`.
+    ///
+    /// Locks the JSON contract so a regression to free-form text (e.g. the
+    /// historical plain `"OK"`) or an added/renamed field fails this test.
+    #[test]
+    fn health_serialises_to_fixed_json_status_ok() {
+        let body = serde_json::to_string(&HealthResponse { status: "ok" })
+            .expect("HealthResponse must serialise");
+        assert_eq!(body, r#"{"status":"ok"}"#);
+    }
+
+    /// AC #3010: the handler returns the canonical body with `status == "ok"`.
+    #[tokio::test]
+    async fn health_handler_returns_json_status_ok() {
+        let Json(payload) = health().await;
+        assert_eq!(payload.status, "ok");
+    }
 }
 
 /// Response for creating a document

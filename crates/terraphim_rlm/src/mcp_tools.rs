@@ -1010,9 +1010,6 @@ impl RlmMcpService {
             ErrorData::invalid_params("'skills' must be an array of skill entries", None)
         })?;
 
-        // Explicit closure (not function pointer) to avoid stable-Rust
-        // inference quirks with `serde_json::from_value` (consumes its
-        // argument).
         let skills: Vec<SkillEntry> = skills_array
             .iter()
             .cloned()
