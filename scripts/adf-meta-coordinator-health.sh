@@ -33,8 +33,18 @@ fi
 
 log_warn() { echo "WARNING: $*"; }
 log_info() { echo "INFO: $*"; }
-
 timestamp() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
+
+# Run journalctl for the adf-orchestrator unit. Fall back to non-sudo if the
+# environment blocks elevation (e.g. containerized no-new-privileges), but keep
+# sudo first for hosts where the journal is restricted to root/adm.
+journal_adf() {
+    if sudo -n journalctl -u adf-orchestrator --since "$SINCE" -q >/dev/null 2>&1; then
+        sudo journalctl -u adf-orchestrator --since "$SINCE" -q
+    else
+        journalctl -u adf-orchestrator --since "$SINCE" -q
+    fi
+}
 
 # Search for an already-open issue with this exact title prefix.
 # Prevents duplicate health-alert spam on every cron invocation.
@@ -70,11 +80,11 @@ create_issue() {
 }
 
 # --- 1. reconcile_tick stalls ---
-stall_count=$(sudo journalctl -u adf-orchestrator --since "$SINCE" 2>/dev/null | grep -c 'reconcile_tick SLOW' || true)
+stall_count=$(journal_adf | grep -c 'reconcile_tick SLOW' || true)
 if [[ "$stall_count" -gt 0 ]]; then
     log_warn "$stall_count tick stalls detected in last 4h"
     create_issue "[ADF] Tick-stall detected: $stall_count in 4h" \
-"$(timestamp): $stall_count reconcile_tick SLOW events detected.
+        "$(timestamp): $stall_count reconcile_tick SLOW events detected.
 
 Theme-ID: adf-health-alert"
     WARN_EXIT=1
@@ -83,13 +93,12 @@ else
 fi
 
 # --- 2. non-success agent exits ---
-failures=$(sudo journalctl -u adf-orchestrator --since "$SINCE" 2>/dev/null \
-    | grep 'exit classified' | grep -v 'success' | grep -v 'empty_success' || true)
+failures=$(journal_adf | grep 'exit classified' | grep -v 'success' | grep -v 'empty_success' || true)
 failure_count=$(echo "$failures" | grep -c 'exit_class=' || true)
 if [[ "$failure_count" -gt 3 ]]; then
     log_warn "$failure_count non-success agent exits in last 4h"
     create_issue "[ADF] $failure_count agent failures in 4h" \
-"$(timestamp): $failure_count non-success agent exits in last 4h:
+        "$(timestamp): $failure_count non-success agent exits in last 4h:
 
 $(echo "$failures" | tail -20)
 
@@ -100,12 +109,12 @@ else
 fi
 
 # --- 3. max_cpu_seconds timeouts ---
-timeouts=$(sudo journalctl -u adf-orchestrator --since "$SINCE" 2>/dev/null | grep 'AGENT EXCEEDED max_cpu_seconds' || true)
+timeouts=$(journal_adf | grep 'AGENT EXCEEDED max_cpu_seconds' || true)
 timeout_count=$(echo "$timeouts" | grep -c 'AGENT EXCEEDED' || true)
 if [[ "$timeout_count" -gt 0 ]]; then
     log_warn "$timeout_count agents exceeded max_cpu_seconds in last 4h"
     create_issue "[ADF] $timeout_count agents exceeded max_cpu_seconds" \
-"$(timestamp): Agents killed after exceeding their configured max_cpu_seconds:
+        "$(timestamp): Agents killed after exceeding their configured max_cpu_seconds:
 
 $(echo "$timeouts" | tail -10)
 
