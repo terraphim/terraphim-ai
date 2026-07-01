@@ -87,18 +87,19 @@ directory-`path`-filter bug (returns nothing for directory paths; tracked at
 Use `terraphim-grep` via Bash:
 
 ```bash
-# Search all Rust files for a symbol
-terraphim-grep "fn ensure_thesaurus_loaded" --type rust
+# Search code for a symbol (works without a thesaurus)
+terraphim-grep "fn ensure_thesaurus_loaded" --haystack code
 
 # Search with context lines
-terraphim-grep "DeviceStorage::init" --type rust -C 3
+terraphim-grep "DeviceStorage::init" --haystack code -C 3
 
 # Search a specific directory
-terraphim-grep "haystack" crates/terraphim_service/src/
+terraphim-grep "haystack" --haystack code --paths terraphim_server/src/
 ```
 
-`terraphim-grep` is the `fff_search` crate CLI and is always available at
-`~/.cargo/bin/terraphim-grep` or on `$PATH` after `cargo install`.
+`terraphim-grep` is installed with the `code-search` feature by default and is always
+available at `~/.cargo/bin/terraphim-grep` or on `$PATH` after `cargo install`. It works
+without a thesaurus in search-only mode.
 
 ### File-Name Lookup (find files by name/pattern)
 
