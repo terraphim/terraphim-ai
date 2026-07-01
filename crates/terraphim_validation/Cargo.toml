@@ -57,7 +57,7 @@ urlencoding = "2.1"
 
 # TUI testing dependencies
 regex = "1.10"
-sysinfo = "0.30"
+sysinfo = "0.39"
 term_size = "0.3"
 
  # Additional dependencies for reporting and metadata
