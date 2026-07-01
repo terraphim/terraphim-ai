@@ -29,6 +29,7 @@
 //! ```
 
 pub mod adf_commands;
+pub mod agent_allowlist_kg;
 pub mod agent_registry;
 pub mod agent_run_command;
 pub mod agent_run_record;
