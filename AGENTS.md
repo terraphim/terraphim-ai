@@ -84,7 +84,8 @@ directory-`path`-filter bug (returns nothing for directory paths; tracked at
 
 ### Content Search (find text inside files)
 
-Use `terraphim-grep` via Bash:
+Use `terraphim-grep` via Bash. It is installed with the `code-search` feature by default
+and works without a thesaurus in search-only mode.
 
 ```bash
 # Search code for a symbol (works without a thesaurus)
@@ -97,9 +98,56 @@ terraphim-grep "DeviceStorage::init" --haystack code -C 3
 terraphim-grep "haystack" --haystack code --paths terraphim_server/src/
 ```
 
-`terraphim-grep` is installed with the `code-search` feature by default and is always
-available at `~/.cargo/bin/terraphim-grep` or on `$PATH` after `cargo install`. It works
-without a thesaurus in search-only mode.
+### Role-based search with a project thesaurus
+
+For KG-boosted ranking, keep a project-level `.terraphim/` directory in the repo root.
+terraphim-grep auto-discovers `.terraphim/thesaurus-<role>.json`.
+
+```bash
+# Use an explicit thesaurus
+terraphim-grep "session persistence" --paths . --thesaurus .terraphim/thesaurus.json -n 8 -C 2
+
+# Structured output with concepts and boost scores
+terraphim-grep "provider" --paths . --thesaurus .terraphim/thesaurus.json --json
+```
+
+Concept markdown format (`.terraphim/kg/<concept>.md`):
+
+```markdown
+# Provider
+
+Abstract LLM backend implementing the Provider trait.
+
+synonyms:: provider, llm backend, anthropic, openai, gemini, cohere, azure, bedrock, vertex, copilot, kimi
+```
+
+Generate `.terraphim/thesaurus.json` from `kg/*.md`:
+
+```bash
+python3 - <<'PY'
+import os, json, glob
+data, cid = {}, 100
+for f in sorted(glob.glob(".terraphim/kg/*.md")):
+    nterm = os.path.splitext(os.path.basename(f))[0]
+    txt = open(f, encoding="utf-8").read()
+    syn = next((l.split("::",1)[1] for l in txt.splitlines()
+                if l.strip().lower().startswith("synonyms::")), "")
+    for t in dict.fromkeys([nterm] + [s.strip().lower() for s in syn.split(",") if s.strip()]):
+        data.setdefault(t.lower(), {"id": cid, "nterm": nterm})
+    cid += 1
+json.dump({"name": "Project Engineer", "data": data}, open(".terraphim/thesaurus.json","w"), indent=2)
+PY
+```
+
+### Maintaining the thesaurus
+
+1. Keep `kg/*.md` in version control.
+2. Regenerate `thesaurus.json` after any concept or code-identifier change.
+3. Enrich concepts with real code anchors mined by ast-grep (struct/trait/impl names).
+4. Use name-based mapping rules and avoid file-wide catch-alls that add noise.
+
+Full details and a working enrichment loop are in `docs/terraphim-grep-offline-setup.md`
+and the `terraphim-grep-offline` skill.
 
 ### File-Name Lookup (find files by name/pattern)
 
