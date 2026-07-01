@@ -1,0 +1,90 @@
+[package]
+name = "terraphim_sessions"
+version.workspace = true
+edition.workspace = true
+description = "Session management for AI coding assistant history - search across Claude Code, Cursor, Aider sessions"
+license = "Apache-2.0"
+authors = ["Terraphim Contributors"]
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["sessions", "ai", "search", "claude", "cursor"]
+readme = "../../README.md"
+
+[features]
+default = []
+
+# Enable terraphim-session-analyzer integration for enhanced parsing
+terraphim-session-analyzer = ["dep:terraphim-session-analyzer"]
+
+# Enable full TSA features including Cursor support
+tsa-full = ["terraphim-session-analyzer", "terraphim-session-analyzer/connectors"]
+
+# Enable Aider session connector
+aider-connector = ["dep:regex", "dep:terraphim-markdown-parser"]
+
+# Enable Cline session connector (VS Code extension)
+cline-connector = []
+
+# Enable OpenCode session connector
+opencode-connector = ["dep:rusqlite"]
+
+# Enable Codex (OpenAI) session connector
+codex-connector = []
+
+# Enable all extra connectors
+extra-connectors = ["aider-connector", "cline-connector", "opencode-connector", "codex-connector"]
+
+# Enable terraphim knowledge graph enrichment
+enrichment = ["terraphim_automata", "terraphim_rolegraph", "terraphim_types"]
+
+# Enable BM25-ranked session search via terraphim_types score module
+search-index = ["terraphim_types"]
+
+# All features
+full = ["tsa-full", "extra-connectors", "enrichment", "search-index"]
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true, features = ["full"] }
+async-trait = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+
+
+# Time handling (same as CLA)
+jiff = { version = "0.2", features = ["serde"] }
+
+# File system
+walkdir = "2.4"
+dirs = "5.0"
+
+# File watching
+notify = "8.2"
+
+# Feature-gated: regex for Aider/Cline connectors
+regex = { version = "1.10", optional = true }
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
+
+# Feature-gated: Terraphim Session Analyzer
+terraphim-session-analyzer = { version = "1.19.2", optional = true, registry = "terraphim" }
+
+# Feature-gated: Markdown parsing for Aider/Cline connectors
+terraphim-markdown-parser = { version = "1.20.2", registry = "terraphim", optional = true }
+
+# Feature-gated: Terraphim enrichment (uses published crates.io versions)
+terraphim_automata = { version = ">=1.4.10", registry = "terraphim", optional = true }
+terraphim_rolegraph = { version = ">=1.4.10", registry = "terraphim", optional = true }
+terraphim_types = { version = ">=1.4.10", registry = "terraphim", optional = true }
+
+
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+tokio-test = "0.4"

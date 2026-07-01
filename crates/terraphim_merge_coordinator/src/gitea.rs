@@ -219,7 +219,8 @@ impl GiteaClient {
                 }
                 Ok(resp) => {
                     let status = resp.status();
-                    let is_client_error = status.is_client_error() && status != reqwest::StatusCode::TOO_MANY_REQUESTS;
+                    let is_client_error = status.is_client_error()
+                        && status != reqwest::StatusCode::TOO_MANY_REQUESTS;
                     let body_text = resp.text().await.unwrap_or_default();
                     last_err = Some(format!("status {status}: {body_text}"));
                     if is_client_error {

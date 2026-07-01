@@ -8485,7 +8485,7 @@ dependencies = [
  "terraphim_persistence 1.20.4",
  "terraphim_rolegraph 1.20.4",
  "terraphim_service",
- "terraphim_sessions",
+ "terraphim_sessions 1.20.3",
  "terraphim_settings 1.20.4",
  "terraphim_tracker 1.20.4",
  "terraphim_types 1.20.4",
@@ -8888,6 +8888,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_mcp_search"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99c5fa870352d8c83fc154fae396d49abee108fe5feeae3f4d92dda42d31c687"
+dependencies = [
+ "serde",
+ "serde_json",
+ "terraphim_automata 1.20.4",
+ "terraphim_types 1.20.4",
+]
+
+[[package]]
 name = "terraphim_merge_coordinator"
 version = "1.21.0"
 dependencies = [
@@ -8897,7 +8909,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
@@ -9127,7 +9139,7 @@ dependencies = [
  "terraphim_agent_supervisor",
  "terraphim_automata 1.20.4",
  "terraphim_config 1.20.4",
- "terraphim_mcp_search 0.1.0 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
+ "terraphim_mcp_search 0.2.0",
  "terraphim_rolegraph 1.20.4",
  "terraphim_service",
  "terraphim_types 1.20.4",
@@ -9316,6 +9328,33 @@ dependencies = [
  "terraphim_types 1.20.4",
  "thiserror 1.0.69",
  "tokio",
+ "tracing",
+ "uuid",
+ "walkdir",
+]
+
+[[package]]
+name = "terraphim_sessions"
+version = "1.21.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "dirs 5.0.1",
+ "jiff",
+ "notify 8.2.0",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim-session-analyzer",
+ "terraphim_automata 1.20.4",
+ "terraphim_rolegraph 1.20.4",
+ "terraphim_types 1.20.4",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-test",
  "tracing",
  "uuid",
  "walkdir",
