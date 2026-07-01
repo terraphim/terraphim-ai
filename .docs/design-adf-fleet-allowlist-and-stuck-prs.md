@@ -1,38 +1,43 @@
 # Implementation Plan: Reconcile ADF auto-merge allowlist fix + remediate 10 stuck fleet PRs
 
-**Status**: Draft (awaiting human approval — this plan is not to be executed autonomously)
+**Status**: Draft — reviewed; binary-provenance gate required before execution
 **Research Doc**: `.docs/research-adf-fleet-allowlist-and-stuck-prs.md`
 **Author**: session agent (Claude Code)
 **Date**: 2026-07-01
-**Estimated Effort**: 2–4 hours, gated by Step 1's findings and deploy timing
+**Estimated Effort**: 2–5 hours, gated by binary provenance and deploy timing
 
 ## Overview
 
 ### Summary
-Deploy the verified allowlist fix (terraphim-ai#3065) to bigbox, close the two
-competing fix PRs opened in the wrong repo (terraphim-agents#70/#69), finish
-attributing the 9 remaining stuck PRs' CI failures, and apply a fixed decision
-rule to each: merge, fix-then-merge, or close.
+Prove which repo/branch produced bigbox's installed `/usr/local/bin/adf`, merge
+exactly one allowlist fix in that canonical source, deploy it from a tracked
+branch, close only the superseded PRs, finish attributing the 9 remaining stuck
+PRs' CI failures, and apply a fixed decision rule to each: merge,
+fix-then-merge, or close.
 
 ### Approach
-Sequential, gated steps. Step 1 (identify the active task branch) is short but
-informs whether the current binary carries other off-main changes that need to
-be preserved or rolled back before #3065 is deployed from `main`.
+Sequential, gated steps. Step 1 is a hard provenance gate because evidence is
+conflicting: `AGENTS.md` says the orchestrator binary is built from
+`terraphim-agents`, while bigbox shell history shows real `terraphim-ai`
+task-branch builds. No merge, close, or deploy action happens until the
+installed binary is traced by hash/build artefact.
 
 ### Scope
 
 **In Scope:**
-- Identifying the terraphim-ai task branch that built the current bigbox binary
-- Merging terraphim-ai#3065 and deploying it to bigbox
-- Closing/redirecting terraphim-agents#70/#69
-- Attributing CI failure cause for the 5 still-unknown stuck PRs
+- Identifying the exact repo/branch that built the current bigbox binary
+- Choosing exactly one surviving allowlist fix from terraphim-ai#3065,
+  terraphim-agents#70, and terraphim-agents#69
+- Deploying the chosen fix to bigbox from a tracked branch
+- Closing/redirecting only the PRs superseded by the proven canonical fix
+- Attributing CI failure cause for the remaining unattributed stuck PRs
 - A merge/fix/close decision for each of the 9 remaining stuck PRs
 
 **Out of Scope:**
 - Fixing every attributed CI failure in this pass (attribution ≠ remediation
   for every case — see Decision Rule)
 - Reconciling the full `terraphim_orchestrator` divergence between
-  terraphim-ai and terraphim-agents beyond closing the two false-premise PRs
+  terraphim-ai and terraphim-agents beyond this incident's allowlist fix
 - Redesigning the fleet-agent Gitea login convention (`adf-<name>` prefix
   for all agents) — valuable, but a separate proposal
 - Any change to the orchestrator's reconcile-tick logging behaviour (the
@@ -49,6 +54,8 @@ be preserved or rolled back before #3065 is deployed from `main`.
 - Attempting to fix the CI-runner `rustup-with-perms` infra bug as part of
   this plan — it's an ops issue on the runner host, orthogonal to any PR's
   content, and owning it here would blow the scope
+- Assuming either `AGENTS.md` or shell history alone proves binary provenance —
+  require hash/build artefact evidence
 - Blindly adopting the current task-branch binary's other off-main changes
   just because they are "already deployed" — each must be reviewed and
   either fast-tracked to main or explicitly rolled back
@@ -57,22 +64,26 @@ be preserved or rolled back before #3065 is deployed from `main`.
 
 ### Data Flow (of this remediation, not of the orchestrator)
 ```
-Step 1 (identify active task branch) --gates--> Step 2 (merge #3065)
-                                                       |
-                                                       v
-Step 3 (deploy from main) ----------------------> Step 4 (close agents#70/#69)
-                                                       |
-                                                       v
-Step 5 (finish CI taxonomy) --------------------> Step 6 (apply decision rule per PR)
+Step 1 (prove binary provenance) --gates--> Step 2 (choose one fix)
+                                                    |
+                                                    v
+Step 3 (merge chosen fix) -------------------> Step 4 (deploy chosen fix)
+                                                    |
+                                                    v
+Step 5 (close superseded fixes) -------------> Step 6 (finish CI taxonomy)
+                                                    |
+                                                    v
+                                      Step 7 (apply decision rule per PR)
 ```
 
 ### Key Design Decisions
 
 | Decision | Rationale | Alternatives Rejected |
 |----------|-----------|------------------------|
-| Keep terraphim-ai#3065 as the canonical fix and close agents#70/#69 | Verified that bigbox's binary is built from terraphim-ai; agents#70/#69 were based on a false premise | Merging agents#70/#69 and reconciling three designs; porting #3065 to terraphim-agents |
-| Merge #3065 to `main`, then deploy from `main` | Avoids silently continuing a task-branch-deploy pattern that has already lost commits (#3024's `38f06db0`) | Deploying #3065's branch directly without merging to main |
-| KG-driven allowlist in the filesystem (`crates/terraphim_orchestrator/kg/recognised_agents.md`) | Editable by ops without a rebuild; no service restart needed for allowlist changes alone | Fleet-config-sourced allowlist (agents#70) still requires a deploy to add a login |
+| Make binary provenance the first gate | Current evidence conflicts; closing/merging the wrong repo would have no production effect | Trusting `AGENTS.md` alone; trusting shell history alone |
+| Merge exactly one allowlist fix | Three divergent fixes for one policy will drift and recreate the incident | Merging #3065 and agents#70/#69 independently |
+| Prefer KG-driven allowlist if implementation cost is comparable | Editable by ops without a rebuild; aligns with Terraphim KG conventions | Fleet-config-sourced allowlist as the only source if it requires deploys for login additions |
+| Deploy from a tracked branch after merge | Avoids silently continuing a task-branch-deploy pattern that has already lost commits (#3024's `38f06db0`) | Deploying an unmerged task branch directly |
 
 ### Eliminated Options (Essentialism)
 
@@ -81,14 +92,14 @@ Step 5 (finish CI taxonomy) --------------------> Step 6 (apply decision rule pe
 | Fixing all 9 CI-failing PRs' underlying code issues in this plan | 5 are still unattributed; fixing blind is guessing | Wasted effort on PRs that may need to be closed instead (stale, superseded) |
 | Unifying terraphim-ai and terraphim-agents' orchestrator copies | Separate, larger architecture problem flagged in research §Recommendations | Scope explosion — this plan would never ship |
 | Automating the merge/close decisions with a script | Only 9 PRs; a human-reviewable table is faster to produce and safer to execute than automation for a one-time cleanup | Script bugs execute against real repos with no review step |
-| Deploying the current task branch plus #3065 as a one-off | Reinforces the same branch-based-deploy pattern that caused the lost-commit confusion | Lost-traceability risk; main would still not reflect production |
+| Deploying the current task branch plus a local patch as a one-off | Reinforces the same branch-based-deploy pattern that caused the lost-commit confusion | Lost-traceability risk; main would still not reflect production |
 
 ### Simplicity Check
-**What if this could be easy?** It would be: "merge the verified fix, deploy
-from main, close the two wrong-repo PRs, then finish the CI taxonomy and apply
-a simple decision rule." That's exactly this plan's shape — six steps, no new
-abstractions, no code written for this plan itself (all actions are Gitea API
-calls and one standard deploy).
+**What if this could be easy?** It would be: "prove the binary source, merge
+one fix there, deploy it, close only the superseded fixes, then finish the CI
+taxonomy and apply a simple decision rule." That's exactly this plan's shape —
+seven steps, no new abstractions, and no code written for the plan itself
+unless provenance proves #3065 must be ported to `terraphim-agents`.
 
 **Nothing Speculative Checklist**:
 - [x] No features requested beyond "reconcile the fix and clear the queue"
@@ -99,19 +110,23 @@ calls and one standard deploy).
 
 ## File Changes
 
-No new files in this plan. PR #3065 already contains the necessary code
-changes. This plan's actions are operational:
-- Gitea PR merge (#3065)
-- Gitea PR close with comment (agents#70, agents#69)
-- bigbox systemd deploy
+No new files are required if provenance proves `terraphim-ai#3065` is the
+canonical fix. If provenance proves `terraphim-agents` is canonical, a small
+port may be required from #3065's KG-driven design into the agents repo before
+merge.
+
+Operational actions:
+- Gitea PR merge of exactly one surviving allowlist fix
+- Gitea PR close/comment for superseded allowlist fixes
+- bigbox systemd deploy from the selected canonical branch
 - Gitea PR merge/close/comment for the 9 remaining stuck PRs
 
 ## Test Strategy
 
-### Verification of #3065
+### Verification of the Chosen Allowlist Fix
 | Test | How | Expected Result |
 |------|-----|-----------------|
-| Unit tests | `cargo test -p terraphim_orchestrator --lib` | Pass (already verified: 18 tests including `author_is_agent_policy`) |
+| Unit tests | `cargo test -p terraphim_orchestrator --lib` in the selected canonical repo | Pass, including author-gate policy coverage |
 | Pre-commit hook | `git commit` via repo hook | Pass (formatting + workspace tests) |
 | Deploy smoke | After deploy, `sudo journalctl -u adf-orchestrator -f` | Previously-blocked login (`implementation-swarm`) either stops producing rejection lines or starts logging successful auto-merge enqueue |
 
@@ -123,33 +138,51 @@ changes. This plan's actions are operational:
 
 ## Implementation Steps
 
-### Step 1: Identify the active task branch that built the current binary
-**Action:** On bigbox, correlate `/usr/local/bin/adf` metadata (mtime, md5)
-with the task-branch checkout paths under `/opt/ai-dark-factory/build/` and the
-zsh history entries that clone terraphim-ai task branches. Specifically:
-- Check `/opt/ai-dark-factory/build/` for terraphim-ai checkouts and their
-  branches.
-- Match binary hash to `target/release/adf` in those checkouts.
-- Record the branch name and the extra commits it carries vs. `main`.
+### Step 1: Prove binary provenance
+**Action:** On bigbox, correlate `/usr/local/bin/adf` metadata (mtime, hash,
+build-id if available) with all candidate build artefacts and deployment
+records. Specifically:
+- Record `sha256sum /usr/local/bin/adf`, mtime, size, and systemd unit path.
+- Enumerate candidate `target/release/adf` binaries under `/home/alex/projects`,
+  `/data/projects`, and `/opt/ai-dark-factory/build`.
+- Compare hash, size, and mtime for each candidate.
+- For any matching or near-matching candidate, record repo, branch, HEAD SHA,
+  dirty state, and diff from main.
+- Inspect deployment scripts/history for the command that copied the binary to
+  `/usr/local/bin/adf`.
 
-**Verifies:** which off-main changes are silently deployed.
-**Blocks:** Step 3 (deploy from main) if the branch contains needed changes
-that must be fast-tracked first.
+**Verifies:** which repo/branch is canonical for this incident and which
+off-main changes are silently deployed.
+**Blocks:** Steps 2–5. No PR should be merged or closed before this is done.
+**Estimated:** 30–60 minutes.
+
+### Step 2: Choose the single surviving allowlist fix
+**Action:** Based on Step 1:
+- If `terraphim-ai` is proven canonical: keep #3065 as the surviving fix.
+- If `terraphim-agents` is proven canonical: review #70/#69 in full and either
+  merge them as a stack or port #3065's KG-driven design into `terraphim-agents`.
+- If no candidate artefact proves provenance: stop and ask for owner decision;
+  do not infer from partial evidence.
+
+**Depends on:** Step 1.
+**Test/Verification:** One PR is explicitly named as surviving; the other two
+are explicitly named as superseded but not yet closed.
 **Estimated:** 15–30 minutes.
 
-### Step 2: Merge terraphim-ai#3065
-**Action:** Merge PR #3065 to `terraphim-ai/main` via Gitea API or web UI.
+### Step 3: Merge the chosen fix
+**Action:** Merge the chosen PR into its repo's main branch. If a port is needed,
+create and verify that PR first; do not deploy a local-only patch.
 
-**Depends on:** nothing (can proceed independently of Step 1).
-**Test/Verification:** PR merge commit appears on `main`; `cargo test -p
-terraphim_orchestrator --lib` passes on `main`.
-**Estimated:** 5 minutes.
+**Depends on:** Step 2.
+**Test/Verification:** Merge commit appears on the selected repo's main branch;
+the relevant crate tests pass on that branch.
+**Estimated:** 5–30 minutes depending on whether a port is needed.
 
-### Step 3: Deploy from main to bigbox
-**Action:**
+### Step 4: Deploy the chosen fix to bigbox
+**Action (repo path depends on Step 1):**
 ```bash
 ssh bigbox
-cd /home/alex/projects/terraphim/terraphim-ai
+cd <canonical-orchestrator-repo>
 git fetch origin
 git checkout main
 git pull origin main
@@ -159,23 +192,24 @@ sudo cp target/release/adf /usr/local/bin/adf
 sudo systemctl start adf-orchestrator
 ```
 
-**Depends on:** Steps 1 and 2.
+**Depends on:** Step 3.
 **Test/Verification:** After restart, tail `sudo journalctl -u adf-orchestrator
 -f` and confirm a PR previously blocked with "author `implementation-swarm` is
 not a recognised agent" either stops recurring or proceeds to auto-merge
 enqueue.
 **Estimated:** 10–20 minutes build + deploy; owner's call on timing.
 
-### Step 4: Close/redirect terraphim-agents#70 and #69
-**Action:** Post a closing comment on each PR explaining that the deploy source
-is verified to be terraphim-ai, the fix has landed in terraphim-ai#3065, and
-the agents-repo changes would target the wrong copy. Close both PRs.
+### Step 5: Close/redirect superseded allowlist PRs
+**Action:** Post a closing comment on each superseded PR explaining the proven
+canonical repo and the surviving fix. Close only those superseded by the merged
+and deployed fix.
 
-**Depends on:** Step 2 (so #3065 exists to link to).
-**Test/Verification:** Both PRs show state=closed with a redirect comment.
+**Depends on:** Step 4.
+**Test/Verification:** Superseded PRs show state=closed with a redirect comment;
+the surviving PR is merged.
 **Estimated:** 10 minutes.
 
-### Step 5: Finish the CI failure taxonomy for the 5 unattributed PRs
+### Step 6: Finish the CI failure taxonomy for the remaining unattributed PRs
 **Depends on:** nothing (can run in parallel with Steps 1–4, but listed after
 because it's lower-priority than un-breaking the allowlist).
 **Action:** For each of terraphim-agents#53, terraphim-clients#54, #35, #34,
@@ -191,7 +225,7 @@ merged) has a filled-in row in the taxonomy table — no "not yet isolated"
 or "empty response" entries left.
 **Estimated:** 30–45 minutes (roughly what the first 4 took, this session).
 
-### Step 6: Apply the Decision Rule to each of the 9 remaining PRs
+### Step 7: Apply the Decision Rule to each of the 9 remaining PRs
 
 **Decision Rule** (apply mechanically once each PR's category is known):
 
@@ -204,7 +238,7 @@ or "empty response" entries left.
 | ADF-gate-only failure (adf/pr-reviewer, adf/validation, adf/verification) with native-ci green | Check whether it correlates with the bigbox Anthropic provider outage noted in this session's earlier findings; if so, treat as a review-agent availability problem, not a PR defect — do not close or force-merge, wait for provider health to recover and let the gate re-run |
 | PR superseded/duplicated by another (e.g. terraphim-clients#18 vs #20, both Refs #2366) | Compare diffs; keep the more complete/correct one, close the other with a comment linking to the survivor |
 
-**Depends on:** Step 5 (needs full taxonomy) and Step 3 (the allowlist fix
+**Depends on:** Step 6 (needs full taxonomy) and Step 4 (the allowlist fix
 must be live before any of these can auto-merge even if CI is green).
 **Test/Verification:** Post-execution, `terraphim-clients#18`/`#20` overlap
 is resolved to exactly one open or merged PR, not two; every other PR is
@@ -214,13 +248,13 @@ is closed with a linked reason.
 `#2366` PRs needing an actual diff comparison.
 
 ## Rollback Plan
-- **Step 2/3 (merge/deploy of #3065):** if the deployed fix turns out wrong
+- **Step 3/4 (merge/deploy of chosen fix):** if the deployed fix turns out wrong
   post-deploy (e.g. still doesn't recognise a login), revert the merge commit
-  on `terraphim-ai/main`, rebuild/deploy the previous binary from the prior
-  known-good state.
-- **Step 4 (close agents#70/#69):** if #3065 is reverted, re-open the
+  on the selected repo's main branch, rebuild/deploy the previous binary from
+  the prior known-good state.
+- **Step 5 (close superseded PRs):** if the chosen fix is reverted, re-open the
   runner-up PR or create a new one.
-- **Step 6 (per-PR merges):** each merge is a normal Gitea PR merge — revertible
+- **Step 7 (per-PR merges):** each merge is a normal Gitea PR merge — revertible
   via `git revert` on the target branch if a merged PR turns out broken.
 - No schema/data migrations involved; rollback is git-native throughout.
 
@@ -232,15 +266,16 @@ operations plus one standard Rust build/deploy to bigbox.
 
 | Item | Status | Owner |
 |------|--------|-------|
-| Which terraphim-ai task branch built the current bigbox binary? | **Answered in principle (terraphim-ai), but exact branch still to confirm** | session agent |
-| Close/redirect terraphim-agents#70/#69 | Pending Step 2 | session agent |
-| Deploy #3065 to bigbox | Pending human approval and Step 1/2 | Alex |
-| CI taxonomy for 5 PRs | Pending | session agent |
+| Which repo/branch built the current bigbox binary? | **Blocking; evidence conflict unresolved** | session agent |
+| Which allowlist fix survives (#3065 vs #70/#69)? | Pending Step 1 | session agent + Alex |
+| Close/redirect superseded allowlist PRs | Pending Step 5 | session agent |
+| Deploy chosen fix to bigbox | Pending human approval and Steps 1–3 | Alex |
+| CI taxonomy for remaining unattributed PRs | Pending | session agent |
 | Duplicate resolution for terraphim-clients#18 vs #20 (issue #2366) | Pending Step 5 completion | session agent |
 
 ## Approval
 
 - [x] Technical review complete
-- [x] Repo-identity question resolved (terraphim-ai verified)
-- [ ] Exact active task branch identified (Step 1)
-- [ ] Human approval received to execute Steps 2–6
+- [ ] Binary provenance resolved by hash/build artefact (Step 1)
+- [ ] Surviving allowlist fix selected (Step 2)
+- [ ] Human approval received to execute Steps 3–7

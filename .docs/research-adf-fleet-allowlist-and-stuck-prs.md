@@ -1,6 +1,6 @@
 # Research Document: ADF auto-merge allowlist bug and 10 stuck fleet PRs
 
-**Status**: Draft — corrected 2026-07-01 after deploy-source verification
+**Status**: Draft — reviewed 2026-07-01 after deploy-source evidence conflict
 **Author**: session agent (Claude Code)
 **Date**: 2026-07-01
 **Reviewers**: Alex Mikhalev
@@ -12,11 +12,13 @@ The ADF auto-merge author-allowlist bug has three layers, not one:
    `claude-code`, `root`, and `adf-*`-prefixed logins, rejecting six real fleet
    agents. This session fixed it in **terraphim-ai#3065** with a KG-driven
    allowlist.
-2. **Deploy-source question**: Circumstantial evidence initially suggested
-   `terraphim-agents` was the deploy source. Direct evidence from bigbox's
-   `~/.zsh_history` proves the current `/usr/local/bin/adf` binary is built
-   from `terraphim/terraphim-ai.git` (specific task branches, not necessarily
-   `main`). Therefore **terraphim-ai#3065 targets the correct repo**.
+2. **Deploy-source question**: Evidence is conflicting. Project instructions
+   say the orchestrator binary is built from `terraphim-agents`, while
+   bigbox's `~/.zsh_history` shows real `terraphim-ai` task-branch builds of
+   `adf`. Neither evidence source alone proves which checkout produced the
+   currently-installed `/usr/local/bin/adf` because no candidate build has yet
+   been hash-matched to the installed binary. Therefore **repo identity remains
+   a blocking provenance question**, not a settled fact.
 3. **Remaining work**: 10 PRs are still stuck. One (`terraphim-clients#31`) was
    merged in this session. The other 9 fail CI for at least three independent
    reasons (orchestrator-gate/provider issue, CI-runner rustup proxy bug,
@@ -56,9 +58,9 @@ Two related problems:
   independent fix (terraphim-ai#3065) — three fixes, two repos, none merged.
 
 ### Success Criteria
-- The allowlist fix lands in `terraphim-ai/main` and is deployed to bigbox,
-  confirmed via a subsequent auto-merge log line showing a previously-blocked
-  login now clearing the gate.
+- The allowlist fix lands in the repo proven to produce the installed bigbox
+  binary, is deployed from a tracked branch, and is confirmed via a subsequent
+  auto-merge log line showing a previously-blocked login now clearing the gate.
 - No duplicate/competing PRs left open for the same issue.
 - Each of the 9 CI-failing PRs has a known, attributed failure cause (even if
   not yet fixed) rather than being lumped under "the allowlist bug."
@@ -76,16 +78,16 @@ sites: `pr_review::evaluate()` (used in `auto_merge_impl.rs`'s
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Allowlist policy (canonical and deploy source) | `terraphim-ai` repo, `crates/terraphim_orchestrator/src/pr_review.rs` | Fixed this session in PR #3065 (KG-driven, `crates/terraphim_orchestrator/kg/recognised_agents.md`) |
-| Diverged copy (not currently deployed) | `terraphim-agents` repo, `crates/terraphim_orchestrator/src/pr_review.rs` | Materially ahead in some areas (`blocker_kind`, `max_remediation_attempts`, `From<&AutoMergeConfig>`) but **not** the source of the running binary on bigbox |
-| Competing fix #1 | `terraphim-agents#70` "Fix terraphim-ai#3024: source auto-merge agent-author allowlist from fleet config" | Open, based on the false premise that terraphim-agents is canonical; should be closed/redirected |
-| Competing fix #2 | `terraphim-agents#69` "Fix terraphim-ai#3028: include allowlist hint in auto-merge author-rejection" | Open, companion issue; same false-premise redirect |
+| Allowlist policy candidate A | `terraphim-ai` repo, `crates/terraphim_orchestrator/src/pr_review.rs` | Fixed this session in PR #3065 (KG-driven, `crates/terraphim_orchestrator/kg/recognised_agents.md`); bigbox history shows at least one `adf` build from this repo |
+| Allowlist policy candidate B | `terraphim-agents` repo, `crates/terraphim_orchestrator/src/pr_review.rs` | Project deployment instructions say this is the orchestrator binary source; materially ahead in some areas (`blocker_kind`, `max_remediation_attempts`, `From<&AutoMergeConfig>`) |
+| Competing fix #1 | `terraphim-agents#70` "Fix terraphim-ai#3024: source auto-merge agent-author allowlist from fleet config" | Open; should not be closed until binary provenance proves this repo is not the deploy source |
+| Competing fix #2 | `terraphim-agents#69` "Fix terraphim-ai#3028: include allowlist hint in auto-merge author-rejection" | Open; same provenance gate as #70 |
 | Issue tracking | `terraphim-ai#3024`, `terraphim-ai#3028` | Filed 2026-06-29 by ADF itself, ~48h before ADF's own remediation agent produced #70/#69; #3024's body records that an *earlier* attempted fix (commit `38f06db0` on a branch that no longer exists) was silently lost |
-| Orchestrator config (bigbox) | `/opt/ai-dark-factory/orchestrator.toml` + `conf.d/*.toml` | `max_diff_loc = 10000` matches the *deployed binary's behaviour*; this is because bigbox's binary was built from a terraphim-ai task branch that carried those changes, not because terraphim-agents is the canonical source |
+| Orchestrator config (bigbox) | `/opt/ai-dark-factory/orchestrator.toml` + `conf.d/*.toml` | `max_diff_loc = 10000` matches behaviour seen in the deployed binary, but does not by itself identify the source checkout |
 
 ### Data Flow
-Orchestrator binary (`/usr/local/bin/adf`, built from a terraphim-ai task
-branch and deployed to bigbox) polls each configured project's Gitea PRs every
+Orchestrator binary (`/usr/local/bin/adf`, source checkout still to be proven by
+hash/build metadata) polls each configured project's Gitea PRs every
 reconcile tick → `evaluate_pr_gates`/`evaluate` → rejects any PR whose author
 isn't in the 3-entry hardcoded allowlist → re-logs the same rejection
 indefinitely, no backoff.
@@ -105,10 +107,10 @@ allowlist?
 - `pr_review.rs` module has an explicit "zero I/O" contract (see its
   top-of-file doc comment) — any KG/file-based allowlist loading must live in
   a separate module (respected in PR #3065 via `agent_allowlist_kg.rs`).
-- The deployed binary is currently a task-branch build; merging #3065 to
-  `main` does not automatically update bigbox. A deploy step (build from
-  `main`, copy to `/usr/local/bin/adf`, restart systemd) is required for the
-  fix to take effect.
+- The deploy-source evidence conflicts: project instructions name
+  `terraphim-agents`, while bigbox shell history shows `terraphim-ai`
+  task-branch builds. A safe deploy must first identify or reproduce the exact
+  binary provenance, then build from the agreed canonical repo.
 
 ### Business Constraints
 - North Star: ADF stabilisation target was 2026-06-15; it's now 2026-07-01,
@@ -127,8 +129,8 @@ for 6 of the fleet's most active agents.
 
 | Constraint | Why It's Vital | Evidence |
 |------------|----------------|----------|
-| Fix must land in `terraphim-ai/main` and be deployed to bigbox | A merged fix that is not deployed has zero production effect | Direct bigbox zsh history shows `cargo build -p terraphim_orchestrator --release --bin adf` run from a terraphim-ai task-branch checkout |
-| Must not duplicate ADF's own in-flight remediation | Three independent fixes for one bug (agents#70, agents#69, ai#3065) is worse than one, and merging more than one risks conflicting `AutoMergeCriteria` shapes | agents#70/#69 predate this session's fix by 2 days and are based on a false repo premise |
+| Fix must land in the repo proven to build `/usr/local/bin/adf` and then be deployed | A merged fix in a non-deployed repo has zero production effect | Evidence currently conflicts; hash-level provenance is required |
+| Must not duplicate ADF's own in-flight remediation | Three independent fixes for one bug (agents#70, agents#69, ai#3065) is worse than one, and merging more than one risks conflicting `AutoMergeCriteria` shapes | agents#70/#69 predate this session's fix by 2 days; #3065 uses a different KG-driven design |
 | Each stuck PR's CI failure needs individual attribution before merge, not a blanket retry | 9/11 PRs fail CI for reasons independent of the allowlist bug; blind-merging on green mergeable status alone would ship a broken build (e.g. terraphim-clients#26's clippy failure) | Direct job-log inspection, this document §CI Failure Taxonomy |
 
 ### Eliminated from Scope
@@ -143,8 +145,9 @@ for 6 of the fleet's most active agents.
 ### Internal Dependencies
 | Dependency | Impact | Risk |
 |------------|--------|------|
-| terraphim-ai repo's orchestrator copy | Deploy source of truth, **verified** by bigbox build history | Low — but the current binary is from a task branch, so main must be merged and redeployed |
-| ADF's own remediation agent (produced #70/#69) | Already attempted this exact fix in the wrong repo | Medium — must close/redirect cleanly so the agent doesn't re-open them |
+| terraphim-ai repo's orchestrator copy | Candidate deploy source: bigbox zsh history shows `adf` builds from this repo | High until hash provenance is established |
+| terraphim-agents repo's orchestrator copy | Candidate deploy source: project deployment instructions say this builds the orchestrator binary | High until hash provenance is established |
+| ADF's own remediation agent (produced #70/#69) | Already attempted this exact fix with a different design | Medium — must not close or merge until provenance decides which repo is canonical |
 | `terraphim-gitea-runner` CI infrastructure | One observed failure (`unknown proxy name: 'rustup-with-perms'`) is a runner-host bug, not a code bug | Medium — unknown how many other "failing" PRs are runner flakes vs real breakage |
 
 ## Risks and Unknowns
@@ -152,20 +155,23 @@ for 6 of the fleet's most active agents.
 ### Known Risks
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|----------|
-| The current bigbox binary was built from a terraphim-ai task branch; merging #3065 to main without redeploying leaves production unfixed | Medium (depends on deploy discipline) | Medium (allowlist stays broken in production) | After merging #3065, explicitly deploy from main and verify in journal |
-| terraphim-agents#70/#69 are left open and an agent or human merges them later, creating conflicting `AutoMergeCriteria` shapes | Medium | Low-medium (rework, not breakage) | Close #70/#69 with a comment pointing to #3065 and the deploy-source finding |
+| Plan chooses the wrong repo because it trusts shell history or AGENTS.md alone | Medium | High (fix has no production effect) | Reproduce or hash-match the installed binary before merging/closing any competing fix PR |
+| The current bigbox binary was built from an unmerged task branch; merging a fix to main without accounting for off-main deployed changes regresses production behaviour | Medium | Medium-high | Diff current deployed source branch against main before deploying from main |
+| terraphim-agents#70/#69 or terraphim-ai#3065 are left open after canonical fix lands, creating future conflicting `AutoMergeCriteria` shapes | Medium | Low-medium (rework, not breakage) | Close superseded PRs only after canonical repo and surviving design are decided |
 | Blind-merging the other 9 PRs once CI is "green" ships unrelated regressions | Low if this document's guidance is followed | High | Never merge on `mergeable=true` alone; require green combined CI status, verified per PR |
 
 ### Open Questions
-1. Which terraphim-ai task branch built the currently-deployed `/usr/local/bin/adf` (so we know what else besides the allowlist is silently deployed off-main)? The zsh history entry cloned `task/2301-pr-gate-result-contract`, but the binary's timestamp (2026-06-14) does not obviously match that command's timestamp (2026-06-09).
-2. Is `terraphim-agents` supposed to be a live fork of `terraphim_orchestrator`, or is this itself the architectural bug (an accidental duplication from the polyrepo split that should be collapsed back to one source)?
-3. Are terraphim-agents#70 and #69 mutually exclusive or stackable (i.e. does #69 depend on #70's allowlist-source refactor)?
-4. Was the `38f06db0` "lost commit" mentioned in issue #3024 ever real, or is that itself a symptom of a broken ADF remediation-tracking mechanism worth its own investigation?
+1. Which repo/branch actually produced the currently-installed `/usr/local/bin/adf`, proven by matching binary hash, build-id, or deployment artefact path?
+2. If the source is a task branch, what commits are deployed off-main and must be preserved before redeploying from main?
+3. Is `terraphim-agents` supposed to be a live fork of `terraphim_orchestrator`, or is this itself the architectural bug (an accidental duplication from the polyrepo split that should be collapsed back to one source)?
+4. Are terraphim-agents#70 and #69 mutually exclusive or stackable (i.e. does #69 depend on #70's allowlist-source refactor)?
+5. Was the `38f06db0` "lost commit" mentioned in issue #3024 ever real, or is that itself a symptom of a broken ADF remediation-tracking mechanism worth its own investigation?
 
 ### Assumptions Explicitly Stated
 | Assumption | Basis | Risk if Wrong | Verified? |
 |------------|-------|---------------|-----------|
-| terraphim-ai is the deploy source for `/usr/local/bin/adf` | Bigbox `~/.zsh_history` shows literal `cargo build -p terraphim_orchestrator --release --bin adf` executed inside a terraphim-ai task-branch checkout; no comparable history for terraphim-agents | If wrong, effort goes toward the wrong repo | **Yes — direct evidence** |
+| terraphim-ai may be the deploy source for `/usr/local/bin/adf` | Bigbox `~/.zsh_history` shows literal `cargo build -p terraphim_orchestrator --release --bin adf` executed inside a terraphim-ai task-branch checkout | If wrong, effort goes toward the wrong repo | No — direct build history exists, but installed-binary hash provenance is not yet proved |
+| terraphim-agents may be the deploy source for `/usr/local/bin/adf` | Project deployment instructions state the orchestrator binary is built from terraphim-agents | If wrong, agents#70/#69 target a non-deployed copy | No — documented policy exists, but installed-binary hash provenance is not yet proved |
 | The 9 CI failures are independent, not systemic | Spot-checked 4 of 9 job logs, found 3 different causes (allowlist-adjacent ADF-gate failures, a runner rustup bug, a genuine clippy lint) | If wrong, a shared fix could unblock more PRs at once than this document assumes | Partially — 4/9 checked |
 
 ## Research Findings
@@ -175,13 +181,12 @@ for 6 of the fleet's most active agents.
    fix PRs) that predates this session's independent discovery — the
    session should reconcile with, not duplicate, that work.
 2. `crates/terraphim_orchestrator` is duplicated across two Gitea repos with
-   diverging implementations. The duplicate in `terraphim-agents` is **not**
-   the deployed binary's source, but it is a real architecture liability that
-   should be tracked separately.
-3. The deployed binary on bigbox was built from a terraphim-ai **task branch**,
-   not from `main`. This means other changes (e.g. `max_diff_loc: 10_000`,
+   diverging implementations. This is now part of the incident, not merely a
+   follow-up, because the competing fixes are in different copies.
+3. The deployed binary on bigbox may have been built from a task branch, not
+   from `main`. This means other changes (e.g. `max_diff_loc: 10_000`,
    `blocker_kind` classification) may be silently live in production without
-   having landed on `main`.
+   having landed on the branch selected for redeploy.
 4. CI failures on the 9 non-#31 stuck PRs are **not** one problem: at least
    one ADF-gate-only failure pattern (adf/pr-reviewer, adf/validation —
    plausibly downstream of the Anthropic provider outage found earlier this
@@ -196,8 +201,8 @@ for 6 of the fleet's most active agents.
 | terraphim-clients#26 | native-ci | Genuine code bug: `clippy::field_reassign_with_default` in `crates/terraphim_agent/src/shared_learning/wiki_sync.rs:536-537` |
 | terraphim-core#9 | native-ci | CI runner infra bug: `error: unknown proxy name: 'rustup-with-perms'` — broken rustup toolchain proxy on the runner host, unrelated to PR content |
 | terraphim-config-persistence#7 | adf/pr-reviewer, adf/validation, adf/verification (native-ci itself passes) | Not yet isolated; tests pass locally in the log tail, so failure is in the ADF review/validation agent step itself, not the build |
-| terraphim-agents#53 | native-ci | Job log fetch returned empty via the jobs-list endpoint used; needs the same per-job drill-down as the other three |
-| terraphim-clients#54, #35, #34, #21, #18, terraphim-clients#20 (conflicts) | mixed adf/* and native-ci | Not yet drilled into — 5 PRs remain unattributed |
+| terraphim-agents#53 | native-ci | Job log fetch returned empty via the jobs-list endpoint used; needs the same per-job drill-down as the other PRs |
+| terraphim-clients#54, #35, #34, #21, #18, terraphim-clients#20 (conflicts) | mixed adf/* and native-ci | Not yet drilled into — remaining PRs still need attribution or conflict/duplicate resolution |
 
 ### Relevant Prior Art
 - terraphim-ai#3024 / #3028: same-bug issues filed by ADF, with a detailed
@@ -214,48 +219,52 @@ for 6 of the fleet's most active agents.
 ### Technical Spikes Needed
 | Spike | Purpose | Estimated Effort |
 |-------|---------|-------------------|
-| Identify the exact terraphim-ai task branch that built the current bigbox binary | Know what else is silently deployed off-main; decide whether to fast-track those changes or roll back to main | 15–30 min (bigbox zsh history + binary metadata) |
-| Job-log drill-down for the remaining 5 unattributed PRs | Complete the CI failure taxonomy before any merge attempt | 30–45 min |
+| Prove the exact repo/branch that built the current bigbox binary | Avoid landing/deploying a fix in the wrong repo; know what else is silently deployed off-main | 30–60 min (hash-match installed binary against candidate builds, inspect deployment scripts/history) |
+| Job-log drill-down for remaining unattributed PRs | Complete the CI failure taxonomy before any merge attempt | 30–45 min |
 | Diff full terraphim-ai vs terraphim-agents `terraphim_orchestrator` trees | Quantify total divergence, scope a reconciliation | 1–2 hours, separate task |
 
 ## Recommendations
 
 ### Proceed/No-Proceed
-Proceed to design. The deploy-source question is now answered: **terraphim-ai
-is canonical**. The design's focus shifts from "which repo?" to:
-1. Merge/deploy the verified fix (#3065) and close the two competing PRs in
-   the wrong repo.
+Proceed to design, but keep repo identity as the first blocking gate. The
+design's focus is:
+1. Prove which repo/branch produced the installed binary and choose the
+   surviving fix accordingly.
 2. Finish CI failure attribution for the 9 remaining stuck PRs.
 3. Apply a mechanical merge/fix/close decision rule.
 
 ### Scope Recommendations
-- Design phase should produce: (a) a deploy plan for #3065 to bigbox, (b) a
-  close/redirect action for terraphim-agents#70/#69, (c) a per-PR
+- Design phase should produce: (a) a binary-provenance gate, (b) a branch plan
+  for either #3065 or agents#70/#69 depending on that gate, (c) a per-PR
   remediation plan for the 9 CI-failing PRs *only after* their failure causes
-  are fully attributed (5 remain unknown).
+  are fully attributed.
 - Do not expand scope to the terraphim-ai/terraphim-agents duplication
   itself in this pass — flag it as a follow-up architecture issue.
 
 ### Risk Mitigation Recommendations
-- After merging #3065, explicitly build from `main` and deploy to bigbox; do
-  not assume merging is enough.
-- Close terraphim-agents#70/#69 with a comment linking to #3065 and citing
-  the verified deploy source, so they are not revived.
+- Do not merge #3065 or close agents#70/#69 until the binary provenance gate
+  is complete.
+- After merging the chosen fix, explicitly build from the selected canonical
+  branch and deploy to bigbox; do not assume merging is enough.
 - Do not merge any of the 9 remaining PRs until each has a filled-in taxonomy
   row and passes the Decision Rule.
 
 ## Next Steps
 
 If approved:
-1. **Deploy-source spike** (15–30 min): identify which terraphim-ai task
-   branch built the current bigbox `/usr/local/bin/adf` and what else it
-   contains.
-2. **Merge and deploy #3065** (owner's call on deploy timing): merge PR, build
-   from `main`, copy to `/usr/local/bin/adf`, restart `adf-orchestrator`.
-3. **Close/redirect terraphim-agents#70/#69**: comment and close with reference
-   to #3065.
-4. **Finish the CI failure taxonomy** for the 5 remaining unattributed PRs.
-5. **File a follow-up issue** for the terraphim-ai/terraphim-agents
+1. **Binary-provenance spike** (30–60 min): prove which repo/branch built the
+   current bigbox `/usr/local/bin/adf` by hash-matching or deployment artefact
+   trace, and record off-main commits if any.
+2. **Choose and merge one fix**: if `terraphim-ai` is proven canonical, use
+   #3065; if `terraphim-agents` is proven canonical, review #70/#69 and either
+   merge them or port #3065's KG design there.
+3. **Deploy the chosen fix** (owner's call on deploy timing): build from the
+   selected canonical branch, copy to `/usr/local/bin/adf`, restart
+   `adf-orchestrator`.
+4. **Close/redirect superseded PRs**: only after the chosen fix is merged and
+   deployed.
+5. **Finish the CI failure taxonomy** for the remaining unattributed PRs.
+6. **File a follow-up issue** for the terraphim-ai/terraphim-agents
    `terraphim_orchestrator` duplication as a standalone architecture problem.
 
 ## Appendix
