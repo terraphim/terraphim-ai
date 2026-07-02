@@ -1,33 +1,35 @@
 # Implementation Plan: Reconcile ADF auto-merge allowlist fix + remediate 10 stuck fleet PRs
 
-**Status**: Draft — reviewed; binary-provenance gate required before execution
+**Status**: Draft — Step 1 complete; `terraphim-agents` provenance proved
 **Research Doc**: `.docs/research-adf-fleet-allowlist-and-stuck-prs.md`
 **Author**: session agent (Claude Code)
 **Date**: 2026-07-01
-**Estimated Effort**: 2–5 hours, gated by binary provenance and deploy timing
+**Estimated Effort**: 1.5–4 hours remaining, gated by fix selection and deploy timing
 
 ## Overview
 
 ### Summary
-Prove which repo/branch produced bigbox's installed `/usr/local/bin/adf`, merge
-exactly one allowlist fix in that canonical source, verify it covers all six
-known fleet logins, deploy it from a tracked branch with rollback, close only
-the superseded PRs, finish attributing the 9 remaining stuck PRs' CI failures,
-and apply a fixed decision rule to each: merge, fix-then-merge, or close.
+Step 1 proved that bigbox's installed `/usr/local/bin/adf` was built from
+`terraphim-agents` main commit `0a093aa1803fdbec2f145c430f94fd6310848f40`.
+The remaining plan is to merge exactly one allowlist fix in `terraphim-agents`,
+verify it covers all six known fleet logins, deploy it from a tracked branch
+with rollback, close only the superseded PRs, finish attributing the 9 remaining
+stuck PRs' CI failures, and apply a fixed decision rule to each: merge,
+fix-then-merge, or close.
 
 ### Approach
-Sequential, gated steps. Step 1 is a hard provenance gate because evidence is
-conflicting: `AGENTS.md` says the orchestrator binary is built from
-`terraphim-agents`, while bigbox shell history shows real `terraphim-ai`
-task-branch builds. No merge, close, or deploy action happens until the
-installed binary is traced by hash/build artefact.
+Sequential, gated steps. Step 1 is complete: the installed binary hash matches
+`/home/alex/projects/terraphim/terraphim-agents/target/release/deps/adf-b7d747a1c218d613`.
+No `terraphim-ai` build artefact matched. The next gate is fix selection within
+`terraphim-agents`: review #70/#69 and decide whether to merge them, stack them,
+or port #3065's KG-driven design.
 
 ### Scope
 
 **In Scope:**
-- Identifying the exact repo/branch that built the current bigbox binary
-- Choosing exactly one surviving allowlist fix from terraphim-ai#3065,
-  terraphim-agents#70, and terraphim-agents#69
+- Recording the exact repo/branch that built the current bigbox binary
+- Choosing exactly one surviving `terraphim-agents` fix path from #70/#69, or a
+  port of terraphim-ai#3065's KG-driven design
 - Verifying the chosen fix covers all six known blocked fleet logins:
   `implementation-swarm`, `odilo-developer`, `meta-coordinator`,
   `quality-coordinator`, `security-sentinel`, and `test-guardian`
@@ -57,8 +59,8 @@ installed binary is traced by hash/build artefact.
 - Attempting to fix the CI-runner `rustup-with-perms` infra bug as part of
   this plan — it's an ops issue on the runner host, orthogonal to any PR's
   content, and owning it here would blow the scope
-- Assuming either `AGENTS.md` or shell history alone proves binary provenance —
-  require hash/build artefact evidence
+- Re-opening the repo-identity question without new evidence — Step 1 is now
+  resolved by exact hash match to a `terraphim-agents` artefact
 - Treating `implementation-swarm` as the whole incident — #3024 records six
   blocked fleet logins and the fix must cover all six
 - Blindly adopting the current task-branch binary's other off-main changes
@@ -69,7 +71,7 @@ installed binary is traced by hash/build artefact.
 
 ### Data Flow (of this remediation, not of the orchestrator)
 ```
-Step 1 (prove binary provenance) --gates--> Step 2 (choose one fix)
+Step 1 (binary provenance: DONE) ------> Step 2 (choose agents fix)
                                                     |
                                                     v
 Step 3 (verify six-login coverage) ----------> Step 4 (merge chosen fix)
@@ -85,8 +87,8 @@ Step 7 (finish CI taxonomy) -----------------> Step 8 (apply decision rule per P
 
 | Decision | Rationale | Alternatives Rejected |
 |----------|-----------|------------------------|
-| Make binary provenance the first gate | Current evidence conflicts; closing/merging the wrong repo would have no production effect | Trusting `AGENTS.md` alone; trusting shell history alone |
-| Merge exactly one allowlist fix | Three divergent fixes for one policy will drift and recreate the incident | Merging #3065 and agents#70/#69 independently |
+| Treat `terraphim-agents` as canonical for this incident | Installed binary SHA-256 matches a `terraphim-agents` build artefact; no candidate `terraphim-ai` artefact matched | Trusting shell history over hash evidence; merging #3065 as production remediation |
+| Merge exactly one allowlist fix path in `terraphim-agents` | Three divergent fixes for one policy will drift and recreate the incident | Merging #3065 and agents#70/#69 independently |
 | Require all-six-login acceptance before merge | #3024 impact spans six fleet accounts; #3065 currently only embeds `implementation-swarm` | Treating the largest offender as the only offender |
 | Prefer KG-driven allowlist if implementation cost is comparable | Editable by ops without a rebuild; aligns with Terraphim KG conventions | Fleet-config-sourced allowlist as the only source if it requires deploys for login additions |
 | Deploy from a tracked branch after merge | Avoids silently continuing a task-branch-deploy pattern that has already lost commits (#3024's `38f06db0`) | Deploying an unmerged task branch directly |
@@ -117,10 +119,9 @@ all six logins.
 
 ## File Changes
 
-No new files are required if provenance proves `terraphim-ai#3065` is the
-canonical fix. If provenance proves `terraphim-agents` is canonical, a small
-port may be required from #3065's KG-driven design into the agents repo before
-merge.
+No new files are required if `terraphim-agents#70` and/or #69 are selected as
+the surviving fix path. A small port may be required if #3065's KG-driven design
+is preferred over #70's fleet-config-sourced design.
 
 Operational actions:
 - Gitea PR merge of exactly one surviving allowlist fix
@@ -147,33 +148,37 @@ Operational actions:
 
 ## Implementation Steps
 
-### Step 1: Prove binary provenance
-**Action:** On bigbox, correlate `/usr/local/bin/adf` metadata (mtime, hash,
-build-id if available) with all candidate build artefacts and deployment
-records. Specifically:
-- Record `sha256sum /usr/local/bin/adf`, mtime, size, and systemd unit path.
-- Enumerate candidate `target/release/adf` binaries under `/home/alex/projects`,
-  `/data/projects`, and `/opt/ai-dark-factory/build`.
-- Compare hash, size, and mtime for each candidate.
-- For any matching or near-matching candidate, record repo, branch, HEAD SHA,
-  dirty state, and diff from main.
-- Inspect deployment scripts/history for the command that copied the binary to
-  `/usr/local/bin/adf`.
+### Step 1: Prove binary provenance — COMPLETE
+**Result:** Installed `/usr/local/bin/adf` metadata:
+- SHA-256: `5d136a617bc5aebf4cadcce9464c6b6f3e2fe484d05d589879a51f8869bb5853`
+- Size: `21151432`
+- Mtime: `2026-06-23 17:26:22 CEST`
+- Build ID: `e890326837dcc0fcedc8e747437e58bade8fea5f`
 
-**Verifies:** which repo/branch is canonical for this incident and which
-off-main changes are silently deployed.
-**Blocks:** Steps 2–5. No PR should be merged or closed before this is done.
-**Estimated:** 30–60 minutes.
+Exact matching artefact:
+- `/home/alex/projects/terraphim/terraphim-agents/target/release/deps/adf-b7d747a1c218d613`
+- Same SHA-256 and size
+- Mtime: `2026-06-23 17:10:55 CEST`
+- Repo state before build: `terraphim-agents` main commit
+  `0a093aa1803fdbec2f145c430f94fd6310848f40`
 
-### Step 2: Choose the single surviving allowlist fix
-**Action:** Based on Step 1:
-- If `terraphim-ai` is proven canonical: keep #3065 as the surviving fix.
-- If `terraphim-agents` is proven canonical: review #70/#69 in full and either
-  merge them as a stack or port #3065's KG-driven design into `terraphim-agents`.
-- If no candidate artefact proves provenance: stop and ask for owner decision;
-  do not infer from partial evidence.
+Current `target/release/adf` no longer matches because it was rebuilt later.
+This does not invalidate provenance; the exact matching artefact still exists
+under `target/release/deps/`.
 
-**Depends on:** Step 1.
+**Decision:** `terraphim-agents` is canonical for this incident.
+
+### Step 2: Choose the single surviving `terraphim-agents` allowlist fix
+**Action:** Review `terraphim-agents#70` and `terraphim-agents#69` in full and
+compare them with #3065's KG-driven design. Choose exactly one path:
+- Merge #70 alone if fleet-config-sourced allowlist covers all six fleet logins
+  and #69's message improvement is unnecessary or already included.
+- Merge #70 and #69 as a stack if #70 fixes policy and #69 provides the needed
+  operator-facing hint.
+- Port #3065's KG-driven design to `terraphim-agents` if editable KG config is
+  preferred over fleet-config sourcing.
+
+**Depends on:** Step 1 (complete).
 **Test/Verification:** One PR is explicitly named as surviving; the other two
 are explicitly named as superseded but not yet closed.
 **Estimated:** 15–30 minutes.
@@ -208,10 +213,10 @@ the relevant crate tests pass on that branch.
 **Estimated:** 5–30 minutes depending on whether a port is needed.
 
 ### Step 5: Deploy the chosen fix to bigbox
-**Action (repo path depends on Step 1):**
+**Action:**
 ```bash
 ssh bigbox
-cd <canonical-orchestrator-repo>
+cd /home/alex/projects/terraphim/terraphim-agents
 git fetch origin
 git checkout main
 git pull origin main
@@ -298,8 +303,8 @@ operations plus one standard Rust build/deploy to bigbox.
 
 | Item | Status | Owner |
 |------|--------|-------|
-| Which repo/branch built the current bigbox binary? | **Blocking; evidence conflict unresolved** | session agent |
-| Which allowlist fix survives (#3065 vs #70/#69)? | Pending Step 1 | session agent + Alex |
+| Which repo/branch built the current bigbox binary? | **Resolved: terraphim-agents main commit `0a093aa`** | session agent |
+| Which allowlist fix survives (#70/#69 vs KG port)? | Pending Step 2 | session agent + Alex |
 | Does the surviving fix cover all six fleet logins? | Pending Step 3 | session agent |
 | Close/redirect superseded allowlist PRs | Pending Step 6 | session agent |
 | Deploy chosen fix to bigbox | Pending human approval and Steps 1–4 | Alex |
@@ -309,7 +314,7 @@ operations plus one standard Rust build/deploy to bigbox.
 ## Approval
 
 - [x] Technical review complete
-- [ ] Binary provenance resolved by hash/build artefact (Step 1)
+- [x] Binary provenance resolved by hash/build artefact (Step 1)
 - [ ] Surviving allowlist fix selected (Step 2)
 - [ ] Six-login coverage verified (Step 3)
 - [ ] Human approval received to execute Steps 4–8

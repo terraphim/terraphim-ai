@@ -1,6 +1,6 @@
 # Research Document: ADF auto-merge allowlist bug and 10 stuck fleet PRs
 
-**Status**: Draft — reviewed 2026-07-01 after deploy-source evidence conflict
+**Status**: Draft — Step 1 provenance proved 2026-07-02
 **Author**: session agent (Claude Code)
 **Date**: 2026-07-01
 **Reviewers**: Alex Mikhalev
@@ -11,13 +11,12 @@ The ADF auto-merge author-allowlist bug has three layers, not one:
 1. **Root cause**: `author_is_agent()` in the orchestrator only recognised
    `claude-code`, `root`, and `adf-*`-prefixed logins, rejecting six real fleet
    agents.
-2. **Deploy-source question**: Evidence is conflicting. Project instructions
-   say the orchestrator binary is built from `terraphim-agents`, while
-   bigbox's `~/.zsh_history` shows real `terraphim-ai` task-branch builds of
-   `adf`. Neither evidence source alone proves which checkout produced the
-   currently-installed `/usr/local/bin/adf` because no candidate build has yet
-   been hash-matched to the installed binary. Therefore **repo identity remains
-   a blocking provenance question**, not a settled fact.
+2. **Deploy-source question**: Step 1 provenance is now proved. The installed
+   `/usr/local/bin/adf` SHA-256 exactly matches
+   `/home/alex/projects/terraphim/terraphim-agents/target/release/deps/adf-b7d747a1c218d613`.
+   The matching artefact was built from `terraphim-agents` main at commit
+   `0a093aa1803fdbec2f145c430f94fd6310848f40`. Therefore the surviving fix must
+   land in **terraphim-agents**, not only in terraphim-ai.
 3. **Remaining work**: 10 PRs are still stuck. One (`terraphim-clients#31`) was
    merged in this session. The other 9 fail CI for at least three independent
    reasons (orchestrator-gate/provider issue, CI-runner rustup proxy bug,
@@ -77,16 +76,16 @@ sites: `pr_review::evaluate()` (used in `auto_merge_impl.rs`'s
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Allowlist policy candidate A | `terraphim-ai` repo, `crates/terraphim_orchestrator/src/pr_review.rs` | PR #3065 implements a KG-driven allowlist; bigbox history shows at least one `adf` build from this repo. **Gap found during review:** its current KG synonyms list only `implementation-swarm`, not all six blocked fleet logins. |
-| Allowlist policy candidate B | `terraphim-agents` repo, `crates/terraphim_orchestrator/src/pr_review.rs` | Project deployment instructions say this is the orchestrator binary source; materially ahead in some areas (`blocker_kind`, `max_remediation_attempts`, `From<&AutoMergeConfig>`) |
-| Competing fix #1 | `terraphim-agents#70` "Fix terraphim-ai#3024: source auto-merge agent-author allowlist from fleet config" | Open; should not be closed until binary provenance proves this repo is not the deploy source |
-| Competing fix #2 | `terraphim-agents#69` "Fix terraphim-ai#3028: include allowlist hint in auto-merge author-rejection" | Open; same provenance gate as #70 |
+| Allowlist policy candidate A | `terraphim-ai` repo, `crates/terraphim_orchestrator/src/pr_review.rs` | PR #3065 implements a KG-driven allowlist, but **does not target the proven deployed source**. It can still inform the design if its KG approach is ported. Gap found during review: its current KG synonyms list only `implementation-swarm`, not all six blocked fleet logins. |
+| Allowlist policy candidate B (**proven deploy source**) | `terraphim-agents` repo, `crates/terraphim_orchestrator/src/pr_review.rs` | Installed binary hash matches a build artefact from this repo. Commit `0a093aa` contains the hardcoded `author_is_agent()` policy and `blocker_kind` logging observed in production. |
+| Candidate fix #1 | `terraphim-agents#70` "Fix terraphim-ai#3024: source auto-merge agent-author allowlist from fleet config" | Open; now the primary candidate because it targets the proven deploy source. Must be reviewed for six-login coverage and interaction with #69. |
+| Candidate fix #2 | `terraphim-agents#69` "Fix terraphim-ai#3028: include allowlist hint in auto-merge author-rejection" | Open; likely companion/supplement to #70. Must be reviewed before choosing final merge path. |
 | Issue tracking | `terraphim-ai#3024`, `terraphim-ai#3028` | Filed 2026-06-29 by ADF itself, ~48h before ADF's own remediation agent produced #70/#69; #3024's body records that an *earlier* attempted fix (commit `38f06db0` on a branch that no longer exists) was silently lost |
-| Orchestrator config (bigbox) | `/opt/ai-dark-factory/orchestrator.toml` + `conf.d/*.toml` | `max_diff_loc = 10000` matches behaviour seen in the deployed binary, but does not by itself identify the source checkout |
+| Orchestrator config (bigbox) | `/opt/ai-dark-factory/orchestrator.toml` + `conf.d/*.toml` | Service working directory is `/opt/ai-dark-factory`; service executes `/usr/local/bin/adf orchestrator.toml`. |
 
 ### Data Flow
-Orchestrator binary (`/usr/local/bin/adf`, source checkout still to be proven by
-hash/build metadata) polls each configured project's Gitea PRs every
+Orchestrator binary (`/usr/local/bin/adf`, proven built from `terraphim-agents`
+main commit `0a093aa`) polls each configured project's Gitea PRs every
 reconcile tick → `evaluate_pr_gates`/`evaluate` → rejects any PR whose author
 isn't in the 3-entry hardcoded allowlist → re-logs the same rejection
 indefinitely, no backoff.
@@ -106,10 +105,9 @@ allowlist?
 - `pr_review.rs` module has an explicit "zero I/O" contract (see its
   top-of-file doc comment) — any KG/file-based allowlist loading must live in
   a separate module (respected in PR #3065 via `agent_allowlist_kg.rs`).
-- The deploy-source evidence conflicts: project instructions name
-  `terraphim-agents`, while bigbox shell history shows `terraphim-ai`
-  task-branch builds. A safe deploy must first identify or reproduce the exact
-  binary provenance, then build from the agreed canonical repo.
+- The deploy-source evidence is now resolved by hash provenance: deploy work
+  must use `terraphim-agents` unless a deliberate architecture decision moves
+  ownership elsewhere.
 
 ### Business Constraints
 - North Star: ADF stabilisation target was 2026-06-15; it's now 2026-07-01,
@@ -128,7 +126,7 @@ for 6 of the fleet's most active agents.
 
 | Constraint | Why It's Vital | Evidence |
 |------------|----------------|----------|
-| Fix must land in the repo proven to build `/usr/local/bin/adf` and then be deployed | A merged fix in a non-deployed repo has zero production effect | Evidence currently conflicts; hash-level provenance is required |
+| Fix must land in `terraphim-agents` and then be deployed | A merged fix in a non-deployed repo has zero production effect | Installed binary hash matches `terraphim-agents` artefact `target/release/deps/adf-b7d747a1c218d613` |
 | Must not duplicate ADF's own in-flight remediation | Three independent fixes for one bug (agents#70, agents#69, ai#3065) is worse than one, and merging more than one risks conflicting `AutoMergeCriteria` shapes | agents#70/#69 predate this session's fix by 2 days; #3065 uses a different KG-driven design |
 | Surviving allowlist fix must cover all six blocked fleet logins | Covering only `implementation-swarm` leaves five known fleet agents blocked | terraphim-ai#3024 impact table lists `implementation-swarm`, `odilo-developer`, `meta-coordinator`, `quality-coordinator`, `security-sentinel`, `test-guardian` |
 
@@ -144,9 +142,9 @@ for 6 of the fleet's most active agents.
 ### Internal Dependencies
 | Dependency | Impact | Risk |
 |------------|--------|------|
-| terraphim-ai repo's orchestrator copy | Candidate deploy source: bigbox zsh history shows `adf` builds from this repo | High until hash provenance is established |
-| terraphim-agents repo's orchestrator copy | Candidate deploy source: project deployment instructions say this builds the orchestrator binary | High until hash provenance is established |
-| ADF's own remediation agent (produced #70/#69) | Already attempted this exact fix with a different design | Medium — must not close or merge until provenance decides which repo is canonical |
+| terraphim-ai repo's orchestrator copy | Non-deployed reference/duplicate for this incident; PR #3065 can inform design but will not fix production alone | Medium — keeping divergent fixes open creates confusion |
+| terraphim-agents repo's orchestrator copy | Proven deploy source for `/usr/local/bin/adf` | High — fix must land here to affect production |
+| ADF's own remediation agent (produced #70/#69) | Already attempted this exact fix in the proven deploy source | Medium — must review and merge/adjust rather than duplicate blindly |
 | `terraphim-gitea-runner` CI infrastructure | One observed failure (`unknown proxy name: 'rustup-with-perms'`) is a runner-host bug, not a code bug | Medium — unknown how many other "failing" PRs are runner flakes vs real breakage |
 
 ## Risks and Unknowns
@@ -154,43 +152,43 @@ for 6 of the fleet's most active agents.
 ### Known Risks
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|----------|
-| Plan chooses the wrong repo because it trusts shell history or AGENTS.md alone | Medium | High (fix has no production effect) | Reproduce or hash-match the installed binary before merging/closing any competing fix PR |
+| Plan chooses the wrong repo because it trusts shell history or AGENTS.md alone | Low after Step 1 | High (fix has no production effect) | Resolved by exact hash match to `terraphim-agents` artefact; preserve evidence in this document |
 | Surviving fix only allowlists `implementation-swarm` and leaves five known fleet agents blocked | Medium | High (incident partially persists) | Candidate-fix acceptance gate must verify all six fleet logins clear `author_is_agent` |
 | The current bigbox binary was built from an unmerged task branch; merging a fix to main without accounting for off-main deployed changes regresses production behaviour | Medium | Medium-high | Diff current deployed source branch against main before deploying from main |
 | terraphim-agents#70/#69 or terraphim-ai#3065 are left open after canonical fix lands, creating future conflicting `AutoMergeCriteria` shapes | Medium | Low-medium (rework, not breakage) | Close superseded PRs only after canonical repo and surviving design are decided |
 | Blind-merging the other 9 PRs once CI is "green" ships unrelated regressions | Low if this document's guidance is followed | High | Never merge on `mergeable=true` alone; require green combined CI status, verified per PR |
 
 ### Open Questions
-1. Which repo/branch actually produced the currently-installed `/usr/local/bin/adf`, proven by matching binary hash, build-id, or deployment artefact path?
-2. If the source is a task branch, what commits are deployed off-main and must be preserved before redeploying from main?
-3. Is `terraphim-agents` supposed to be a live fork of `terraphim_orchestrator`, or is this itself the architectural bug (an accidental duplication from the polyrepo split that should be collapsed back to one source)?
-4. Are terraphim-agents#70 and #69 mutually exclusive or stackable (i.e. does #69 depend on #70's allowlist-source refactor)?
+1. Are terraphim-agents#70 and #69 mutually exclusive or stackable (i.e. does #69 depend on #70's allowlist-source refactor)?
+2. Does #70's fleet-config-sourced allowlist cover all six known blocked logins in the deployed `/opt/ai-dark-factory/conf.d/*.toml` agent set?
+3. Should #3065's KG-driven design be ported to `terraphim-agents`, or is #70's fleet-config design preferable because `conf.d` already defines fleet agents?
+4. Is `terraphim-ai`'s `terraphim_orchestrator` copy still needed, or should this duplicate be removed/retired after the incident?
 5. Was the `38f06db0` "lost commit" mentioned in issue #3024 ever real, or is that itself a symptom of a broken ADF remediation-tracking mechanism worth its own investigation?
 
 ### Assumptions Explicitly Stated
 | Assumption | Basis | Risk if Wrong | Verified? |
 |------------|-------|---------------|-----------|
-| terraphim-ai may be the deploy source for `/usr/local/bin/adf` | Bigbox `~/.zsh_history` shows literal `cargo build -p terraphim_orchestrator --release --bin adf` executed inside a terraphim-ai task-branch checkout | If wrong, effort goes toward the wrong repo | No — direct build history exists, but installed-binary hash provenance is not yet proved |
-| terraphim-agents may be the deploy source for `/usr/local/bin/adf` | Project deployment instructions state the orchestrator binary is built from terraphim-agents | If wrong, agents#70/#69 target a non-deployed copy | No — documented policy exists, but installed-binary hash provenance is not yet proved |
+| terraphim-agents is the deploy source for `/usr/local/bin/adf` | Installed binary SHA-256 matches `/home/alex/projects/terraphim/terraphim-agents/target/release/deps/adf-b7d747a1c218d613`; matching repo was on main commit `0a093aa` before the artefact build | If wrong, effort goes toward wrong repo | **Yes — exact hash match** |
 | The 9 CI failures are independent, not systemic | Spot-checked 4 of 9 job logs, found 3 different causes (allowlist-adjacent ADF-gate failures, a runner rustup bug, a genuine clippy lint) | If wrong, a shared fix could unblock more PRs at once than this document assumes | Partially — 4/9 checked |
 
 ## Research Findings
 
 ### Key Insights
-1. This bug already has an ADF-native paper trail (issues + two competing
+1. Binary provenance is resolved: `/usr/local/bin/adf` matches a
+   `terraphim-agents` release artefact, not any current `terraphim-ai` build.
+2. This bug already has an ADF-native paper trail (issues + two competing
    fix PRs) that predates this session's independent discovery — the
    session should reconcile with, not duplicate, that work.
-2. PR #3065's KG-driven design is operationally attractive, but its current
+3. PR #3065's KG-driven design is operationally attractive, but its current
    default `recognised_agents.md` is incomplete for #3024: it lists
    `implementation-swarm` but not `odilo-developer`, `meta-coordinator`,
    `quality-coordinator`, `security-sentinel`, or `test-guardian`.
-3. `crates/terraphim_orchestrator` is duplicated across two Gitea repos with
+4. `crates/terraphim_orchestrator` is duplicated across two Gitea repos with
    diverging implementations. This is now part of the incident, not merely a
    follow-up, because the competing fixes are in different copies.
-4. The deployed binary on bigbox may have been built from a task branch, not
-   from `main`. This means other changes (e.g. `max_diff_loc: 10_000`,
-   `blocker_kind` classification) may be silently live in production without
-   having landed on the branch selected for redeploy.
+5. The deployed binary was built from `terraphim-agents` main commit `0a093aa`.
+   Current `target/release/adf` was rebuilt later and no longer matches, but the
+   exact matching artefact still exists in `target/release/deps/`.
 5. CI failures on the 9 non-#31 stuck PRs are **not** one problem: at least
    one ADF-gate-only failure pattern (adf/pr-reviewer, adf/validation —
    plausibly downstream of the Anthropic provider outage found earlier this
@@ -223,48 +221,47 @@ for 6 of the fleet's most active agents.
 ### Technical Spikes Needed
 | Spike | Purpose | Estimated Effort |
 |-------|---------|-------------------|
-| Prove the exact repo/branch that built the current bigbox binary | Avoid landing/deploying a fix in the wrong repo; know what else is silently deployed off-main | 30–60 min (hash-match installed binary against candidate builds, inspect deployment scripts/history) |
 | Verify candidate allowlist coverage for all six fleet logins | Ensure the chosen fix actually closes #3024 rather than only unblocking `implementation-swarm` | 10–15 min |
+| Review #70 and #69 together | Decide whether #70 alone, #69 alone, both stacked, or a KG-design port is the surviving `terraphim-agents` fix | 15–30 min |
 | Job-log drill-down for remaining unattributed PRs | Complete the CI failure taxonomy before any merge attempt | 30–45 min |
 | Diff full terraphim-ai vs terraphim-agents `terraphim_orchestrator` trees | Quantify total divergence, scope a reconciliation | 1–2 hours, separate task |
 
 ## Recommendations
 
 ### Proceed/No-Proceed
-Proceed to design, but keep repo identity as the first blocking gate. The
-design's focus is:
-1. Prove which repo/branch produced the installed binary and choose the
-   surviving fix accordingly.
+Proceed to design with repo identity resolved: **terraphim-agents is canonical
+for the deployed `adf` binary**. The design's focus is:
+1. Choose between #70/#69 and a port of #3065's KG-driven design.
 2. Verify the surviving fix covers all six known fleet agent logins.
-3. Finish CI failure attribution for the 9 remaining stuck PRs.
-4. Apply a mechanical merge/fix/close decision rule.
+3. Deploy from `terraphim-agents` main with rollback.
+4. Finish CI failure attribution for the 9 remaining stuck PRs.
+5. Apply a mechanical merge/fix/close decision rule.
 
 ### Scope Recommendations
-- Design phase should produce: (a) a binary-provenance gate, (b) a branch plan
-  for either #3065 or agents#70/#69 depending on that gate, (c) a per-PR
-  remediation plan for the 9 CI-failing PRs *only after* their failure causes
-  are fully attributed.
+- Design phase should produce: (a) a `terraphim-agents` fix selection plan,
+  (b) an all-six-login acceptance gate, (c) a deploy/rollback plan, (d) a
+  per-PR remediation plan for the 9 CI-failing PRs *only after* their failure
+  causes are fully attributed.
 - Do not expand scope to the terraphim-ai/terraphim-agents duplication
   itself in this pass — flag it as a follow-up architecture issue.
 
 ### Risk Mitigation Recommendations
-- Do not merge #3065 or close agents#70/#69 until the binary provenance gate
-  is complete.
-- After merging the chosen fix, explicitly build from the selected canonical
-  branch and deploy to bigbox; do not assume merging is enough.
+- Do not merge #3065 as production remediation; it targets the non-deployed
+  duplicate for this incident.
+- Do not close #3065 until the `terraphim-agents` surviving fix is merged and
+  deployed, because its KG approach may still be useful as design input.
+- After merging the chosen `terraphim-agents` fix, explicitly build from
+  `terraphim-agents` main and deploy to bigbox; do not assume merging is enough.
 - Do not merge any of the 9 remaining PRs until each has a filled-in taxonomy
   row and passes the Decision Rule.
 
 ## Next Steps
 
 If approved:
-1. **Binary-provenance spike** (30–60 min): prove which repo/branch built the
-   current bigbox `/usr/local/bin/adf` by hash-matching or deployment artefact
-   trace, and record off-main commits if any.
-2. **Choose one fix and verify coverage**: if `terraphim-ai` is proven
-   canonical, use #3065 only after adding/verifying all six fleet logins; if
-   `terraphim-agents` is proven canonical, review #70/#69 and either merge them
-   or port #3065's KG design there with the same six-login coverage.
+1. **Review #70/#69 and #3065's design**: select the surviving
+   `terraphim-agents` fix path.
+2. **Verify coverage**: ensure the selected fix recognises all six fleet logins
+   and still rejects unknown human/bot logins.
 3. **Deploy the chosen fix** (owner's call on deploy timing): build from the
    selected canonical branch, copy to `/usr/local/bin/adf`, restart
    `adf-orchestrator`.
