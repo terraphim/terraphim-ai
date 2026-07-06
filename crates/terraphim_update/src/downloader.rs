@@ -8,7 +8,7 @@
 //! - Timeout handling
 
 use anyhow::{Result, anyhow};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
 
@@ -204,24 +204,30 @@ fn perform_download(
     output_path: &std::path::Path,
     config: &DownloadConfig,
 ) -> Result<u64> {
-    let response = ureq::get(url)
-        .timeout(config.timeout)
+    let agent_config = ureq::Agent::config_builder()
+        .timeout_global(Some(config.timeout))
+        .http_status_as_error(false)
+        .build();
+    let agent = ureq::Agent::new_with_config(agent_config);
+
+    let response = agent
+        .get(url)
         .call()
         .map_err(|e| anyhow!("HTTP request failed: {}", e))?;
 
-    if response.status() != 200 {
-        return Err(anyhow!(
-            "HTTP error: {} {}",
-            response.status(),
-            response.status_text()
-        ));
+    let status = response.status();
+    if status.as_u16() != 200 {
+        return Err(anyhow!("HTTP error: {}", status));
     }
 
     let content_length = response
-        .header("Content-Length")
+        .headers()
+        .get("Content-Length")
+        .and_then(|h| h.to_str().ok())
         .and_then(|h| h.parse::<u64>().ok());
 
-    let mut reader = response.into_reader();
+    let mut body = response.into_body();
+    let mut reader = body.as_reader();
 
     let mut file = std::fs::File::create(output_path)?;
     let mut total_bytes = 0u64;
