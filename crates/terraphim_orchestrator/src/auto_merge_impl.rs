@@ -10,8 +10,8 @@ use crate::dispatcher::DispatchTask;
 #[cfg(feature = "quickwit")]
 use crate::quickwit;
 use crate::{
-    config, dispatcher, post_merge_gate, pr_gate, pr_poller, pr_review, truncate_for_issue,
-    AgentOrchestrator, OrchestratorError,
+    agent_allowlist_kg, config, dispatcher, post_merge_gate, pr_gate, pr_poller, pr_review,
+    truncate_for_issue, AgentOrchestrator, OrchestratorError,
 };
 
 impl AgentOrchestrator {
@@ -58,7 +58,10 @@ impl AgentOrchestrator {
             return Ok(());
         }
 
-        let criteria = pr_review::AutoMergeCriteria::default();
+        let criteria = pr_review::AutoMergeCriteria {
+            recognised_agent_logins: agent_allowlist_kg::load_recognised_agents(),
+            ..pr_review::AutoMergeCriteria::default()
+        };
 
         for (project_id, gitea_cfg) in targets {
             let tracker_cfg = terraphim_tracker::GiteaConfig {

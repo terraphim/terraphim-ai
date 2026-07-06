@@ -676,7 +676,11 @@ mod tests {
         };
         let mgr = WorkspaceManager::new(&config).unwrap();
 
-        let valid = tmp.path().join("MT-42");
+        // Join against the manager's canonicalised root, not `tmp.path()`
+        // directly: on macOS `TMPDIR` resolves through a `/var` -> `/private/var`
+        // symlink, so a path built from the raw `tmp.path()` would fail
+        // `starts_with(&mgr.root)` even though it is genuinely inside the root.
+        let valid = mgr.root.join("MT-42");
         assert!(mgr.validate_path(&valid, "MT-42").is_ok());
     }
 }

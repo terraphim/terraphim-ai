@@ -57,6 +57,17 @@ pub struct AutoMergeCriteria {
     pub require_all_criteria: bool,
     pub max_diff_loc: u32,
     pub require_agent_author: bool,
+    /// Exact-match logins recognised as fleet automation accounts, in
+    /// addition to the `adf-` prefix rule applied by [`author_is_agent`].
+    ///
+    /// Populated from the `recognised_agent` KG concept
+    /// (`crates/terraphim_orchestrator/kg/recognised_agents.md`) by
+    /// [`crate::agent_allowlist_kg::load_recognised_agents`] at orchestrator
+    /// startup; operators extend the allowlist by editing that markdown
+    /// file's `synonyms::` line, no rebuild required. The hardcoded default
+    /// here is a pure, I/O-free fallback so this module and its tests never
+    /// touch the filesystem.
+    pub recognised_agent_logins: std::collections::BTreeSet<String>,
 }
 
 impl Default for AutoMergeCriteria {
@@ -68,6 +79,10 @@ impl Default for AutoMergeCriteria {
             require_all_criteria: true,
             max_diff_loc: 500,
             require_agent_author: true,
+            recognised_agent_logins: ["claude-code", "root", "implementation-swarm"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
         }
     }
 }
@@ -155,7 +170,7 @@ pub fn parse_verdict(body: &str, comment_id: u64) -> Result<ReviewVerdict, Verdi
 /// 3. `verdict.p1_count <= criteria.max_p1`
 /// 4. `verdict.all_criteria_met || !criteria.require_all_criteria`
 /// 5. `pr.diff_loc <= criteria.max_diff_loc`
-/// 6. `!criteria.require_agent_author || author_is_agent(&pr.author_login)`
+/// 6. `!criteria.require_agent_author || author_is_agent(&pr.author_login, &criteria.recognised_agent_logins)`
 ///
 /// When a gate fails the returned [`AutoMergeDecision::HumanReviewNeeded`]
 /// carries a short reason string suitable for posting back to the PR.
@@ -193,9 +208,12 @@ pub fn evaluate(
             pr.diff_loc, criteria.max_diff_loc
         ));
     }
-    if criteria.require_agent_author && !author_is_agent(&pr.author_login) {
+    if criteria.require_agent_author
+        && !author_is_agent(&pr.author_login, &criteria.recognised_agent_logins)
+    {
         return AutoMergeDecision::HumanReviewNeeded(agent_author_rejection_reason(
             &pr.author_login,
+            &criteria.recognised_agent_logins,
         ));
     }
     AutoMergeDecision::Merge
@@ -211,27 +229,40 @@ pub fn evaluate(
 /// the twin gates can never drift out of sync.
 ///
 /// The allowlist policy itself is [`author_is_agent`]: a login is recognised
-/// when it is exactly `claude-code` or `root`, or starts with the `adf-` fleet
-/// prefix. To allowlist a new automation account, add it to the orchestrator
-/// fleet config (an `[[agents]]` entry in `orchestrator.toml`).
-pub fn agent_author_rejection_reason(login: &str) -> String {
+/// when it appears (verbatim) in `recognised_logins`, or starts with the
+/// `adf-` fleet prefix. To allowlist a new automation account, add its login
+/// to the `synonyms::` line in
+/// `crates/terraphim_orchestrator/kg/recognised_agents.md` — no rebuild
+/// required, the orchestrator re-reads it via
+/// [`crate::agent_allowlist_kg::load_recognised_agents`].
+pub fn agent_author_rejection_reason(
+    login: &str,
+    recognised_logins: &std::collections::BTreeSet<String>,
+) -> String {
+    let known = recognised_logins
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(", ");
     format!(
         "author `{login}` is not a recognised agent; human-authored PRs require manual merge. \
-         To allowlist, add the login to the orchestrator fleet config \
-         (`[[agents]]` in `orchestrator.toml`); recognised logins are exactly \
-         `claude-code`, `root`, or any `adf-` prefix."
+         To allowlist, add the login to the `synonyms::` line in \
+         `crates/terraphim_orchestrator/kg/recognised_agents.md`; recognised logins are \
+         currently [{known}] or any `adf-` prefix."
     )
 }
 
 /// Return `true` when `login` belongs to an automation account authorised to
 /// open auto-merge-eligible PRs.
 ///
-/// Policy: the login exactly matches `claude-code` or `root`, or starts with
-/// `adf-` (the ADF fleet agent prefix). Anything else — including human
-/// maintainers, bots from other tenants, and Renovate/Dependabot — is
-/// considered non-agent for auto-merge purposes.
-pub fn author_is_agent(login: &str) -> bool {
-    matches!(login, "claude-code" | "root") || login.starts_with("adf-")
+/// Policy: the login exactly matches an entry in `recognised_logins` (KG-
+/// driven allowlist, see [`crate::agent_allowlist_kg`]), or starts with
+/// `adf-` (the ADF fleet agent prefix, a structural convention rather than a
+/// KG concept). Anything else — including human maintainers, bots from other
+/// tenants, and Renovate/Dependabot — is considered non-agent for auto-merge
+/// purposes.
+pub fn author_is_agent(login: &str, recognised_logins: &std::collections::BTreeSet<String>) -> bool {
+    recognised_logins.contains(login) || login.starts_with("adf-")
 }
 
 /// Strip HTML attributes from `<h3 ...>` tags so that formatting variations
@@ -368,18 +399,21 @@ mod tests {
 
     #[test]
     fn author_is_agent_policy() {
-        assert!(author_is_agent("claude-code"));
-        assert!(author_is_agent("root"));
-        assert!(author_is_agent("adf-fleet"));
-        assert!(author_is_agent("adf-reviewer"));
-        assert!(!author_is_agent("alex"));
-        assert!(!author_is_agent("dependabot[bot]"));
-        assert!(!author_is_agent("renovate[bot]"));
+        let recognised = AutoMergeCriteria::default().recognised_agent_logins;
+        assert!(author_is_agent("claude-code", &recognised));
+        assert!(author_is_agent("root", &recognised));
+        assert!(author_is_agent("implementation-swarm", &recognised));
+        assert!(author_is_agent("adf-fleet", &recognised));
+        assert!(author_is_agent("adf-reviewer", &recognised));
+        assert!(!author_is_agent("alex", &recognised));
+        assert!(!author_is_agent("dependabot[bot]", &recognised));
+        assert!(!author_is_agent("renovate[bot]", &recognised));
     }
 
     #[test]
     fn agent_author_rejection_reason_includes_login_and_allowlist_hint() {
-        let reason = agent_author_rejection_reason("dependabot[bot]");
+        let recognised = AutoMergeCriteria::default().recognised_agent_logins;
+        let reason = agent_author_rejection_reason("dependabot[bot]", &recognised);
         // AC: the rejection message contains the exact author login.
         assert!(
             reason.contains("author `dependabot[bot]`"),
@@ -391,8 +425,8 @@ mod tests {
             "reason must mention allowlisting, got: {reason}"
         );
         assert!(
-            reason.contains("orchestrator.toml"),
-            "reason must point to the fleet config file, got: {reason}"
+            reason.contains("kg/recognised_agents.md"),
+            "reason must point to the KG allowlist file, got: {reason}"
         );
         // Hint must mirror the real author_is_agent() policy so operators are
         // not misled about which logins are already accepted.
@@ -429,7 +463,7 @@ mod tests {
         };
         assert!(reason.contains("renovate[bot]"));
         assert!(reason.contains("allowlist"));
-        assert!(reason.contains("orchestrator.toml"));
+        assert!(reason.contains("kg/recognised_agents.md"));
     }
 
     #[test]
