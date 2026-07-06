@@ -47,7 +47,7 @@ impl Backup {
         let mut hasher = Sha256::new();
         hasher.update(&contents);
         let result = hasher.finalize();
-        Ok(format!("{:x}", result))
+        Ok(hex::encode(result))
     }
 
     /// Verify that the backup file is intact
@@ -185,7 +185,7 @@ impl BackupManager {
         let mut hasher = Sha256::new();
         hasher.update(&contents);
         let result = hasher.finalize();
-        Ok(format!("{:x}", result))
+        Ok(hex::encode(result))
     }
 
     /// Rotate backups to maintain the maximum count

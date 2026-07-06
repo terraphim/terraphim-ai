@@ -38,12 +38,12 @@ toml = "0.8"
 env_logger = "0.11"
 
 # HTTP and networking
-axum = "0.7"
+axum = "0.8"
 tower = "0.5"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 
 # Security and validation
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 jsonschema = "0.28"
 
@@ -57,11 +57,11 @@ urlencoding = "2.1"
 
 # TUI testing dependencies
 regex = "1.10"
-sysinfo = "0.30"
+sysinfo = "0.39"
 term_size = "0.3"
 
  # Additional dependencies for reporting and metadata
- gethostname = "0.4"
+ gethostname = "1.1"
  os_info = "3.0"
  rustc_version = "0.4"
  serde_yaml = "0.9"
@@ -71,9 +71,9 @@ term_size = "0.3"
  dirs = "5.0"
 
 # Docker and container support
-bollard = { version = "0.20", optional = true }
+bollard = { version = "0.21", optional = true }
 ahash = "0.8.12"
-axum-test = "19.1.1"
+axum-test = "21.0.0"
 
 # Platform-specific dependencies
 [target.'cfg(unix)'.dependencies]
