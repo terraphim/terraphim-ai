@@ -324,7 +324,10 @@ pub fn evaluate_pr_gates(
         && !author_is_agent(&pr.author_login, &criteria.recognised_agent_logins)
     {
         return EvaluationOutcome::HumanReviewNeeded {
-            reason: agent_author_rejection_reason(&pr.author_login, &criteria.recognised_agent_logins),
+            reason: agent_author_rejection_reason(
+                &pr.author_login,
+                &criteria.recognised_agent_logins,
+            ),
         };
     }
     if pr.diff_loc > criteria.max_diff_loc {
@@ -727,8 +730,8 @@ mod tests {
             "reason must mention allowlisting, got: {reason}"
         );
         assert!(
-            reason.contains("orchestrator.toml"),
-            "reason must point to the fleet config file, got: {reason}"
+            reason.contains("kg/recognised_agents.md"),
+            "reason must point to the KG allowlist file, got: {reason}"
         );
     }
 
