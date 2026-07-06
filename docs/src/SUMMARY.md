@@ -36,6 +36,7 @@
 
 ## How-Tos
 
+- [AI Agent Onboarding Quickstart](./howto/ai-agent-onboarding-quickstart.md)
 - [Learning Capture for Claude Code](./howto/learning-capture-claude-code.md)
 - [Learning Capture for opencode](./howto/learning-capture-opencode.md)
 - [Personal Assistant Role (JMAP + Obsidian)](./howto/personal-assistant-role.md)

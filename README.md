@@ -48,7 +48,7 @@ cargo install terraphim-cli     # Automation CLI (8 commands)
 - ⚡ Lightweight (15 MB RAM, 13 MB disk)
 - 🚀 Fast (<200ms operations)
 
-**Learn more**: [Quickstart](QUICKSTART.md) | [Changelog](https://docs.terraphim.ai/src/changelog.html) | [Cross-Platform Guide](docs/archive/root/CROSS_PLATFORM_STATUS.md)
+**Learn more**: [Quickstart](QUICKSTART.md) | [AI Agent Onboarding](docs/src/howto/ai-agent-onboarding-quickstart.md) | [Changelog](https://docs.terraphim.ai/src/changelog.html) | [Cross-Platform Guide](docs/archive/root/CROSS_PLATFORM_STATUS.md)
 
 You can use it as a local search engine, configured to search for different types of content on StackOverflow, GitHub, and the local filesystem using a predefined folder, which includes your Markdown files.
 
@@ -182,6 +182,10 @@ pip install terraphim-automata
    ```
 
 (See the [desktop README](desktop/README.md), [TUI documentation](docs/tui-usage.md), and [development setup guide](docs/src/development-setup.md) for more details.)
+
+### AI Agent Onboarding
+
+AI coding agents should start with the [AI Agent Onboarding Quickstart](docs/src/howto/ai-agent-onboarding-quickstart.md). It covers repository orientation, Terraphim-first search, Gitea task tracking, quality gates, release checks, and safe handoff expectations for work in this repository.
 
 ## 📚 Usage Examples
 
