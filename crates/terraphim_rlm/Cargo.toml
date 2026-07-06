@@ -52,7 +52,7 @@ hyper = { version = "1.0", features = ["server", "http1"], optional = true }
 hyper-util = { version = "0.1", features = ["tokio"], optional = true }
 
 # Alternative execution backends
-bollard = { version = "0.20", optional = true }
+bollard = { version = "0.21", optional = true }
 reqwest = { workspace = true, optional = true }
 
 # MCP (Model Context Protocol)
