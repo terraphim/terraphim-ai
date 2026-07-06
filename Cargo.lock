@@ -9576,6 +9576,7 @@ dependencies = [
  "dialoguer",
  "dirs 5.0.1",
  "flate2",
+ "hex",
  "jiff",
  "self_update",
  "semver",
