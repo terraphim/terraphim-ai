@@ -8479,40 +8479,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "terraphim-session-analyzer"
-version = "1.20.3"
-source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
-checksum = "26a995a68e4e3ae32b4d9f43ec3479f8689b677aed90b8136e5704ba88dbadd6"
-dependencies = [
- "aho-corasick",
- "anyhow",
- "clap",
- "colored 2.2.0",
- "csv",
- "dialoguer",
- "glob",
- "handlebars",
- "home",
- "indexmap 2.14.0",
- "indicatif 0.18.5",
- "jiff",
- "lazy_static",
- "libc",
- "rayon",
- "regex",
- "rusqlite",
- "serde",
- "serde_json",
- "shell-words",
- "tabled",
- "thiserror 1.0.69",
- "toml 0.8.23",
- "tracing",
- "tracing-subscriber",
- "walkdir",
-]
-
-[[package]]
 name = "terraphim_agent"
 version = "1.20.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8955,6 +8921,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_mcp_search"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99c5fa870352d8c83fc154fae396d49abee108fe5feeae3f4d92dda42d31c687"
+dependencies = [
+ "serde",
+ "serde_json",
+ "terraphim_automata 1.20.4",
+ "terraphim_types 1.20.4",
+]
+
+[[package]]
 name = "terraphim_merge_coordinator"
 version = "1.21.0"
 dependencies = [
@@ -8964,7 +8942,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
@@ -8990,7 +8968,7 @@ dependencies = [
  "scraper",
  "serde",
  "serde_json",
- "terraphim-session-analyzer 1.20.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "terraphim-session-analyzer",
  "terraphim_automata 1.20.4",
  "terraphim_config 1.20.4",
  "terraphim_file_search",
@@ -9191,11 +9169,10 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "terraphim-firecracker",
  "terraphim_agent_supervisor",
  "terraphim_automata 1.20.4",
  "terraphim_config 1.20.4",
- "terraphim_mcp_search 0.1.0 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
+ "terraphim_mcp_search 0.2.0",
  "terraphim_rolegraph 1.20.4",
  "terraphim_service",
  "terraphim_types 1.20.4",
@@ -9380,7 +9357,7 @@ dependencies = [
  "serde",
  "serde_json",
  "terraphim-markdown-parser 1.20.4",
- "terraphim-session-analyzer 1.20.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "terraphim-session-analyzer",
  "terraphim_types 1.20.4",
  "thiserror 1.0.69",
  "tokio",
@@ -9404,12 +9381,11 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "terraphim-markdown-parser 1.20.2",
- "terraphim-session-analyzer 1.20.3 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
- "terraphim_automata 1.20.2",
- "terraphim_rolegraph 1.20.2",
- "terraphim_types 1.20.2",
- "thiserror 1.0.69",
+ "terraphim-session-analyzer",
+ "terraphim_automata 1.20.4",
+ "terraphim_rolegraph 1.20.4",
+ "terraphim_types 1.20.4",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-test",
  "tracing",
