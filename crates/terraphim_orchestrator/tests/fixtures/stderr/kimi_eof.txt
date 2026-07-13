@@ -1,3 +1,0 @@
-kimi-for-coding: upstream closed connection, EOF before completion
-warn: socket read returned 0 bytes after 38s
-retrying in 5s
