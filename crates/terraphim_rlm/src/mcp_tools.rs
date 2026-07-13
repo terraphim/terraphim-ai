@@ -1133,6 +1133,103 @@ pub struct RlmSnapshotResponse {
 mod tests {
     use super::*;
 
+    /// MCP server capability advertisement health check (WIG-3 / issue #3087).
+    ///
+    /// This is the in-repo realisation of the `tools/list` + protocol-version
+    /// acceptance criteria. There is no transport-level MCP server binary in
+    /// this repo (the stdio/HTTP transport is a separate SEP-1821 epic), so the
+    /// faithful advertisement surface is [`RlmMcpService::get_tools`], which
+    /// returns exactly the `Vec<Tool>` that an MCP server would marshal into the
+    /// `tools/list` response. The negotiated protocol version is the constant
+    /// `rmcp` would place in `InitializeResult.protocol_version`.
+    ///
+    /// The check fails fast on *any* drift: silent loss of a tool, rename, or a
+    /// protocol-version regression would break multi-agent workflows without
+    /// another signal, so zero deviation is enforced.
+    #[test]
+    fn test_mcp_capability_advertisement_health_check() {
+        use rmcp::model::ProtocolVersion;
+
+        // --- AC 1 & 2: tools/list is non-empty and advertises the *exact* expected tool set. ---
+        let tools = RlmMcpService::get_tools();
+        assert!(
+            !tools.is_empty(),
+            "tools/list must advertise a non-empty tool set"
+        );
+
+        let actual: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
+        let expected = [
+            "rlm_code",
+            "rlm_bash",
+            "rlm_query",
+            "rlm_context",
+            "rlm_snapshot",
+            "rlm_status",
+            "mcp_search_tools",
+            "mcp_search_skills",
+        ];
+        assert_eq!(
+            actual.as_slice(),
+            expected,
+            "tool advertisement drift — the MCP tools/list surface must be byte-for-byte stable"
+        );
+
+        // No tool may silently go unnamed (would surface as an empty string on the wire).
+        assert!(
+            tools.iter().all(|t| !t.name.is_empty()),
+            "advertised tools must have non-empty names"
+        );
+
+        // Tool names must be unique — a duplicate would shadow one of the handlers,
+        // silently dropping a capability.
+        let mut sorted = actual.clone();
+        sorted.sort_unstable();
+        let deduped = sorted.clone();
+        sorted.dedup();
+        assert_eq!(
+            sorted.len(),
+            deduped.len(),
+            "tool names must be unique — duplicates shadow handlers"
+        );
+
+        // Every advertised tool must carry a valid JSON Schema for its input, or a
+        // client cannot build a compliant call.
+        for tool in &tools {
+            assert_eq!(
+                tool.input_schema.get("type").and_then(|v| v.as_str()),
+                Some("object"),
+                "tool `{}` input schema must declare type=object",
+                tool.name
+            );
+            assert!(
+                tool.input_schema.contains_key("properties"),
+                "tool `{}` input schema must declare a properties map",
+                tool.name
+            );
+        }
+
+        // --- AC 3: the negotiated protocol version is a known-valid MCP constant. ---
+        // rmcp pins LATEST = 2025-03-26 (2025-06-18 deferred until full compliance +
+        // automated testing land — which this test is a step toward). Asserting the
+        // exact constant guards against an accidental bump that breaks clients.
+        let latest = ProtocolVersion::LATEST;
+        assert_eq!(
+            latest,
+            ProtocolVersion::V_2025_03_26,
+            "negotiated protocol version must be the rmcp-pinned LATEST (2025-03-26)"
+        );
+
+        // The version must round-trip through serde — an MCP client deserialises the
+        // `InitializeResult.protocol_version` string and rejects unknown values.
+        let wire: String = serde_json::to_string(&latest).expect("serialize protocol version");
+        let roundtrip: ProtocolVersion =
+            serde_json::from_str(&wire).expect("deserialize protocol version");
+        assert_eq!(
+            roundtrip, latest,
+            "protocol version must round-trip through serde unchanged"
+        );
+    }
+
     #[test]
     fn test_get_tools() {
         let tools = RlmMcpService::get_tools();
