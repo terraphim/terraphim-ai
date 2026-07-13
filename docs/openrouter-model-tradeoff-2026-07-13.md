@@ -53,13 +53,23 @@ fallback, and compare it with `deepseek/deepseek-v4-flash`.
   synthesis. It is also very cheap (~$0.035 / M prompt tokens).
 - **`deepseek/deepseek-v4-flash`**: in this test it returned no output through
   the `terraphim-grep` path, despite working correctly when called directly via
-  the OpenRouter chat completions endpoint. It is also more expensive than the
-  successful small models.
+  the OpenRouter chat completions endpoint. Investigation shows this is a
+  parsing issue, not a model quality issue (see Root cause below). It is also
+  more expensive than the successful small models.
 - **Small models (1 B–4 B)**: fast, but most produced empty answers with the
-  current prompt format, suggesting they are too constrained for the RLM
-  fallback prompt.
+  current prompt format. The root cause is the same parsing issue, not
+  necessarily model capability.
 - **Free models**: cheapest ($0), but the tested free model hit OpenRouter's
   free-tier rate limit immediately.
+
+## Root cause for dropped answers
+
+`terraphim_grep` expects the model to return a JSON object with `answer`,
+`citations`, and `confidence` fields. The prompt, however, never includes the
+JSON-format instructions defined in `AnswerSignature::instructions()`. Some
+models guess the format and emit JSON; others (DeepSeek V4 Flash, Llama 3.2,
+Gemma 3, Nova Lite) emit plain text or an empty response, which the parser
+drops. This is tracked as `terraphim/terraphim-clients#77`.
 
 ## Recommendations
 
@@ -72,8 +82,8 @@ fallback, and compare it with `deepseek/deepseek-v4-flash`.
 3. **Avoid free models for interactive use** unless you can tolerate rate-limit
    retries.
 4. **Do not assume a model works because it works via raw OpenRouter API**;
-   always validate through `terraphim-grep --answer` because the prompt/template
-  packing in the RLM path can cause some models to return empty output.
+   always validate through `terraphim-grep --answer` because the RLM parser can
+   drop valid plain-text responses.
 
 ## Raw data
 
