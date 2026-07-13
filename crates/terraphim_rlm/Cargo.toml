@@ -56,7 +56,7 @@ bollard = { version = "0.21", optional = true }
 reqwest = { workspace = true, optional = true }
 
 # MCP (Model Context Protocol)
-rmcp = { version = "0.9.0", features = ["server"], optional = true }
+rmcp = { version = "2.2.0", features = ["server"], optional = true }
 
 # Utilities
 parking_lot = "0.12"
