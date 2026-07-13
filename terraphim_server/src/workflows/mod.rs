@@ -290,95 +290,6 @@ pub async fn record_workflow_step(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn trace_includes_recorded_steps() {
-        let sessions = RwLock::new(HashMap::new());
-        let (broadcaster, _rx) = broadcast::channel(16);
-        let wf_id = "wf_test_123".to_string();
-
-        create_workflow_session(
-            &sessions,
-            &broadcaster,
-            wf_id.clone(),
-            "test_pattern".to_string(),
-        )
-        .await;
-
-        let step = WorkflowStep {
-            id: "step_1".to_string(),
-            name: "Parse Input".to_string(),
-            status: StepStatus::Completed,
-            started_at: chrono::Utc::now(),
-            completed_at: Some(chrono::Utc::now()),
-            output: Some("parsed successfully".to_string()),
-        };
-        record_workflow_step(&sessions, &wf_id, step).await;
-
-        let guard = sessions.read().await;
-        let wf = guard.get(&wf_id).expect("workflow should exist");
-        assert_eq!(wf.steps.len(), 1);
-        assert_eq!(wf.steps[0].name, "Parse Input");
-        assert_eq!(wf.steps[0].id, "step_1");
-        assert!(matches!(wf.steps[0].status, StepStatus::Completed));
-    }
-
-    #[tokio::test]
-    async fn trace_starts_with_empty_steps() {
-        let sessions = RwLock::new(HashMap::new());
-        let (broadcaster, _rx) = broadcast::channel(16);
-        let wf_id = "wf_empty_456".to_string();
-
-        create_workflow_session(
-            &sessions,
-            &broadcaster,
-            wf_id.clone(),
-            "test_pattern".to_string(),
-        )
-        .await;
-
-        let guard = sessions.read().await;
-        let wf = guard.get(&wf_id).expect("workflow should exist");
-        assert!(wf.steps.is_empty());
-    }
-
-    #[tokio::test]
-    async fn record_multiple_steps_preserves_order() {
-        let sessions = RwLock::new(HashMap::new());
-        let (broadcaster, _rx) = broadcast::channel(16);
-        let wf_id = "wf_multi_789".to_string();
-
-        create_workflow_session(
-            &sessions,
-            &broadcaster,
-            wf_id.clone(),
-            "test_pattern".to_string(),
-        )
-        .await;
-
-        for i in 1..=3u32 {
-            let step = WorkflowStep {
-                id: format!("step_{i}"),
-                name: format!("Step {i}"),
-                status: StepStatus::Completed,
-                started_at: chrono::Utc::now(),
-                completed_at: Some(chrono::Utc::now()),
-                output: None,
-            };
-            record_workflow_step(&sessions, &wf_id, step).await;
-        }
-
-        let guard = sessions.read().await;
-        let wf = guard.get(&wf_id).expect("workflow should exist");
-        assert_eq!(wf.steps.len(), 3);
-        assert_eq!(wf.steps[0].name, "Step 1");
-        assert_eq!(wf.steps[2].name, "Step 3");
-    }
-}
-
 async fn list_workflows(State(state): State<AppState>) -> Json<Vec<WorkflowStatus>> {
     let sessions = state.workflow_sessions.read().await;
     let workflows: Vec<WorkflowStatus> = sessions.values().cloned().collect();
@@ -524,5 +435,94 @@ pub async fn fail_workflow_session(
         };
 
         let _ = broadcaster.send(message);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn trace_includes_recorded_steps() {
+        let sessions = RwLock::new(HashMap::new());
+        let (broadcaster, _rx) = broadcast::channel(16);
+        let wf_id = "wf_test_123".to_string();
+
+        create_workflow_session(
+            &sessions,
+            &broadcaster,
+            wf_id.clone(),
+            "test_pattern".to_string(),
+        )
+        .await;
+
+        let step = WorkflowStep {
+            id: "step_1".to_string(),
+            name: "Parse Input".to_string(),
+            status: StepStatus::Completed,
+            started_at: chrono::Utc::now(),
+            completed_at: Some(chrono::Utc::now()),
+            output: Some("parsed successfully".to_string()),
+        };
+        record_workflow_step(&sessions, &wf_id, step).await;
+
+        let guard = sessions.read().await;
+        let wf = guard.get(&wf_id).expect("workflow should exist");
+        assert_eq!(wf.steps.len(), 1);
+        assert_eq!(wf.steps[0].name, "Parse Input");
+        assert_eq!(wf.steps[0].id, "step_1");
+        assert!(matches!(wf.steps[0].status, StepStatus::Completed));
+    }
+
+    #[tokio::test]
+    async fn trace_starts_with_empty_steps() {
+        let sessions = RwLock::new(HashMap::new());
+        let (broadcaster, _rx) = broadcast::channel(16);
+        let wf_id = "wf_empty_456".to_string();
+
+        create_workflow_session(
+            &sessions,
+            &broadcaster,
+            wf_id.clone(),
+            "test_pattern".to_string(),
+        )
+        .await;
+
+        let guard = sessions.read().await;
+        let wf = guard.get(&wf_id).expect("workflow should exist");
+        assert!(wf.steps.is_empty());
+    }
+
+    #[tokio::test]
+    async fn record_multiple_steps_preserves_order() {
+        let sessions = RwLock::new(HashMap::new());
+        let (broadcaster, _rx) = broadcast::channel(16);
+        let wf_id = "wf_multi_789".to_string();
+
+        create_workflow_session(
+            &sessions,
+            &broadcaster,
+            wf_id.clone(),
+            "test_pattern".to_string(),
+        )
+        .await;
+
+        for i in 1..=3u32 {
+            let step = WorkflowStep {
+                id: format!("step_{i}"),
+                name: format!("Step {i}"),
+                status: StepStatus::Completed,
+                started_at: chrono::Utc::now(),
+                completed_at: Some(chrono::Utc::now()),
+                output: None,
+            };
+            record_workflow_step(&sessions, &wf_id, step).await;
+        }
+
+        let guard = sessions.read().await;
+        let wf = guard.get(&wf_id).expect("workflow should exist");
+        assert_eq!(wf.steps.len(), 3);
+        assert_eq!(wf.steps[0].name, "Step 1");
+        assert_eq!(wf.steps[2].name, "Step 3");
     }
 }
