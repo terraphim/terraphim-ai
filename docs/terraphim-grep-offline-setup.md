@@ -269,3 +269,11 @@ terraphim-grep 'ReadTool' --paths src --thesaurus .terraphim/thesaurus.json -n 3
 4. **Keep the project KG in the repo** (`.terraphim/`), version-controlled. It is documentation that doubles as a search index.
 5. **The best thesaurus terms are the code's own identifiers.** Prose synonyms match intent; ast-grep-mined struct/trait/impl names match the actual text in chunks. Enrich the KG structurally and keep it fresh with a repeatable script — a hand-maintained thesaurus rots.
 6. **Selectivity beats coverage.** File-wide bucketing rules (`f.startswith("src/providers/")`) drown the thesaurus in noise; name-based rules (`n.endswith("Provider")`) keep it signal-rich.
+
+---
+
+## Companion documents
+
+- **Skill:** `terraphim-skills/skills/terraphim-grep-offline/SKILL.md` -- agent-facing skill covering offline search, thesaurus setup, ast-grep enrichment, and the OpenRouter `--answer` LLM fallback (model selection, env vars, 1Password key loading).
+- **Usage guide:** `terraphim-skills/docs/terraphim-grep-usage.md` -- end-user quick reference with the OpenRouter model cost table.
+- **OpenRouter fallback:** pass `--answer` (optionally `--force-rlm`) and export `OPENROUTER_API_KEY` / `OPENROUTER_MODEL`; see the skill's "OpenRouter model setup" section.
