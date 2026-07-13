@@ -247,12 +247,12 @@ impl ConnectorRegistry {
             }
 
             // Apply global limit if specified
-            if let Some(limit) = options.limit {
-                if all_sessions.len() >= limit {
-                    tracing::info!("Reached global limit of {} sessions", limit);
-                    all_sessions.truncate(limit);
-                    break;
-                }
+            if let Some(limit) = options.limit
+                && all_sessions.len() >= limit
+            {
+                tracing::info!("Reached global limit of {} sessions", limit);
+                all_sessions.truncate(limit);
+                break;
             }
         }
 

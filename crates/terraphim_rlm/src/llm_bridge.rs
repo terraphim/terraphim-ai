@@ -443,6 +443,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires live OpenRouter API; run with --ignored"]
     async fn test_single_query() {
         if std::env::var("OPENROUTER_API_KEY").is_err() {
             eprintln!("Skipping test_single_query: OPENROUTER_API_KEY not set");
@@ -467,6 +468,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires live OpenRouter API; run with --ignored"]
     async fn test_batched_query() {
         if std::env::var("OPENROUTER_API_KEY").is_err() {
             eprintln!("Skipping test_batched_query: OPENROUTER_API_KEY not set");

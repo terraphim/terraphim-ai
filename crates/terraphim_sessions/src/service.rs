@@ -219,15 +219,15 @@ impl SessionService {
             sessions
                 .into_iter()
                 .filter(|session| {
-                    if let Some(title) = &session.title {
-                        if title.to_lowercase().contains(&query_lower) {
-                            return true;
-                        }
+                    if let Some(title) = &session.title
+                        && title.to_lowercase().contains(&query_lower)
+                    {
+                        return true;
                     }
-                    if let Some(path) = &session.metadata.project_path {
-                        if path.to_lowercase().contains(&query_lower) {
-                            return true;
-                        }
+                    if let Some(path) = &session.metadata.project_path
+                        && path.to_lowercase().contains(&query_lower)
+                    {
+                        return true;
                     }
                     for msg in &session.messages {
                         if msg.content.to_lowercase().contains(&query_lower) {
