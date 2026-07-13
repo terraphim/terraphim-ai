@@ -8388,7 +8388,7 @@ dependencies = [
  "serde",
  "terraphim_types 1.20.2",
  "thiserror 1.0.69",
- "ulid",
+ "ulid 1.2.1",
 ]
 
 [[package]]
@@ -8401,7 +8401,7 @@ dependencies = [
  "serde",
  "terraphim_types 1.20.4",
  "thiserror 1.0.69",
- "ulid",
+ "ulid 1.2.1",
 ]
 
 [[package]]
@@ -8758,7 +8758,7 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "tracing-subscriber",
- "ulid",
+ "ulid 1.2.1",
  "url",
 ]
 
@@ -8790,7 +8790,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tsify",
- "ulid",
+ "ulid 1.2.1",
  "url",
  "wasm-bindgen",
 ]
@@ -9033,7 +9033,7 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "tracing-subscriber",
- "ulid",
+ "ulid 1.2.1",
  "uuid",
  "which 5.0.0",
 ]
@@ -9075,7 +9075,7 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "tracing-subscriber",
- "ulid",
+ "ulid 1.2.1",
  "uuid",
  "which 5.0.0",
 ]
@@ -9164,7 +9164,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tokio-util",
- "ulid",
+ "ulid 2.0.1",
  "wait-timeout",
 ]
 
@@ -9186,7 +9186,7 @@ dependencies = [
  "terraphim_types 1.20.2",
  "thiserror 1.0.69",
  "tokio",
- "ulid",
+ "ulid 1.2.1",
  "unicode-segmentation",
  "url",
 ]
@@ -9209,7 +9209,7 @@ dependencies = [
  "terraphim_types 1.20.4",
  "thiserror 1.0.69",
  "tokio",
- "ulid",
+ "ulid 1.2.1",
  "unicode-segmentation",
  "url",
 ]
@@ -9287,7 +9287,7 @@ dependencies = [
  "terraphim_update 1.21.0",
  "tokio",
  "tower-http 0.6.11",
- "ulid",
+ "ulid 2.0.1",
  "urlencoding",
  "uuid",
  "walkdir",
@@ -9534,7 +9534,7 @@ dependencies = [
  "strsim",
  "thiserror 1.0.69",
  "toml 0.8.23",
- "ulid",
+ "ulid 1.2.1",
  "uuid",
 ]
 
@@ -9555,7 +9555,7 @@ dependencies = [
  "strsim",
  "thiserror 1.0.69",
  "toml 0.8.23",
- "ulid",
+ "ulid 1.2.1",
  "uuid",
 ]
 
@@ -10477,6 +10477,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "470dbf6591da1b39d43c14523b2b469c86879a53e8b758c8e090a470fe7b1fbe"
 dependencies = [
  "rand 0.9.4",
+ "serde",
+ "uuid",
+ "web-time",
+]
+
+[[package]]
+name = "ulid"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39493d572b98fe1d142e132e7a726c50c68121bce84429216a5ec20e1ad7fec5"
+dependencies = [
+ "rand 0.10.1",
  "serde",
  "uuid",
  "web-time",
