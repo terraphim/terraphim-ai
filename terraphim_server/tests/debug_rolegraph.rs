@@ -5,7 +5,6 @@ mod tests {
     use ahash::AHashMap;
 
     use terraphim_server::{Status, axum_server};
-    use terraphim_settings::DeviceSettings;
 
     use std::{net::SocketAddr, time::Duration};
     use terraphim_config::{
@@ -70,15 +69,8 @@ mod tests {
     }
 
     async fn start_server() -> SocketAddr {
-        let server_settings =
-            DeviceSettings::load_from_env_and_file(None).expect("Failed to load settings");
-        let server_hostname = server_settings
-            .server_hostname
-            .parse::<SocketAddr>()
-            .unwrap_or_else(|_| {
-                let port = portpicker::pick_unused_port().expect("Failed to find unused port");
-                SocketAddr::from(([127, 0, 0, 1], port))
-            });
+        let port = portpicker::pick_unused_port().expect("Failed to find unused port");
+        let server_hostname = SocketAddr::from(([127, 0, 0, 1], port));
 
         let mut config = sample_config_with_kg();
         let config_state = ConfigState::new(&mut config)
