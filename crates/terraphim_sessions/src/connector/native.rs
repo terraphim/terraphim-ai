@@ -86,15 +86,15 @@ impl SessionConnector for NativeClaudeConnector {
                 Ok(session) => {
                     if let Some(session) = session {
                         // Apply time filters
-                        if let Some(since) = options.since {
-                            if session.started_at.map(|t| t < since).unwrap_or(false) {
-                                continue;
-                            }
+                        if let Some(since) = options.since
+                            && session.started_at.map(|t| t < since).unwrap_or(false)
+                        {
+                            continue;
                         }
-                        if let Some(until) = options.until {
-                            if session.started_at.map(|t| t > until).unwrap_or(false) {
-                                continue;
-                            }
+                        if let Some(until) = options.until
+                            && session.started_at.map(|t| t > until).unwrap_or(false)
+                        {
+                            continue;
                         }
 
                         sessions.push(session);
@@ -106,11 +106,11 @@ impl SessionConnector for NativeClaudeConnector {
             }
 
             // Apply limit
-            if let Some(limit) = options.limit {
-                if sessions.len() >= limit {
-                    tracing::info!("Reached limit of {} sessions, stopping import", limit);
-                    break;
-                }
+            if let Some(limit) = options.limit
+                && sessions.len() >= limit
+            {
+                tracing::info!("Reached limit of {} sessions, stopping import", limit);
+                break;
             }
         }
 
