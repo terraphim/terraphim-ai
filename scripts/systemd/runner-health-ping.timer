@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Terraphim runner health ping every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Terraphim runner health ping (healthchecks.io + Gitea runner count)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/terraphim-gitea-runner/env
+ExecStart=%h/.config/terraphim-gitea-runner/runner-health-ping.sh
+
+[Install]
+WantedBy=default.target
