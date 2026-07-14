@@ -299,7 +299,13 @@ impl WorkflowExecutor {
         context: &WorkflowContext,
     ) -> Result<WorkflowResult> {
         let session = self.session_manager.create_session(context).await?;
-        self.execute_workflow_in_session(workflow, &session).await
+        let result = self.execute_workflow_in_session(workflow, &session).await;
+        // Always release the VM after execution, regardless of success or failure.
+        // Without this, every workflow leaks a Firecracker microVM.
+        if let Err(e) = self.session_manager.release_session(&session.id).await {
+            log::warn!("Failed to release session {}: {}", session.id, e);
+        }
+        result
     }
 
     /// Execute a workflow in a pre-created session.
