@@ -105,6 +105,11 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
         if let Some(writer) = &self.status_fallback {
             worker = worker.with_status_fallback(writer.clone());
         }
+        worker = worker.with_vm_config(
+            self.config.vm_mode,
+            self.config.fcctl_url.clone(),
+            self.config.fcctl_vm_type.clone(),
+        );
         match worker.run(state, task).await {
             Ok(ok) => log::info!("task complete: success={ok}"),
             Err(e) => log::error!("task failed: {e}"),

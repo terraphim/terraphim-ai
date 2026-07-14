@@ -58,8 +58,8 @@ pub use models::{
     RunnerConfig, SessionId, SnapshotId, WorkflowContext, WorkflowResult,
 };
 pub use session::{
-    HostVmProvider, MockVmProvider, Session, SessionManager, SessionManagerConfig,
-    SessionStartSpec, SessionState, SessionStats, VmProvider,
+    FcctlWebProvider, HostVmProvider, MockVmProvider, Session, SessionManager,
+    SessionManagerConfig, SessionStartSpec, SessionState, SessionStats, VmProvider,
 };
 #[cfg(feature = "github-runner")]
 pub use workflow::WorkflowParser;

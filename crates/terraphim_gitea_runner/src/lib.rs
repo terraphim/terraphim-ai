@@ -40,7 +40,7 @@ pub mod taxonomy_policy;
 pub mod types;
 pub mod workflow_payload;
 
-pub use config::RunnerConfig;
+pub use config::{RunnerConfig, VmMode};
 pub use policy::{CommandRoute, ExecutionPlan, PolicyPlanner, TrustLevel};
 pub use state::RunnerState;
 pub use taxonomy_policy::TaxonomyPlanner;

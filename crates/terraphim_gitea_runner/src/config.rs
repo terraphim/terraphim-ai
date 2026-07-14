@@ -3,6 +3,26 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+/// VM execution mode for build steps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum VmMode {
+    /// Run commands directly on the host (today's behaviour; fail-open default).
+    #[default]
+    Host,
+    /// Run commands inside ephemeral Firecracker microVMs via fcctl-web.
+    Firecracker,
+}
+
+impl VmMode {
+    /// Parse from an environment variable string (case-insensitive).
+    pub fn from_env_str(s: &str) -> Self {
+        match s.to_ascii_lowercase().as_str() {
+            "firecracker" | "fc" | "vm" => VmMode::Firecracker,
+            _ => VmMode::Host,
+        }
+    }
+}
+
 /// Configuration for the native Gitea runner daemon.
 #[derive(Debug, Clone)]
 pub struct RunnerConfig {
@@ -40,6 +60,12 @@ pub struct RunnerConfig {
     /// Directory containing `command_policy.md` for the taxonomy-driven
     /// command allowlist. If `None`, the embedded default policy is used.
     pub taxonomy_dir: Option<PathBuf>,
+    /// VM execution mode: `Host` (default, fail-open) or `Firecracker`.
+    pub vm_mode: VmMode,
+    /// fcctl-web base URL when `vm_mode == Firecracker`.
+    pub fcctl_url: String,
+    /// VM type to allocate from fcctl-web (must exist in images.yaml).
+    pub fcctl_vm_type: String,
 }
 
 /// Configuration for the optional legacy commit-status mirror.
@@ -66,6 +92,9 @@ impl Default for RunnerConfig {
             http_request_timeout: Duration::from_secs(30),
             poll_timeout: Duration::from_secs(60),
             taxonomy_dir: None,
+            vm_mode: VmMode::Host,
+            fcctl_url: "http://127.0.0.1:8080".to_string(),
+            fcctl_vm_type: "rust-ci".to_string(),
         }
     }
 }
