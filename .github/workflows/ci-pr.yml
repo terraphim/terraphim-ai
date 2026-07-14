@@ -830,12 +830,40 @@ jobs:
           # Failures include advisory ID and affected crate name.
           cargo audit --deny warnings
 
+  # Workspace rust-version declaration gate (#3078)
+  # Fast (<1s), no Rust toolchain needed — mirrors the crate-manifests gate (#3062).
+  # Fails fast at PR time if any effective workspace member omits [package] rust-version.
+  rust-version:
+    name: Workspace rust-version Gate
+    runs-on: [self-hosted, bigbox]
+    timeout-minutes: 1
+    needs: changes
+    if: needs.changes.outputs.rust-changed == 'true'
+
+    steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify every workspace member declares rust-version
+        run: ./scripts/check-rust-version.sh
+
   # Job summary
   pr-summary:
     name: PR Validation Summary
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 1
-    needs: [changes, build-frontend, rust-format, rustdoc, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build, ranking-regression-gate, security-audit]
+    needs: [changes, build-frontend, rust-format, rustdoc, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build, ranking-regression-gate, security-audit, rust-version]
     if: always()
 
     steps:
@@ -862,6 +890,7 @@ jobs:
           echo "| WASM Build | ${{ needs.wasm-build.result || 'skipped' }} | WebAssembly compilation |" >> $GITHUB_STEP_SUMMARY
           echo "| Ranking Regression Gate | ${{ needs.ranking-regression-gate.result || 'skipped' }} | Kendall-tau snapshot gate (WIG-1) |" >> $GITHUB_STEP_SUMMARY
           echo "| Security Audit | ${{ needs.security-audit.result || 'skipped' }} | cargo audit -- blocks on unacknowledged RUSTSEC advisories |" >> $GITHUB_STEP_SUMMARY
+          echo "| rust-version Gate | ${{ needs.rust-version.result || 'skipped' }} | declares MSRV per member -- blocks MSRV drift recurrence (#2754, #3078) |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [[ "${{ needs.rust-format.result }}" == "failure" ]] || \
@@ -870,7 +899,8 @@ jobs:
              [[ "${{ needs.rust-compile.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.ranking-regression-gate.result }}" == "failure" ]] || \
-             [[ "${{ needs.security-audit.result }}" == "failure" ]]; then
+             [[ "${{ needs.security-audit.result }}" == "failure" ]] || \
+             [[ "${{ needs.rust-version.result }}" == "failure" ]]; then
             echo "❌ **PR Validation Failed** - Please fix the failing checks before merging." >> $GITHUB_STEP_SUMMARY
             exit 1
           else
