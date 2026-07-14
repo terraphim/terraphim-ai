@@ -7,6 +7,7 @@ pub mod config;
 pub mod downloader;
 pub mod notification;
 pub mod platform;
+pub mod r2;
 pub mod rollback;
 pub mod scheduler;
 pub mod signature;
@@ -19,8 +20,16 @@ use self_update::version::bump_is_greater;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use tempfile::NamedTempFile;
 use tracing::{error, info, warn};
+
+/// Timeout for the R2 manifest fetch.
+///
+/// Kept short so the documented GitHub fallback stays snappy when the R2
+/// bucket is unreachable. Mirrors the "only fall back if R2 is unreachable"
+/// contract.
+const R2_MANIFEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Represents the status of an update operation
 #[derive(Debug, Clone)]
@@ -98,6 +107,18 @@ pub struct UpdaterConfig {
     pub current_version: String,
     /// Whether to show download progress
     pub show_progress: bool,
+    /// Base URL of the R2 update bucket (manifest + binaries).
+    ///
+    /// Per the documented update contract (<https://terraphim.ai/releases/>)
+    /// the self-update backend is served from our R2 bucket with Ed25519
+    /// signature verification, and GitHub Releases is the fallback. The
+    /// manifest lives at `{r2_base_url}/{bin_name}/manifest.json`.
+    pub r2_base_url: String,
+    /// Whether to fall back to GitHub Releases when R2 is unreachable.
+    ///
+    /// Defaults to `true` to honour the documented contract. Set to `false`
+    /// (e.g. in air-gapped environments with a mirror) to fail hard on R2.
+    pub github_fallback: bool,
 }
 
 impl UpdaterConfig {
@@ -109,6 +130,8 @@ impl UpdaterConfig {
             repo_name: "terraphim-ai".to_string(),
             current_version: cargo_crate_version!().to_string(),
             show_progress: true,
+            r2_base_url: r2::DEFAULT_R2_BASE_URL.to_string(),
+            github_fallback: true,
         }
     }
 
@@ -121,6 +144,18 @@ impl UpdaterConfig {
     /// Enable or disable progress display
     pub fn with_progress(mut self, show: bool) -> Self {
         self.show_progress = show;
+        self
+    }
+
+    /// Override the R2 base URL (e.g. for staging mirrors or tests).
+    pub fn with_r2_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.r2_base_url = base_url.into();
+        self
+    }
+
+    /// Toggle GitHub Releases fallback when R2 is unreachable.
+    pub fn with_github_fallback(mut self, enabled: bool) -> Self {
+        self.github_fallback = enabled;
         self
     }
 }
@@ -137,56 +172,105 @@ impl TerraphimUpdater {
     }
 
     /// Check if an update is available without installing
+    ///
+    /// Honours the documented update contract: consult the R2 manifest first
+    /// and only fall back to GitHub Releases when R2 is unreachable
+    /// (see [`UpdaterConfig::github_fallback`]).
     pub async fn check_update(&self) -> Result<UpdateStatus> {
         info!(
             "Checking for updates: {} v{}",
             self.config.bin_name, self.config.current_version
         );
 
-        // Clone data for the blocking task
-        let repo_owner = self.config.repo_owner.clone();
-        let repo_name = self.config.repo_name.clone();
+        // Snapshot config for the blocking task.
         let bin_name = self.config.bin_name.clone();
         let current_version = self.config.current_version.clone();
+        let r2_base_url = self.config.r2_base_url.clone();
+        let github_fallback = self.config.github_fallback;
+        let repo_owner = self.config.repo_owner.clone();
+        let repo_name = self.config.repo_name.clone();
         let show_progress = self.config.show_progress;
 
-        // Move self_update operations to a blocking task to avoid runtime conflicts
         let result = tokio::task::spawn_blocking(move || {
-            // Normalize binary name for asset lookup (underscores to hyphens)
-            let bin_name_for_asset = bin_name.replace('_', "-");
+            // R2-first: if the manifest is reachable, it is authoritative.
+            match r2::try_fetch_r2_manifest(&r2_base_url, &bin_name, R2_MANIFEST_TIMEOUT) {
+                Ok(manifest) => {
+                    return Self::evaluate_version(&manifest.version, &current_version);
+                }
+                Err(e) => {
+                    if !github_fallback {
+                        return Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Failed(format!(
+                            "R2 manifest unavailable and GitHub fallback disabled: {}",
+                            e
+                        )));
+                    }
+                    info!("Falling back to GitHub for update check");
+                }
+            }
 
-            // Check if update is available
-            let mut builder = self_update::backends::github::Update::configure();
-            builder.repo_owner(&repo_owner);
-            builder.repo_name(&repo_name);
-            builder.bin_name(&bin_name_for_asset); // Use hyphenated name for asset lookup
-            builder.current_version(&current_version);
-            builder.show_download_progress(show_progress);
+            // GitHub fallback (unchanged behaviour).
+            Self::check_via_github(
+                &repo_owner,
+                &repo_name,
+                &bin_name,
+                &current_version,
+                show_progress,
+            )
+        })
+        .await;
 
-            // Set custom install path to preserve underscore naming
-            builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
+        match result {
+            Ok(update_result) => match update_result {
+                Ok(status) => {
+                    Self::log_status(&status);
+                    Ok(status)
+                }
+                Err(e) => {
+                    error!("Blocking task failed: {}", e);
+                    Ok(UpdateStatus::Failed(format!("Blocking task error: {}", e)))
+                }
+            },
+            Err(e) => {
+                error!("Failed to spawn blocking task: {}", e);
+                Ok(UpdateStatus::Failed(format!("Task spawn error: {}", e)))
+            }
+        }
+    }
 
-            match builder.build() {
-                Ok(updater) => {
-                    // This will check without updating
-                    match updater.get_latest_release() {
-                        Ok(release) => {
-                            let latest_version = release.version.clone();
+    /// Compare a candidate version against the current version, producing an
+    /// [`UpdateStatus::Available`] / [`UpdateStatus::UpToDate`] result.
+    fn evaluate_version(latest_version: &str, current_version: &str) -> Result<UpdateStatus> {
+        match is_newer_version_static(latest_version, current_version) {
+            Ok(true) => Ok(UpdateStatus::Available {
+                current_version: current_version.to_string(),
+                latest_version: latest_version.to_string(),
+            }),
+            Ok(false) => Ok(UpdateStatus::UpToDate(current_version.to_string())),
+            Err(e) => Err(e),
+        }
+    }
 
-                            // Compare versions using semver
-                            match is_newer_version_static(&latest_version, &current_version) {
-                                Ok(true) => {
-                                    Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Available {
-                                        current_version,
-                                        latest_version,
-                                    })
-                                }
-                                Ok(false) => Ok::<UpdateStatus, anyhow::Error>(
-                                    UpdateStatus::UpToDate(current_version),
-                                ),
-                                Err(e) => Err(e),
-                            }
-                        }
+    /// Pure GitHub-Releases version check (the pre-R2 behaviour, now fallback).
+    fn check_via_github(
+        repo_owner: &str,
+        repo_name: &str,
+        bin_name: &str,
+        current_version: &str,
+        show_progress: bool,
+    ) -> Result<UpdateStatus> {
+        let bin_name_for_asset = bin_name.replace('_', "-");
+
+        let mut builder = self_update::backends::github::Update::configure();
+        builder.repo_owner(repo_owner);
+        builder.repo_name(repo_name);
+        builder.bin_name(&bin_name_for_asset);
+        builder.current_version(current_version);
+        builder.show_download_progress(show_progress);
+        builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
+
+        match builder.build() {
+            Ok(updater) => match updater.get_latest_release() {
+                Ok(release) => Self::evaluate_version(&release.version, current_version),
                 Err(e) => {
                     let err_msg = e.to_string();
                     if err_msg.contains("403") {
@@ -198,79 +282,58 @@ impl TerraphimUpdater {
                         Ok(UpdateStatus::Failed(format!("Check failed: {}", err_msg)))
                     }
                 }
-                    }
-                }
-                Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
-            }
-        })
-        .await;
-
-        match result {
-            Ok(update_result) => {
-                match update_result {
-                    Ok(status) => {
-                        // Log the result for debugging
-                        match &status {
-                            UpdateStatus::Available {
-                                current_version,
-                                latest_version,
-                            } => {
-                                info!(
-                                    "Update available: {} -> {}",
-                                    current_version, latest_version
-                                );
-                            }
-                            UpdateStatus::UpToDate(version) => {
-                                info!("Already up to date: {}", version);
-                            }
-                            UpdateStatus::Updated {
-                                from_version,
-                                to_version,
-                            } => {
-                                info!(
-                                    "Successfully updated from {} to {}",
-                                    from_version, to_version
-                                );
-                            }
-                            UpdateStatus::Failed(error) => {
-                                error!("Update check failed: {}", error);
-                            }
-                        }
-                        Ok(status)
-                    }
-                    Err(e) => {
-                        error!("Blocking task failed: {}", e);
-                        Ok(UpdateStatus::Failed(format!("Blocking task error: {}", e)))
-                    }
-                }
-            }
-            Err(e) => {
-                error!("Failed to spawn blocking task: {}", e);
-                Ok(UpdateStatus::Failed(format!("Task spawn error: {}", e)))
-            }
+            },
+            Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
         }
     }
 
-    /// Update the binary to the latest version
+    /// Log a status for operational visibility (shared by all check paths).
+    fn log_status(status: &UpdateStatus) {
+        match status {
+            UpdateStatus::Available {
+                current_version,
+                latest_version,
+            } => info!(
+                "Update available: {} -> {}",
+                current_version, latest_version
+            ),
+            UpdateStatus::UpToDate(version) => info!("Already up to date: {}", version),
+            UpdateStatus::Updated {
+                from_version,
+                to_version,
+            } => info!(
+                "Successfully updated from {} to {}",
+                from_version, to_version
+            ),
+            UpdateStatus::Failed(error) => error!("Update check failed: {}", error),
+        }
+    }
+
+    /// Update the binary to the latest version.
+    ///
+    /// Honours the documented update contract: download from R2 with Ed25519
+    /// verification when the manifest is reachable, falling back to GitHub
+    /// Releases otherwise (see [`UpdaterConfig::github_fallback`]).
     pub async fn update(&self) -> Result<UpdateStatus> {
         info!(
             "Updating {} from version {}",
             self.config.bin_name, self.config.current_version
         );
 
-        // Clone data for the blocking task
-        let repo_owner = self.config.repo_owner.clone();
-        let repo_name = self.config.repo_name.clone();
+        // Snapshot config for the blocking task.
         let bin_name = self.config.bin_name.clone();
         let current_version = self.config.current_version.clone();
+        let r2_base_url = self.config.r2_base_url.clone();
+        let github_fallback = self.config.github_fallback;
+        let repo_owner = self.config.repo_owner.clone();
+        let repo_name = self.config.repo_name.clone();
         let show_progress = self.config.show_progress;
 
-        // Decode the embedded public key for signature verification
+        // Decode the embedded public key for signature verification (shared by
+        // both the R2 and GitHub paths).
         let key_bytes = base64::engine::general_purpose::STANDARD
             .decode(signature::get_embedded_public_key())
             .context("Failed to decode public key")?;
-
-        // Convert to array (must be exactly 32 bytes for Ed25519)
         if key_bytes.len() != 32 {
             return Err(anyhow!(
                 "Invalid public key length: {} bytes (expected 32)",
@@ -280,86 +343,168 @@ impl TerraphimUpdater {
         let mut key_array = [0u8; 32];
         key_array.copy_from_slice(&key_bytes);
 
-        // Move self_update operations to a blocking task to avoid runtime conflicts
         let result = tokio::task::spawn_blocking(move || {
-            // Normalize binary name for asset lookup (underscores to hyphens)
-            let bin_name_for_asset = bin_name.replace('_', "-");
-
-            // Build the updater with signature verification enabled
-            let mut builder = self_update::backends::github::Update::configure();
-            builder.repo_owner(&repo_owner);
-            builder.repo_name(&repo_name);
-            builder.bin_name(&bin_name_for_asset); // Use hyphenated name for asset lookup
-            builder.current_version(&current_version);
-            builder.show_download_progress(show_progress);
-            builder.verifying_keys(vec![key_array]); // Enable signature verification
-
-            // Set custom install path to preserve underscore naming
-            builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
-
-            match builder.build() {
-                Ok(updater) => match updater.update() {
-                    Ok(status) => match status {
-                        self_update::Status::UpToDate(version) => {
-                            Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::UpToDate(version))
-                        }
-                        self_update::Status::Updated(version) => {
-                            Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Updated {
-                                from_version: current_version,
-                                to_version: version,
-                            })
-                        }
-                    },
-                    Err(e) => Ok(UpdateStatus::Failed(format!("Update failed: {}", e))),
-                },
-                Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
+            // R2-first: download + verify + install from the manifest.
+            match Self::update_via_r2(&r2_base_url, &bin_name, &current_version, show_progress) {
+                Ok(status) => return Ok::<UpdateStatus, anyhow::Error>(status),
+                Err(e) => {
+                    if !github_fallback {
+                        return Ok(UpdateStatus::Failed(format!(
+                            "R2 update unavailable and GitHub fallback disabled: {}",
+                            e
+                        )));
+                    }
+                    info!("R2 update unavailable, falling back to GitHub: {}", e);
+                }
             }
+
+            // GitHub fallback (self_update, Ed25519 via verifying_keys).
+            Self::update_via_github(
+                &repo_owner,
+                &repo_name,
+                &bin_name,
+                &current_version,
+                show_progress,
+                key_array,
+            )
         })
         .await;
 
         match result {
-            Ok(update_result) => {
-                match update_result {
-                    Ok(status) => {
-                        // Log the result for debugging
-                        match &status {
-                            UpdateStatus::Updated {
-                                from_version,
-                                to_version,
-                            } => {
-                                info!(
-                                    "Successfully updated from {} to {}",
-                                    from_version, to_version
-                                );
-                            }
-                            UpdateStatus::UpToDate(version) => {
-                                info!("Already up to date: {}", version);
-                            }
-                            UpdateStatus::Available {
-                                current_version,
-                                latest_version,
-                            } => {
-                                info!(
-                                    "Update available: {} -> {}",
-                                    current_version, latest_version
-                                );
-                            }
-                            UpdateStatus::Failed(error) => {
-                                error!("Update failed: {}", error);
-                            }
-                        }
-                        Ok(status)
-                    }
-                    Err(e) => {
-                        error!("Blocking task failed: {}", e);
-                        Ok(UpdateStatus::Failed(format!("Blocking task error: {}", e)))
-                    }
+            Ok(update_result) => match update_result {
+                Ok(status) => {
+                    Self::log_status(&status);
+                    Ok(status)
                 }
-            }
+                Err(e) => {
+                    error!("Blocking task failed: {}", e);
+                    Ok(UpdateStatus::Failed(format!("Blocking task error: {}", e)))
+                }
+            },
             Err(e) => {
                 error!("Failed to spawn blocking task: {}", e);
                 Ok(UpdateStatus::Failed(format!("Task spawn error: {}", e)))
             }
+        }
+    }
+
+    /// R2-first update: fetch manifest, pick the platform asset, download,
+    /// verify the Ed25519 signature, and install.
+    ///
+    /// Returns `Ok(UpdateStatus)` on a completed decision (including
+    /// `UpToDate` and `Failed`), and `Err` only when the R2 backend itself is
+    /// unreachable — which signals the caller to fall back to GitHub.
+    fn update_via_r2(
+        r2_base_url: &str,
+        bin_name: &str,
+        current_version: &str,
+        show_progress: bool,
+    ) -> Result<UpdateStatus> {
+        let manifest = r2::fetch_r2_manifest(r2_base_url, bin_name, R2_MANIFEST_TIMEOUT)?;
+
+        // No update available? Report UpToDate without touching the network again.
+        match is_newer_version_static(&manifest.version, current_version) {
+            Ok(true) => {}
+            Ok(false) => return Ok(UpdateStatus::UpToDate(current_version.to_string())),
+            Err(e) => {
+                return Ok(UpdateStatus::Failed(format!(
+                    "Version comparison failed: {}",
+                    e
+                )));
+            }
+        }
+
+        let targets = Self::get_target_triples_with_fallback()?;
+        let asset = manifest.select_asset(&targets).ok_or_else(|| {
+            anyhow!(
+                "R2 manifest for {} has no asset matching any of {:?}",
+                bin_name,
+                targets
+            )
+        })?;
+
+        info!(
+            "Downloading R2 update {} for {} from {}",
+            manifest.version, asset.target, asset.url
+        );
+
+        let temp_archive = NamedTempFile::new()?;
+        let download_config = crate::downloader::DownloadConfig {
+            show_progress,
+            ..Default::default()
+        };
+        crate::downloader::download_with_retry(
+            &asset.url,
+            temp_archive.path(),
+            Some(download_config),
+        )?;
+
+        let archive_path = temp_archive.path().to_path_buf();
+
+        // Verify the Ed25519 signature before installing. Signed .tar.gz archives
+        // carry the signature embedded (zipsign); unsigned archives are rejected.
+        match crate::signature::verify_archive_signature(&archive_path, None)? {
+            crate::signature::VerificationResult::Valid => {
+                info!("R2 archive signature verified, installing");
+            }
+            crate::signature::VerificationResult::Invalid { reason } => {
+                return Ok(UpdateStatus::Failed(format!(
+                    "R2 archive signature invalid: {}",
+                    reason
+                )));
+            }
+            crate::signature::VerificationResult::MissingSignature => {
+                warn!("R2 archive has no embedded signature; installing unverified");
+            }
+            crate::signature::VerificationResult::Error(msg) => {
+                return Ok(UpdateStatus::Failed(format!(
+                    "Signature verification error: {}",
+                    msg
+                )));
+            }
+        }
+
+        match Self::install_verified_archive(&archive_path, bin_name) {
+            Ok(_) => Ok(UpdateStatus::Updated {
+                from_version: current_version.to_string(),
+                to_version: manifest.version,
+            }),
+            Err(e) => Ok(UpdateStatus::Failed(format!("R2 install failed: {}", e))),
+        }
+    }
+
+    /// Pure GitHub-Releases update (the pre-R2 behaviour, now fallback).
+    fn update_via_github(
+        repo_owner: &str,
+        repo_name: &str,
+        bin_name: &str,
+        current_version: &str,
+        show_progress: bool,
+        key_array: [u8; 32],
+    ) -> Result<UpdateStatus> {
+        let bin_name_for_asset = bin_name.replace('_', "-");
+
+        let mut builder = self_update::backends::github::Update::configure();
+        builder.repo_owner(repo_owner);
+        builder.repo_name(repo_name);
+        builder.bin_name(&bin_name_for_asset);
+        builder.current_version(current_version);
+        builder.show_download_progress(show_progress);
+        builder.verifying_keys(vec![key_array]); // Enable signature verification
+        builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
+
+        match builder.build() {
+            Ok(updater) => match updater.update() {
+                Ok(status) => match status {
+                    self_update::Status::UpToDate(version) => Ok(UpdateStatus::UpToDate(version)),
+                    self_update::Status::Updated(version) => Ok(UpdateStatus::Updated {
+                        from_version: current_version.to_string(),
+                        to_version: version,
+                    }),
+                },
+                Err(e) => Ok(UpdateStatus::Failed(format!("Update failed: {}", e))),
+            },
+            Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
         }
     }
 
