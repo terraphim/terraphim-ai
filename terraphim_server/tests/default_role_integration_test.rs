@@ -7,6 +7,8 @@ use tokio::time::sleep;
 use terraphim_config::{Config, ConfigState};
 use terraphim_server::{ConfigResponse, SearchResponse, axum_server};
 
+mod common;
+
 /// Integration test for Default role configuration with Ripgrep haystack
 ///
 /// This test validates:
@@ -123,15 +125,18 @@ async fn test_default_role_ripgrep_integration() {
         }
     });
 
-    // Wait for server to start
-    log::info!("⏳ Waiting for server startup...");
-    sleep(Duration::from_secs(3)).await;
+    // Wait for server to become ready by polling the readiness probe instead
+    // of a blind `sleep` that races the router on slow/contended CI runners
+    // (issue #2998 / #2947 flake root cause).
+    log::info!("⏳ Waiting for server readiness via GET /health...");
+    common::wait_for_server_ready(server_addr).await;
 
     let client = terraphim_service::http_client::create_default_client()
         .expect("Failed to create HTTP client");
     let base_url = "http://127.0.0.1:8085";
 
-    // Test 1: Health check
+    // Test 1: Health check (readiness already verified by the poll above;
+    // assert the contract here too for explicit coverage).
     log::info!("🔍 Testing server health...");
     let health_response = client
         .get(format!("{}/health", base_url))
