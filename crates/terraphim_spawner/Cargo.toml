@@ -2,6 +2,7 @@
 name = "terraphim_spawner"
 version = "1.21.0"
 edition = "2021"
+rust-version.workspace = true
 authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "Agent spawner for Terraphim with health checking and output capture"
 documentation = "https://terraphim.ai"
