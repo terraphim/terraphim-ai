@@ -14,11 +14,6 @@ ignore = [
     # No safe upgrade available yet; RustCrypto team migrating to constant-time impl
     # TODO: Remove once octocrab updates to rsa with constant-time support
     "RUSTSEC-2023-0071",
-    # atty unaligned read - transitive dep, only affects Windows with custom allocators
-    "RUSTSEC-2021-0145",
-    # atty unmaintained - used by terraphim_agent, should migrate to std::io::IsTerminal
-    # TODO: Replace atty with is-terminal or std::io::IsTerminal
-    "RUSTSEC-2024-0375",
     # bincode unmaintained - used by redb persistence backend
     # TODO: Evaluate alternatives (postcard, rkyv, etc.)
     "RUSTSEC-2025-0141",

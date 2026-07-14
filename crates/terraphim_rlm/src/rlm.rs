@@ -938,8 +938,9 @@ impl TerraphimRlm {
                 log::debug!("RLM auto-configure: RLM_SKIP_OP=1 set, skipping 1Password");
                 return None;
             }
-            let stdin_is_tty = atty::is(atty::Stream::Stdin);
-            let stderr_is_tty = atty::is(atty::Stream::Stderr);
+            use std::io::IsTerminal;
+            let stdin_is_tty = std::io::stdin().is_terminal();
+            let stderr_is_tty = std::io::stderr().is_terminal();
             let has_display =
                 std::env::var("DISPLAY").is_ok() || std::env::var("WAYLAND_DISPLAY").is_ok();
             if (!stdin_is_tty || !stderr_is_tty) && !has_display {
