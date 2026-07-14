@@ -1,0 +1,52 @@
+# gitea-runner-steward agent template -- disabled by default
+#
+# This template is intentionally outside scripts/adf-setup/agents/ so existing
+# setup globs cannot activate it accidentally. Move into the active agent set
+# only after manifest validation and human review.
+
+[[agents]]
+name = "gitea-runner-steward"
+layer = "Core"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Ferrox"
+terraphim_role = "DevOps Engineer"
+skill_chain = [
+  "rust-development",
+  "gitea-pagerank-workflow",
+  "testing",
+]
+schedule = "15 3 * * *"
+max_cpu_seconds = 1800
+grace_period_secs = 30
+capabilities = [
+  "gitea-runner",
+  "commit-status",
+  "ci-automation",
+]
+project = "terraphim"
+task = '''
+source ~/.profile
+cd "$GITEA_WORKING_DIR"
+
+You are the Gitea runner steward for terraphim-ai. Produce analysis only unless
+a Gitea issue explicitly authorises implementation.
+
+Required checks:
+1. Inspect `crates/terraphim_gitea_runner`, `crates/terraphim_github_runner`,
+   `crates/terraphim_github_runner_server`, and `crates/terraphim_merge_coordinator`.
+2. Confirm whether each crate is an active workspace member or excluded.
+3. Verify that proposed test commands cover excluded crates explicitly and do not
+   rely only on `cargo test --workspace`.
+4. Review Gitea API/status usage for secret handling and branch-protection risk.
+5. Do not change runner configuration, tokens, branch protection, or merge rules.
+
+Post findings to the relevant Gitea issue or write a local report if no issue
+context is provided.
+'''
+
+[agents.pre_check]
+kind = "shell"
+script = """test -f manifest.yaml && grep -q 'gitea-automation:' manifest.yaml && test -d crates/terraphim_gitea_runner"""
+timeout_secs = 30
