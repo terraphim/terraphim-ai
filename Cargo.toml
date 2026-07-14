@@ -50,7 +50,7 @@ exclude = [
     # Host-only runners (omitted from Docker build context)
     # "crates/terraphim_github_runner",  -- re-added to workspace for CI testing (#2953)
     "crates/terraphim_github_runner_server",
-    "crates/terraphim_gitea_runner",
+    # "crates/terraphim_gitea_runner",  -- re-added to workspace for CI testing (#3097)
 ]
 default-members = ["terraphim_server"]
 

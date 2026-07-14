@@ -28,7 +28,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use terraphim_gitea_runner::client::{GiteaRunnerClient, ReqwestRunnerClient};
-use terraphim_gitea_runner::config::{LegacyStatusMirrorConfig, RunnerConfig};
+use terraphim_gitea_runner::config::{LegacyStatusMirrorConfig, RunnerConfig, VmMode};
 use terraphim_gitea_runner::poller::Poller;
 use terraphim_gitea_runner::state::RunnerState;
 use terraphim_gitea_runner::taxonomy_policy::TaxonomyPlanner;
@@ -92,6 +92,12 @@ async fn main() -> anyhow::Result<()> {
 
     let taxonomy_dir = std::env::var("RUNNER_TAXONOMY_DIR").ok().map(PathBuf::from);
 
+    let vm_mode = std::env::var("RUNNER_VM_MODE")
+        .map(|s| VmMode::from_env_str(&s))
+        .unwrap_or_default();
+    let fcctl_url = env_or("FCCTL_URL", "http://127.0.0.1:8080");
+    let fcctl_vm_type = env_or("FCCTL_VM_TYPE", "rust-ci");
+
     let config = RunnerConfig {
         instance_url: env_or("GITEA_URL", "https://git.terraphim.cloud"),
         org: env_or("GITEA_ORG", "terraphim"),
@@ -105,6 +111,9 @@ async fn main() -> anyhow::Result<()> {
         http_request_timeout,
         poll_timeout,
         taxonomy_dir,
+        vm_mode,
+        fcctl_url,
+        fcctl_vm_type,
     };
     let checkout_dir = env_or("RUNNER_CHECKOUT_DIR", ".");
     let version = env!("CARGO_PKG_VERSION").to_string();

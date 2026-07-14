@@ -13,8 +13,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use terraphim_github_runner::{
-    HostCommandExecutor, HostVmProvider, SessionId, SessionManager, SessionManagerConfig,
-    SessionStartSpec, WorkflowExecutor, WorkflowExecutorConfig,
+    FcctlWebProvider, HostCommandExecutor, HostVmProvider, SessionId, SessionManager,
+    SessionManagerConfig, SessionStartSpec, VmCommandExecutor, WorkflowExecutor,
+    WorkflowExecutorConfig,
 };
 
 /// Executes a single fetched task through the reused host stack under policy.
@@ -31,6 +32,12 @@ pub struct TaskWorker<C: GiteaRunnerClient, P: PolicyPlanner> {
     /// Dedicated API token for native commit-status posts (RUNNER_STATUS_TOKEN /
     /// GITEA_TOKEN). Per-job `github.token` often lacks statuses scope on private repos.
     status_fallback: Option<Arc<SingleStatusWriter>>,
+    /// VM execution mode (Host = fail-open default, Firecracker = hermetic VMs).
+    vm_mode: crate::config::VmMode,
+    /// fcctl-web base URL when vm_mode is Firecracker.
+    fcctl_url: String,
+    /// VM type to allocate from fcctl-web (e.g. "rust-ci").
+    fcctl_vm_type: String,
 }
 
 impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
@@ -52,6 +59,9 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             checkout_dir: checkout_dir.into(),
             legacy: None,
             status_fallback: None,
+            vm_mode: crate::config::VmMode::Host,
+            fcctl_url: "http://127.0.0.1:8080".to_string(),
+            fcctl_vm_type: "rust-ci".to_string(),
         }
     }
 
@@ -66,6 +76,19 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
     /// token is missing or returns HTTP 401.
     pub fn with_status_fallback(mut self, writer: Arc<SingleStatusWriter>) -> Self {
         self.status_fallback = Some(writer);
+        self
+    }
+
+    /// Configure VM execution mode (Host = fail-open default, Firecracker = hermetic VMs).
+    pub fn with_vm_config(
+        mut self,
+        vm_mode: crate::config::VmMode,
+        fcctl_url: impl Into<String>,
+        fcctl_vm_type: impl Into<String>,
+    ) -> Self {
+        self.vm_mode = vm_mode;
+        self.fcctl_url = fcctl_url.into();
+        self.fcctl_vm_type = fcctl_vm_type.into();
         self
     }
 
@@ -216,14 +239,40 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
         // the bare `checkout_dir`, preserving prior behaviour.
         let work_dir = self.resolve_work_dir(state, &task).await;
 
-        // Build the reused host execution stack (no VM, no snapshots) rooted at
-        // the resolved per-repo working tree.
+        // Build the execution stack. In Host mode (default, fail-open), commands
+        // run directly on the host. In Firecracker mode, commands run inside
+        // ephemeral Firecracker microVMs via fcctl-web.
+        let http_client = Arc::new(reqwest::Client::new());
+        let (provider, executor): (
+            Arc<dyn terraphim_github_runner::VmProvider>,
+            Arc<dyn terraphim_github_runner::CommandExecutor>,
+        ) = match self.vm_mode {
+            crate::config::VmMode::Firecracker => {
+                log::info!(
+                    "vm_mode=Firecracker: using fcctl-web at {} (vm_type={})",
+                    self.fcctl_url,
+                    self.fcctl_vm_type
+                );
+                let auth_token = std::env::var("FIRECRACKER_AUTH_TOKEN").ok();
+                (
+                    Arc::new(FcctlWebProvider::new(self.fcctl_url.clone(), auth_token)),
+                    Arc::new(VmCommandExecutor::new(self.fcctl_url.clone(), http_client)),
+                )
+            }
+            crate::config::VmMode::Host => (
+                Arc::new(HostVmProvider),
+                Arc::new(HostCommandExecutor::new(work_dir)),
+            ),
+        };
         let session_manager = Arc::new(SessionManager::with_provider(
-            Arc::new(HostVmProvider),
-            SessionManagerConfig::default(),
+            provider,
+            SessionManagerConfig {
+                default_vm_type: self.fcctl_vm_type.clone(),
+                ..Default::default()
+            },
         ));
         let exec = WorkflowExecutor::with_executor(
-            Arc::new(HostCommandExecutor::new(work_dir)),
+            executor,
             session_manager.clone(),
             WorkflowExecutorConfig {
                 snapshot_on_success: false,
