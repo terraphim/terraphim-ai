@@ -299,13 +299,14 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             ) {
                 let job_token =
                     workflow_payload::job_token(&task).unwrap_or_else(|| state.token.clone());
-                let clone_url = format!(
-                    "https://{}@{}/{full}.git",
-                    job_token,
-                    self.instance_url.trim_end_matches('/')
-                );
+                let base = self.instance_url.trim_end_matches('/');
+                let host = base
+                    .strip_prefix("https://")
+                    .or_else(|| base.strip_prefix("http://"))
+                    .unwrap_or(base);
+                let clone_url = format!("https://{}@{}/{full}.git", job_token, host);
                 let clone_cmd = format!(
-                    "git init /workspace && cd /workspace && \
+                    "rm -rf /workspace && git init /workspace && cd /workspace && \
                      git remote add origin {clone_url} && \
                      git fetch --depth 1 origin {sha} && \
                      git checkout FETCH_HEAD"
