@@ -44,9 +44,6 @@ website/static/video/
 website/static/images/terraphim_bg.*
 releases/
 
-# Beads task database (local working state)
-.beads/
-
 # Learning capture artefacts (auto-generated, machine-local)
 .terraphim/learnings/
 
