@@ -18,16 +18,12 @@ synonyms:: pattern detection, anomaly review, fleet health
 
 trigger:: analytical decisions over execution data with session continuity
 
-route:: openai, openai/gpt-5.5
-action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
-
-# Kimi K2.6 via pi-rust (faster, more reliable than opencode).
 route:: kimi-for-coding, kimi-k2.6
 action:: /home/alex/.local/bin/pi-rust --provider kimi-for-coding --model {{ model }} -p "{{ prompt }}"
 
-# Kimi K2.6 via opencode (fallback).
-route:: kimi, kimi-for-coding/k2p6
-action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+# GPT-5.5 via pi-rust openai-codex (ChatGPT OAuth subscription).
+route:: openai-codex, gpt-5.5
+action:: /home/alex/.local/bin/pi-rust --provider openai-codex --model {{ model }} -p "{{ prompt }}"
 
 # Z.AI Coding Plan: GLM-5.2 for analytical decisions (free via subscription).
 route:: zai-coding-plan, glm-5.2
