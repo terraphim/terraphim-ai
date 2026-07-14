@@ -272,7 +272,7 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             },
         ));
         let exec = WorkflowExecutor::with_executor(
-            executor,
+            executor.clone(),
             session_manager.clone(),
             WorkflowExecutorConfig {
                 snapshot_on_success: false,
@@ -289,6 +289,55 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             })
             .await
             .map_err(|e| RunnerError::Execution(e.to_string()))?;
+
+        // In Firecracker mode, clone the repo inside the VM before running
+        // the workflow.  The host checkout is skipped (sources live in the VM).
+        if self.vm_mode == crate::config::VmMode::Firecracker {
+            if let (Some(full), Some(sha)) = (
+                workflow_payload::repository(&task),
+                workflow_payload::head_sha(&task),
+            ) {
+                let job_token =
+                    workflow_payload::job_token(&task).unwrap_or_else(|| state.token.clone());
+                let clone_url = format!(
+                    "https://{}@{}/{full}.git",
+                    job_token,
+                    self.instance_url.trim_end_matches('/')
+                );
+                let clone_cmd = format!(
+                    "git init /workspace && cd /workspace && \
+                     git remote add origin {clone_url} && \
+                     git fetch --depth 1 origin {sha} && \
+                     git checkout FETCH_HEAD"
+                );
+                log::info!(
+                    "Firecracker: cloning {full}@{sha:.8} into VM {} at /workspace",
+                    session.vm_id
+                );
+                match executor
+                    .execute(&session, &clone_cmd, Duration::from_secs(120), "/root")
+                    .await
+                {
+                    Ok(r) if r.success() => {
+                        log::info!(
+                            "Firecracker: repo cloned in {:?} (exit {})",
+                            r.duration,
+                            r.exit_code
+                        );
+                    }
+                    Ok(r) => {
+                        log::error!(
+                            "Firecracker: git clone failed (exit {}): {}",
+                            r.exit_code,
+                            r.stderr
+                        );
+                    }
+                    Err(e) => log::error!("Firecracker: git clone error: {e}"),
+                }
+            } else {
+                log::info!("Firecracker: task has no repo/sha; running workflow without clone");
+            }
+        }
 
         // Report running.
         self.client
