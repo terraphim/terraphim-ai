@@ -9388,6 +9388,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "criterion",
  "dirs 5.0.1",
  "jiff",
  "notify 8.2.0",
