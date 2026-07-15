@@ -4,7 +4,6 @@
 //! This module contains integration tests that exercise the full terraphim server API
 //! using the test harness and fixtures defined in the server_api module.
 
-use std::time::Duration;
 use terraphim_validation::testing::server_api::*;
 
 #[cfg(test)]
@@ -58,7 +57,7 @@ mod api_integration_tests {
 
         // 5. Update configuration
         let mut updated_config = config_response.config;
-        updated_config.global_shortcut = "Ctrl+Shift+X".to_string();
+        updated_config.global_shortcut = Some("Ctrl+Shift+X".to_string());
 
         let response = server.post("/config", &updated_config).await;
 
@@ -67,7 +66,10 @@ mod api_integration_tests {
         let update_response: terraphim_server::ConfigResponse =
             response.validate_json().expect("JSON validation failed");
         assert_eq!(update_response.status, terraphim_server::Status::Success);
-        assert_eq!(update_response.config.global_shortcut, "Ctrl+Shift+X");
+        assert_eq!(
+            update_response.config.global_shortcut,
+            Some("Ctrl+Shift+X".to_string())
+        );
 
         // 6. Test rolegraph visualization
         let response = server.get("/rolegraph").await;
