@@ -475,11 +475,11 @@ async fn test_vm_reuse_after_completion() {
     assert_eq!(vms_after_1.len(), 1, "Should have 1 VM after workflow 1");
     let vm_id_1 = vms_after_1[0].clone();
 
-    // Release the session
-    session_manager
-        .release_session(&result_1.session_id)
-        .await
-        .expect("Should release session 1");
+    // execute_workflow() now owns the full session lifecycle: it creates the
+    // session and releases it after execution (see WorkflowExecutor::execute_workflow
+    // and the VM-leak fix in commit 979e8605e / PR #3113). The executor has already
+    // released workflow 1's session here, so the release-state assertions below
+    // observe the executor's internal release rather than a caller-side one.
 
     let release_count_after_1 = vm_provider.get_release_count().await;
     assert_eq!(
@@ -516,9 +516,20 @@ async fn test_vm_reuse_after_completion() {
     let allocated_vms = vm_provider.get_allocated_vms().await;
     assert_eq!(allocated_vms.len(), 2, "Should have 2 VMs in history");
 
-    // Verify first VM was released
+    // Verify both VMs were released (the executor releases each session after its
+    // workflow completes, so both workflow 1 and workflow 2 VMs are released).
     let released_vms = vm_provider.get_released_vms().await;
-    assert_eq!(released_vms.len(), 1, "Should have 1 released VM");
+    assert_eq!(
+        released_vms.len(),
+        2,
+        "Should have 2 released VMs (executor releases both sessions)"
+    );
+    assert!(
+        released_vms.contains(&vm_id_1),
+        "Workflow 1's VM {} should be among released VMs {:?}",
+        vm_id_1,
+        released_vms
+    );
 
     log::info!("✅ TEST 3 PASSED: VMs properly released and new allocations work correctly");
 }
