@@ -709,10 +709,12 @@ jobs:
 
       - name: Run ranking regression gate
         run: |
+          # In-repo golden-set harness (issue #3132). terraphim_service was extracted to
+          # a polyrepo in #1910; `-p terraphim_service` fails "package not found" here.
           # Fails if Kendall-tau < 0.95 against committed snapshots.
           # To accept an intentional ranking change, run locally with
           # UPDATE_RANKING_SNAPSHOTS=1 and add "Ranking change ACK" to the PR.
-          cargo nextest run -p terraphim_service --profile ci ranking_regression
+          cargo nextest run -p terraphim_server --profile ci ranking_regression_test
 
       - name: sccache stats
         if: always()

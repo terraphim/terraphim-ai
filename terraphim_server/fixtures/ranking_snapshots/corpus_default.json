@@ -1,0 +1,125 @@
+{
+  "scorer": "BM25",
+  "documents": [
+    {
+      "id": "rust_ownership",
+      "title": "Rust Ownership and Borrowing",
+      "body": "Ownership is the core concept of Rust memory safety. The borrow checker enforces that each value has a single owner and tracks lifetimes of borrows. Mutable and immutable references cannot coexist. Rust ownership rules prevent data races at compile time without a garbage collector.",
+      "description": "Rust ownership, borrowing, and lifetimes"
+    },
+    {
+      "id": "rust_async",
+      "title": "Async Rust and the Tokio Runtime",
+      "body": "Async programming in Rust uses futures and the async await syntax. The tokio runtime provides a multi threaded executor, a reactor for IO, and task scheduling. Rust async futures are zero cost abstractions. Tokio spawn creates a new task on the runtime executor.",
+      "description": "Async programming in Rust with the tokio runtime"
+    },
+    {
+      "id": "rust_testing",
+      "title": "Testing Strategies in Rust",
+      "body": "Rust testing includes unit tests, integration tests, and property based testing with proptest. The cargo test command runs the test suite. Rust testing encourages arrange act assert structure. Test coverage tools like tarpaulin measure how many lines are exercised.",
+      "description": "Unit and integration testing in Rust projects"
+    },
+    {
+      "id": "rust_cargo",
+      "title": "Cargo Package Management for Rust",
+      "body": "Cargo is the Rust package manager and build system. The Cargo.toml manifest declares dependencies. Cargo.lock locks dependency versions for reproducible builds. Cargo workspace groups multiple crates. Cargo audit checks dependencies for known vulnerabilities.",
+      "description": "Managing Rust dependencies with Cargo"
+    },
+    {
+      "id": "search_indexing",
+      "title": "Building a Search Engine Inverted Index",
+      "body": "A search engine builds an inverted index mapping terms to document ids. The indexer tokenises documents, removes stop words, and stores postings lists. Ranking uses tf-idf or bm25 relevance scoring. A good search engine balances indexing speed and query latency.",
+      "description": "Inverted index construction for a search engine"
+    },
+    {
+      "id": "search_ranking",
+      "title": "BM25 Ranking and Relevance Scoring",
+      "body": "BM25 is a probabilistic ranking function used by search engines. It extends tf-idf with document length normalisation and saturation. BM25 scoring produces relevance scores that rank documents by query similarity. Okapi BM25 is the reference implementation.",
+      "description": "BM25 relevance ranking for search results"
+    },
+    {
+      "id": "search_fuzzy",
+      "title": "Fuzzy Search and Approximate String Matching",
+      "body": "Fuzzy search finds documents that approximately match a query using edit distance or n-gram similarity. Approximate matching is useful for typo tolerance. Jaccard similarity over n-gram sets is one fuzzy ranking approach. The search engine combines exact and fuzzy matches.",
+      "description": "Fuzzy and approximate matching in search"
+    },
+    {
+      "id": "automata_fsm",
+      "title": "Finite State Automata Theory",
+      "body": "Automata theory studies finite state machines that recognise regular languages. A deterministic finite automaton has exactly one transition per symbol. Nondeterministic automata allow multiple transitions. Automata are the foundation of lexical analysis and pattern matching.",
+      "description": "Finite state automata and regular language recognition"
+    },
+    {
+      "id": "automata_ac",
+      "title": "Aho Corasick Multi Pattern Matching",
+      "body": "The Aho Corasick algorithm builds an automaton that matches multiple string patterns simultaneously in a single pass. It extends the trie with failure links. Aho Corasick is used for synonym detection and token replacement. The automaton construction is linear in pattern size.",
+      "description": "Aho Corasick automaton for multi-pattern matching"
+    },
+    {
+      "id": "automata_regex",
+      "title": "Regular Expressions and Regex Engines",
+      "body": "Regular expressions describe patterns compiled into automata. A regex engine such as the Rust regex crate builds a deterministic automaton for fast matching. Regex theory connects formal languages to practical pattern matching. Backtracking and automata based engines differ in guarantees.",
+      "description": "Regular expression compilation and matching"
+    },
+    {
+      "id": "graph_model",
+      "title": "Graph Database Data Modelling",
+      "body": "A graph database stores entities as nodes and relationships as edges. Modelling data as a graph enables traversal queries that are expensive in relational databases. The property graph model attaches key value pairs to nodes and edges. Graph databases excel at connected data.",
+      "description": "Modelling data in a graph database"
+    },
+    {
+      "id": "graph_traversal",
+      "title": "Graph Traversal Algorithms",
+      "body": "Graph traversal visits nodes following edges. Breadth first search explores neighbours level by level. Depth first search follows a path to its end before backtracking. Dijkstra computes shortest paths with non negative edge weights. Traversal is the basis of graph queries.",
+      "description": "BFS, DFS, and shortest-path graph traversal"
+    },
+    {
+      "id": "graph_knowledge",
+      "title": "Knowledge Graphs and Semantic Representation",
+      "body": "A knowledge graph represents facts as a graph of entities and relations. Knowledge representation in a graph supports semantic queries and reasoning. Linking a knowledge graph to documents enables semantic search. Ontologies define the schema of a knowledge graph.",
+      "description": "Knowledge graphs for semantic search and reasoning"
+    },
+    {
+      "id": "k8s_deploy",
+      "title": "Kubernetes Container Deployment",
+      "body": "Kubernetes orchestrates container deployment across a cluster. A kubernetes deployment manages replicated pods. Container images are scheduled onto nodes by the kubelet. Kubernetes services expose running containers to network traffic. Rolling updates deploy new container versions without downtime.",
+      "description": "Deploying containers with Kubernetes"
+    },
+    {
+      "id": "k8s_network",
+      "title": "Kubernetes Networking and Service Mesh",
+      "body": "Kubernetes networking connects pods and services. A service mesh like Istio manages inter-service traffic and security. Network policies restrict pod communication. Ingress controllers route external traffic to kubernetes services. Container networking uses overlay or bridge drivers.",
+      "description": "Kubernetes networking policies and service mesh"
+    },
+    {
+      "id": "observability_logs",
+      "title": "Log Aggregation and Observability",
+      "body": "Observability combines logs, metrics, and traces. Log aggregation centralises application logs for monitoring and incident response. Structured logging in JSON aids parsing. The ELK stack indexes logs for search. Monitoring dashboards visualise log derived metrics.",
+      "description": "Centralised logging for monitoring and observability"
+    },
+    {
+      "id": "observability_metrics",
+      "title": "Metrics and Monitoring Dashboards",
+      "body": "Metrics quantify system behaviour for monitoring. Prometheus scrapes and stores time series metrics. Grafana dashboards visualise metrics for observability. Alerting rules fire when metrics cross thresholds. Monitoring metrics drives incident response and capacity planning.",
+      "description": "Prometheus metrics and Grafana monitoring dashboards"
+    },
+    {
+      "id": "security_auth",
+      "title": "Authentication and Authorisation Patterns",
+      "body": "Authentication verifies identity while authorisation checks permissions. OAuth and OIDC are standard authentication flows. Role based access control maps roles to permissions. Security best practice applies least privilege. Token based authentication scales to distributed systems.",
+      "description": "Authentication and authorisation security patterns"
+    },
+    {
+      "id": "security_secrets",
+      "title": "Secrets Management and Key Rotation",
+      "body": "Secrets management stores credentials securely outside source code. A vault or secrets manager provides API access to secrets. Key rotation limits the blast radius of a leaked credential. Secret scanning prevents accidental commits of credentials. Security requires regular rotation.",
+      "description": "Managing and rotating security secrets"
+    },
+    {
+      "id": "ci_pipeline",
+      "title": "CI CD Pipeline Automation",
+      "body": "A CI CD pipeline automates build, test, and deployment. Continuous integration runs tests on every commit. Continuous deployment releases passing builds. Pipeline automation reduces manual error. Pipeline stages include lint, compile, test, and deploy. CI gates prevent merging broken code.",
+      "description": "Automating builds and deployment with CI CD pipelines"
+    }
+  ]
+}
