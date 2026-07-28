@@ -157,8 +157,37 @@ impl TaxonomyPlanner {
     }
 }
 
+// Test-only re-export so the gating tests in `mod tests` below can call
+// `probe_rch` directly. Without this, the tests would have to mutate env
+// and exercise the gating indirectly via `default_policy().compile()`,
+// which obscures the assertion.
+//
+// Placed before `mod tests` to satisfy clippy::items_after_test_module.
+// Marked #[cfg(test)] so it only compiles in test builds.
+#[cfg(test)]
+fn probe_rch_for_test() -> bool {
+    probe_rch()
+}
+
 /// Probe `PATH` for an executable named `rch`.
+///
+/// Gated on `RUNNER_VM_MODE`: Firecracker microVMs do NOT ship `rch`,
+/// so routing cargo through `rch exec --` makes every command fail with
+/// exit 127 inside the VM. Host-mode runners can still use rch.
+///
+/// Override with `RCH_DISABLED=1` for emergency disable.
+///
+/// Layer-1 fix for terraphim-agents#83.
 fn probe_rch() -> bool {
+    if std::env::var_os("RCH_DISABLED").is_some() {
+        return false;
+    }
+    if std::env::var_os("RUNNER_VM_MODE")
+        .map(|v| v == "firecracker")
+        .unwrap_or(false)
+    {
+        return false;
+    }
     std::env::var_os("PATH")
         .map(|paths| {
             std::env::split_paths(&paths).any(|dir| {
@@ -488,4 +517,78 @@ mod tests {
         assert!(planner.policy.allowed.contains("cargo"));
         assert!(planner.policy.denied.contains("docker"));
     }
+
+    // -- probe_rch() gating tests (terraphim-agents#83) --
+    //
+    // These tests mutate process-wide environment variables. They use a mutex
+    // to serialise so they don't race with each other or other env-touching
+    // tests. `probe_rch_for_test` (below) re-exports the private fn under
+    // #[cfg(test)] so the assertions are direct rather than indirect.
+
+    /// Mutex serialising tests that mutate RUNNER_VM_MODE / RCH_DISABLED / PATH.
+    static PROBE_RCH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn probe_rch_returns_false_in_fc_mode() {
+        let _g = PROBE_RCH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        unsafe {
+            std::env::set_var("RUNNER_VM_MODE", "firecracker");
+        }
+        assert!(
+            !super::probe_rch_for_test(),
+            "probe_rch() must return false when RUNNER_VM_MODE=firecracker (FC VM has no rch binary)"
+        );
+        unsafe {
+            std::env::remove_var("RUNNER_VM_MODE");
+        }
+    }
+
+    #[test]
+    fn probe_rch_honors_rch_disabled() {
+        let _g = PROBE_RCH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        unsafe {
+            std::env::set_var("RCH_DISABLED", "1");
+        }
+        assert!(
+            !super::probe_rch_for_test(),
+            "probe_rch() must return false when RCH_DISABLED is set"
+        );
+        unsafe {
+            std::env::remove_var("RCH_DISABLED");
+        }
+    }
+
+    #[test]
+    fn probe_rch_returns_true_on_host_with_rch_on_path() {
+        let _g = PROBE_RCH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        unsafe {
+            std::env::remove_var("RUNNER_VM_MODE");
+            std::env::remove_var("RCH_DISABLED");
+        }
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let rch_path = tmp.path().join("rch");
+        std::fs::write(&rch_path, "#!/bin/sh\nexit 0\n").expect("write rch");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&rch_path, std::fs::Permissions::from_mode(0o755))
+                .expect("chmod");
+        }
+        let original_path = std::env::var_os("PATH").unwrap_or_default();
+        let mut new_path = tmp.path().to_path_buf().into_os_string();
+        new_path.push(":");
+        new_path.push(&original_path);
+        unsafe {
+            std::env::set_var("PATH", &new_path);
+        }
+        assert!(
+            super::probe_rch_for_test(),
+            "probe_rch() must return true when rch is on PATH and no FC-mode gate is active"
+        );
+        unsafe {
+            std::env::set_var("PATH", original_path);
+        }
+    }
 }
+
+
