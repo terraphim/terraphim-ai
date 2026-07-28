@@ -13,6 +13,36 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
+/// Wrap a shell command with `cd {working_dir} && ` so it executes inside
+/// the Firecracker VM's mounted workspace, not `/root`.
+///
+/// Layer-1 fix for terraphim-agents#83. fcctl-web's HTTP `/api/llm/execute`
+/// ignores `working_dir` (verified 2026-07-28; only the websocket path honors
+/// it). The runner must wrap defensively so cargo / clippy / build / test
+/// find `Cargo.toml` regardless of fcctl-web behaviour.
+///
+/// Idempotent: if the command already starts with `cd <path>`, the existing
+/// prefix is preserved (no double-wrap). Useful for the git-clone composite
+/// command at task_worker.rs:308 which already bakes `cd /workspace &&` into
+/// itself.
+///
+/// # Arguments
+/// * `command`     — the original shell command
+/// * `working_dir` — absolute path inside the VM (e.g. `/workspace`)
+///
+/// # Returns
+/// The command prefixed with `cd {working_dir} && `, or the original command
+/// if `working_dir` is empty or already begins with `cd `.
+pub fn wrap_command_for_vm(command: &str, working_dir: &str) -> String {
+    if working_dir.is_empty() {
+        return command.to_string();
+    }
+    if command.trim_start().starts_with("cd ") {
+        return command.to_string();
+    }
+    format!("cd {} && {}", working_dir, command)
+}
+
 /// Command executor that uses Firecracker VMs via HTTP API
 pub struct VmCommandExecutor {
     /// Base URL for the fcctl-web API
@@ -85,9 +115,14 @@ impl CommandExecutor for VmCommandExecutor {
         timeout: Duration,
         working_dir: &str,
     ) -> Result<CommandResult> {
+        // Layer-1 fix for terraphim-agents#83: wrap the command with
+        // `cd {working_dir} &&` so cargo runs in /workspace, not /root.
+        // See wrap_command_for_vm for the rationale.
+        let wrapped_command = wrap_command_for_vm(command, working_dir);
+
         info!(
             "Executing command in Firecracker VM {}: {}",
-            session.vm_id, command
+            session.vm_id, wrapped_command
         );
 
         let start = std::time::Instant::now();
@@ -96,7 +131,7 @@ impl CommandExecutor for VmCommandExecutor {
         let payload = serde_json::json!({
             "agent_id": format!("workflow-executor-{}", session.id),
             "language": "bash",
-            "code": command,
+            "code": wrapped_command,
             "vm_id": session.vm_id,
             "timeout_seconds": timeout.as_secs(),
             "working_dir": working_dir,
@@ -464,5 +499,37 @@ mod tests {
         let result = executor.rollback(&session, &snapshot_id).await;
 
         assert!(result.is_ok());
+    }
+
+    // -- wrap_command_for_vm() tests (terraphim-agents#83) --
+
+    #[test]
+    fn wrap_command_for_vm_adds_cd_prefix() {
+        assert_eq!(
+            wrap_command_for_vm("cargo fmt --all -- --check", "/workspace"),
+            "cd /workspace && cargo fmt --all -- --check"
+        );
+    }
+
+    #[test]
+    fn wrap_command_for_vm_idempotent_when_already_wrapped() {
+        // The git-clone composite at task_worker.rs:308 already starts with `cd `.
+        // Don't double-wrap.
+        let cmd = "cd /workspace && rm -rf /workspace && git init /workspace";
+        assert_eq!(wrap_command_for_vm(cmd, "/workspace"), cmd);
+    }
+
+    #[test]
+    fn wrap_command_for_vm_handles_leading_whitespace() {
+        assert_eq!(
+            wrap_command_for_vm("  cargo fmt", "/workspace"),
+            "cd /workspace &&   cargo fmt"
+        );
+    }
+
+    #[test]
+    fn wrap_command_for_vm_empty_working_dir_passes_through() {
+        // No working_dir → no wrapping. Defensive default.
+        assert_eq!(wrap_command_for_vm("cargo fmt", ""), "cargo fmt");
     }
 }
