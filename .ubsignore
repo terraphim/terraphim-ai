@@ -1,2 +1,10 @@
+# UBS hang mitigation (issue #3149): v5.0.7 copies the scan tree to /tmp
+# before scanning. Exclude large non-source directories so the copy stays
+# small even when UBS_MAX_DIR_SIZE_MB=0 is set in the pre-commit hook.
 target/
 **/target/
+.opencode/
+node_modules/
+vs-code-terraphim-it/
+.terraphim/
+.playwright-mcp/
