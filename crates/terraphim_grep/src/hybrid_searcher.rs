@@ -361,7 +361,7 @@ impl HybridSearcher {
         #[cfg(not(feature = "code-search"))]
         {
             let _ = (query, limit, search_path);
-            Ok(vec![])
+            Err("terraphim-grep was built without the `code-search` feature; rebuild with `--features code-search` or use the default release binary".to_string())
         }
     }
 
