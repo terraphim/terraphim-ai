@@ -159,14 +159,14 @@ impl TerraphimGrep {
                 let stats = GrepStats {
                     search_latency_ms,
                     rlm_latency_ms: None,
-                    chunks_returned: 0,
-                    kg_hits: 0,
+                    chunks_returned: chunks.len(),
+                    kg_hits: hybrid_results.kg_concepts.len(),
                 };
 
                 Ok(GrepResult {
                     chunks,
                     answer: None,
-                    concepts: vec![],
+                    concepts: hybrid_results.kg_concepts,
                     sufficiency: SufficiencyState::RlmInsufficient,
                     stats,
                 })
@@ -284,13 +284,22 @@ impl TerraphimGrep {
         &self,
         _query: &str,
         _options: GrepOptions,
-        _chunks: Vec<RetrievedChunk>,
-        _hybrid_results: HybridResults,
-        _start: std::time::Instant,
+        chunks: Vec<RetrievedChunk>,
+        hybrid_results: HybridResults,
+        start: std::time::Instant,
     ) -> Result<GrepResult> {
-        Err(TerraphimGrepError::LlmNotConfigured(
-            "LLM feature not enabled".to_string(),
-        ))
+        Ok(GrepResult {
+            stats: GrepStats {
+                search_latency_ms: start.elapsed().as_millis() as u64,
+                rlm_latency_ms: None,
+                chunks_returned: chunks.len(),
+                kg_hits: hybrid_results.kg_concepts.len(),
+            },
+            chunks,
+            answer: None,
+            concepts: hybrid_results.kg_concepts,
+            sufficiency: SufficiencyState::SearchOnly,
+        })
     }
 
     async fn search_with_rlm(
