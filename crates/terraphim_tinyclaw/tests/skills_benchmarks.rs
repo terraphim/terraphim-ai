@@ -1,11 +1,15 @@
 //! Benchmarks for skills system performance validation
 
+mod common;
+
 use std::time::Instant;
 use tempfile::TempDir;
 use terraphim_tinyclaw::skills::{Skill, SkillExecutor, SkillStep};
 
 #[test]
 fn benchmark_skill_load_time() {
+    common::scrub_env();
+
     // NFR: Skill load time < 100ms
     let temp_dir = TempDir::new().unwrap();
     let executor = SkillExecutor::new(temp_dir.path()).unwrap();
@@ -62,6 +66,8 @@ fn benchmark_skill_load_time() {
 
 #[test]
 fn benchmark_skill_save_time() {
+    common::scrub_env();
+
     let temp_dir = TempDir::new().unwrap();
     let executor = SkillExecutor::new(temp_dir.path()).unwrap();
 
@@ -108,6 +114,8 @@ fn benchmark_skill_save_time() {
 
 #[test]
 fn benchmark_execution_small_skill() {
+    common::scrub_env();
+
     let temp_dir = TempDir::new().unwrap();
     let executor = SkillExecutor::new(temp_dir.path()).unwrap();
 

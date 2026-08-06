@@ -8,6 +8,8 @@
 //!     cargo test -p terraphim_tinyclaw --features slack --test slack_integration -- --ignored
 //! ```
 
+mod common;
+
 #[cfg(feature = "slack")]
 mod slack_tests {
     use std::sync::Arc;
@@ -31,6 +33,7 @@ mod slack_tests {
     #[tokio::test]
     #[ignore]
     async fn test_slack_auth_and_start() {
+        common::scrub_env();
         let config = slack_config_from_env()
             .expect("Set SLACK_BOT_TOKEN and SLACK_APP_TOKEN to run this test");
 
@@ -54,6 +57,7 @@ mod slack_tests {
     #[tokio::test]
     #[ignore]
     async fn test_slack_send_message() {
+        common::scrub_env();
         let config = slack_config_from_env()
             .expect("Set SLACK_BOT_TOKEN and SLACK_APP_TOKEN to run this test");
         let channel_id = test_channel_id().expect("Set SLACK_TEST_CHANNEL to run this test");
