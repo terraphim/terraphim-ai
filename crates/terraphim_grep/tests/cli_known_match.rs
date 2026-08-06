@@ -1,3 +1,5 @@
+#![cfg(feature = "code-search")]
+
 use serde_json::Value;
 use std::fs;
 use std::process::Command;
