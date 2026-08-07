@@ -42,10 +42,30 @@ jobs:
       - name: Create VM
         id: vm
         run: |
-          RESPONSE=$(curl -sf -X POST $FCCTL_URL/api/vms \
+          RESPONSE_FILE=$(mktemp)
+          trap 'rm -f "${RESPONSE_FILE}"' EXIT
+          if HTTP_STATUS=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" -X POST "$FCCTL_URL/api/vms" \
             -H 'Content-Type: application/json' \
-            -d "{\"vm_type\": \"$VM_TYPE\"}")
+            -d "{\"vm_type\": \"$VM_TYPE\"}"); then
+            :
+          else
+            CURL_EXIT=$?
+            RESPONSE=$(cat "$RESPONSE_FILE")
+            echo "fcctl create transport failed: curl exit $CURL_EXIT"
+            if [ -n "$RESPONSE" ]; then
+              echo "$RESPONSE"
+            fi
+            exit 1
+          fi
+          RESPONSE=$(cat "$RESPONSE_FILE")
+          rm -f "$RESPONSE_FILE"
+          trap - EXIT
+          echo "fcctl create status: $HTTP_STATUS"
           echo "$RESPONSE"
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "ERROR: fcctl-web VM create failed with HTTP $HTTP_STATUS"
+            exit 1
+          fi
           VM_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
           if [ -z "$VM_ID" ] || [ "$VM_ID" = "null" ]; then
             echo "ERROR: failed to parse vm id from response"
@@ -144,8 +164,8 @@ jobs:
       # bigbox; see .cargo/config.toml for the Darwin `dynamic_lookup`
       # linker workaround on local Mac dev.
       #
-      # All cargo invocations are dispatched via `rch exec --` so they
-      # share rchd's queue + slot accounting with ADF agents (see
+      # Build-oriented cargo invocations are dispatched via `rch exec --` so
+      # they share rchd's queue + slot accounting with ADF agents (see
       # .docs/adr-rch-build-queue-not-firecracker-ci.md). Fail-open: if
       # rchd is down or no slot is available, rch falls through to local
       # cargo with no behaviour change.
@@ -161,15 +181,34 @@ jobs:
       - name: Install cargo-nextest
         run: |
           if ! command -v cargo-nextest >/dev/null 2>&1; then
-            cargo install cargo-nextest --locked
+            curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C "${CARGO_HOME:-$HOME/.cargo}/bin"
           fi
           cargo nextest --version
 
       - name: cargo nextest run --workspace
-        # Only test_chat_command is skipped: it requires LLM API credentials
-        # not present in CI. All other failures must be fixed at the source,
-        # not skipped. nextest uses filter expressions instead of --skip.
-        run: /home/alex/.local/bin/rch exec -- cargo nextest run --workspace --profile ci -E 'not test(test_chat_command)'
+        # test_chat_command is skipped: it requires LLM API credentials not
+        # present in CI. The MCP autocomplete E2E binary is excluded here only
+        # because it spawns nested `cargo run`; the following step covers it
+        # serially to avoid build-dir lock contention. All other failures must
+        # be fixed at the source, not skipped. nextest uses filter expressions
+        # instead of --skip.
+        # Do not wrap these invocations in `rch exec`: rch's non-compilation
+        # command path loses shell quoting around filter expressions and makes
+        # `/bin/sh` parse parentheses in predicates like `test(...)`.
+        # `RUSTC_WRAPPER=sccache` above still applies to rustc invocations.
+        run: |
+          cargo nextest run --workspace --profile ci \
+            -E 'not test(test_chat_command) - binary_id(terraphim_mcp_server::mcp_autocomplete_e2e_test)'
+
+      - name: cargo nextest run mcp_autocomplete_e2e serially
+        # These tests spawn `cargo run --bin terraphim_mcp_server`. Under
+        # nextest each test is its own process, so `#[serial]` cannot prevent
+        # concurrent nested Cargo invocations. Run this binary separately with
+        # one test thread to avoid build-dir lock contention and CI timeouts.
+        run: |
+          cargo nextest run -p terraphim_mcp_server --test mcp_autocomplete_e2e_test \
+            --profile ci --test-threads 1 --no-capture \
+            -E 'not test(test_chat_command)'
 
       - name: sccache stats
         if: always()
