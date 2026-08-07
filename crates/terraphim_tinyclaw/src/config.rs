@@ -10,6 +10,11 @@ pub struct Config {
     pub channels: ChannelsConfig,
     #[serde(default)]
     pub tools: ToolsConfig,
+    /// Credential pool configuration. **Default: disabled.** When
+    /// `credentials.enabled = false`, the existing env-var expansion path
+    /// remains in effect (rollback = config flag, no code revert).
+    #[serde(default)]
+    pub credentials: CredentialsConfig,
 }
 
 impl Config {
@@ -868,5 +873,178 @@ model = "llama3.2"
             output.contains("***REDACTED***"),
             "Redaction marker must appear in LlmConfig Debug output"
         );
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Credential pool configuration (Wave 1 of Hermes parity arc, epic #3160).
+// -----------------------------------------------------------------------------
+
+/// Credential pool configuration. When `enabled = false` (the default) the
+/// existing env-var expansion path is used. When `enabled = true`, the
+/// `HybridLlmRouter` consults the pool instead.
+///
+/// **Default behaviour: disabled.** Tinyclaw continues to honour `OPENROUTER_KEY`
+/// etc. via the existing config expansion unless the operator explicitly
+/// turns the pool on.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CredentialsConfig {
+    /// Master switch. `false` = use the legacy env-var path.
+    /// `true` = use the credential pool.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Optional path to a `KEY=VALUE` env file (Hermes' `~/.hermes/.env`
+    /// style). When set, an `EnvFileSource` is constructed at startup and
+    /// used as the default source for the pool. When unset, an
+    /// `EnvVarSource` is used (env-var lookups only).
+    #[serde(default)]
+    pub pool_file: Option<std::path::PathBuf>,
+
+    /// Default cooldown applied by `report_throttle` when the caller does
+    /// not supply one. Matches Hermes' 60-second default.
+    #[serde(default = "default_credentials_cooldown_secs")]
+    pub cooldown_secs: u64,
+
+    /// Provider class the router should acquire from the pool (e.g.
+    /// "openrouter"). When `None` or empty, the pool is not consulted even
+    /// if `enabled = true`.
+    #[serde(default)]
+    pub provider_class: Option<String>,
+
+    /// Pool entries as `provider=class:env_or_file` triples. Format:
+    ///
+    /// ```toml
+    /// [[credentials.entries]]
+    /// provider = "openrouter-primary"
+    /// class = "openrouter"
+    /// token_ref = { env_var = "OPENROUTER_KEY_1" }
+    ///
+    /// [[credentials.entries]]
+    /// provider = "openrouter-fallback"
+    /// class = "openrouter"
+    /// token_ref = { file = "/etc/tinyclaw/openrouter-2.env" }
+    /// ```
+    ///
+    /// Empty by default; pool becomes a no-op (every `acquire` returns
+    /// `Exhausted`) unless entries are registered.
+    #[serde(default)]
+    pub entries: Vec<CredentialEntryConfig>,
+}
+
+/// TOML-friendly serialisation of `TokenRef`. Same shape as `TokenRef` but
+/// uses `serde`'s `tag`-less externally-tagged enum so configs stay short.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum TokenRefConfig {
+    /// `token_ref = { env_var = "OPENROUTER_KEY" }`
+    EnvVar {
+        #[serde(rename = "env_var")]
+        env_var: String,
+    },
+    /// `token_ref = { file = "/etc/tinyclaw/or.env" }`
+    File { file: std::path::PathBuf },
+}
+
+impl From<TokenRefConfig> for crate::credentials::TokenRef {
+    fn from(value: TokenRefConfig) -> Self {
+        match value {
+            TokenRefConfig::EnvVar { env_var } => {
+                crate::credentials::TokenRef::EnvVar { name: env_var }
+            }
+            TokenRefConfig::File { file } => crate::credentials::TokenRef::File { path: file },
+        }
+    }
+}
+
+/// One credential entry in `CredentialsConfig.entries`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CredentialEntryConfig {
+    /// Provider identifier (e.g. `"openrouter-primary"`).
+    pub provider: String,
+    /// Provider class (e.g. `"openrouter"`). Multiple entries with the
+    /// same class form a rotation pool.
+    pub class: String,
+    /// How to materialise the secret.
+    pub token_ref: TokenRefConfig,
+}
+
+fn default_credentials_cooldown_secs() -> u64 {
+    60
+}
+
+impl Default for CredentialsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            pool_file: None,
+            cooldown_secs: default_credentials_cooldown_secs(),
+            provider_class: None,
+            entries: Vec::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod credentials_config_tests {
+    use super::*;
+
+    #[test]
+    fn credentials_config_default_is_disabled() {
+        let cfg = CredentialsConfig::default();
+        assert!(!cfg.enabled);
+        assert!(cfg.pool_file.is_none());
+        assert_eq!(cfg.cooldown_secs, 60);
+        assert!(cfg.entries.is_empty());
+    }
+
+    #[test]
+    fn credentials_config_round_trip() {
+        let toml = r#"
+enabled = true
+pool_file = "/etc/tinyclaw/creds.env"
+cooldown_secs = 30
+provider_class = "openrouter"
+
+[[entries]]
+provider = "openrouter-primary"
+class = "openrouter"
+token_ref = { env_var = "OPENROUTER_KEY_1" }
+
+[[entries]]
+provider = "openrouter-fallback"
+class = "openrouter"
+token_ref = { file = "/etc/tinyclaw/or-2.env" }
+"#;
+        let cfg: CredentialsConfig = toml::from_str(toml).expect("parse");
+        assert!(cfg.enabled);
+        assert_eq!(
+            cfg.pool_file.as_deref(),
+            Some(std::path::Path::new("/etc/tinyclaw/creds.env"))
+        );
+        assert_eq!(cfg.cooldown_secs, 30);
+        assert_eq!(cfg.provider_class.as_deref(), Some("openrouter"));
+        assert_eq!(cfg.entries.len(), 2);
+        assert_eq!(cfg.entries[0].provider, "openrouter-primary");
+        assert_eq!(cfg.entries[1].provider, "openrouter-fallback");
+    }
+
+    #[test]
+    fn credentials_config_missing_section_uses_defaults() {
+        let toml = r#"
+[agent]
+max_iterations = 10
+workspace = "/tmp/tinyclaw-test"
+[llm]
+[llm.proxy]
+base_url = "http://x"
+[llm.direct]
+provider = "ollama"
+model = "llama3"
+"#;
+        // Top-level Config defaults `credentials` when missing.
+        let cfg: Config = toml::from_str(toml).expect("parse");
+        assert!(!cfg.credentials.enabled);
+        assert!(cfg.credentials.entries.is_empty());
     }
 }

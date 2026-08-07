@@ -15,6 +15,7 @@ pub mod channel;
 pub mod channels;
 pub mod commands;
 pub mod config;
+pub mod credentials;
 pub mod format;
 pub mod session;
 pub mod skills;

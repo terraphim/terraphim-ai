@@ -53,6 +53,7 @@ pub enum OAuthError {
 }
 
 /// Placeholder type used in tests and as the default. Does not perform any I/O.
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct NoopOAuthFlow {
     provider: String,
@@ -61,6 +62,7 @@ pub struct NoopOAuthFlow {
 impl NoopOAuthFlow {
     /// Create a stub OAuth flow that always returns `Revoked`. Useful for
     /// hermetic tests and as the default value when no real provider is wired.
+    #[allow(dead_code)]
     pub fn new(provider: impl Into<String>) -> Self {
         Self {
             provider: provider.into(),

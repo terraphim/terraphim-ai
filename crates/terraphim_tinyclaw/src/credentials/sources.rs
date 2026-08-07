@@ -13,7 +13,6 @@
 //! plugged in by implementing the `CredentialSource` trait.
 
 use std::collections::HashMap;
-use std::fmt;
 use std::path::PathBuf;
 
 use super::pool::{CredentialError, CredentialSource, TokenRef};
@@ -24,6 +23,13 @@ use super::pool::{CredentialError, CredentialSource, TokenRef};
 /// `EnvFileSource` if file-backed credentials are in play.
 #[derive(Debug, Default, Clone)]
 pub struct EnvVarSource;
+
+impl EnvVarSource {
+    /// Construct a new env-var source.
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 impl CredentialSource for EnvVarSource {
     fn resolve(&self, token_ref: &TokenRef) -> Option<String> {
@@ -60,9 +66,8 @@ impl EnvFileSource {
     /// from the parsed map).
     pub fn load(path: impl Into<PathBuf>) -> Result<Self, CredentialError> {
         let path = path.into();
-        let content = std::fs::read_to_string(&path).map_err(|e| {
-            CredentialError::SourceUnreadable(format!("{}: {}", path.display(), e))
-        })?;
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| CredentialError::SourceUnreadable(format!("{}: {}", path.display(), e)))?;
         let pairs = Self::parse(&content);
         Ok(Self { pairs, path })
     }
@@ -120,36 +125,44 @@ mod tests {
 
     #[test]
     fn env_var_source_returns_present_var() {
-        // The `common::scrub_env()` call ensures we start from a known
-        // state; this test only runs in the `credentials` integration suite.
         let src = EnvVarSource;
-        std::env::set_var("WAVE1_TEST_KEY", "present");
+        // SAFETY: test-only env mutation, single-threaded test runner per
+        // Wave 0 hermetic scrubber convention.
+        unsafe {
+            std::env::set_var("WAVE1_TEST_KEY", "present");
+        }
         let resolved = src.resolve(&TokenRef::EnvVar {
             name: "WAVE1_TEST_KEY".into(),
         });
         assert_eq!(resolved.as_deref(), Some("present"));
-        std::env::remove_var("WAVE1_TEST_KEY");
+        unsafe {
+            std::env::remove_var("WAVE1_TEST_KEY");
+        }
     }
 
     #[test]
     fn env_var_source_skips_missing() {
         let src = EnvVarSource;
-        std::env::remove_var("WAVE1_DEFINITELY_NOT_SET");
-        assert!(src
-            .resolve(&TokenRef::EnvVar {
+        unsafe {
+            std::env::remove_var("WAVE1_DEFINITELY_NOT_SET");
+        }
+        assert!(
+            src.resolve(&TokenRef::EnvVar {
                 name: "WAVE1_DEFINITELY_NOT_SET".into()
             })
-            .is_none());
+            .is_none()
+        );
     }
 
     #[test]
     fn env_var_source_cannot_read_files() {
         let src = EnvVarSource;
-        assert!(src
-            .resolve(&TokenRef::File {
+        assert!(
+            src.resolve(&TokenRef::File {
                 path: PathBuf::from("/tmp/x.env")
             })
-            .is_none());
+            .is_none()
+        );
     }
 
     #[test]
@@ -183,9 +196,6 @@ export ZED_KEY='single quoted'
     #[test]
     fn env_file_source_missing_file_is_error() {
         let src = EnvFileSource::load("/nonexistent/path/creds.env");
-        assert!(matches!(
-            src,
-            Err(CredentialError::SourceUnreadable(_))
-        ));
+        assert!(matches!(src, Err(CredentialError::SourceUnreadable(_))));
     }
 }

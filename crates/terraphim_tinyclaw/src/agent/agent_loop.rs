@@ -7,6 +7,7 @@ use crate::agent::proxy_client::{
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::commands::CommandRegistry;
 use crate::config::{AgentConfig, DirectLlmConfig};
+use crate::credentials::{CredentialPool, CredentialSource, EnvVarSource, ProviderId};
 use crate::session::{ChatMessage, MessageRole, SessionManager};
 use crate::tools::{ToolError, ToolRegistry};
 use std::collections::HashMap;
@@ -43,11 +44,52 @@ pub struct HybridLlmRouter {
     direct_http: reqwest::Client,
     /// Whether tools are currently available.
     tools_available: AtomicBool,
+    /// Optional credential pool. When present and enabled, the router
+    /// acquires a live token before each proxy request.
+    credential_pool: Option<Arc<CredentialPool>>,
+    /// Synchronous source used to resolve TokenRefs.
+    credential_source: Arc<dyn CredentialSource>,
+    /// Provider class to acquire (e.g. "openrouter"). Mirrors Hermes'
+    /// `provider_class` config field.
+    credential_class: String,
 }
 
 impl HybridLlmRouter {
-    /// Create a new hybrid router.
+    /// Create a new hybrid router without credential pooling.
     pub fn new(proxy_config: ProxyClientConfig, direct_config: DirectLlmConfig) -> Self {
+        Self::with_credential_pool_inner(
+            proxy_config,
+            direct_config,
+            None,
+            Arc::new(EnvVarSource::new()),
+            String::new(),
+        )
+    }
+
+    /// Create a new hybrid router with credential-pool support.
+    pub fn with_credential_pool(
+        proxy_config: ProxyClientConfig,
+        direct_config: DirectLlmConfig,
+        pool: Arc<CredentialPool>,
+        credential_class: impl Into<String>,
+        credential_source: Option<Arc<dyn CredentialSource>>,
+    ) -> Self {
+        Self::with_credential_pool_inner(
+            proxy_config,
+            direct_config,
+            Some(pool),
+            credential_source.unwrap_or_else(|| Arc::new(EnvVarSource::new())),
+            credential_class.into(),
+        )
+    }
+
+    fn with_credential_pool_inner(
+        proxy_config: ProxyClientConfig,
+        direct_config: DirectLlmConfig,
+        credential_pool: Option<Arc<CredentialPool>>,
+        credential_source: Arc<dyn CredentialSource>,
+        credential_class: String,
+    ) -> Self {
         let proxy = ProxyClient::new(proxy_config);
         let direct_http = reqwest::Client::new();
 
@@ -56,11 +98,39 @@ impl HybridLlmRouter {
             direct_config,
             direct_http,
             tools_available: AtomicBool::new(true),
+            credential_pool,
+            credential_source,
+            credential_class,
         }
     }
 
     /// Default Ollama base URL.
     const DEFAULT_OLLAMA_URL: &str = "http://127.0.0.1:11434";
+
+    /// Resolve the API key to use for the next proxy request.
+    ///
+    /// If the credential pool is enabled and yields a token, use it and
+    /// remember the provider id so we can report success/throttle later.
+    /// Otherwise fall back to the static `proxy.api_key`.
+    fn acquire_proxy_token(&self) -> (String, Option<ProviderId>) {
+        if let Some(pool) = &self.credential_pool
+            && !self.credential_class.is_empty()
+        {
+            match pool.acquire(&self.credential_class, self.credential_source.as_ref()) {
+                Ok(cred) => {
+                    let provider = cred.provider.clone();
+                    return (cred.token, Some(provider));
+                }
+                Err(e) => {
+                    log::warn!(
+                        "Credential pool exhausted ({}); falling back to proxy.api_key",
+                        e
+                    );
+                }
+            }
+        }
+        (self.proxy.api_key().to_string(), None)
+    }
 
     /// Call the direct LLM (Ollama) with a prompt.
     /// Returns the response text, or an error if the call fails.
@@ -103,13 +173,29 @@ impl HybridLlmRouter {
             anyhow::bail!("Proxy is unavailable - tools disabled");
         }
 
-        match self.proxy.chat_with_tools(messages, system, tools).await {
+        let (token, provider) = self.acquire_proxy_token();
+
+        match self
+            .proxy
+            .chat_with_tools_and_token(&token, messages, system, tools)
+            .await
+        {
             Ok(response) => {
                 self.tools_available.store(true, Ordering::SeqCst);
+                if let Some(p) = provider
+                    && let Some(pool) = &self.credential_pool
+                {
+                    pool.report_success(&p);
+                }
                 Ok(response)
             }
             Err(e) => {
                 self.tools_available.store(false, Ordering::SeqCst);
+                if let Some(p) = provider
+                    && let Some(pool) = &self.credential_pool
+                {
+                    pool.report_throttle(&p, None);
+                }
                 Err(e)
             }
         }
@@ -130,14 +216,29 @@ impl HybridLlmRouter {
 
         // Try proxy first for text-only if available
         if self.proxy.is_available() {
-            match self.proxy.chat(messages.clone(), system.clone()).await {
+            let (token, provider) = self.acquire_proxy_token();
+            match self
+                .proxy
+                .chat_with_token(&token, messages.clone(), system.clone())
+                .await
+            {
                 Ok(response) => {
+                    if let Some(p) = provider
+                        && let Some(pool) = &self.credential_pool
+                    {
+                        pool.report_success(&p);
+                    }
                     return Ok(response.content.unwrap_or_else(|| {
                         "Tools are currently unavailable, answering from knowledge only."
                             .to_string()
                     }));
                 }
                 Err(e) => {
+                    if let Some(p) = provider
+                        && let Some(pool) = &self.credential_pool
+                    {
+                        pool.report_throttle(&p, None);
+                    }
                     log::warn!("Proxy unavailable for text response: {}", e);
                 }
             }
@@ -196,12 +297,18 @@ impl HybridLlmRouter {
         // Tier 1: Try proxy (Claude/OpenAI via terraphim-llm-proxy)
         if self.proxy.is_available() {
             let proxy_messages = vec![Message::user(&summarization_prompt)];
+            let (token, provider) = self.acquire_proxy_token();
             match self
                 .proxy
-                .chat(proxy_messages, Some(summarization_system.clone()))
+                .chat_with_token(&token, proxy_messages, Some(summarization_system.clone()))
                 .await
             {
                 Ok(response) => {
+                    if let Some(p) = provider
+                        && let Some(pool) = &self.credential_pool
+                    {
+                        pool.report_success(&p);
+                    }
                     log::info!(
                         "Context compressed via proxy (model: {}, tokens: {}/{})",
                         response.model,
@@ -213,6 +320,11 @@ impl HybridLlmRouter {
                     }
                 }
                 Err(e) => {
+                    if let Some(p) = provider
+                        && let Some(pool) = &self.credential_pool
+                    {
+                        pool.report_throttle(&p, None);
+                    }
                     log::warn!("Proxy unavailable for compression: {}", e);
                 }
             }
@@ -941,5 +1053,127 @@ mod tests {
         assert!(result.contains("b.mp3"));
         // Should have two voice_transcribe instructions
         assert_eq!(result.matches("voice_transcribe").count(), 2);
+    }
+
+    // -------------------------------------------------------------------------
+    // Credential-pool integration tests for HybridLlmRouter.
+    // -------------------------------------------------------------------------
+
+    /// Build a minimal proxy config for router tests.
+    fn test_proxy_config(api_key: &str) -> ProxyClientConfig {
+        ProxyClientConfig {
+            base_url: "http://localhost:9999".to_string(),
+            api_key: api_key.to_string(),
+            timeout_ms: 1000,
+            model: Some("test-model".to_string()),
+            retry_after_secs: 1,
+        }
+    }
+
+    fn test_direct_config() -> DirectLlmConfig {
+        DirectLlmConfig {
+            provider: "ollama".to_string(),
+            model: "llama3.2".to_string(),
+            base_url: None,
+        }
+    }
+
+    #[test]
+    fn router_without_pool_uses_static_api_key() {
+        let router = HybridLlmRouter::new(test_proxy_config("static-key"), test_direct_config());
+        let (token, provider) = router.acquire_proxy_token();
+        assert_eq!(token, "static-key");
+        assert!(provider.is_none());
+    }
+
+    #[test]
+    fn router_with_pool_uses_resolved_token() {
+        // SAFETY: test-only env mutation under the Wave 0 scrubber convention.
+        unsafe {
+            std::env::set_var("WAVE1_ROUTER_KEY_A", "token-from-pool");
+        }
+
+        let pool = Arc::new(CredentialPool::new());
+        pool.add(crate::credentials::PoolEntry {
+            provider: crate::credentials::ProviderId::from("openrouter-primary"),
+            class: crate::credentials::ProviderClass::from("openrouter"),
+            token_ref: crate::credentials::TokenRef::EnvVar {
+                name: "WAVE1_ROUTER_KEY_A".into(),
+            },
+        });
+
+        let router = HybridLlmRouter::with_credential_pool(
+            test_proxy_config("static-key"),
+            test_direct_config(),
+            pool.clone(),
+            "openrouter",
+            None,
+        );
+
+        let (token, provider) = router.acquire_proxy_token();
+        assert_eq!(token, "token-from-pool");
+        assert_eq!(provider.as_deref(), Some("openrouter-primary"));
+
+        unsafe {
+            std::env::remove_var("WAVE1_ROUTER_KEY_A");
+        }
+    }
+
+    #[test]
+    fn router_with_pool_falls_back_when_exhausted() {
+        // Empty pool for the requested class → fall back to static key.
+        let pool = Arc::new(CredentialPool::new());
+        let router = HybridLlmRouter::with_credential_pool(
+            test_proxy_config("static-key"),
+            test_direct_config(),
+            pool,
+            "openrouter",
+            None,
+        );
+
+        let (token, provider) = router.acquire_proxy_token();
+        assert_eq!(token, "static-key");
+        assert!(provider.is_none());
+    }
+
+    #[test]
+    fn router_pool_success_and_throttle_update_stats() {
+        unsafe {
+            std::env::set_var("WAVE1_ROUTER_KEY_B", "token-b");
+        }
+
+        let pool = Arc::new(CredentialPool::new());
+        pool.add(crate::credentials::PoolEntry {
+            provider: crate::credentials::ProviderId::from("openrouter-primary"),
+            class: crate::credentials::ProviderClass::from("openrouter"),
+            token_ref: crate::credentials::TokenRef::EnvVar {
+                name: "WAVE1_ROUTER_KEY_B".into(),
+            },
+        });
+
+        let router = HybridLlmRouter::with_credential_pool(
+            test_proxy_config("static-key"),
+            test_direct_config(),
+            pool.clone(),
+            "openrouter",
+            None,
+        );
+
+        let (_, provider) = router.acquire_proxy_token();
+        let provider = provider.expect("acquired a provider");
+
+        pool.report_success(&provider);
+        let stats = pool.stats();
+        assert_eq!(stats.successes, 1);
+        assert_eq!(stats.throttles, 0);
+
+        pool.report_throttle(&provider, None);
+        let stats = pool.stats();
+        assert_eq!(stats.successes, 1);
+        assert_eq!(stats.throttles, 1);
+
+        unsafe {
+            std::env::remove_var("WAVE1_ROUTER_KEY_B");
+        }
     }
 }

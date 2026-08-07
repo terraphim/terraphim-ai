@@ -20,11 +20,19 @@ mod oauth;
 mod pool;
 mod sources;
 
+// The bin target doesn't reference every public item — the pool API is
+// surface for the library + integration tests. Allow unused imports on the
+// re-exports so the public API stays documented even when only a subset
+// is wired in by the bin.
+#[allow(unused_imports)]
 pub use oauth::{OAuthError, OAuthFlow};
+#[allow(unused_imports)]
 pub use pool::{
     CredentialError, CredentialPool, PoolEntry, PoolStats, ProviderClass, ProviderId, TokenRef,
 };
+#[allow(unused_imports)]
 pub use sources::{EnvFileSource, EnvVarSource};
 
 // Re-export the trait so consumers can implement their own sources.
+#[allow(unused_imports)]
 pub use pool::CredentialSource;

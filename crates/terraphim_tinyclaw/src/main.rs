@@ -9,6 +9,8 @@ mod commands;
 #[allow(dead_code)]
 mod config;
 #[allow(dead_code)]
+mod credentials;
+#[allow(dead_code)]
 mod format;
 #[allow(dead_code)]
 mod session;
@@ -23,6 +25,7 @@ use crate::bus::MessageBus;
 use crate::channel::{Channel, ChannelManager, build_channels_from_config};
 use crate::channels::cli::CliChannel;
 use crate::config::Config;
+use crate::credentials::{CredentialPool, CredentialSource, EnvFileSource, EnvVarSource};
 use crate::session::SessionManager;
 use crate::skills::{Skill, SkillExecutor};
 use crate::tools::create_default_registry;
@@ -190,14 +193,7 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     ));
 
     // Create hybrid LLM router
-    let proxy_config = ProxyClientConfig {
-        base_url: config.llm.proxy.base_url.clone(),
-        api_key: config.llm.proxy.api_key.clone(),
-        timeout_ms: config.llm.proxy.timeout_ms,
-        model: config.llm.proxy.model.clone(),
-        retry_after_secs: config.llm.proxy.retry_after_secs,
-    };
-    let router = HybridLlmRouter::new(proxy_config, config.llm.direct.clone());
+    let router = build_router(&config)?;
 
     // Create agent loop
     let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt);
@@ -247,14 +243,7 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     ));
 
     // Create hybrid LLM router
-    let proxy_config = ProxyClientConfig {
-        base_url: config.llm.proxy.base_url.clone(),
-        api_key: config.llm.proxy.api_key.clone(),
-        timeout_ms: config.llm.proxy.timeout_ms,
-        model: config.llm.proxy.model.clone(),
-        retry_after_secs: config.llm.proxy.retry_after_secs,
-    };
-    let router = HybridLlmRouter::new(proxy_config, config.llm.direct.clone());
+    let router = build_router(&config)?;
 
     // Create agent loop
     let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt);
@@ -303,6 +292,76 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Build the hybrid LLM router from configuration.
+///
+/// When `config.credentials.enabled` is `true` and a `provider_class` is
+/// configured, build a `CredentialPool` backed by either an env-file source
+/// (`pool_file`) or the process environment. The router will acquire a live
+/// token before each proxy request, fall back to the static `proxy.api_key`
+/// when the pool is exhausted, and report success/throttle events so the
+/// pool can rotate credentials.
+fn build_router(config: &Config) -> anyhow::Result<HybridLlmRouter> {
+    let proxy_config = ProxyClientConfig {
+        base_url: config.llm.proxy.base_url.clone(),
+        api_key: config.llm.proxy.api_key.clone(),
+        timeout_ms: config.llm.proxy.timeout_ms,
+        model: config.llm.proxy.model.clone(),
+        retry_after_secs: config.llm.proxy.retry_after_secs,
+    };
+
+    if config.credentials.enabled {
+        if let Some(class) = config
+            .credentials
+            .provider_class
+            .as_deref()
+            .filter(|s| !s.is_empty())
+        {
+            let source: Arc<dyn CredentialSource> =
+                if let Some(path) = &config.credentials.pool_file {
+                    Arc::new(EnvFileSource::load(path)?)
+                } else {
+                    Arc::new(EnvVarSource::new())
+                };
+
+            let pool = Arc::new(CredentialPool::with_default_cooldown(
+                std::time::Duration::from_secs(config.credentials.cooldown_secs),
+            ));
+
+            for entry in &config.credentials.entries {
+                pool.add(crate::credentials::PoolEntry {
+                    provider: crate::credentials::ProviderId::from(entry.provider.clone()),
+                    class: crate::credentials::ProviderClass::from(entry.class.clone()),
+                    token_ref: entry.token_ref.clone().into(),
+                });
+            }
+
+            log::info!(
+                "Credential pool enabled for class '{}' with {} entries",
+                class,
+                pool.len()
+            );
+
+            return Ok(HybridLlmRouter::with_credential_pool(
+                proxy_config,
+                config.llm.direct.clone(),
+                pool,
+                class,
+                Some(source),
+            ));
+        } else {
+            log::warn!(
+                "credentials.enabled = true but provider_class is missing or empty; \
+                 falling back to static proxy.api_key"
+            );
+        }
+    }
+
+    Ok(HybridLlmRouter::new(
+        proxy_config,
+        config.llm.direct.clone(),
+    ))
 }
 
 async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {

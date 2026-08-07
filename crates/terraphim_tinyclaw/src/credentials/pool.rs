@@ -23,6 +23,7 @@
 //! `CredentialPool::acquire()`, which is the only method that returns a
 //! `MaterialisedCredential` with the live token.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::{Mutex, RwLock};
@@ -218,16 +219,13 @@ impl CredentialPool {
             if &entry.class != class {
                 continue;
             }
-            if let Some(until) = cooldowns.get(&entry.provider) {
-                if *until > now {
-                    continue;
-                }
+            if let Some(until) = cooldowns.get(&entry.provider)
+                && *until > now
+            {
+                continue;
             }
             let token = source.resolve(&entry.token_ref).ok_or_else(|| {
-                CredentialError::SourceUnreadable(format!(
-                    "no value for {}",
-                    entry.token_ref
-                ))
+                CredentialError::SourceUnreadable(format!("no value for {}", entry.token_ref))
             })?;
             return Ok(MaterialisedCredential {
                 provider: entry.provider.clone(),
@@ -296,7 +294,6 @@ impl Default for CredentialPool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
 
     /// In-memory source for hermetic tests. Maps env-var names → values.
     #[derive(Debug, Default)]
