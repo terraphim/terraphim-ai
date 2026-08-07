@@ -6,6 +6,8 @@
 //! - Progress monitoring and reporting
 //! - Error handling and cancellation
 
+mod common;
+
 use std::collections::HashMap;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -67,6 +69,7 @@ fn create_multi_step_skill(step_count: usize) -> Skill {
 
 #[tokio::test]
 async fn test_skill_save_and_load() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
     let skill = create_test_skill();
 
@@ -87,6 +90,7 @@ async fn test_skill_save_and_load() {
 
 #[tokio::test]
 async fn test_skill_list_and_delete() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
 
     // Create multiple skills
@@ -135,6 +139,7 @@ async fn test_skill_list_and_delete() {
 
 #[tokio::test]
 async fn test_skill_execution_success() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
     let skill = create_test_skill();
 
@@ -159,6 +164,7 @@ async fn test_skill_execution_success() {
 #[tokio::test]
 #[ignore]
 async fn test_skill_execution_with_defaults() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
 
     let skill = Skill {
@@ -199,6 +205,7 @@ async fn test_skill_execution_with_defaults() {
 
 #[tokio::test]
 async fn test_skill_execution_missing_required_input() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
     let skill = create_test_skill();
 
@@ -212,6 +219,7 @@ async fn test_skill_execution_missing_required_input() {
 
 #[tokio::test]
 async fn test_skill_execution_timeout() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
     let skill = create_multi_step_skill(5);
 
@@ -232,6 +240,7 @@ async fn test_skill_execution_timeout() {
 
 #[tokio::test]
 async fn test_skill_execution_cancellation() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
     let (_temp_dir2, executor_clone) = setup_test_executor().await;
     let skill = create_multi_step_skill(10);
@@ -261,6 +270,7 @@ async fn test_skill_execution_cancellation() {
 
 #[tokio::test]
 async fn test_execution_report_generation() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
     let skill = create_multi_step_skill(3);
 
@@ -290,6 +300,7 @@ async fn test_execution_report_generation() {
 
 #[tokio::test]
 async fn test_progress_monitoring() {
+    common::scrub_env();
     let skill = create_multi_step_skill(5);
     let mut monitor = SkillMonitor::new(skill.steps.len());
 
@@ -318,6 +329,7 @@ async fn test_progress_monitoring() {
 
 #[tokio::test]
 async fn test_complex_skill_with_all_step_types() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
 
     let skill = Skill {
@@ -368,6 +380,7 @@ async fn test_complex_skill_with_all_step_types() {
 
 #[tokio::test]
 async fn test_skill_versioning() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
 
     // Save first version
@@ -412,6 +425,7 @@ async fn test_skill_versioning() {
 
 #[tokio::test]
 async fn test_empty_skill_execution() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
 
     let skill = Skill {
@@ -435,6 +449,7 @@ async fn test_empty_skill_execution() {
 
 #[tokio::test]
 async fn test_skill_with_many_inputs() {
+    common::scrub_env();
     let (_temp_dir, executor) = setup_test_executor().await;
 
     let skill = Skill {

@@ -3,6 +3,8 @@
 //! Tests GAP-003: Verifies that outbound messages are properly dispatched
 //! to channels in gateway mode.
 
+mod common;
+
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -69,6 +71,8 @@ impl Channel for MockChannel {
 /// Test that outbound messages are dispatched to the correct channel
 #[tokio::test]
 async fn test_outbound_message_dispatch() {
+    common::scrub_env();
+
     // Create message bus
     let bus = Arc::new(MessageBus::new());
 
@@ -123,6 +127,8 @@ async fn test_outbound_message_dispatch() {
 /// Test that messages are routed to the correct channel based on channel field
 #[tokio::test]
 async fn test_message_routing_to_multiple_channels() {
+    common::scrub_env();
+
     // Create message bus
     let bus = Arc::new(MessageBus::new());
 
@@ -187,6 +193,8 @@ async fn test_message_routing_to_multiple_channels() {
 /// Test that unknown channels are handled gracefully
 #[tokio::test]
 async fn test_unknown_channel_graceful_handling() {
+    common::scrub_env();
+
     // Create message bus
     let bus = Arc::new(MessageBus::new());
 
@@ -219,6 +227,8 @@ async fn test_unknown_channel_graceful_handling() {
 /// Test high-throughput message dispatch
 #[tokio::test]
 async fn test_high_throughput_dispatch() {
+    common::scrub_env();
+
     // Create message bus
     let bus = Arc::new(MessageBus::new());
 

@@ -2,12 +2,16 @@
 //!
 //! Tests that configuration values from files are properly passed to tools.
 
+mod common;
+
 use terraphim_tinyclaw::config::{Config, ToolsConfig, WebToolsConfig};
 use terraphim_tinyclaw::tools::create_default_registry;
 
 /// Test that web tools configuration is wired through to the registry.
 #[test]
 fn test_web_tools_config_wired_to_registry() {
+    common::scrub_env();
+
     // Create a config with specific web tools settings
     let config = Config {
         tools: ToolsConfig {
@@ -36,6 +40,8 @@ fn test_web_tools_config_wired_to_registry() {
 /// Test that registry works with no web tools config.
 #[test]
 fn test_registry_without_web_tools_config() {
+    common::scrub_env();
+
     // Create registry without web tools config
     let registry = create_default_registry(None, None);
 
@@ -57,6 +63,8 @@ fn test_registry_without_web_tools_config() {
 /// Test that all expected tools are registered.
 #[test]
 fn test_all_expected_tools_registered() {
+    common::scrub_env();
+
     let registry = create_default_registry(None, None);
 
     let expected_tools = [
