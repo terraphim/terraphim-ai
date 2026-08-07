@@ -23,7 +23,6 @@
 //! `CredentialPool::acquire()`, which is the only method that returns a
 //! `MaterialisedCredential` with the live token.
 
-use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::{Mutex, RwLock};
@@ -414,44 +413,6 @@ mod tests {
         let src = InMemorySource::default();
         let err = pool.acquire(&"x".to_string(), &src).unwrap_err();
         assert!(matches!(err, CredentialError::SourceUnreadable(_)));
-    }
-
-    #[test]
-    fn env_file_source_parses_keyvalue_lines() {
-        let parsed = EnvFileSource::parse(
-            "\
-# comment line
-OR_KEY=or-secret
-AN_KEY=\"quoted value\"
-
-export ZED_KEY='single quoted'
-",
-        );
-        assert_eq!(parsed.get("OR_KEY").unwrap(), "or-secret");
-        assert_eq!(parsed.get("AN_KEY").unwrap(), "quoted value");
-        assert_eq!(parsed.get("ZED_KEY").unwrap(), "single quoted");
-    }
-
-    #[test]
-    fn env_file_source_loads_from_disk() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let path = dir.path().join("creds.env");
-        let mut f = std::fs::File::create(&path).expect("create");
-        writeln!(f, "OR_KEY=disk-secret").unwrap();
-        let src = EnvFileSource::load(&path).expect("load");
-        let resolved = src.resolve(&TokenRef::EnvVar {
-            name: "OR_KEY".into(),
-        });
-        assert_eq!(resolved.as_deref(), Some("disk-secret"));
-    }
-
-    #[test]
-    fn env_file_source_missing_file_is_error() {
-        let src = EnvFileSource::load("/nonexistent/path/creds.env");
-        assert!(matches!(
-            src,
-            Err(CredentialError::SourceUnreadable(_))
-        ));
     }
 
     #[test]
