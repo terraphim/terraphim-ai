@@ -70,6 +70,11 @@ impl ProxyClient {
         }
     }
 
+    /// Access the configured API key (for fallback paths).
+    pub fn api_key(&self) -> &str {
+        &self.config.api_key
+    }
+
     /// Check if the proxy is considered healthy.
     /// Returns false if there was a recent failure and backoff hasn't elapsed.
     pub fn is_available(&self) -> bool {
@@ -102,9 +107,22 @@ impl ProxyClient {
         );
     }
 
-    /// Send a chat request with tools to the proxy.
+    /// Send a chat request with tools to the proxy using the configured API key.
+    #[allow(dead_code)]
     pub async fn chat_with_tools(
         &self,
+        messages: Vec<Message>,
+        system: Option<String>,
+        tools: Vec<ToolDefinition>,
+    ) -> anyhow::Result<ProxyResponse> {
+        self.chat_with_tools_and_token(&self.config.api_key, messages, system, tools)
+            .await
+    }
+
+    /// Send a chat request with tools to the proxy using an explicit bearer token.
+    pub async fn chat_with_tools_and_token(
+        &self,
+        token: &str,
         messages: Vec<Message>,
         system: Option<String>,
         tools: Vec<ToolDefinition>,
@@ -126,7 +144,7 @@ impl ProxyClient {
         let response = self
             .http
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.config.api_key))
+            .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
             .json(&request_body)
             .send()
@@ -156,13 +174,26 @@ impl ProxyClient {
         }
     }
 
-    /// Send a simple chat request without tools.
+    /// Send a simple chat request without tools using the configured API key.
+    #[allow(dead_code)]
     pub async fn chat(
         &self,
         messages: Vec<Message>,
         system: Option<String>,
     ) -> anyhow::Result<ProxyResponse> {
-        self.chat_with_tools(messages, system, vec![]).await
+        self.chat_with_token(&self.config.api_key, messages, system)
+            .await
+    }
+
+    /// Send a simple chat request without tools using an explicit bearer token.
+    pub async fn chat_with_token(
+        &self,
+        token: &str,
+        messages: Vec<Message>,
+        system: Option<String>,
+    ) -> anyhow::Result<ProxyResponse> {
+        self.chat_with_tools_and_token(token, messages, system, vec![])
+            .await
     }
 
     /// Convert Anthropic response format to our ProxyResponse.

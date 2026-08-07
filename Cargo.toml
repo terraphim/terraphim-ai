@@ -91,6 +91,9 @@ rustls-webpki = "0.103.12"
 
 # LLM Router integration
 
+# terraphim-core types (provider convention: `provider: String`, mirrors `terraphim_types::llm_usage`)
+terraphim_types = { version = "1.20.4", registry = "terraphim" }
+
 [patch.crates-io]
 # Republished Gitea 1.20.5 fixes openrouter private-method bug; override crates.io 1.20.4.
 terraphim_service = { version = "1.20.5", registry = "terraphim" }
