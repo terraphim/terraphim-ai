@@ -94,6 +94,8 @@ rustls-webpki = "0.103.12"
 [patch.crates-io]
 # Republished Gitea 1.20.5 fixes openrouter private-method bug; override crates.io 1.20.4.
 terraphim_service = { version = "1.20.5", registry = "terraphim" }
+# 1.21.1 fixes aider-connector missing-dep bug present in crates.io 1.21.0.
+terraphim_sessions = { version = "1.21.1", registry = "terraphim" }
 # genai patch temporarily disabled to test crates.io 0.6.0 compatibility for v1.20.0 publish chain.
 # genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
 self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }
