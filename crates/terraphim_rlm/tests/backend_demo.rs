@@ -1,8 +1,8 @@
 //! Demonstration: RLM running locally (LocalExecutor) and via Docker (DockerExecutor).
 //! Run: cargo test -p terraphim_rlm --test backend_demo -- --nocapture
 
-use terraphim_rlm::config::{BackendType, RlmConfig};
 use terraphim_rlm::TerraphimRlm;
+use terraphim_rlm::config::{BackendType, RlmConfig};
 
 #[tokio::test]
 async fn demo_local_executor() {
@@ -19,11 +19,22 @@ async fn demo_local_executor() {
 
     // Python
     let r = rlm.execute_code(&session.id, "print(2+2)").await.unwrap();
-    println!("  [Python] 2+2 = {} (exit {})", r.stdout.trim(), r.exit_code);
+    println!(
+        "  [Python] 2+2 = {} (exit {})",
+        r.stdout.trim(),
+        r.exit_code
+    );
 
     // Bash
-    let r = rlm.execute_command(&session.id, "echo hello-from-local").await.unwrap();
-    println!("  [Bash]   echo = {} (exit {})", r.stdout.trim(), r.exit_code);
+    let r = rlm
+        .execute_command(&session.id, "echo hello-from-local")
+        .await
+        .unwrap();
+    println!(
+        "  [Bash]   echo = {} (exit {})",
+        r.stdout.trim(),
+        r.exit_code
+    );
 
     // Show backend type
     let status = rlm.get_session_status(&session.id, false).await.unwrap();
@@ -55,11 +66,22 @@ async fn demo_docker_executor() {
 
     // Python
     let r = rlm.execute_code(&session.id, "print(2+2)").await.unwrap();
-    println!("  [Python] 2+2 = {} (exit {})", r.stdout.trim(), r.exit_code);
+    println!(
+        "  [Python] 2+2 = {} (exit {})",
+        r.stdout.trim(),
+        r.exit_code
+    );
 
     // Bash
-    let r = rlm.execute_command(&session.id, "echo hello-from-docker").await.unwrap();
-    println!("  [Bash]   echo = {} (exit {})", r.stdout.trim(), r.exit_code);
+    let r = rlm
+        .execute_command(&session.id, "echo hello-from-docker")
+        .await
+        .unwrap();
+    println!(
+        "  [Bash]   echo = {} (exit {})",
+        r.stdout.trim(),
+        r.exit_code
+    );
 
     // Show backend type
     let status = rlm.get_session_status(&session.id, false).await.unwrap();
@@ -73,11 +95,17 @@ async fn demo_docker_executor() {
     println!("  [Container hostname] {}", r.stdout.trim());
 
     // Show Python version inside container
-    let r = rlm.execute_code(&session.id, "import sys; print(sys.version)").await.unwrap();
+    let r = rlm
+        .execute_code(&session.id, "import sys; print(sys.version)")
+        .await
+        .unwrap();
     println!("  [Python version] {}", r.stdout.trim());
 
     // Show container filesystem
-    let r = rlm.execute_command(&session.id, "ls / | head -5").await.unwrap();
+    let r = rlm
+        .execute_command(&session.id, "ls / | head -5")
+        .await
+        .unwrap();
     println!("  [Container root]\n{}", r.stdout);
 
     rlm.destroy_session(&session.id).await.unwrap();

@@ -14,7 +14,6 @@ use terraphim_server::{
     GetConversationResponse, ListConversationsResponse, Status, axum_server,
 };
 use terraphim_service::http_client;
-use terraphim_settings::DeviceSettings;
 use terraphim_types::{ContextType, Document, DocumentType, RelevanceFunction};
 
 /// Sample configuration for testing context management
@@ -50,15 +49,8 @@ fn create_test_config() -> Config {
 
 /// Start a test server with context management API
 async fn start_test_server() -> SocketAddr {
-    let server_settings =
-        DeviceSettings::load_from_env_and_file(None).expect("Failed to load settings");
-    let server_hostname = server_settings
-        .server_hostname
-        .parse::<SocketAddr>()
-        .unwrap_or_else(|_| {
-            let port = portpicker::pick_unused_port().expect("Failed to find unused port");
-            SocketAddr::from(([127, 0, 0, 1], port))
-        });
+    let port = portpicker::pick_unused_port().expect("Failed to find unused port");
+    let server_hostname = SocketAddr::from(([127, 0, 0, 1], port));
 
     let mut config = create_test_config();
     let config_state = terraphim_config::ConfigState::new(&mut config)
