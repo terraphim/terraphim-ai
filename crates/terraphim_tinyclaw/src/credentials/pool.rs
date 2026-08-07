@@ -119,6 +119,11 @@ pub enum CredentialError {
     /// The configured source could not be loaded (e.g. missing file).
     #[error("credential source unreadable: {0}")]
     SourceUnreadable(String),
+
+    /// The source resolved the entry but returned no value (e.g. env var
+    /// unset, key absent from env file).
+    #[error("credential value unavailable for {0}")]
+    Unavailable(String),
 }
 
 /// The credential pool itself.
@@ -225,7 +230,7 @@ impl CredentialPool {
                 continue;
             }
             let token = source.resolve(&entry.token_ref).ok_or_else(|| {
-                CredentialError::SourceUnreadable(format!("no value for {}", entry.token_ref))
+                CredentialError::Unavailable(format!("no value for {}", entry.token_ref))
             })?;
             return Ok(MaterialisedCredential {
                 provider: entry.provider.clone(),
@@ -404,12 +409,12 @@ mod tests {
     }
 
     #[test]
-    fn unresolved_token_ref_is_source_unreadable() {
+    fn unresolved_token_ref_is_unavailable() {
         let pool = CredentialPool::new();
         pool.add(entry("a", "x", "MISSING"));
         let src = InMemorySource::default();
         let err = pool.acquire(&"x".to_string(), &src).unwrap_err();
-        assert!(matches!(err, CredentialError::SourceUnreadable(_)));
+        assert!(matches!(err, CredentialError::Unavailable(_)));
     }
 
     #[test]

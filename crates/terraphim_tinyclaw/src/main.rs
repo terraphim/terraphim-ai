@@ -25,7 +25,10 @@ use crate::bus::MessageBus;
 use crate::channel::{Channel, ChannelManager, build_channels_from_config};
 use crate::channels::cli::CliChannel;
 use crate::config::Config;
-use crate::credentials::{CredentialPool, CredentialSource, EnvFileSource, EnvVarSource};
+use crate::credentials::{
+    CredentialPool, CredentialSource, EnvFileSource, EnvVarSource, PoolEntry, ProviderClass,
+    ProviderId,
+};
 use crate::session::SessionManager;
 use crate::skills::{Skill, SkillExecutor};
 use crate::tools::create_default_registry;
@@ -330,9 +333,9 @@ fn build_router(config: &Config) -> anyhow::Result<HybridLlmRouter> {
             ));
 
             for entry in &config.credentials.entries {
-                pool.add(crate::credentials::PoolEntry {
-                    provider: crate::credentials::ProviderId::from(entry.provider.clone()),
-                    class: crate::credentials::ProviderClass::from(entry.class.clone()),
+                pool.add(PoolEntry {
+                    provider: ProviderId::from(entry.provider.clone()),
+                    class: ProviderClass::from(entry.class.clone()),
                     token_ref: entry.token_ref.clone().into(),
                 });
             }

@@ -54,10 +54,6 @@ impl CredentialSource for EnvVarSource {
 #[derive(Debug, Clone)]
 pub struct EnvFileSource {
     pairs: HashMap<String, String>,
-    /// Path the file was loaded from. Retained for diagnostics and for
-    /// `TokenRef::File` resolution when the token_ref points at this source's
-    /// own path.
-    path: PathBuf,
 }
 
 impl EnvFileSource {
@@ -69,7 +65,7 @@ impl EnvFileSource {
         let content = std::fs::read_to_string(&path)
             .map_err(|e| CredentialError::SourceUnreadable(format!("{}: {}", path.display(), e)))?;
         let pairs = Self::parse(&content);
-        Ok(Self { pairs, path })
+        Ok(Self { pairs })
     }
 
     /// Parse the env-file content. Public so tests can construct sources
@@ -106,14 +102,12 @@ impl CredentialSource for EnvFileSource {
         match token_ref {
             TokenRef::EnvVar { name } => self.pairs.get(name).cloned(),
             TokenRef::File { path } => {
-                if path == &self.path {
-                    // Whole-file semantics: return the first key's value for
-                    // simplicity. Consumers needing the full file should iterate
-                    // `pairs` directly (not exposed yet; Wave 6 candidate).
-                    self.pairs.values().next().cloned()
-                } else {
-                    None
-                }
+                // File refs are resolved by reading the file directly, not
+                // from the parsed env map. This keeps semantics explicit:
+                // a File token_ref always means "read this file".
+                std::fs::read_to_string(path)
+                    .ok()
+                    .map(|s| s.trim().to_string())
             }
         }
     }
