@@ -587,6 +587,24 @@ fn resolve_output_config(robot: bool, format: OutputFormat) -> CommandOutputConf
     CommandOutputConfig { mode, robot }
 }
 
+fn effective_json_output_mode(
+    subcommand_json: bool,
+    output: CommandOutputConfig,
+) -> Option<CommandOutputMode> {
+    if !subcommand_json && !output.is_machine_readable() {
+        return None;
+    }
+
+    Some(
+        if subcommand_json && matches!(output.mode, CommandOutputMode::Human) {
+            // Historical subcommand `--json` output used compact, single-line JSON.
+            CommandOutputMode::JsonCompact
+        } else {
+            output.mode
+        },
+    )
+}
+
 #[cfg(feature = "repl-sessions")]
 mod session_output {
     use serde::Serialize;
@@ -1988,8 +2006,8 @@ async fn run_offline_command(
         };
         let result = guard.check(&input_command);
 
-        if *json {
-            println!("{}", serde_json::to_string(&result)?);
+        if let Some(json_mode) = effective_json_output_mode(*json, output) {
+            print_json_output(&result, json_mode)?;
         } else if result.decision == guard_patterns::GuardDecision::Block {
             if let Some(reason) = &result.reason {
                 eprintln!("BLOCKED: {}", reason);
@@ -2570,12 +2588,13 @@ async fn run_offline_command(
             };
 
             let role_name = service.resolve_role(role.as_deref()).await?;
+            let json_mode = effective_json_output_mode(json, output);
 
             if connectivity {
                 let result = service.check_connectivity(&role_name, &input_text).await?;
 
-                if json {
-                    println!("{}", serde_json::to_string(&result)?);
+                if let Some(json_mode) = json_mode {
+                    print_json_output(&result, json_mode)?;
                 } else {
                     println!("Connectivity Check for role '{}':", role_name);
                     println!("  Connected: {}", result.connected);
@@ -2588,8 +2607,8 @@ async fn run_offline_command(
                     .validate_checklist(&role_name, &checklist_name, &input_text)
                     .await?;
 
-                if json {
-                    println!("{}", serde_json::to_string(&result)?);
+                if let Some(json_mode) = json_mode {
+                    print_json_output(&result, json_mode)?;
                 } else {
                     println!(
                         "Checklist '{}' Validation for role '{}':",
@@ -2614,13 +2633,13 @@ async fn run_offline_command(
                 // Default validation: find matches
                 let matches = service.find_matches(&role_name, &input_text).await?;
 
-                if json {
+                if let Some(json_mode) = json_mode {
                     let output = serde_json::json!({
                         "role": role_name.to_string(),
                         "matched_count": matches.len(),
                         "matches": matches.iter().map(|m| m.term.clone()).collect::<Vec<_>>()
                     });
-                    println!("{}", serde_json::to_string(&output)?);
+                    print_json_output(&output, json_mode)?;
                 } else {
                     println!("Validation for role '{}':", role_name);
                     println!("  Found {} matched term(s)", matches.len());
@@ -2651,13 +2670,14 @@ async fn run_offline_command(
             };
 
             let role_name = service.resolve_role(role.as_deref()).await?;
+            let json_mode = effective_json_output_mode(json, output);
 
             let suggestions = service
                 .fuzzy_suggest(&role_name, &input_query, threshold, Some(limit))
                 .await?;
 
-            if json {
-                println!("{}", serde_json::to_string(&suggestions)?);
+            if let Some(json_mode) = json_mode {
+                print_json_output(&suggestions, json_mode)?;
             } else if suggestions.is_empty() {
                 println!(
                     "No suggestions found for '{}' with threshold {}",
@@ -4669,22 +4689,22 @@ async fn run_server_command(
             }
         }
         Command::Validate { json, .. } => {
-            if json {
+            if let Some(json_mode) = effective_json_output_mode(json, output) {
                 let err = serde_json::json!({
                     "error": "Validate command is only available in offline mode"
                 });
-                println!("{}", serde_json::to_string(&err)?);
+                print_json_output(&err, json_mode)?;
             } else {
                 eprintln!("Validate command is only available in offline mode");
             }
             std::process::exit(1);
         }
         Command::Suggest { json, .. } => {
-            if json {
+            if let Some(json_mode) = effective_json_output_mode(json, output) {
                 let err = serde_json::json!({
                     "error": "Suggest command is only available in offline mode"
                 });
-                println!("{}", serde_json::to_string(&err)?);
+                print_json_output(&err, json_mode)?;
             } else {
                 eprintln!("Suggest command is only available in offline mode");
             }
@@ -4748,8 +4768,8 @@ async fn run_server_command(
             };
             let result = guard.check(&input_command);
 
-            if json {
-                println!("{}", serde_json::to_string(&result)?);
+            if let Some(json_mode) = effective_json_output_mode(json, output) {
+                print_json_output(&result, json_mode)?;
             } else if result.decision == guard_patterns::GuardDecision::Block {
                 if let Some(reason) = &result.reason {
                     eprintln!("BLOCKED: {}", reason);
