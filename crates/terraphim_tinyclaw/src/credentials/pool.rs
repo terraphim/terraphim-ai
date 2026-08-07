@@ -78,111 +78,14 @@ pub struct PoolEntry {
 /// Source for materialising `TokenRef`s. Implementations are read-only
 /// and synchronous (the network OAuth case lives behind `OAuthFlow`
 /// rather than this trait).
+///
+/// Built-in impls live in `super::sources`:
+/// - [`super::sources::EnvVarSource`] — reads `std::env::var(name)`.
+/// - [`super::sources::EnvFileSource`] — parses a dotenv-style file.
 pub trait CredentialSource: Send + Sync + fmt::Debug {
     /// Resolve `token_ref` to its underlying secret string, or `None` if
     /// the source has nothing for it (e.g. env var unset, file missing).
     fn resolve(&self, token_ref: &TokenRef) -> Option<String>;
-}
-
-/// Default credential source: env-var lookups only.
-#[derive(Debug, Default, Clone)]
-pub struct EnvVarSource;
-
-impl CredentialSource for EnvVarSource {
-    fn resolve(&self, token_ref: &TokenRef) -> Option<String> {
-        match token_ref {
-            TokenRef::EnvVar { name } => std::env::var(name).ok(),
-            // EnvVarSource cannot read files.
-            TokenRef::File { .. } => None,
-        }
-    }
-}
-
-/// Default credential source: parses a `KEY=VALUE` file.
-///
-/// Line format (matches `dotenv`):
-/// - `KEY=value`
-/// - `KEY="quoted value"` (double quotes preserved literally except
-///   for trailing `";` handling, which we skip in Wave 1 — Hermes does
-///   not escape inline, neither do we)
-/// - `# comment` and blank lines are skipped.
-///
-/// Parsing is *not* done lazily — the file is read at construction time.
-/// This is intentional: it matches Hermes' `EnvFileSource` behaviour
-/// (which caches the parsed map for the pool's lifetime), and it
-/// guarantees tests can swap the file once at construction.
-#[derive(Debug, Clone)]
-pub struct EnvFileSource {
-    /// Parsed key→value pairs.
-    pairs: HashMap<String, String>,
-    /// Path the file was loaded from. Retained for diagnostics and for
-    /// `TokenRef::File` resolution when no env-var name matches.
-    path: PathBuf,
-}
-
-impl EnvFileSource {
-    /// Load a `KEY=VALUE` file from disk. Returns an error if the file
-    /// cannot be read; missing keys are NOT errors (they're just absent
-    /// from the parsed map).
-    pub fn load(path: impl Into<PathBuf>) -> Result<Self, CredentialError> {
-        let path = path.into();
-        let content = std::fs::read_to_string(&path).map_err(|e| {
-            CredentialError::SourceUnreadable(format!(
-                "{}: {}",
-                path.display(),
-                e
-            ))
-        })?;
-        let pairs = Self::parse(&content);
-        Ok(Self { pairs, path })
-    }
-
-    /// Parse the env-file content. Public so tests can construct sources
-    /// without touching disk.
-    pub fn parse(content: &str) -> HashMap<String, String> {
-        let mut out = HashMap::new();
-        for line in content.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with('#') {
-                continue;
-            }
-            // Strip optional `export ` prefix.
-            let stripped = trimmed.strip_prefix("export ").unwrap_or(trimmed);
-            if let Some((k, v)) = stripped.split_once('=') {
-                let key = k.trim().to_string();
-                let val = v.trim();
-                // Strip surrounding double or single quotes if present.
-                let val = if (val.starts_with('"') && val.ends_with('"') && val.len() >= 2)
-                    || (val.starts_with('\'') && val.ends_with('\'') && val.len() >= 2)
-                {
-                    &val[1..val.len() - 1]
-                } else {
-                    val
-                };
-                out.insert(key, val.to_string());
-            }
-        }
-        out
-    }
-}
-
-impl CredentialSource for EnvFileSource {
-    fn resolve(&self, token_ref: &TokenRef) -> Option<String> {
-        match token_ref {
-            TokenRef::EnvVar { name } => self.pairs.get(name).cloned(),
-            TokenRef::File { path } => {
-                if path == &self.path {
-                    // Whole-file semantics: each TokenRef::File from this source
-                    // resolves to the file's contents joined by newlines. We
-                    // return the first key's value for simplicity; consumers
-                    // needing the full file should iterate `pairs`.
-                    self.pairs.values().next().cloned()
-                } else {
-                    None
-                }
-            }
-        }
-    }
 }
 
 /// A materialised credential ready to use. Holds the secret by value
