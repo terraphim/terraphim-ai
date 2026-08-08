@@ -18,6 +18,8 @@ Two real findings of fleet-standard significance:
 
 1. **Unlicensed path-deps introduced by Wave 4 of this session.** `jmap_client` (1.0.0) and `haystack_core` (0.2.0) — both from `terraphim-private` workspace — do not declare a `license` field in their Cargo.toml. **This is a supply-chain hygiene gap I introduced by adding `jmap_client` as a path dep without first verifying the sibling's license metadata.**
 
+   **2026-08-08 update:** Terraphim AI workspace DOES have MIT-licensed haystack crates (`atlassian_haystack 1.0.0`, `discourse_haystack 1.0.0` — both on terraphim registry). But there is no MIT-licensed `jmap_client` in `terraphim-ai`; the only JMAP client is the unlicensed path-dep in `terraphim-private/`. So `jmap_client` path dep remains the right call capability-wise, but the license gap is real and the action item (file issue in `terraphim-private`) is still required.
+
 2. **Cargo.lock vulnerability in `crossbeam-epoch 0.9.18`** (CVE in `fmt::Pointer` impl for `Atomic`/`Shared`). Dev-only dep via `criterion` → `rayon`. Not in our runtime, but still flagged by the gate.
 
 ## Decision
