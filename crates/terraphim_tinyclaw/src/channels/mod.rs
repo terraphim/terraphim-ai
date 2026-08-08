@@ -15,3 +15,11 @@ pub mod slack;
 // pub mod matrix;
 
 pub mod cli;
+
+// Wave 4 (Phase B) channels added for Hermes parity.
+// These are unconditionally compiled (no feature gate) because they
+// don't pull in heavy SDK dependencies.
+pub mod email;
+pub mod gitea;
+pub mod github;
+pub mod linear;

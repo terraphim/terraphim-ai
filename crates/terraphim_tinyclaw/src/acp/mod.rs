@@ -18,7 +18,7 @@ pub mod handlers;
 pub mod protocol;
 pub mod router;
 
-pub use protocol::{AgentCapabilities, AgentInfo, InitializeResult, ProtocolVersion};
+pub use protocol::{AgentCapabilities, AgentInfo, InitializeResult};
 
 use std::sync::Arc;
 use tokio::sync::Mutex;

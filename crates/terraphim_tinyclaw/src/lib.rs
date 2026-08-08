@@ -9,6 +9,7 @@
 //! - **Skills**: JSON-based reusable workflows
 //! - **Session Management**: Persistent conversation history
 
+pub mod acp;
 pub mod agent;
 pub mod bus;
 pub mod channel;

@@ -19,7 +19,7 @@ pub struct AgentInfo {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct AgentCapabilities {
     /// Can the agent load existing sessions?
-    #[serde(default)]
+    #[serde(rename = "loadSession", default)]
     pub load_session: bool,
     /// Can the agent stream messages?
     #[serde(default)]
@@ -29,7 +29,9 @@ pub struct AgentCapabilities {
 /// Result returned from `initialize`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitializeResult {
+    #[serde(rename = "protocolVersion")]
     pub protocol_version: String,
+    #[serde(rename = "agentInfo")]
     pub agent_info: AgentInfo,
     pub capabilities: AgentCapabilities,
 }

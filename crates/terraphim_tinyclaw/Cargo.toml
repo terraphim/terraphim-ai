@@ -101,6 +101,16 @@ terraphim_persistence = { version = "1.20.4" }
 # which is unbuildable in isolation. Until `terraphim-llm-proxy` publishes a
 # clean version, TinyClaw ships a minimal echo proxy.
 
+# Wave 4 (Phase B) Email channel — leverage the existing `jmap_client`
+# crate (path: `terraphim-private/crates/haystack_jmap`). Brings in
+# `haystack_core` + `terraphim_types` from the same `terraphim-private`
+# workspace. The path is valid relative to `crates/terraphim_tinyclaw`.
+jmap_client = { path = "../../../terraphim-private/crates/haystack_jmap" }
+
+# Wave 4 (Phase B) GitHub channel — HMAC-SHA256 webhook verification.
+hmac = "0.12"
+sha2 = "0.10"
+
 # Wave 5 (Phase C1) dashboard: axum-based HTTP server (Hermes parity).
 axum = { version = "0.8", features = ["macros"] }
 tower = "0.5"
