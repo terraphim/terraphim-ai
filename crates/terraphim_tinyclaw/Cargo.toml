@@ -88,7 +88,9 @@ rmcp = { version = "0.9.1", features = ["server", "transport-io", "client", "tra
 schemars = "1"
 
 # Wave 3 of Hermes parity arc: cron scheduler with persistence.
-# Published crate on terraphim registry + crates.io.
+# Uses `cron = "0.13"` for cron expression parsing (instead of a hand-rolled
+# parser) and `terraphim_persistence` for job storage.
+cron = "0.13"
 terraphim_persistence = { version = "1.20.4" }
 
 [features]

@@ -3,12 +3,15 @@
 //! Wave 3 of the Hermes parity arc. Matches Hermes' `cron/jobs.py` surface:
 //! - `Schedule::Delay` for relative delays ("30m", "2h", "1d")
 //! - `Schedule::Interval` for recurring intervals ("every 2h")
-//! - `Schedule::Cron` for cron expressions ("0 9 * * *")
+//! - `Schedule::Cron` for cron expressions ("0 9 * * *") — parsed via
+//!   the `cron` crate (also used by `terraphim_orchestrator::TimeScheduler`)
 //! - `Schedule::At` for one-shot ISO timestamps
 
 use chrono::{DateTime, Utc};
+use cron::Schedule as CronSchedule;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -31,7 +34,7 @@ pub enum Schedule {
         /// Interval in seconds.
         secs: u64,
     },
-    /// Cron expression: "0 9 * * *".
+    /// Cron expression: "0 9 * * *". Parsed via the `cron` crate.
     Cron {
         /// 5-field cron expression.
         expr: String,
@@ -65,9 +68,17 @@ impl Schedule {
             });
         }
 
-        // 5-field cron expression: "* * * * *"
+        // 5-field cron expression. The `cron` crate requires 6 fields
+        // (seconds + standard 5), so we pad with a leading "0" for seconds.
         let parts: Vec<&str> = trimmed.split_whitespace().collect();
-        if parts.len() == 5 && parts.iter().all(|p| is_cron_field(p)) {
+        if parts.len() == 5 {
+            let padded = format!("0 {trimmed}");
+            if CronSchedule::from_str(&padded).is_ok() {
+                return Ok(Schedule::Cron {
+                    expr: trimmed.to_string(),
+                });
+            }
+        } else if parts.len() == 6 && CronSchedule::from_str(trimmed).is_ok() {
             return Ok(Schedule::Cron {
                 expr: trimmed.to_string(),
             });
@@ -92,7 +103,20 @@ impl Schedule {
                 let base = last.unwrap_or(now);
                 Some(base + Duration::from_secs(*secs))
             }
-            Schedule::Cron { expr } => next_cron_fire(expr, now),
+            Schedule::Cron { expr } => {
+                let padded = if expr.split_whitespace().count() == 5 {
+                    format!("0 {expr}")
+                } else {
+                    expr.clone()
+                };
+                let schedule = CronSchedule::from_str(&padded).ok()?;
+                // The `cron` crate's `after()` returns an iterator of fire
+                // times strictly after the given instant. Use `now` for fresh
+                // jobs and `last` for recurring (so we don't re-fire the same
+                // occurrence).
+                let anchor = last.unwrap_or(now - Duration::from_secs(1));
+                schedule.after(&anchor).next()
+            }
             Schedule::At { timestamp } => {
                 if *timestamp > now {
                     Some(*timestamp)
@@ -260,87 +284,6 @@ fn parse_duration_secs(input: &str) -> Option<u64> {
     Some(num * multiplier)
 }
 
-fn is_cron_field(s: &str) -> bool {
-    s.chars()
-        .all(|c| c.is_ascii_digit() || c == '*' || c == ',' || c == '-' || c == '/' || c == '?')
-}
-
-/// Compute the next fire time for a 5-field cron expression.
-///
-/// Uses a simplified algorithm: iterate minute-by-minute up to 24h ahead. This
-/// is correct but O(1440) per call — fine for tick-based schedulers where the
-/// function is called at most once per job per tick.
-fn next_cron_fire(expr: &str, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
-    let parts: Vec<&str> = expr.split_whitespace().collect();
-    if parts.len() != 5 {
-        return None;
-    }
-    let minute_field = parts[0];
-    let hour_field = parts[1];
-
-    let candidates = expand_field(minute_field, 0, 59)?;
-    let hours = expand_field(hour_field, 0, 23)?;
-
-    // Walk forward from the next minute, checking each (hour, minute) combo.
-    let start = now + Duration::from_secs(60);
-    let start = start.with_second(0).and_then(|t| t.with_nanosecond(0))?;
-
-    for offset_minutes in 0..(24 * 60) {
-        let candidate = start + Duration::from_secs(offset_minutes * 60);
-        let hour = candidate.hour();
-        let minute = candidate.minute();
-        if hours.contains(&hour) && candidates.contains(&minute) {
-            return Some(candidate);
-        }
-    }
-    None
-}
-
-use chrono::Timelike;
-
-fn expand_field(field: &str, min: u32, max: u32) -> Option<Vec<u32>> {
-    let mut result = Vec::new();
-    for part in field.split(',') {
-        let part = part.trim();
-        if part == "*" {
-            for v in min..=max {
-                result.push(v);
-            }
-        } else if let Some((start, step)) = part.split_once('/') {
-            let step: u32 = step.parse().ok()?;
-            let range = if start == "*" {
-                min..=max
-            } else if let Some((lo, hi)) = start.split_once('-') {
-                let lo: u32 = lo.parse().ok()?;
-                let hi: u32 = hi.parse().ok()?;
-                lo..=hi
-            } else {
-                let v: u32 = start.parse().ok()?;
-                v..=max
-            };
-            for v in range.step_by(step as usize) {
-                result.push(v);
-            }
-        } else if let Some((lo, hi)) = part.split_once('-') {
-            let lo: u32 = lo.parse().ok()?;
-            let hi: u32 = hi.parse().ok()?;
-            for v in lo..=hi {
-                result.push(v);
-            }
-        } else {
-            let v: u32 = part.parse().ok()?;
-            result.push(v);
-        }
-    }
-    result.sort();
-    result.dedup();
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -377,6 +320,20 @@ mod tests {
             Schedule::Cron {
                 expr: "0 9 * * *".into()
             }
+        );
+    }
+
+    #[test]
+    fn test_schedule_parsing_cron_uses_cron_crate() {
+        // Verify the cron crate actually parsed it (next_after returns a valid time)
+        let s = Schedule::Cron {
+            expr: "0 9 * * *".into(),
+        };
+        let now = Utc::now();
+        let next = s.next_after(now, None);
+        assert!(
+            next.is_some(),
+            "cron crate should parse 5-field expressions"
         );
     }
 
