@@ -2,11 +2,13 @@
 //!
 //! Matches Hermes' `mcp_serve.py` surface (pinned commit `846b14ab`).
 
-use rmcp::model::{CallToolResult, Content, Tool};
+use rmcp::model::{CallToolResult, Content, JsonObject, Tool};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+use std::sync::Arc;
 
 /// A conversation summary returned by `conversations_list`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ConversationSummary {
     /// Unique conversation identifier.
     pub id: String,
@@ -21,7 +23,7 @@ pub struct ConversationSummary {
 }
 
 /// A single message in a conversation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ConversationMessage {
     /// Message identifier.
     pub id: String,
@@ -34,25 +36,27 @@ pub struct ConversationMessage {
 }
 
 /// Parameters for `conversation_get`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ConversationGetParams {
     /// Conversation identifier.
     pub conversation_id: String,
 }
 
 /// Parameters for `messages_read`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct MessagesReadParams {
     /// Conversation identifier.
     pub conversation_id: String,
     /// Maximum number of messages to return.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<usize>,
     /// Return messages before this message ID.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
 }
 
 /// Parameters for `messages_send`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct MessagesSendParams {
     /// Conversation identifier.
     pub conversation_id: String,
@@ -61,14 +65,15 @@ pub struct MessagesSendParams {
 }
 
 /// Parameters for `events_wait`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct EventsWaitParams {
     /// Maximum time to wait in milliseconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout_ms: Option<u64>,
 }
 
 /// An approval request from the agent loop.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ApprovalRequest {
     /// Request identifier.
     pub id: String,
@@ -81,7 +86,7 @@ pub struct ApprovalRequest {
 }
 
 /// Parameters for `permissions_respond`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PermissionsRespondParams {
     /// Request identifier.
     pub request_id: String,
@@ -89,160 +94,152 @@ pub struct PermissionsRespondParams {
     pub approved: bool,
 }
 
+fn empty_schema() -> Arc<JsonObject> {
+    let mut map = JsonObject::new();
+    map.insert("type".to_string(), "object".into());
+    map.insert("properties".to_string(), serde_json::json!({}));
+    map.insert("required".to_string(), serde_json::json!([]));
+    Arc::new(map)
+}
+
+fn object_schema(properties: serde_json::Value, required: Vec<&str>) -> Arc<JsonObject> {
+    let mut map = JsonObject::new();
+    map.insert("type".to_string(), "object".into());
+    map.insert("properties".to_string(), properties);
+    map.insert(
+        "required".to_string(),
+        serde_json::json!(required.iter().map(|s| s.to_string()).collect::<Vec<_>>()),
+    );
+    Arc::new(map)
+}
+
+fn make_tool(name: &'static str, description: &'static str, input_schema: Arc<JsonObject>) -> Tool {
+    Tool {
+        name: Cow::Borrowed(name),
+        description: Some(Cow::Borrowed(description)),
+        input_schema,
+        annotations: None,
+        title: None,
+        output_schema: None,
+        icons: None,
+        meta: None,
+    }
+}
+
 /// Build the `conversations_list` tool definition.
 pub fn conversations_list_tool() -> Tool {
-    Tool {
-        name: "conversations_list".into(),
-        description: Some("List conversations across platforms".into()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {},
-            "required": []
-        })
-        .into(),
-    }
+    make_tool(
+        "conversations_list",
+        "List conversations across platforms",
+        empty_schema(),
+    )
 }
 
 /// Build the `conversation_get` tool definition.
 pub fn conversation_get_tool() -> Tool {
-    Tool {
-        name: "conversation_get".into(),
-        description: Some("Get a single conversation by ID".into()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
+    make_tool(
+        "conversation_get",
+        "Get a single conversation by ID",
+        object_schema(
+            serde_json::json!({
                 "conversation_id": { "type": "string" }
-            },
-            "required": ["conversation_id"]
-        })
-        .into(),
-    }
+            }),
+            vec!["conversation_id"],
+        ),
+    )
 }
 
 /// Build the `messages_read` tool definition.
 pub fn messages_read_tool() -> Tool {
-    Tool {
-        name: "messages_read".into(),
-        description: Some("Read message history for a conversation".into()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
+    make_tool(
+        "messages_read",
+        "Read message history for a conversation",
+        object_schema(
+            serde_json::json!({
                 "conversation_id": { "type": "string" },
                 "limit": { "type": "integer" },
                 "before": { "type": "string" }
-            },
-            "required": ["conversation_id"]
-        })
-        .into(),
-    }
+            }),
+            vec!["conversation_id"],
+        ),
+    )
 }
 
 /// Build the `attachments_fetch` tool definition.
 pub fn attachments_fetch_tool() -> Tool {
-    Tool {
-        name: "attachments_fetch".into(),
-        description: Some("Fetch attachments for a conversation".into()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
+    make_tool(
+        "attachments_fetch",
+        "Fetch attachments for a conversation",
+        object_schema(
+            serde_json::json!({
                 "conversation_id": { "type": "string" }
-            },
-            "required": ["conversation_id"]
-        })
-        .into(),
-    }
+            }),
+            vec!["conversation_id"],
+        ),
+    )
 }
 
 /// Build the `events_poll` tool definition.
 pub fn events_poll_tool() -> Tool {
-    Tool {
-        name: "events_poll".into(),
-        description: Some("Poll for live events".into()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {},
-            "required": []
-        })
-        .into(),
-    }
+    make_tool("events_poll", "Poll for live events", empty_schema())
 }
 
 /// Build the `events_wait` tool definition.
 pub fn events_wait_tool() -> Tool {
-    Tool {
-        name: "events_wait".into(),
-        description: Some("Wait for live events (long-poll)".into()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
+    make_tool(
+        "events_wait",
+        "Wait for live events (long-poll)",
+        object_schema(
+            serde_json::json!({
                 "timeout_ms": { "type": "integer" }
-            },
-            "required": []
-        })
-        .into(),
-    }
+            }),
+            vec![],
+        ),
+    )
 }
 
 /// Build the `messages_send` tool definition.
 pub fn messages_send_tool() -> Tool {
-    Tool {
-        name: "messages_send".into(),
-        description: Some("Send a message to a conversation".into()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
+    make_tool(
+        "messages_send",
+        "Send a message to a conversation",
+        object_schema(
+            serde_json::json!({
                 "conversation_id": { "type": "string" },
                 "content": { "type": "string" }
-            },
-            "required": ["conversation_id", "content"]
-        })
-        .into(),
-    }
+            }),
+            vec!["conversation_id", "content"],
+        ),
+    )
 }
 
 /// Build the `permissions_list_open` tool definition.
 pub fn permissions_list_open_tool() -> Tool {
-    Tool {
-        name: "permissions_list_open".into(),
-        description: Some("List open approval requests".into()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {},
-            "required": []
-        })
-        .into(),
-    }
+    make_tool(
+        "permissions_list_open",
+        "List open approval requests",
+        empty_schema(),
+    )
 }
 
 /// Build the `permissions_respond` tool definition.
 pub fn permissions_respond_tool() -> Tool {
-    Tool {
-        name: "permissions_respond".into(),
-        description: Some("Respond to an approval request".into()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
+    make_tool(
+        "permissions_respond",
+        "Respond to an approval request",
+        object_schema(
+            serde_json::json!({
                 "request_id": { "type": "string" },
                 "approved": { "type": "boolean" }
-            },
-            "required": ["request_id", "approved"]
-        })
-        .into(),
-    }
+            }),
+            vec!["request_id", "approved"],
+        ),
+    )
 }
 
 /// Build the `channels_list` tool definition (Hermes-specific extra).
 pub fn channels_list_tool() -> Tool {
-    Tool {
-        name: "channels_list".into(),
-        description: Some("List connected channels".into()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {},
-            "required": []
-        })
-        .into(),
-    }
+    make_tool("channels_list", "List connected channels", empty_schema())
 }
 
 /// Return all 10 tool definitions (9 bridge + `channels_list`).
@@ -270,10 +267,7 @@ pub fn text_result(text: impl Into<String>) -> CallToolResult {
 pub fn json_result<T: Serialize>(value: &T) -> CallToolResult {
     match serde_json::to_string_pretty(value) {
         Ok(json) => CallToolResult::success(vec![Content::text(json)]),
-        Err(e) => CallToolResult::error(vec![Content::text(format!(
-            "serialization error: {}",
-            e
-        ))]),
+        Err(e) => CallToolResult::error(vec![Content::text(format!("serialization error: {}", e))]),
     }
 }
 
@@ -284,7 +278,7 @@ mod tests {
     #[test]
     fn test_tool_schemas_match_hermes() {
         let tools = all_bridge_tools();
-        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert_eq!(
             names,
             vec![

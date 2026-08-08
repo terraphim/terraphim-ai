@@ -1,42 +1,24 @@
-mod agent;
-#[allow(dead_code)]
-mod bus;
-#[allow(dead_code)]
-mod channel;
-mod channels;
-#[allow(dead_code)]
-mod commands;
-#[allow(dead_code)]
-mod config;
-#[allow(dead_code)]
-mod credentials;
-#[allow(dead_code)]
-mod format;
-#[allow(dead_code)]
-mod session;
-#[allow(dead_code)]
-mod skills;
-#[allow(dead_code)]
-mod tools;
+// Library modules are imported from the library crate, not re-declared locally.
+// This avoids the "multiple different versions of crate" E0308 error.
 
-use crate::agent::agent_loop::{HybridLlmRouter, ToolCallingLoop};
-use crate::agent::proxy_client::ProxyClientConfig;
-use crate::bus::MessageBus;
-use crate::channel::{Channel, ChannelManager, build_channels_from_config};
-use crate::channels::cli::CliChannel;
-use crate::config::Config;
-use crate::credentials::{
-    CredentialPool, CredentialSource, EnvFileSource, EnvVarSource, PoolEntry, ProviderClass,
-    ProviderId,
-};
-use crate::session::SessionManager;
-use crate::skills::{Skill, SkillExecutor};
-use crate::tools::create_default_registry;
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_mcp_search::{SkillEntry, mcp_search_skills};
+use terraphim_tinyclaw::agent::agent_loop::{HybridLlmRouter, ToolCallingLoop};
+use terraphim_tinyclaw::agent::proxy_client::ProxyClientConfig;
+use terraphim_tinyclaw::bus::MessageBus;
+use terraphim_tinyclaw::channel::{Channel, ChannelManager, build_channels_from_config};
+use terraphim_tinyclaw::channels::cli::CliChannel;
+use terraphim_tinyclaw::config::Config;
+use terraphim_tinyclaw::credentials::{
+    CredentialPool, CredentialSource, EnvFileSource, EnvVarSource, PoolEntry, ProviderClass,
+    ProviderId,
+};
+use terraphim_tinyclaw::session::SessionManager;
+use terraphim_tinyclaw::skills::{Skill, SkillExecutor};
+use terraphim_tinyclaw::tools::create_default_registry;
 
 /// Multi-channel AI assistant powered by Terraphim.
 #[derive(Parser, Debug)]
@@ -70,6 +52,12 @@ enum Commands {
     Skill {
         #[command(subcommand)]
         command: SkillCommands,
+    },
+    /// Start MCP server on stdio (9-tool channel bridge).
+    Mcp {
+        /// Run in server mode (default).
+        #[arg(long, default_value_t = true)]
+        serve: bool,
     },
 }
 
@@ -158,6 +146,10 @@ async fn main() -> anyhow::Result<()> {
         Commands::Skill { command } => {
             log::info!("Executing skill command");
             run_skill_command(command).await?;
+        }
+        Commands::Mcp { serve } => {
+            log::info!("Starting MCP server mode");
+            run_mcp_mode(config, serve).await?;
         }
     }
 
@@ -297,6 +289,34 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Run in MCP server mode (9-tool channel bridge over stdio).
+async fn run_mcp_mode(config: Config, serve: bool) -> anyhow::Result<()> {
+    if !serve {
+        anyhow::bail!("MCP client mode is not yet implemented; use --serve");
+    }
+
+    if !config.mcp.enabled {
+        log::warn!("mcp.enabled = false; MCP server is disabled in config");
+        println!("MCP server is disabled. Set mcp.enabled = true in config to enable.");
+        return Ok(());
+    }
+
+    println!("TinyClaw MCP Server");
+    println!("===================");
+
+    // Create message bus
+    let bus = Arc::new(MessageBus::new());
+
+    // Create session manager
+    let sessions_dir = config.agent.workspace.join("sessions");
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
+
+    log::info!("Starting MCP server on stdio");
+    terraphim_tinyclaw::mcp::server::serve_mcp_stdio(sessions, bus).await?;
+
+    Ok(())
+}
+
 /// Build the hybrid LLM router from configuration.
 ///
 /// When `config.credentials.enabled` is `true` and a `provider_class` is
@@ -425,9 +445,11 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
             println!("\nSteps ({} total):", skill.steps.len());
             for (i, step) in skill.steps.iter().enumerate() {
                 let step_type = match step {
-                    crate::skills::SkillStep::Tool { tool, .. } => format!("tool: {}", tool),
-                    crate::skills::SkillStep::Llm { .. } => "llm".to_string(),
-                    crate::skills::SkillStep::Shell { .. } => "shell".to_string(),
+                    terraphim_tinyclaw::skills::SkillStep::Tool { tool, .. } => {
+                        format!("tool: {}", tool)
+                    }
+                    terraphim_tinyclaw::skills::SkillStep::Llm { .. } => "llm".to_string(),
+                    terraphim_tinyclaw::skills::SkillStep::Shell { .. } => "shell".to_string(),
                 };
                 println!("  {}. {}", i + 1, step_type);
             }
@@ -532,9 +554,13 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
                         .steps
                         .iter()
                         .map(|step| match step {
-                            crate::skills::SkillStep::Tool { tool, .. } => format!("tool:{}", tool),
-                            crate::skills::SkillStep::Llm { .. } => "llm".to_string(),
-                            crate::skills::SkillStep::Shell { .. } => "shell".to_string(),
+                            terraphim_tinyclaw::skills::SkillStep::Tool { tool, .. } => {
+                                format!("tool:{}", tool)
+                            }
+                            terraphim_tinyclaw::skills::SkillStep::Llm { .. } => "llm".to_string(),
+                            terraphim_tinyclaw::skills::SkillStep::Shell { .. } => {
+                                "shell".to_string()
+                            }
                         })
                         .collect();
                     if let Some(author) = &s.author {

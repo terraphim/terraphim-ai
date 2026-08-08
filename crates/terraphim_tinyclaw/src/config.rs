@@ -15,6 +15,13 @@ pub struct Config {
     /// remains in effect (rollback = config flag, no code revert).
     #[serde(default)]
     pub credentials: CredentialsConfig,
+
+    /// MCP (Model Context Protocol) configuration. **Default: disabled.**
+    /// When `mcp.enabled = true`, the MCP server exposes the 9-tool channel
+    /// bridge over stdio. When `mcp.server_command` is set, the client
+    /// connects to an external MCP server.
+    #[serde(default)]
+    pub mcp: McpConfig,
 }
 
 impl Config {
@@ -981,6 +988,31 @@ impl Default for CredentialsConfig {
             cooldown_secs: default_credentials_cooldown_secs(),
             provider_class: None,
             entries: Vec::new(),
+        }
+    }
+}
+
+/// MCP (Model Context Protocol) configuration.
+///
+/// **Default behaviour: disabled.** The MCP server is only started when
+/// `enabled = true`. The client is only used when `server_command` is set.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct McpConfig {
+    /// Master switch for the MCP server.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Optional external MCP server command for the client to connect to.
+    /// Example: `"npx -y @modelcontextprotocol/server-everything stdio"`.
+    #[serde(default)]
+    pub server_command: Option<String>,
+}
+
+impl Default for McpConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            server_command: None,
         }
     }
 }

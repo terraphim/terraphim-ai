@@ -15,8 +15,10 @@ pub mod channel;
 pub mod channels;
 pub mod commands;
 pub mod config;
+#[allow(dead_code)]
 pub mod credentials;
 pub mod format;
+pub mod mcp;
 pub mod session;
 pub mod skills;
 pub mod tools;

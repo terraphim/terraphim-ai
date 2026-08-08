@@ -44,5 +44,29 @@ pub enum McpError {
 
     /// rmcp protocol error.
     #[error(transparent)]
-    Rmcp(#[from] rmcp::Error),
+    Rmcp(#[from] rmcp::ErrorData),
+
+    /// IO error.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+
+impl From<McpError> for rmcp::ErrorData {
+    fn from(err: McpError) -> Self {
+        match err {
+            McpError::Server(msg) => rmcp::ErrorData::internal_error(msg, None),
+            McpError::Client(msg) => rmcp::ErrorData::internal_error(msg, None),
+            McpError::SessionNotFound(id) => {
+                rmcp::ErrorData::invalid_params(format!("session not found: {}", id), None)
+            }
+            McpError::ConversationNotFound(id) => {
+                rmcp::ErrorData::invalid_params(format!("conversation not found: {}", id), None)
+            }
+            McpError::ApprovalNotFound(id) => {
+                rmcp::ErrorData::invalid_params(format!("approval request not found: {}", id), None)
+            }
+            McpError::Rmcp(e) => e,
+            McpError::Io(e) => rmcp::ErrorData::internal_error(e.to_string(), None),
+        }
+    }
 }
