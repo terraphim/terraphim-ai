@@ -37,6 +37,7 @@ async fn make_app() -> (DashboardState, axum::Router) {
         bus: Arc::new(MessageBus::new()),
         cron_store,
         auth_required: false,
+        fire_token: None,
     };
     let app = router(state.clone());
     (state, app)

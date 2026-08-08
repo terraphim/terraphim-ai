@@ -13,7 +13,7 @@
 //! so the channel's data shape matches the JMAP spec.
 
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
-use crate::channel::{Channel, is_sender_allowed};
+use crate::channel::Channel;
 use async_trait::async_trait;
 use jmap_client::{Email, JMAPClient};
 use std::sync::Arc;
@@ -22,7 +22,7 @@ use std::sync::Arc;
 pub const CHANNEL_NAME: &str = "email";
 
 /// Configuration for the email channel.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct EmailConfig {
     /// JMAP access token (Bearer credential).
     pub jmap_access_token: String,
@@ -32,6 +32,19 @@ pub struct EmailConfig {
     pub from_address: String,
     /// Allowed sender email addresses (must be non-empty).
     pub allow_from: Vec<String>,
+}
+
+/// Custom Debug that redacts the JMAP token (mirrors `TelegramConfig::fmt`).
+/// Prevents accidental credential leakage via `dbg!()` or `tracing::debug!()`.
+impl std::fmt::Debug for EmailConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EmailConfig")
+            .field("jmap_access_token", &"***REDACTED***")
+            .field("smtp_host", &self.smtp_host)
+            .field("from_address", &self.from_address)
+            .field("allow_from", &self.allow_from)
+            .finish()
+    }
 }
 
 impl Default for EmailConfig {
@@ -132,7 +145,12 @@ impl Channel for EmailChannel {
     }
 
     fn is_allowed(&self, sender_id: &str) -> bool {
-        is_sender_allowed(&self.config.allow_from, sender_id)
+        // Email local-parts are case-insensitive per RFC 5321 §2.4.
+        let id_lower = sender_id.to_lowercase();
+        self.config
+            .allow_from
+            .iter()
+            .any(|a| a == "*" || a.to_lowercase() == id_lower)
     }
 }
 

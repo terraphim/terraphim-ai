@@ -28,6 +28,13 @@ pub trait Channel: Send + Sync {
 
 /// Check if a sender is in the allowlist.
 /// Returns true if the list contains `"*"` (wildcard) or the given identifier.
+///
+/// Identifier comparison is **case-sensitive** (exact match). This matches
+/// the platform-specific case sensitivity rules enforced by each channel
+/// adapter (e.g. `SlackConfig::is_allowed` requires exact case for Slack
+/// user IDs `U01234567`; `TelegramConfig::is_allowed` requires exact
+/// case for Telegram usernames; GitHub/Gitea platform APIs canonicalize
+/// to lowercase at their layer, so adapters normalize before calling).
 pub fn is_sender_allowed(allow_from: &[String], identifier: &str) -> bool {
     allow_from.iter().any(|a| a == "*") || allow_from.contains(&identifier.to_string())
 }

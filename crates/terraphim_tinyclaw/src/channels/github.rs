@@ -13,7 +13,7 @@ use std::sync::Arc;
 pub const CHANNEL_NAME: &str = "github";
 
 /// Configuration for the GitHub channel.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GithubConfig {
     /// GitHub personal access token or GitHub App token.
     pub token: String,
@@ -21,6 +21,18 @@ pub struct GithubConfig {
     pub webhook_secret: String,
     /// Allowed GitHub user logins (must be non-empty).
     pub allow_from: Vec<String>,
+}
+
+/// Custom Debug that redacts the GitHub token.
+/// Prevents accidental credential leakage via `dbg!()` or `tracing::debug!()`.
+impl std::fmt::Debug for GithubConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GithubConfig")
+            .field("token", &"***REDACTED***")
+            .field("webhook_secret", &"***REDACTED***")
+            .field("allow_from", &self.allow_from)
+            .finish()
+    }
 }
 
 impl Default for GithubConfig {
@@ -51,6 +63,9 @@ impl GithubChannel {
     /// Hermes contract: `gateway/channels/github.py` requires the
     /// `X-Hub-Signature-256` header to match HMAC-SHA256 of the body
     /// with the configured secret. Returns true if the signature is valid.
+    ///
+    /// Uses `hmac::Mac::verify_slice` for constant-time comparison
+    /// (avoids timing-attackable `String ==`).
     pub fn verify_webhook(&self, body: &[u8], signature_header: &str) -> bool {
         use hmac::{Hmac, Mac};
         use sha2::Sha256;
@@ -67,13 +82,40 @@ impl GithubChannel {
             Err(_) => return false,
         };
         mac.update(body);
-        let expected = mac.finalize().into_bytes();
-        // Constant-time compare via hex-encoding both sides.
-        let expected_hex = expected
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<String>();
-        expected_hex == provided
+        // Constant-time comparison via the hmac crate's verify_slice.
+        let mut provided_bytes = [0u8; 32];
+        if !hex_decode_32(provided, &mut provided_bytes) {
+            return false;
+        }
+        mac.verify_slice(&provided_bytes).is_ok()
+    }
+}
+
+/// Decode a hex string into a 32-byte buffer (SHA-256 size).
+/// Returns false if length is wrong or chars aren't hex.
+fn hex_decode_32(s: &str, out: &mut [u8; 32]) -> bool {
+    if s.len() != 64 {
+        return false;
+    }
+    let bytes = s.as_bytes();
+    for (i, chunk) in bytes.chunks(2).enumerate() {
+        let hi = hex_nibble(chunk[0]);
+        let lo = hex_nibble(chunk[1]);
+        match (hi, lo) {
+            (Some(h), Some(l)) => out[i] = (h << 4) | l,
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// Convert a single hex character to its 0-15 value.
+fn hex_nibble(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
     }
 }
 
@@ -145,6 +187,18 @@ mod tests {
     fn webhook_verification_rejects_wrong_prefix() {
         let ch = GithubChannel::new(GithubConfig::default());
         assert!(!ch.verify_webhook(b"hello", "md5=abc"));
+    }
+
+    #[test]
+    fn webhook_verification_rejects_malformed_hex() {
+        let ch = GithubChannel::new(GithubConfig::default());
+        assert!(!ch.verify_webhook(b"hello", "sha256=not-hex-chars-zzzz"));
+    }
+
+    #[test]
+    fn webhook_verification_rejects_wrong_length_hex() {
+        let ch = GithubChannel::new(GithubConfig::default());
+        assert!(!ch.verify_webhook(b"hello", "sha256=deadbeefdeadbeef"));
     }
 
     #[test]

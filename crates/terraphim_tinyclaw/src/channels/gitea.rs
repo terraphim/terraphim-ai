@@ -56,6 +56,8 @@ impl GiteaChannel {
     /// Verify a Gitea webhook signature (HMAC-SHA256).
     ///
     /// Gitea signature header format: `sha256=<hex>` (same as GitHub).
+    /// Uses `hmac::Mac::verify_slice` for constant-time comparison
+    /// (avoids timing-attackable `String ==`).
     pub fn verify_webhook(&self, body: &[u8], signature_header: &str) -> bool {
         let prefix = "sha256=";
         if !signature_header.starts_with(prefix) {
@@ -67,12 +69,39 @@ impl GiteaChannel {
             Err(_) => return false,
         };
         mac.update(body);
-        let expected = mac.finalize().into_bytes();
-        let expected_hex = expected
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<String>();
-        expected_hex == provided
+        let mut provided_bytes = [0u8; 32];
+        if !hex_decode_32(provided, &mut provided_bytes) {
+            return false;
+        }
+        mac.verify_slice(&provided_bytes).is_ok()
+    }
+}
+
+/// Decode a hex string into a 32-byte buffer (SHA-256 size).
+/// Returns false if length is wrong or chars aren't hex.
+fn hex_decode_32(s: &str, out: &mut [u8; 32]) -> bool {
+    if s.len() != 64 {
+        return false;
+    }
+    let bytes = s.as_bytes();
+    for (i, chunk) in bytes.chunks(2).enumerate() {
+        let hi = hex_nibble_gitea(chunk[0]);
+        let lo = hex_nibble_gitea(chunk[1]);
+        match (hi, lo) {
+            (Some(h), Some(l)) => out[i] = (h << 4) | l,
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// Convert a single hex character to its 0-15 value (gitea helper).
+fn hex_nibble_gitea(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
     }
 }
 

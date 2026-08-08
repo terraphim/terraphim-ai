@@ -35,13 +35,31 @@ pub struct FireRequest {
 /// - Missing `job_id` → 400 `{"error": "missing job_id"}`
 /// - Job not found → 200 `{"status": "gone", "job_id": "..."}`
 /// - Valid → 202 `{"status": "accepted", "job_id": "..."}`
+///
+/// Auth: `Authorization: Bearer <FIRE_TOKEN>` header. The token is
+/// supplied via `DashboardState::fire_token` (set from
+/// `TINYCLAW_FIRE_TOKEN` env var at startup). When the state has no
+/// token configured (dev/test), the endpoint is unauthenticated and
+/// the caller is responsible for network-level isolation.
 pub async fn fire_webhook(
     State(state): State<DashboardState>,
+    headers: axum::http::HeaderMap,
     Json(body): Json<FireRequest>,
 ) -> impl IntoResponse {
-    // TinyClaw has no NAS JWT verifier in Wave 5. We accept any caller
-    // but mark the path as public (no dashboard cookie gate). A real
-    // implementation would call `get_fire_verifier()` here.
+    // Auth gate — per Hermes contract, refuse without a matching Bearer token.
+    if let Some(expected) = state.fire_token.as_deref() {
+        let provided = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "));
+        if provided != Some(expected) {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "error": "invalid fire token" })),
+            );
+        }
+    }
+
     let job_id = body.job_id;
     if job_id.is_empty() {
         return (
