@@ -22,6 +22,7 @@ pub mod cron;
 pub mod dashboard;
 pub mod format;
 pub mod mcp;
+pub mod memory;
 pub mod proxy;
 pub mod session;
 pub mod skills;
