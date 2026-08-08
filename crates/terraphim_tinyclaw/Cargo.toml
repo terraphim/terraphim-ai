@@ -81,6 +81,11 @@ hound = { version = "3.5", optional = true }
 # to the terraphim registry (cargo publish --registry terraphim).
 terraphim_mcp_search = { version = "0.1.0", registry = "terraphim" }
 
+# MCP (Model Context Protocol) client + server for the 9-tool channel bridge
+# (Wave 2 of Hermes parity arc). `server` + `transport-io` for stdio server;
+# `client` + `transport-child-process` for stdio client.
+rmcp = { version = "0.9.1", features = ["server", "transport-io", "client", "transport-child-process"] }
+
 [features]
 default = ["telegram"]
 telegram = ["dep:teloxide"]
