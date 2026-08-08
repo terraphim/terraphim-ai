@@ -31,6 +31,112 @@
       "llm_provider": "ollama",
       "ollama_model": "llama3.2:3b",
       "ollama_base_url": "http://127.0.0.1:11434"
+    },
+    "Terraphim AI Developer": {
+      "shortname": "taidev",
+      "name": "Terraphim AI Developer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "united",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": ".terraphim/kg-taidev"
+        },
+        "public": false,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": ".",
+          "service": "Ripgrep",
+          "read_only": true,
+          "fetch_content": false,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "crates",
+          "service": "Ripgrep",
+          "read_only": true,
+          "fetch_content": false,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "memory",
+          "service": "Ripgrep",
+          "read_only": true,
+          "fetch_content": false,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_enabled": false,
+      "llm_provider": "ollama",
+      "ollama_model": "llama3.2:3b",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "llm_router_enabled": false,
+      "llm_context_window": 32768,
+      "extra": {}
+    },
+    "Terraphim AI Architect": {
+      "shortname": "taiarch",
+      "name": "Terraphim AI Architect",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "united",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": ".terraphim/kg-taiarch"
+        },
+        "public": false,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": ".",
+          "service": "Ripgrep",
+          "read_only": true,
+          "fetch_content": false,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "docs",
+          "service": "Ripgrep",
+          "read_only": true,
+          "fetch_content": false,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": ".docs",
+          "service": "Ripgrep",
+          "read_only": true,
+          "fetch_content": false,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "memory",
+          "service": "Ripgrep",
+          "read_only": true,
+          "fetch_content": false,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_enabled": false,
+      "llm_provider": "ollama",
+      "ollama_model": "llama3.2:3b",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "llm_router_enabled": false,
+      "llm_context_window": 32768,
+      "extra": {}
     }
   }
 }
