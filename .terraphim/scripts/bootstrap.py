@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Bootstrap .terraphim for this clone.
 
-- Regenerates thesaurus-<shortname>.json from kg-<shortname>/*.md
-- Normalizes role KG paths to repo-relative `.terraphim/kg-<short>` form
-- Keeps haystack locations repo-relative (`.`, `crates`, …)
-- NEVER writes machine-absolute paths into the tracked config.json
-  (fleet standard §8 portability)
+- Regenerates thesaurus-<shortname>.json from kg-<shortname>/*.md when that
+  fleet-style directory exists
+- Normalizes accidental absolute/{REPO} haystack paths back to repo-relative
+- Does NOT rewrite legacy kg/<role>/ paths (e.g. .terraphim/kg/rust-engineer)
+- NEVER writes machine-absolute paths into tracked config.json
 
 Idempotent. Run after clone and after editing concept files.
 """
@@ -15,7 +15,6 @@ import glob
 import json
 import os
 import subprocess
-import sys
 
 REPO = subprocess.check_output(
     ["git", "rev-parse", "--show-toplevel"], text=True
@@ -51,7 +50,6 @@ def compile_thesaurus(kg_dir: str, out_path: str, role_name: str) -> None:
 
 
 def to_repo_relative(loc: str) -> str:
-    """Map absolute/{REPO}/foreign paths back to repo-relative form."""
     if loc in ("{REPO}", ".", ""):
         return "."
     if loc.startswith("{REPO}/"):
@@ -60,7 +58,6 @@ def to_repo_relative(loc: str) -> str:
         return "."
     if loc.startswith(REPO + os.sep):
         return loc[len(REPO) + 1 :] or "."
-    # foreign absolute: try known suffixes, else basename==repo basename → root
     if loc.startswith("/"):
         for suffix in (
             "/rust/crates",
@@ -74,33 +71,45 @@ def to_repo_relative(loc: str) -> str:
                 return suffix.lstrip("/")
         if os.path.basename(loc.rstrip("/")) == os.path.basename(REPO):
             return "."
-    return loc  # already relative or unknown — leave
+    return loc
 
 
 cfg = json.load(open(CFG))
 changed = False
 for role in cfg.get("roles", {}).values():
     short = role.get("shortname") or role.get("name", "role").lower().replace(" ", "-")
+    fleet_kg = os.path.join(TD, f"kg-{short}")
     kg = role.get("kg", {}).get("knowledge_graph_local")
-    if kg and "path" in kg:
+    # Only force fleet path when fleet kg-<short> dir exists; leave legacy kg/<name>
+    if kg and "path" in kg and os.path.isdir(fleet_kg):
         rel = f".terraphim/kg-{short}"
         if kg["path"] != rel:
             kg["path"] = rel
+            changed = True
+    elif kg and "path" in kg:
+        # normalize absolute/{REPO} on legacy paths without changing layout
+        p = kg["path"]
+        if p.startswith("{REPO}/"):
+            kg["path"] = p[len("{REPO}/") :]
+            changed = True
+        elif p.startswith(REPO + os.sep):
+            kg["path"] = p[len(REPO) + 1 :]
             changed = True
     for h in role.get("haystacks", []):
         new = to_repo_relative(h.get("location", "."))
         if h.get("location") != new:
             h["location"] = new
             changed = True
-    compile_thesaurus(
-        os.path.join(TD, f"kg-{short}"),
-        os.path.join(TD, f"thesaurus-{short}.json"),
-        role.get("name", short),
-    )
+    if os.path.isdir(fleet_kg):
+        compile_thesaurus(
+            fleet_kg,
+            os.path.join(TD, f"thesaurus-{short}.json"),
+            role.get("name", short),
+        )
 
 if changed:
     json.dump(cfg, open(CFG, "w"), indent=2)
-    print("  config.json normalized to repo-relative paths (portable)")
+    print("  config.json normalized (portable relative paths)")
 else:
     print("  config.json already portable (no path rewrite)")
 print("done.")

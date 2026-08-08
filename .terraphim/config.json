@@ -12,7 +12,7 @@
       "kg": {
         "knowledge_graph_local": {
           "input_type": "markdown",
-          "path": ".terraphim/kg-rust-engineer"
+          "path": ".terraphim/kg/rust-engineer"
         },
         "public": true,
         "publish": true
