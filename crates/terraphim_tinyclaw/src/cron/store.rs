@@ -104,6 +104,31 @@ impl CronStore {
         Ok(jobs)
     }
 
+    /// Get a single job by ID.
+    ///
+    /// Hermes contract: `get_job(job_id) -> Optional[Dict]` returns the
+    /// job or None if not found. This ports `cron/jobs.py:get_job`.
+    pub async fn get_job(&self, job_id: &str) -> Result<Option<CronJob>, CronError> {
+        self.load_job(job_id).await
+    }
+
+    /// Remove a job by ID.
+    ///
+    /// Hermes contract: `remove_job(job_id) -> bool` returns True if the
+    /// job existed and was removed, False if not found. This ports
+    /// `cron/jobs.py:remove_job`.
+    pub async fn remove_job(&self, job_id: &str) -> Result<bool, CronError> {
+        let mut jobs = self.load_all().await?;
+        let before = jobs.len();
+        jobs.retain(|j| j.id != job_id);
+        if jobs.len() < before {
+            self.save_all(&jobs).await?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Save all jobs (replaces index + persists each job).
     pub async fn save_all(&self, jobs: &[CronJob]) -> Result<(), CronError> {
         for job in jobs {
