@@ -365,7 +365,7 @@ cd /tmp && terraphim-agent learn list --global --recent 10
 
 ## See also
 
-- Multi-client plan: `private/cto-executive-system/2026-08-08-learn-hooks-multi-client.md`
+- Multi-client plan: internal CTO note `2026-08-08-learn-hooks-multi-client.md` (not public; see issues below)
 - Issues: terraphim-ai#2704 (closed), terraphim-ai#810 (P2/P3)
 - Clients: terraphim-clients#90 (envelopes), #91 (pi), #92 (fmt), #93 (recursive KG)
 - Skill: `terraphim-agent-learn-hooks`
