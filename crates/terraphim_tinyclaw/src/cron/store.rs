@@ -1,9 +1,13 @@
-//! Cron job persistence via `terraphim_persistence`.
+//! Cron job persistence via `terraphim_persistence::DeviceStorage`.
 //!
-//! Wave 3 of the Hermes parity arc. Jobs are stored as a JSON-serialised list
-//! under a single key, matching Hermes' `jobs.json` flat-file approach.
+//! Wave 3 of the Hermes parity arc. Each job is stored as a JSON document
+//! under a key derived from the job ID. A separate index document tracks
+//! the set of job IDs.
+//!
+//! Uses `DeviceStorage::fastest_op` (opendal `Operator`) for raw read/write
+//! to keep the implementation independent of the `Persistable` trait
+//! (which has private fields).
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use terraphim_persistence::DeviceStorage;
 
@@ -11,51 +15,103 @@ use super::CronError;
 use super::job::CronJob;
 
 /// Persistent store for cron jobs.
+///
+/// For hermetic tests, call `DeviceStorage::init_memory_only()` before
+/// constructing the store.
 #[derive(Clone)]
 pub struct CronStore {
     storage: Arc<DeviceStorage>,
-    key: String,
+    /// Key for the job-index document.
+    index_key: String,
 }
 
 impl CronStore {
-    /// Create a new store using the given storage backend and key prefix.
-    ///
-    /// The store reads/writes a single `HashMap<String, CronJob>` under `key`.
-    pub fn new(storage: Arc<DeviceStorage>, key: impl Into<String>) -> Self {
+    /// Create a new store.
+    pub fn new(storage: Arc<DeviceStorage>, index_key: impl Into<String>) -> Self {
         Self {
             storage,
-            key: key.into(),
+            index_key: index_key.into(),
         }
     }
 
-    /// Load all jobs from the store.
-    pub async fn load_all(&self) -> Result<Vec<CronJob>, CronError> {
-        match self.storage.restore::<HashMap<String, CronJob>>(&self.key).await {
-            Ok(Some(map)) => Ok(map.into_values().collect()),
-            Ok(None) => Ok(Vec::new()),
-            Err(e) => Err(CronError::Store(e.to_string())),
+    /// Load all job IDs from the index. Returns an empty vec if the index
+    /// does not exist yet.
+    async fn load_index(&self) -> Result<Vec<String>, CronError> {
+        match self.storage.fastest_op.read(&self.index_key).await {
+            Ok(bytes) => {
+                let index: Vec<String> = serde_json::from_slice(bytes.to_bytes().as_ref())
+                    .map_err(|e| CronError::Store(format!("parse index: {e}")))?;
+                Ok(index)
+            }
+            Err(_) => Ok(Vec::new()),
         }
     }
 
-    /// Save all jobs to the store (atomic write via DeviceStorage).
-    pub async fn save_all(&self, jobs: &[CronJob]) -> Result<(), CronError> {
-        let mut map = HashMap::new();
-        for job in jobs {
-            map.insert(job.id.clone(), job.clone());
-        }
+    /// Save the job ID index.
+    async fn save_index(&self, ids: &[String]) -> Result<(), CronError> {
+        let json = serde_json::to_vec(ids)
+            .map_err(|e| CronError::Store(format!("serialise index: {e}")))?;
         self.storage
-            .persist(&self.key, &map)
+            .fastest_op
+            .write(&self.index_key, json)
             .await
-            .map_err(|e| CronError::Store(e.to_string()))
+            .map_err(|e| CronError::Store(format!("write index: {e}")))?;
+        Ok(())
     }
 
-    /// Load and return jobs as a map for O(1) lookup.
-    pub async fn load_map(&self) -> Result<HashMap<String, CronJob>, CronError> {
-        match self.storage.restore::<HashMap<String, CronJob>>(&self.key).await {
-            Ok(Some(map)) => Ok(map),
-            Ok(None) => Ok(HashMap::new()),
-            Err(e) => Err(CronError::Store(e.to_string())),
+    /// Load a single job by ID.
+    async fn load_job(&self, id: &str) -> Result<Option<CronJob>, CronError> {
+        let key = format!("cron_job:{id}");
+        match self.storage.fastest_op.read(&key).await {
+            Ok(bytes) => {
+                let job: CronJob = serde_json::from_slice(bytes.to_bytes().as_ref())
+                    .map_err(|e| CronError::Store(format!("parse job {id}: {e}")))?;
+                Ok(Some(job))
+            }
+            Err(e) => {
+                let kind = e.kind();
+                if format!("{kind:?}").contains("NotFound") {
+                    Ok(None)
+                } else {
+                    Err(CronError::Store(format!("read job {id}: {e}")))
+                }
+            }
         }
+    }
+
+    /// Save a single job.
+    async fn save_job(&self, job: &CronJob) -> Result<(), CronError> {
+        let key = format!("cron_job:{}", job.id);
+        let json =
+            serde_json::to_vec(job).map_err(|e| CronError::Store(format!("serialise job: {e}")))?;
+        self.storage
+            .fastest_op
+            .write(&key, json)
+            .await
+            .map_err(|e| CronError::Store(format!("write job: {e}")))?;
+        Ok(())
+    }
+
+    /// Load all jobs.
+    pub async fn load_all(&self) -> Result<Vec<CronJob>, CronError> {
+        let ids = self.load_index().await?;
+        let mut jobs = Vec::new();
+        for id in ids {
+            if let Some(job) = self.load_job(&id).await? {
+                jobs.push(job);
+            }
+        }
+        Ok(jobs)
+    }
+
+    /// Save all jobs (replaces index + persists each job).
+    pub async fn save_all(&self, jobs: &[CronJob]) -> Result<(), CronError> {
+        for job in jobs {
+            self.save_job(job).await?;
+        }
+        let ids: Vec<String> = jobs.iter().map(|j| j.id.clone()).collect();
+        self.save_index(&ids).await?;
+        Ok(())
     }
 }
 
@@ -63,23 +119,20 @@ impl CronStore {
 mod tests {
     use super::*;
     use crate::cron::job::{JobState, Schedule};
-    use tempfile::TempDir;
 
-    async fn make_store() -> (CronStore, TempDir) {
-        let dir = TempDir::new().unwrap();
-        std::env::set_var("TERRAPHIM_HOME", dir.path());
-        let storage = Arc::new(
-            DeviceStorage::new()
-                .await
-                .expect("DeviceStorage::new should succeed"),
-        );
-        let store = CronStore::new(storage, "test_cron_jobs");
-        (store, dir)
+    async fn make_store() -> CronStore {
+        // Ensure memory-only backend is initialised
+        let _ = DeviceStorage::init_memory_only().await;
+        let storage = DeviceStorage::arc_memory_only()
+            .await
+            .expect("arc memory-only DeviceStorage");
+        let key = format!("test_cron_index_{}", uuid::Uuid::new_v4().simple());
+        CronStore::new(storage, key)
     }
 
     #[tokio::test]
     async fn test_store_round_trip() {
-        let (store, _dir) = make_store().await;
+        let store = make_store().await;
 
         let mut job = CronJob::new("hello world", Schedule::Delay { secs: 60 });
         job.state = JobState::Paused;
@@ -95,14 +148,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_store_empty() {
-        let (store, _dir) = make_store().await;
+        let store = make_store().await;
         let loaded = store.load_all().await.unwrap();
         assert!(loaded.is_empty());
     }
 
     #[tokio::test]
     async fn test_store_overwrite() {
-        let (store, _dir) = make_store().await;
+        let store = make_store().await;
 
         let job1 = CronJob::new("first", Schedule::Delay { secs: 60 });
         store.save_all(&[job1.clone()]).await.unwrap();

@@ -81,7 +81,11 @@ impl Schedule {
 
     /// Compute the next fire time given `now` and the last fire time (for
     /// intervals).
-    pub fn next_after(&self, now: DateTime<Utc>, last: Option<DateTime<Utc>>) -> Option<DateTime<Utc>> {
+    pub fn next_after(
+        &self,
+        now: DateTime<Utc>,
+        last: Option<DateTime<Utc>>,
+    ) -> Option<DateTime<Utc>> {
         match self {
             Schedule::Delay { secs } => Some(now + Duration::from_secs(*secs)),
             Schedule::Interval { secs } => {
@@ -274,14 +278,12 @@ fn next_cron_fire(expr: &str, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
     let minute_field = parts[0];
     let hour_field = parts[1];
 
-    let mut candidates = expand_field(minute_field, 0, 59)?;
+    let candidates = expand_field(minute_field, 0, 59)?;
     let hours = expand_field(hour_field, 0, 23)?;
 
     // Walk forward from the next minute, checking each (hour, minute) combo.
     let start = now + Duration::from_secs(60);
-    let start = start
-        .with_second(0)
-        .and_then(|t| t.with_nanosecond(0))?;
+    let start = start.with_second(0).and_then(|t| t.with_nanosecond(0))?;
 
     for offset_minutes in 0..(24 * 60) {
         let candidate = start + Duration::from_secs(offset_minutes * 60);
@@ -294,7 +296,7 @@ fn next_cron_fire(expr: &str, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
     None
 }
 
-use chrono::{Timelike, Datelike};
+use chrono::Timelike;
 
 fn expand_field(field: &str, min: u32, max: u32) -> Option<Vec<u32>> {
     let mut result = Vec::new();

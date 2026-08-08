@@ -17,6 +17,7 @@ pub mod commands;
 pub mod config;
 #[allow(dead_code)]
 pub mod credentials;
+pub mod cron;
 pub mod format;
 pub mod mcp;
 pub mod session;

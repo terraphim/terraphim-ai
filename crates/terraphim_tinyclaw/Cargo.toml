@@ -87,6 +87,10 @@ terraphim_mcp_search = { version = "0.1.0", registry = "terraphim" }
 rmcp = { version = "0.9.1", features = ["server", "transport-io", "client", "transport-child-process", "macros"] }
 schemars = "1"
 
+# Wave 3 of Hermes parity arc: cron scheduler with persistence.
+# Published crate on terraphim registry + crates.io.
+terraphim_persistence = { version = "1.20.4" }
+
 [features]
 default = ["telegram"]
 telegram = ["dep:teloxide"]
