@@ -40,10 +40,14 @@ impl MemoryBackend for JsonlBackend {
     }
 
     async fn persist(&self, session: &Session) -> Result<(), MemoryError> {
-        let manager = self.manager.lock().unwrap();
+        let mut manager = self.manager.lock().unwrap();
         manager
             .save(session)
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        // Invalidate the in-memory cache so the next `get_or_create`
+        // reloads from disk (jsonl is append-only; without this, the
+        // session in the cache would never reflect disk updates).
+        manager.invalidate_cache(&session.key);
         Ok(())
     }
 

@@ -204,6 +204,17 @@ impl SessionManager {
         self.cache.get(key)
     }
 
+    /// Remove a session from the in-memory cache. The next call to
+    /// `get_or_create` will reload it from disk.
+    ///
+    /// Used by `JsonlBackend` (memory::jsonl) after `save` so that
+    /// subsequent reads see the persisted state instead of the stale
+    /// cached Session. Idempotent: removing a key that isn't in the
+    /// cache is a no-op.
+    pub fn invalidate_cache(&mut self, key: &str) {
+        self.cache.remove(key);
+    }
+
     /// Save a session to disk.
     pub fn save(&self, session: &Session) -> anyhow::Result<()> {
         let file_path = self.session_file_path(&session.key);
