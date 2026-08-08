@@ -70,7 +70,7 @@ impl CronStore {
             }
             Err(e) => {
                 let kind = e.kind();
-                if format!("{kind:?}").contains("NotFound") {
+                if kind == opendal::ErrorKind::NotFound {
                     Ok(None)
                 } else {
                     Err(CronError::Store(format!("read job {id}: {e}")))
@@ -99,7 +99,7 @@ impl CronStore {
             Ok(()) => Ok(()),
             Err(e) => {
                 let kind = e.kind();
-                if format!("{kind:?}").contains("NotFound") {
+                if kind == opendal::ErrorKind::NotFound {
                     Ok(())
                 } else {
                     Err(CronError::Store(format!("delete job {id}: {e}")))
