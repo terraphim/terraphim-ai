@@ -52,7 +52,9 @@ def compile_thesaurus(kg_dir: str, out_path: str, role_name: str) -> None:
                 continue
             data.setdefault(key, {"id": cid, "nterm": nterm})
         cid += 1
-    json.dump({"name": role_name, "data": data}, open(out_path, "w"), indent=2)
+    with open(out_path, "w", encoding="utf-8") as fh:
+        json.dump({"name": role_name, "data": data}, fh, indent=2)
+        fh.write("\n")
     print(f"  wrote {os.path.relpath(out_path, REPO)} ({len(data)} terms)")
 
 
@@ -66,18 +68,21 @@ def to_repo_relative(loc: str) -> str:
     if loc.startswith(REPO + os.sep):
         return loc[len(REPO) + 1 :] or "."
     if loc.startswith("/"):
-        for suffix in (
-            "/rust/crates",
-            "/crates",
-            "/memory",
-            "/docs",
-            "/.docs",
-            "/.terraphim",
-        ):
-            if loc.endswith(suffix):
-                return suffix.lstrip("/")
-        if os.path.basename(loc.rstrip("/")) == os.path.basename(REPO):
+        # Only rewrite absolute paths that resolve INSIDE this repo.
+        # Never rewrite foreign paths that merely share a directory suffix
+        # (e.g. /mnt/shared/docs must not become "docs").
+        try:
+            real_loc = os.path.realpath(loc)
+            real_repo = os.path.realpath(REPO)
+        except OSError:
+            return loc
+        if real_loc == real_repo:
             return "."
+        prefix = real_repo + os.sep
+        if real_loc.startswith(prefix):
+            return real_loc[len(prefix):] or "."
+        # foreign absolute path — leave untouched
+        return loc
     return loc
 
 
