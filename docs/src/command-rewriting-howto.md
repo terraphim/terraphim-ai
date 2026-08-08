@@ -274,3 +274,98 @@ The hook only touches `tool.execute.before`; the agent does not loop back
 through the hook on its own retries. If you see double rewrites, check
 whether `input.tool === "Bash"` is spelt exactly -- OpenCode passes
 `"Bash"`, not `"bash"`.
+
+## 7. Multi-client install (Claude Code, OpenCode, pi) — 2026-08-08
+
+**Binary floor:** `terraphim-agent` **≥ 1.21.1** (Gitea private cargo / terraphim-clients).  
+1.21.1 adds Claude live envelope aliases (`tool_response` / `exitCode`, clients #90).  
+1.8.0 PATH stubs print `(Not yet implemented)` for `learn correct` and miss `learn hook`.
+
+### 7.1 Dual CLI (do not mix)
+
+| Entrypoint | Captures learnings? | Use |
+|------------|---------------------|-----|
+| `learn hook --format <claude\|codex\|opencode> --learn-hook-type <pre-tool-use\|post-tool-use\|user-prompt-submit>` | **Yes** | Post-tool capture, pre-tool warn, user-prompt corrections |
+| `hook --hook-type post-tool-use` | **No** | KG connectivity only |
+
+### 7.2 Claude Code
+
+```bash
+# PostToolUse → learn capture (not KG post hook)
+# PreToolUse → guard → replace → learn-pre
+# UserPromptSubmit → learn hook user-prompt-submit
+```
+
+Settings (`~/.claude/settings.local.json`) should call:
+
+- `~/.claude/hooks/pre_tool_use.sh`
+- `~/.claude/hooks/post_tool_use.sh`  → **must** invoke `terraphim-agent learn hook`
+- `~/.claude/hooks/user_prompt_submit.sh`
+
+Live Claude often sends `tool_response` + `exitCode`; agent ≥1.21.1 accepts aliases (clients #90). Shell hooks may still jq-normalize for older binaries.
+
+### 7.3 OpenCode
+
+`~/.config/opencode/opencode.json` plugins:
+
+- `terraphim-learn` — `tool.execute.before` (guard/replace/learn-pre) + `tool.execute.after` (capture)
+- `terraphim-learn-prompt` — listens on OpenCode `chat.message` and runs `learn hook --learn-hook-type user-prompt-submit` when the text matches use/prefer/instead-of patterns
+
+### 7.4 pi (pi_agent_rust)
+
+```bash
+pi install /path/to/terraphim-clients/packages/pi-terraphim-learn
+terraphim-agent learn install-hook pi   # prints install docs + smoke helper path
+```
+
+Extension listens for `onToolResult` and fail-opens if the agent is missing.
+
+## 8. Phase 3 — compile learned corrections into replace KG
+
+### 8.1 Capture
+
+User says e.g. "use bun instead of npm" → `correction-*.md` with `correction_type: tool-preference`
+under `~/.local/share/terraphim/learnings/` (run capture from a non-project cwd, or use global).
+
+### 8.2 Export + compile
+
+```bash
+# Prefer global learnings: run from /tmp so project .terraphim/ is not preferred
+cd /tmp
+terraphim-agent learn export-kg \
+  --output "$HOME/.config/terraphim/docs/src/kg/learned" \
+  --correction-type tool-preference
+terraphim-agent learn compile \
+  --output "$HOME/.config/terraphim/compiled-corrections.json"
+
+# Or the host helper:
+~/.config/terraphim/bin/sync-learned-corrections.sh
+```
+
+`export-kg` writes reviewable markdown under **`docs/src/kg/learned/`**.  
+`replace` (and the agent entity thesaurus builder) walk the KG root **recursively**, so `learned/**` is included — **requires terraphim-agent ≥ 1.21.1 with clients #93 merged**.  
+
+`learn compile` writes `compiled-corrections.json` for optional merge/export pipelines; the §8.4 `replace` verify path reads **markdown under the role KG** (after `export-kg`), not the JSON compile output.
+
+### 8.3 Auto-sync after user-prompt capture
+
+Claude `user_prompt_submit.sh` and OpenCode `terraphim-learn-prompt` can call
+`sync-learned-corrections.sh` after a successful capture (best-effort, fail-open).
+
+### 8.4 Verify
+
+```bash
+printf 'npm install x' | terraphim-agent replace --role "Terraphim Engineer" --json --fail-open
+# success example: {"result":"bun install x","original":"npm install x","replacements":1,"changed":true}
+# empty thesaurus / no match: {"result":"npm install x","original":"npm install x","replacements":0,"changed":false} (or pass-through with --fail-open)
+ls ~/.config/terraphim/docs/src/kg/learned/
+# Prefer listing from a non-project cwd so project .terraphim/ does not override global learnings
+cd /tmp && terraphim-agent learn list --global --recent 10
+```
+
+## See also
+
+- Multi-client plan: internal CTO note `2026-08-08-learn-hooks-multi-client.md` (not public; see issues below)
+- Issues: terraphim-ai#2704 (closed), terraphim-ai#810 (P2/P3)
+- Clients: terraphim-clients#90 (envelopes), #91 (pi), #92 (fmt), #93 (recursive KG)
+- Skill: `terraphim-agent-learn-hooks`
