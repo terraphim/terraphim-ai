@@ -40,10 +40,17 @@ def compile_thesaurus(kg_dir: str, out_path: str, role_name: str) -> None:
             ),
             "",
         )
-        for t in dict.fromkeys(
+        for term in dict.fromkeys(
             [nterm] + [s.strip().lower() for s in syn.split(",") if s.strip()]
         ):
-            data.setdefault(t.lower(), {"id": cid, "nterm": nterm})
+            key = term.lower()
+            if key in data and data[key]["nterm"] != nterm:
+                print(
+                    f"  warn: synonym {key!r} already maps to {data[key]['nterm']!r}; "
+                    f"ignoring mapping to {nterm!r} ({os.path.basename(f)})"
+                )
+                continue
+            data.setdefault(key, {"id": cid, "nterm": nterm})
         cid += 1
     json.dump({"name": role_name, "data": data}, open(out_path, "w"), indent=2)
     print(f"  wrote {os.path.relpath(out_path, REPO)} ({len(data)} terms)")
@@ -87,13 +94,12 @@ for role in cfg.get("roles", {}).values():
             kg["path"] = rel
             changed = True
     elif kg and "path" in kg:
-        # normalize absolute/{REPO} on legacy paths without changing layout
-        p = kg["path"]
-        if p.startswith("{REPO}/"):
-            kg["path"] = p[len("{REPO}/") :]
-            changed = True
-        elif p.startswith(REPO + os.sep):
-            kg["path"] = p[len(REPO) + 1 :]
+        # legacy kg/<role>/ — heal via same relative normalizer (no layout change)
+        new_p = to_repo_relative(kg["path"])
+        if new_p == ".":
+            new_p = kg["path"]  # don't collapse a kg path to repo root
+        if kg["path"] != new_p:
+            kg["path"] = new_p
             changed = True
     for h in role.get("haystacks", []):
         new = to_repo_relative(h.get("location", "."))

@@ -111,6 +111,6 @@ Repo agent memory: `memory/` at repo root.
 
 ## Path portability
 
-Fleet roles use **repo-relative** haystack and KG paths. `scripts/bootstrap.py`
+Fleet roles use **repo-relative** haystack and KG paths. `scripts/bootstrap.py` — regenerates thesauri and normalizes any absolute/`{REPO}` paths **back** to repo-relative form. Run once after cloning.
 regenerates thesauri and normalizes accidental absolute/`{REPO}` paths back to
 relative form — it never writes machine-absolute paths into tracked config.

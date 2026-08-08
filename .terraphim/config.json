@@ -138,6 +138,5 @@
       "llm_context_window": 32768,
       "extra": {}
     }
-  },
-  "id": "TerraphimAI"
+  }
 }
