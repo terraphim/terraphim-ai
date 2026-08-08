@@ -44,6 +44,25 @@ ignore = [
     # rand unsound with custom logger + thread_rng - currently transitive via proptest/dev tooling.
     # TODO: remove once the rand 0.9.3+ upgrade lands across the dependency graph.
     "RUSTSEC-2026-0097",
+    # quick-xml 0.37.5 CVEs (RUSTSEC-2026-0194, RUSTSEC-2026-0195) — pinned by
+    # the self_update git fork (terraphim_update branch
+    # update-zipsign-api-v0.2) at ^0.37.5. Cannot upgrade without changing the
+    # upstream dep. Both CVEs are upstream-only (adversarial XML parsing in
+    # the self_update crate, which only parses release-manifest XML at binary
+    # update time — not user-reachable from TinyClaw). Not introduced by this
+    # session's work.
+    # TODO: drop these ignores once self_update is upgraded to use quick-xml >= 0.41.
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+    # rmcp 0.9.1 — RUSTSEC-2026-0189 (DNS rebinding in Streamable HTTP
+    # server transport). TinyClaw uses the stdio + child-process transports
+    # only (see mcp/server.rs and mcp/client.rs); the vulnerable HTTP
+    # transport is not exposed. The fix is to upgrade to rmcp >= 1.4.0,
+    # which is a breaking API change (ServerInfo/Tool non-exhaustive struct
+    # literals; peer_info now returns Arc<InitializeResult>). The upgrade
+    # is a real Wave 2 refactor that is scoped separately.
+    # TODO: remove once rmcp is upgraded to >= 1.4.0.
+    "RUSTSEC-2026-0189",
 ]
 
 [licenses]
