@@ -77,6 +77,10 @@ allow = [
     "AGPL-3.0-or-later",
     "CDLA-Permissive-2.0",
     "bzip2-1.0.6",
+    # Functional Source License 1.1 with MIT Future License.
+    # Used by terraphim-llm-proxy. Non-OSI but explicitly accepted by
+    # terraphim-ai per project policy (FSL converts to MIT after 2 years).
+    "FSL-1.1-MIT",
 ]
 confidence-threshold = 0.8
 
@@ -102,4 +106,7 @@ allow-git = [
     "https://github.com/snapview/tokio-tungstenite.git",
     # Security patch: rustls-webpki 0.103.10 to fix RUSTSEC-2026-0049 (used by newer rustls)
     "https://github.com/rustls/webpki.git",
+    # terraphim-llm-proxy: main LLM proxy with intelligent routing.
+    # Uses `claude_code_agents` git submodule (recursed with --recurse-submodules).
+    "https://github.com/terraphim/terraphim-llm-proxy.git",
 ]
