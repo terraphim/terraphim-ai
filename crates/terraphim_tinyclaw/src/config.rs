@@ -996,7 +996,7 @@ impl Default for CredentialsConfig {
 ///
 /// **Default behaviour: disabled.** The MCP server is only started when
 /// `enabled = true`. The client is only used when `server_command` is set.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct McpConfig {
     /// Master switch for the MCP server.
     #[serde(default)]
@@ -1006,15 +1006,6 @@ pub struct McpConfig {
     /// Example: `"npx -y @modelcontextprotocol/server-everything stdio"`.
     #[serde(default)]
     pub server_command: Option<String>,
-}
-
-impl Default for McpConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            server_command: None,
-        }
-    }
 }
 
 #[cfg(test)]
