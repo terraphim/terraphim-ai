@@ -3,6 +3,7 @@
 - [Introduction](./Introduction.md)
 - [Contributing](./CONTRIBUTE.md)
 - [Branch Protection and Security](./branch-protection.md)
+- [Release Channels](./release-channels.md)
 - [Architecture](./Architecture.md)
 - [Claude Desktop Integration](./ClaudeDesktop.md)
 - [Design Decisions](./DesignDecisions.md)
