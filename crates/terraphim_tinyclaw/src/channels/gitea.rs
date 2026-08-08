@@ -167,6 +167,18 @@ mod tests {
     }
 
     #[test]
+    fn webhook_verification_rejects_malformed_hex() {
+        let ch = GiteaChannel::new(GiteaConfig::default());
+        assert!(!ch.verify_webhook(b"hello", "sha256=not-hex-chars-zzzz"));
+    }
+
+    #[test]
+    fn webhook_verification_rejects_wrong_length_hex() {
+        let ch = GiteaChannel::new(GiteaConfig::default());
+        assert!(!ch.verify_webhook(b"hello", "sha256=deadbeefdeadbeef"));
+    }
+
+    #[test]
     fn is_allowed_respects_allowlist() {
         let ch = GiteaChannel::new(GiteaConfig {
             allow_from: vec!["alice".into()],
