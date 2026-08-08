@@ -62,8 +62,14 @@ pub fn router(state: DashboardState) -> Router {
         .route("/api/health", get(health::get_health))
         .route("/api/status", get(status::get_status))
         .route("/api/cron/fire", post(cron::fire_webhook))
-        .route("/api/cron/jobs", get(cron::list_jobs).post(cron::create_job))
-        .route("/api/cron/jobs/{id}", get(cron::get_job).delete(cron::delete_job))
+        .route(
+            "/api/cron/jobs",
+            get(cron::list_jobs).post(cron::create_job),
+        )
+        .route(
+            "/api/cron/jobs/{id}",
+            get(cron::get_job).delete(cron::delete_job),
+        )
         .route("/api/sessions", get(sessions::list_sessions))
         .with_state(state)
 }

@@ -18,8 +18,10 @@ pub mod config;
 #[allow(dead_code)]
 pub mod credentials;
 pub mod cron;
+pub mod dashboard;
 pub mod format;
 pub mod mcp;
+pub mod proxy;
 pub mod session;
 pub mod skills;
 pub mod tools;

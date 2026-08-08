@@ -93,6 +93,18 @@ schemars = "1"
 cron = "0.13"
 terraphim_persistence = { version = "1.20.4" }
 
+# Wave 5 (Phase C2) OpenAI-compatible HTTP proxy — TinyClaw provides its own
+# minimal proxy here. We attempted to leverage the sibling
+# `terraphim-llm-proxy` crate (0.1.6) at `/home/alex/projects/terraphim-llm-proxy/`,
+# but it is not published to any registry and its path-only dependency
+# pulls in the entire `terraphim-ai` monorepo via git (via `terraphim_types`),
+# which is unbuildable in isolation. Until `terraphim-llm-proxy` publishes a
+# clean version, TinyClaw ships a minimal echo proxy.
+
+# Wave 5 (Phase C1) dashboard: axum-based HTTP server (Hermes parity).
+axum = { version = "0.8", features = ["macros"] }
+tower = "0.5"
+
 [features]
 default = ["telegram"]
 telegram = ["dep:teloxide"]
@@ -103,6 +115,8 @@ voice = ["dep:whisper-rs", "dep:symphonia", "dep:hound"]
 
 [dev-dependencies]
 tokio-test = "0.4"
+tower = { version = "0.5", features = ["util"] }
+reqwest = { workspace = true }
 tempfile = { workspace = true }
 
 criterion = { version = "0.8", features = ["async_tokio"] }
