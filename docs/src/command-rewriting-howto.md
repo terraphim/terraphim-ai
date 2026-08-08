@@ -277,14 +277,15 @@ whether `input.tool === "Bash"` is spelt exactly -- OpenCode passes
 
 ## 7. Multi-client install (Claude Code, OpenCode, pi) — 2026-08-08
 
-**Binary floor:** `terraphim-agent` **≥ 1.21.0** (Gitea private cargo / terraphim-clients).  
+**Binary floor:** `terraphim-agent` **≥ 1.21.1** (Gitea private cargo / terraphim-clients).  
+1.21.1 adds Claude live envelope aliases (`tool_response` / `exitCode`, clients #90).  
 1.8.0 PATH stubs print `(Not yet implemented)` for `learn correct` and miss `learn hook`.
 
 ### 7.1 Dual CLI (do not mix)
 
 | Entrypoint | Captures learnings? | Use |
 |------------|---------------------|-----|
-| `learn hook --format …` | **Yes** | Post-tool capture, pre-tool warn, user-prompt corrections |
+| `learn hook --format <claude\|codex\|opencode> --learn-hook-type <pre-tool-use\|post-tool-use\|user-prompt-submit>` | **Yes** | Post-tool capture, pre-tool warn, user-prompt corrections |
 | `hook --hook-type post-tool-use` | **No** | KG connectivity only |
 
 ### 7.2 Claude Code
@@ -308,7 +309,7 @@ Live Claude often sends `tool_response` + `exitCode`; agent ≥1.21.1 accepts al
 `~/.config/opencode/opencode.json` plugins:
 
 - `terraphim-learn` — `tool.execute.before` (guard/replace/learn-pre) + `tool.execute.after` (capture)
-- `terraphim-learn-prompt` — `chat.message` → user-prompt-submit (use/prefer/instead)
+- `terraphim-learn-prompt` — listens on OpenCode `chat.message` and runs `learn hook --learn-hook-type user-prompt-submit` when the text matches use/prefer/instead-of patterns
 
 ### 7.4 pi (pi_agent_rust)
 
@@ -342,7 +343,9 @@ terraphim-agent learn compile \
 ```
 
 `export-kg` writes reviewable markdown under **`docs/src/kg/learned/`**.  
-Agent builds the entity thesaurus **recursively** from the KG root (so `learned/**` is included — clients PR for recursive walk).
+`replace` (and the agent entity thesaurus builder) walk the KG root **recursively**, so `learned/**` is included — **requires terraphim-agent ≥ 1.21.1 with clients #93 merged**.  
+
+`learn compile` writes `compiled-corrections.json` for optional merge/export pipelines; the §8.4 `replace` verify path reads **markdown under the role KG** (after `export-kg`), not the JSON compile output.
 
 ### 8.3 Auto-sync after user-prompt capture
 
@@ -353,12 +356,16 @@ Claude `user_prompt_submit.sh` and OpenCode `terraphim-learn-prompt` can call
 
 ```bash
 printf 'npm install x' | terraphim-agent replace --role "Terraphim Engineer" --json --fail-open
+# success example: {"result":"bun install x","original":"npm install x","replacements":1,"changed":true}
+# empty thesaurus / no match: {"result":"npm install x","original":"npm install x","replacements":0,"changed":false} (or pass-through with --fail-open)
 ls ~/.config/terraphim/docs/src/kg/learned/
-terraphim-agent learn list --global --recent 10
+# Prefer listing from a non-project cwd so project .terraphim/ does not override global learnings
+cd /tmp && terraphim-agent learn list --global --recent 10
 ```
 
 ## See also
 
 - Multi-client plan: `private/cto-executive-system/2026-08-08-learn-hooks-multi-client.md`
-- Issues: #2704 (closed), #810 (P2/P3), clients #90–#92
+- Issues: terraphim-ai#2704 (closed), terraphim-ai#810 (P2/P3)
+- Clients: terraphim-clients#90 (envelopes), #91 (pi), #92 (fmt), #93 (recursive KG)
 - Skill: `terraphim-agent-learn-hooks`
