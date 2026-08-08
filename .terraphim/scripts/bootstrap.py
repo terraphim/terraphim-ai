@@ -119,7 +119,9 @@ for role in cfg.get("roles", {}).values():
         )
 
 if changed:
-    json.dump(cfg, open(CFG, "w"), indent=2)
+    with open(CFG, "w", encoding="utf-8") as fh:
+        json.dump(cfg, fh, indent=2)
+        fh.write("\n")
     print("  config.json normalized (portable relative paths)")
 else:
     print("  config.json already portable (no path rewrite)")
