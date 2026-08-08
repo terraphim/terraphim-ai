@@ -59,7 +59,7 @@ impl CronStore {
         Ok(())
     }
 
-    /// Load a single job by ID.
+    /// Load a single job by ID. Returns None if the job document doesn't exist.
     async fn load_job(&self, id: &str) -> Result<Option<CronJob>, CronError> {
         let key = format!("cron_job:{id}");
         match self.storage.fastest_op.read(&key).await {
@@ -79,7 +79,7 @@ impl CronStore {
         }
     }
 
-    /// Save a single job.
+    /// Save a single job's document.
     async fn save_job(&self, job: &CronJob) -> Result<(), CronError> {
         let key = format!("cron_job:{}", job.id);
         let json =
@@ -90,6 +90,22 @@ impl CronStore {
             .await
             .map_err(|e| CronError::Store(format!("write job: {e}")))?;
         Ok(())
+    }
+
+    /// Delete a single job's document. NotFound is treated as success.
+    pub(crate) async fn delete_job(&self, id: &str) -> Result<(), CronError> {
+        let key = format!("cron_job:{id}");
+        match self.storage.fastest_op.delete(&key).await {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                let kind = e.kind();
+                if format!("{kind:?}").contains("NotFound") {
+                    Ok(())
+                } else {
+                    Err(CronError::Store(format!("delete job {id}: {e}")))
+                }
+            }
+        }
     }
 
     /// Load all jobs.
@@ -112,7 +128,8 @@ impl CronStore {
         self.load_job(job_id).await
     }
 
-    /// Remove a job by ID.
+    /// Remove a job by ID. Returns `true` if the job existed and was removed,
+    /// `false` if not found.
     ///
     /// Hermes contract: `remove_job(job_id) -> bool` returns True if the
     /// job existed and was removed, False if not found. This ports
@@ -122,6 +139,9 @@ impl CronStore {
         let before = jobs.len();
         jobs.retain(|j| j.id != job_id);
         if jobs.len() < before {
+            // Delete the per-job document too (Hermes removes the entry,
+            // we also need to drop the file).
+            self.delete_job(job_id).await?;
             self.save_all(&jobs).await?;
             Ok(true)
         } else {
@@ -146,7 +166,6 @@ mod tests {
     use crate::cron::job::{JobState, Schedule};
 
     async fn make_store() -> CronStore {
-        // Ensure memory-only backend is initialised
         let _ = DeviceStorage::init_memory_only().await;
         let storage = DeviceStorage::arc_memory_only()
             .await
@@ -162,7 +181,7 @@ mod tests {
         let mut job = CronJob::new("hello world", Schedule::Delay { secs: 60 });
         job.state = JobState::Paused;
 
-        store.save_all(&[job.clone()]).await.unwrap();
+        store.save_all(std::slice::from_ref(&job)).await.unwrap();
 
         let loaded = store.load_all().await.unwrap();
         assert_eq!(loaded.len(), 1);
@@ -191,5 +210,26 @@ mod tests {
         let loaded = store.load_all().await.unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].id, job2.id);
+    }
+
+    #[tokio::test]
+    async fn test_remove_job_clears_document() {
+        // Verifies the fix for the contract test: remove_job must delete
+        // the per-job document, not just update the index.
+        let store = make_store().await;
+        let job = CronJob::new("test", Schedule::Delay { secs: 60 });
+        store.save_all(std::slice::from_ref(&job)).await.unwrap();
+
+        // Verify get_job finds it
+        assert!(store.get_job(&job.id).await.unwrap().is_some());
+
+        // Remove
+        assert!(store.remove_job(&job.id).await.unwrap());
+
+        // Verify get_job returns None
+        assert!(store.get_job(&job.id).await.unwrap().is_none());
+
+        // Verify load_all returns empty
+        assert!(store.load_all().await.unwrap().is_empty());
     }
 }

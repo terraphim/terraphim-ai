@@ -163,7 +163,7 @@ impl RepeatConfig {
 /// A scheduled job.
 ///
 /// JSON shape mirrors Hermes' `cron/jobs.py` job record.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct CronJob {
     /// Unique job identifier.
     pub id: String,

@@ -8,7 +8,7 @@ pub mod scheduler;
 pub mod store;
 
 pub use job::{CronJob, JobState, RepeatConfig, Schedule};
-pub use scheduler::CronScheduler;
+pub use scheduler::{CronScheduler, JobExecutor, JobOutcome, repeat};
 pub use store::CronStore;
 
 /// Errors the cron subsystem can produce.

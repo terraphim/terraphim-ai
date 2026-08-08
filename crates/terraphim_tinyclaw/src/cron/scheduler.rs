@@ -148,9 +148,12 @@ impl CronScheduler {
             if let Some(repeat) = &mut job.repeat {
                 repeat.completed += 1;
                 if repeat.exhausted() {
-                    job.state = JobState::Completed;
-                    job.enabled = false;
-                    job.next_run_at = None;
+                    // Hermes contract: exhausted repeat job is auto-removed
+                    // (cron/jobs.py:mark_job_run does `jobs.pop(i); save_jobs(jobs); return`)
+                    // Delete the per-job document before retaining.
+                    self.store.delete_job(&job.id).await?;
+                    jobs.retain(|j| j.id != job.id);
+                    continue;
                 }
             } else {
                 // One-shot jobs complete after firing
@@ -316,8 +319,10 @@ mod tests {
         scheduler.store.save_all(&jobs).await.unwrap();
 
         scheduler.tick().await.unwrap();
+        // Exhausted repeat jobs are auto-removed (Hermes contract:
+        // cron/jobs.py:mark_job_run removes when completed >= times)
         let jobs = scheduler.store.load_all().await.unwrap();
-        assert_eq!(jobs[0].state, JobState::Completed);
+        assert_eq!(jobs.len(), 0, "exhausted repeat job must be auto-removed");
         assert_eq!(counter.load(Ordering::SeqCst), 2);
     }
 }
