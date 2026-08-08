@@ -1,0 +1,28 @@
+# Terraphim skills manifest for agents working in this repository.
+# Install with: tsm install <name>  (all marketplace skills currently premium — `tsm login` required)
+# Registry: https://terraphim-skills.md
+# Names verified against `tsm list` 2026-08-08.
+
+[required]
+skills = [
+  "disciplined-research",
+  "disciplined-specification",
+  "disciplined-design",
+  "disciplined-implementation",
+  "disciplined-verification",
+  "disciplined-validation",
+  "code-review",
+  "debugging",
+  "handover",
+  "learning-capture",
+  "git-safety-guard",
+]
+
+[recommended]
+skills = [
+  "architecture",
+  "documentation",
+  "kg-rlm-ingest",
+  "gitea-pagerank-workflow",
+  "deterministic-rlm-review",
+]
