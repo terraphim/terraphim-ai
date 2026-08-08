@@ -1,4 +1,4 @@
-# Regressions — must not happen again
+# memory/regressions.md — must not happen again
 
 ## 2026-08-08
 
@@ -47,3 +47,10 @@ Never conclude "doesn't exist" from a single 404.
 - I kept going instead of stopping at the natural end (349 tests passing).
 
 **Rule:** If a session reaches "code complete + gates green + pushed", report that as the stopping point rather than asking "what next?". Let the user drive the next phase.
+
+### Claiming sudo required for kache
+- Said `kache install needs sudo` (per my eval doc fix section).
+- User corrected: `~/.local/bin/kache` works without sudo.
+- The `kache-install-bigbox` skill (at `~/.hermes/skills/kache-install-bigbox/`) has the full recipe: download musl tarball to `~/.local/bin`, `kache init -y`, daemon runs as user systemd.
+
+**Rule:** Before claiming a permission barrier, check for user-local install paths and existing skills. `~/.local/bin/`, `~/.cargo/bin/`, and user-level systemd (`systemctl --user`) all work without sudo on this box.
