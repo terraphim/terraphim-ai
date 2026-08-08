@@ -48,6 +48,8 @@ rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
 
 # Build configuration
 [build]
+# Fleet standard §1.3: name-keyed build-dir override.
+build-dir = "{cargo-cache-home}/build/by-project/terraphim-terraphim-ai"
 # Default target intentionally left as host; set --target explicitly (use `cross` for Linux)
 
 # Cross-compilation settings (commented out - let cross-rs handle Docker images)

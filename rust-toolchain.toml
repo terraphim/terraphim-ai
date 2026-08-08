@@ -1,0 +1,9 @@
+[toolchain]
+# Fleet standard §1.4: toolchain pin with rustfmt + clippy components.
+# Decision recorded in .docs/adr-0006-toolchain-pin.md (ADOPT 2026-08-08).
+# MSRV chain: workspace rust-version = 1.91 → tightened to 1.95 by
+# sysinfo@0.39.5 → bumped to 1.96 (default stable on this host) after
+# probe verified all workspace deps compile under 1.96. Drift between
+# workspace rust-version and this pin is intentional and documented.
+channel = "1.96"
+components = ["rustfmt", "clippy"]
