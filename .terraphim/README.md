@@ -108,3 +108,9 @@ python3 .terraphim/scripts/bootstrap.py   # materialize {REPO} + refresh thesaur
 
 Skills manifest: `.terraphim/skills.toml` (`tsm install <name>`).
 Repo agent memory: `memory/` at repo root.
+
+## Path portability
+
+Fleet roles use **repo-relative** haystack and KG paths. `scripts/bootstrap.py`
+regenerates thesauri and normalizes accidental absolute/`{REPO}` paths back to
+relative form — it never writes machine-absolute paths into tracked config.
