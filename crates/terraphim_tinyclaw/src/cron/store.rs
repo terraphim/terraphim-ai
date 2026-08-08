@@ -158,10 +158,10 @@ mod tests {
         let store = make_store().await;
 
         let job1 = CronJob::new("first", Schedule::Delay { secs: 60 });
-        store.save_all(&[job1.clone()]).await.unwrap();
+        store.save_all(std::slice::from_ref(&job1)).await.unwrap();
 
         let job2 = CronJob::new("second", Schedule::Interval { secs: 120 });
-        store.save_all(&[job2.clone()]).await.unwrap();
+        store.save_all(std::slice::from_ref(&job2)).await.unwrap();
 
         let loaded = store.load_all().await.unwrap();
         assert_eq!(loaded.len(), 1);
