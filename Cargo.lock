@@ -9526,6 +9526,7 @@ dependencies = [
  "hound",
  "jmap_client",
  "log",
+ "opendal",
  "parking_lot 0.12.5",
  "regex",
  "reqwest 0.12.28",

@@ -93,6 +93,11 @@ schemars = "1"
 cron = "0.13"
 terraphim_persistence = { version = "1.20.4" }
 
+# Direct dep for opendal::ErrorKind matching in cron/store.rs.
+# Was transitive via terraphim_persistence; made direct so the typed
+# enum comparison is stable across opendal version bumps.
+opendal = "0.54"
+
 # Wave 5 (Phase C2) OpenAI-compatible HTTP proxy — TinyClaw provides its own
 # minimal proxy here. We attempted to leverage the sibling
 # `terraphim-llm-proxy` crate (0.1.6) at `/home/alex/projects/terraphim-llm-proxy/`,
