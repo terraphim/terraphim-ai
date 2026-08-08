@@ -232,4 +232,22 @@ mod tests {
         // Verify load_all returns empty
         assert!(store.load_all().await.unwrap().is_empty());
     }
+
+    #[tokio::test]
+    async fn test_get_job_missing_returns_none_via_not_found_kind() {
+        // Pinned-behavior test for the opendal::ErrorKind::NotFound
+        // matching in `read_job`. If a future opendal upgrade changes
+        // the kind semantics, this test fails and the contract is caught.
+        let store = make_store().await;
+        let result = store.get_job("definitely-does-not-exist").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_missing_job_is_idempotent() {
+        // Same contract for delete_job — NotFound on delete should be
+        // treated as success (idempotent delete — safe to retry).
+        let store = make_store().await;
+        store.delete_job("never-existed").await.unwrap();
+    }
 }
