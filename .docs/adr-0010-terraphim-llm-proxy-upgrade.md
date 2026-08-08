@@ -20,9 +20,10 @@ Per the user "ignore licensing" directive, FSL-1.1-MIT is accepted.
 ## Verification (already done)
 
 1. ✅ Cloned `https://github.com/terraphim/terraphim-llm-proxy.git` with `--recurse-submodules`
-2. ✅ `cargo check` on v0.1.12 returns 0 (clean build)
-3. ✅ Identified the blocker: `claude_code_agents` git submodule (now resolved via `--recurse-submodules`)
+2. ✅ `cargo check` on v0.1.12 returns 0 (clean build) — but **only after a manual `--recurse-submodules` clone with a working submodule URL**
+3. ✅ Identified the blocker: `claude_code_agents` git submodule registered as a gitlink in HEAD but **`.gitmodules` is EMPTY** (no URL configured). The submodule content is therefore un-fetchable from a fresh clone.
 4. ✅ Confirmed `v1.0.0-priority-routing` is the latest tag (newer than v0.1.12). v0.1.12 chosen for stability (recently bumped, bottom of stable branch).
+5. ✅ Updated `Cargo.toml` comment in `crates/terraphim_tinyclaw/Cargo.toml` to reflect the **actual** blocker (broken submodule, not "transitive git dep through terraphim_types" as originally assumed).
 
 ## Plan (in 4 steps)
 
@@ -101,10 +102,18 @@ Preserve OpenAI-compatible `/v1/models` + `/v1/chat/completions` shape at the Ti
 
 ## Status
 
-- ✅ Investigation: complete (v0.1.12 builds)
-- ✅ deny.toml: updated (FSL-1.1-MIT, allow-git)
-- ⏳ Step 1: TODO (add git dep to Cargo.toml)
-- ⏳ Step 3: TODO (replace echo stub)
-- ⏳ Step 4: TODO (tests + commit)
+- ✅ Investigation: complete (v0.1.12 builds locally with --recurse-submodules, but is un-fetchable due to broken submodule in `.gitmodules`)
+- ✅ deny.toml: updated (FSL-1.1-MIT, allow-git) — defensively, in case the submodule is fixed later
+- ❌ Step 1: **BLOCKED** — git submodule `.gitmodules` has no URL for `claude_code_agents`. Cannot consume `terraphim-llm-proxy` as a git dep until upstream fixes `.gitmodules` or publishes to crates.io / terraphim registry.
+- ❌ Step 3: TODO (replace echo stub) — depends on Step 1
+- ❌ Step 4: TODO (tests + commit) — depends on Step 1
 
-This ADR documents the upgrade path; the actual implementation is a separate refactor (not in this turn).
+### Alternative path forward
+
+1. **File an issue** in `terraphim-llm-proxy` asking the maintainers to:
+   - Either commit a `.gitmodules` with the URL for `claude_code_agents`, OR
+   - Remove the gitlink (move `claude_code_agents` content into the main repo or a separate crate).
+2. **Wait for v0.1.13** or `v1.0.0-priority-routing` to be tagged with a working `.gitmodules`.
+3. **As a fallback**, vendor `terraphim-llm-proxy` as a git submodule under `terraphim-ai/crates/terraphim-llm-proxy-vendor/` and reference it via path dep. This bypasses the upstream issue.
+
+This ADR documents the upgrade path; the actual implementation requires an upstream fix or a vendoring decision.
