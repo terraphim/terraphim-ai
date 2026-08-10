@@ -155,6 +155,17 @@ When a call exceeds `ExecutionContext::timeout_ms`:
 A timeout therefore never leaves work running inside a container that a later
 call would reuse — at the cost of losing that session's in-container state.
 
+The same applies to a `container exec` that fails with a host **I/O error**
+rather than an exit code. Such an error can arise after the CLI child was
+already spawned — while waiting on it, for instance — so it is no proof that the
+guest process never started. It is treated exactly like a timeout: the container
+is unbound and force-removed under the execution's permit, and
+`RlmError::ExecutionFailed` names the container and says it was discarded. The
+command is not re-run. Pinned by
+`a_runner_io_error_after_exec_started_destroys_the_container`,
+`a_failed_io_error_recovery_delete_blocks_reuse_and_stays_tracked` and
+`cleanup_cannot_overtake_an_io_error_recovery`.
+
 ## Vanished containers
 
 If a session's container disappears between calls (removed by hand, service
@@ -253,10 +264,10 @@ teardown safe against a concurrent execution:
   gate is acquired *before* an operation can create, use or reclaim a container
   — before `container run`, before `container exec` — and it is held, in the
   task that owns the work, until that operation **and every recovery it
-  triggers** has finished. Timeout, vanished-container, panicked-exec and
-  cancellation recovery all run the same unbind → force-delete → retrack path
-  under the permit their execution already held, so none of them can start after
-  cleanup has drained. The cell is (re-)inserted into the session map, so
+  triggers** has finished. Timeout, vanished-container, runner-I/O-error,
+  panicked-exec and cancellation recovery all run the same unbind →
+  force-delete → retrack path under the permit their execution already held, so
+  none of them can start after cleanup has drained. The cell is (re-)inserted into the session map, so
   nothing is restored into a cell terminal cleanup has detached.
 - `cleanup()` is executor-wide and terminal. It raises a closing flag, then
   takes the **write** side. Acquiring it is by itself the proof: a write cannot
@@ -266,7 +277,13 @@ teardown safe against a concurrent execution:
   and no round limit — and equally, once cleanup returns, no permit-holding
   operation from before it exists, so **the drained map cannot be repopulated**.
   Any operation that starts later blocks on the gate and then sees the closing
-  flag and refuses, before it could insert a map entry. There is no interleaving
+  flag and refuses, before it could insert a map entry. `end_session` is part of
+  that rule rather than an exception to it: it reads the closing flag *after*
+  acquiring its permit, so one that arrives after cleanup — or that was queued
+  behind cleanup's write gate — inserts no tombstone into the drained map. It
+  still tears down whatever is *already* tracked, which is how a survivor
+  cleanup re-inserted after a failed delete keeps being reclaimable. There is no
+  interleaving
   in which a created container ends up untracked, including the concurrent
   insertion case where the session was not in the map when cleanup looked.
   The cost of this simplicity is honest and intended: `cleanup()` waits for
@@ -313,6 +330,14 @@ are pinned separately:
   directly: after `cleanup()` returns, the map stays empty across repeated
   scheduler yields, and a caller arriving afterwards is refused before it could
   insert a session cell.
+- `end_session_after_cleanup_does_not_repopulate_the_map` and
+  `end_session_queued_behind_cleanup_leaves_the_map_empty` assert the same
+  postcondition for the teardown path — the second by parking `cleanup()` inside
+  its delete so `end_session` is genuinely queued behind the write gate and
+  resumes only after cleanup returned — while
+  `end_session_after_cleanup_still_retries_a_survivor_cleanup_could_not_delete`
+  pins that refusing to *insert* did not cost the ability to reclaim a container
+  that is already tracked.
 
 ### Cancelling an execution fails closed
 
@@ -333,6 +358,14 @@ as that future is constructed — never released and re-taken — so there is no
 window, however small, in which `cleanup()` could acquire the write side. The
 drop guard registers nothing; the permit it already holds is the registration.
 
+Step 3 is also **independent of the thread the future is dropped on**. An
+execution future is `Send`, so it can be moved out of the runtime and dropped on
+a plain OS thread where `Handle::try_current()` would fail. The guard therefore
+captures the runtime handle when it is *armed* — inside the runtime that owns
+the CLI task — and always spawns recovery through that captured handle. There is
+no drop site on which the permit is released without an owner, and no drop site
+on which the CLI task is merely aborted instead of joined.
+
 The recovery task then owns the rest, and its completion is observable:
 
 4. it awaits the CLI task. The process runner returns only after it has killed
@@ -349,19 +382,19 @@ The recovery task then owns the rest, and its completion is observable:
 
 Nothing on this path is detached, and the permit is released only when the
 recovery future ends — so terminal cleanup cannot return while a cancelled
-execution's child termination or container deletion is outstanding. The one
-exception is documented rather than hidden: when the future is dropped **outside
-a Tokio runtime** there is no task to carry the permit, so the guard aborts the
-CLI task, releases the permit and logs loudly that the container was not deleted
-and must be reclaimed by hand. The container is still tracked as pending, so a
-later `cleanup()` on a live runtime retries it.
+execution's child termination or container deletion is outstanding, whichever
+thread the cancellation happened on.
 
 Pinned by `aborting_an_execution_future_fails_the_session_closed`,
 `a_cancelled_execution_marks_its_slot_unusable_before_the_drop_returns`,
 `cleanup_started_in_the_same_tick_as_the_cancellation_drop_still_waits`,
-`cleanup_waits_for_far_more_cancellations_than_the_old_bounded_rounds` and
-`cleanup_stays_pending_until_a_cancellation_recovery_completes` on the fake
-runner, and by
+`cleanup_waits_for_far_more_cancellations_than_the_old_bounded_rounds`,
+`cleanup_stays_pending_until_a_cancellation_recovery_completes` and
+`a_future_dropped_off_the_runtime_still_blocks_cleanup_until_recovery_ends` —
+which polls the execution inside the runtime, moves it to an OS thread that
+asserts it has no current runtime, drops it there, and then shows `cleanup()`
+pending until the CLI task has been joined (the runner reports it returned on
+the cancellation signal) and the container deleted — on the fake runner, and by
 `cancelling_a_real_child_kills_and_reaps_it_and_stops_the_drains` on a **real
 local process**: that test cancels a live `/bin/sh`, then asserts the child pid
 is gone from the process table (`kill -0` fails — it would still succeed for a

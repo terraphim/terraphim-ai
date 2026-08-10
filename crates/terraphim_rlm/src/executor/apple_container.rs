@@ -27,7 +27,9 @@
 //!   slot carries an explicit lifecycle state ([`SessionSlot`]): teardown marks
 //!   the session `Closing` and **leaves that tombstone in the map**, so
 //!   `end_session` is terminal for a session id and no concurrent or later
-//!   creation can resurrect it.
+//!   creation can resurrect it — except once `cleanup` has raised `closing`,
+//!   where teardown inserts nothing, because the map terminal cleanup drained
+//!   must stay drained and creation is already refused.
 //! - Lifecycle coordination is a single rule, not a protocol: **one owned
 //!   lifecycle read permit is acquired before an operation can create, use or
 //!   reclaim a container, and it is held — inside the owning task — until that
@@ -57,7 +59,10 @@
 //!   stdout/stderr readers before returning — and then force-deletes the
 //!   container, all while still holding the permit the execution acquired
 //!   before it started. The permit is moved, never released and re-taken, so
-//!   there is no spawn/register window for `cleanup` to slip through.
+//!   there is no spawn/register window for `cleanup` to slip through. The
+//!   recovery is spawned on the runtime handle the guard captured when it was
+//!   armed, so this is independent of the thread the execution future is
+//!   dropped on — including a plain `std::thread` with no current runtime.
 //! - A command is never executed twice by this backend. If `container exec`
 //!   reports the session container missing, the container is discarded and the
 //!   failure is returned; whether repeating the command is safe is the caller's
@@ -65,7 +70,9 @@
 //! - Timeouts fail **closed**: the CLI child is killed and reaped, the session
 //!   container is force-removed, and the affinity mapping is cleared so the next
 //!   call gets a fresh VM. A timeout must never leave a process running inside a
-//!   container that a later call would reuse.
+//!   container that a later call would reuse. A `container exec` that fails with
+//!   a host I/O error takes the same path: such an error can be raised after the
+//!   child was spawned, so it is no proof that no guest process ran.
 //! - Process execution goes through the [`ProcessRunner`] seam so the argv
 //!   contract, concurrency, timeout and teardown behaviour can be pinned by
 //!   portable tests on non-Apple hosts. A fake-runner pass is **not** evidence
@@ -614,8 +621,8 @@ impl LifecycleState {
     /// deletion failed.
     ///
     /// This is the single recovery path shared by the elapsed-time timeout, the
-    /// vanished-container case, a panicked exec task and cancellation, so all
-    /// four have identical tracking guarantees:
+    /// vanished-container case, a runner I/O error, a panicked exec task and
+    /// cancellation, so all five have identical tracking guarantees:
     ///
     /// - the name is in `pending` before the delete is attempted, so it is
     ///   tracked even if this task dies;
@@ -1272,6 +1279,11 @@ impl AppleContainerExecutor {
             });
             let mut guard = ExecCancelGuard {
                 armed: true,
+                // Captured here, where a runtime is guaranteed (the exec task
+                // above was just spawned on it), so cancellation recovery is
+                // owned by *this* runtime no matter which thread the execution
+                // future is later dropped on.
+                runtime: tokio::runtime::Handle::current(),
                 state: self.state.clone(),
                 session_id: ctx.session_id,
                 cell,
@@ -1300,8 +1312,22 @@ impl AppleContainerExecutor {
             match joined {
                 Ok(Ok(output)) => (output, permit),
                 Ok(Err(e)) => {
+                    // The runner reports an I/O error, and by this point the
+                    // exec task has already been launched: the error may come
+                    // from spawning the CLI, but it may equally come from
+                    // waiting on a child that had already started. Nothing here
+                    // proves no guest process ran, so this is the same
+                    // unknown-guest-state condition as a timeout or a panicked
+                    // exec task, and it gets the same recovery — under the
+                    // permit this execution has held since before it began.
+                    self.abandon_container(&ctx.session_id, &name, &permit)
+                        .await;
                     return Err(RlmError::ExecutionFailed {
-                        message: format!("failed to spawn `container exec` for {name}: {e}"),
+                        message: format!(
+                            "{BACKEND_NAME}: `container exec` for {name} failed ({e}); the guest \
+                             process cannot be proven not to have started, so the container has \
+                             been discarded"
+                        ),
                         exit_code: None,
                         stdout: None,
                         stderr: None,
@@ -1466,6 +1492,12 @@ impl AppleContainerExecutor {
     /// gate but not yet inserted its entry could create a container *after*
     /// teardown reported the session gone.
     ///
+    /// **Except once `cleanup` has raised `closing`**, where the tombstone is
+    /// pointless and harmful: `ensure_container` is already refused by the
+    /// closing check, and inserting here would repopulate the map terminal
+    /// cleanup drained. A call that arrives then tears down whatever is still
+    /// tracked (a survivor cleanup could not delete) and inserts nothing.
+    ///
     /// Ordering is what makes this race-free:
     ///
     /// 1. an owned lifecycle **read** permit is acquired before anything else
@@ -1486,12 +1518,34 @@ impl AppleContainerExecutor {
         session_id: &SessionId,
     ) -> RlmResult<Vec<String>> {
         let _permit = self.state.permit().await;
-        let cell = self
-            .state
-            .session_to_container
-            .entry(*session_id)
-            .or_insert_with(SessionCell::new_active)
-            .clone();
+        // Read *after* the permit, so this observes cleanup's flag with
+        // cleanup's own ordering: a teardown that was queued behind cleanup's
+        // write gate gets here only once cleanup has finished draining, and
+        // must not put a cell back into the map cleanup drained. An already
+        // tracked survivor — a container cleanup re-inserted because its
+        // deletion failed — is still owned and torn down below; only the
+        // *creation* of a new cell is refused.
+        let cell = if self.state.closing.load(Ordering::Acquire) {
+            match self
+                .state
+                .session_to_container
+                .get(session_id)
+                .map(|e| e.value().clone())
+            {
+                Some(cell) => cell,
+                // Nothing tracked and nothing may be created: cleanup already
+                // reclaimed everything this session owned, so teardown of an
+                // absent container is success, as it is for any other
+                // already-absent container.
+                None => return Ok(Vec::new()),
+            }
+        } else {
+            self.state
+                .session_to_container
+                .entry(*session_id)
+                .or_insert_with(SessionCell::new_active)
+                .clone()
+        };
 
         // Every name the slot is responsible for, not just the bound one: a
         // recovery whose deletion failed left its container pending here, and
@@ -1786,7 +1840,9 @@ impl super::ExecutionEnvironment for AppleContainerExecutor {
 ///    single recovery task.** The permit is moved into the spawned future as it
 ///    is constructed, so it is never released; there is no window between
 ///    "guard dropped" and "recovery running" in which `cleanup` could acquire
-///    the write side.
+///    the write side. The task is spawned on the runtime handle captured when
+///    the guard was armed, so this holds for a future dropped on a thread with
+///    no current runtime exactly as it does for one dropped inside the runtime.
 ///
 /// The recovery task is then the single owner of the whole operation:
 ///
@@ -1805,6 +1861,15 @@ impl super::ExecutionEnvironment for AppleContainerExecutor {
 /// happens only after step 6.
 struct ExecCancelGuard {
     armed: bool,
+    /// The runtime that owns the exec task, captured when the guard is armed.
+    ///
+    /// `Drop` may run on *any* thread — a `Send` execution future can be moved
+    /// out of the runtime and dropped on a plain `std::thread`, where
+    /// `Handle::try_current()` fails. Recovery must not depend on that: the
+    /// handle is captured at arming time, when a runtime is guaranteed, and
+    /// every spawn/join below goes through it. There is therefore no drop site
+    /// on which the permit is released without an owner.
+    runtime: tokio::runtime::Handle,
     state: Arc<LifecycleState>,
     session_id: SessionId,
     cell: Arc<SessionCell>,
@@ -1860,25 +1925,16 @@ impl Drop for ExecCancelGuard {
         let cell = self.cell.clone();
         let state = self.state.clone();
         let session_id = self.session_id;
-        let Ok(handle) = tokio::runtime::Handle::try_current() else {
-            // No runtime to own the recovery on. The exec task cannot be joined
-            // from here, so abort it and say plainly that nothing was reclaimed.
-            if let Some(exec) = &exec {
-                exec.abort();
-            }
-            log::warn!(
-                "apple-container: execution against {name} was cancelled outside a Tokio \
-                 runtime; the CLI task could not be joined, the container was NOT deleted, and \
-                 its session stays unusable. The lifecycle permit is released here because no \
-                 task can carry it, so a concurrent cleanup will proceed — it still finds this \
-                 container tracked as pending. Recover with: container delete --force {name}"
-            );
-            drop(permit);
-            return;
-        };
         // (3) One owned recovery task for the whole operation, carrying the
         // permit so terminal cleanup necessarily waits for it.
-        handle.spawn(async move {
+        //
+        // Spawned through the handle captured when the guard was armed, never
+        // through `Handle::try_current()`: this `drop` can run on a thread with
+        // no current runtime (a `Send` execution future moved out of the
+        // runtime and dropped there), and on such a thread `try_current` would
+        // leave nobody to join the exec task or delete the container. The
+        // captured handle makes the owner the same either way.
+        self.runtime.spawn(async move {
             log::warn!(
                 "apple-container: execution against {name} was cancelled; terminating the CLI \
                  child and destroying the container, because the guest process cannot be proven \
@@ -3834,6 +3890,334 @@ mod tests {
             exec.state.session_to_container.is_empty(),
             "a refused caller must not insert a session cell"
         );
+        assert_no_untracked_container(&exec, &runner).await;
+    }
+
+    #[tokio::test]
+    async fn a_runner_io_error_after_exec_started_destroys_the_container() {
+        // A `ProcessRunner` error is not proof that no guest process ran — it
+        // can come from waiting on a child that already started — so it is the
+        // same unknown-guest-state condition as a timeout, and the container
+        // must be destroyed rather than left bound and reusable.
+        let runner = FakeRunner::new(|args| {
+            if args[0] == "exec" {
+                Err(std::io::Error::other(
+                    "exec pipe broke after the child started",
+                ))
+            } else {
+                Ok(ok_output(""))
+            }
+        });
+        let exec = executor(runner.clone());
+        let ctx = ctx();
+
+        let err = exec.execute_command("work", &ctx).await.unwrap_err();
+        let name = created_names(&runner)[0].clone();
+        assert!(matches!(err, RlmError::ExecutionFailed { .. }), "{err:?}");
+        assert!(err.to_string().contains(&name), "{err}");
+
+        // Recovered exactly like a timeout: unbound, force-deleted, untracked.
+        assert_eq!(deleted_names(&runner), vec![name.clone()]);
+        assert_eq!(bound_container(&exec, &ctx.session_id).await, None);
+        assert!(tracked_names(&exec).await.is_empty());
+        assert_no_untracked_container(&exec, &runner).await;
+
+        // And the container is never handed back: the next command on this
+        // session gets a fresh one.
+        let second = exec.execute_command("work", &ctx).await.unwrap_err();
+        assert!(
+            matches!(second, RlmError::ExecutionFailed { .. }),
+            "{second:?}"
+        );
+        let created = created_names(&runner);
+        assert_eq!(created.len(), 2, "{created:?}");
+        assert_ne!(
+            created[1], name,
+            "a container whose exec failed with an I/O error must never be reused"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_io_error_recovery_delete_blocks_reuse_and_stays_tracked() {
+        // The other half: when the recovery's delete fails, the container stays
+        // tracked (it may still be alive and running the guest command) and no
+        // replacement may be created for that session.
+        let runner = FakeRunner::new(|args| match args[0].as_str() {
+            "exec" => Err(std::io::Error::other(
+                "exec pipe broke after the child started",
+            )),
+            "delete" => Ok(fail_output(1, "resource busy")),
+            _ => Ok(ok_output("")),
+        });
+        let exec = executor(runner.clone());
+        let ctx = ctx();
+
+        exec.execute_command("work", &ctx).await.unwrap_err();
+        let name = created_names(&runner)[0].clone();
+        assert_eq!(tracked_names(&exec).await, vec![name.clone()]);
+
+        let err = exec.execute_command("work", &ctx).await.unwrap_err();
+        assert!(
+            err.to_string().contains("awaiting confirmed deletion"),
+            "{err}"
+        );
+        assert_eq!(
+            created_names(&runner),
+            vec![name.clone()],
+            "no replacement while the I/O-failed container is unconfirmed"
+        );
+        assert_no_untracked_container(&exec, &runner).await;
+    }
+
+    #[tokio::test]
+    async fn cleanup_cannot_overtake_an_io_error_recovery() {
+        // The permit rule holds on this path too: `cleanup` queues for the
+        // write side while the exec is in flight, the exec then fails with an
+        // I/O error, and cleanup must still be pending until the recovery it
+        // triggers has finished deleting the container.
+        let (runner, mut steps) = FakeRunner::stepped(|args| {
+            if args[0] == "exec" {
+                Err(std::io::Error::other(
+                    "exec pipe broke after the child started",
+                ))
+            } else {
+                Ok(ok_output(""))
+            }
+        });
+        let exec = Arc::new(executor(runner.clone()));
+        let ctx = ctx();
+
+        steps.gate("exec");
+        let running = {
+            let exec = exec.clone();
+            let ctx = ctx.clone();
+            tokio::spawn(async move { exec.execute_command("work", &ctx).await })
+        };
+        steps.wait_for("exec").await;
+        let name = created_names(&runner)[0].clone();
+
+        let mut cleaning = Box::pin(exec.cleanup());
+        assert!(
+            futures::poll!(&mut cleaning).is_pending(),
+            "cleanup must wait for the permit an in-flight execution holds"
+        );
+
+        // Park the recovery inside its force-delete, then let the exec fail.
+        steps.gate("delete");
+        steps.release("exec");
+        assert_eq!(
+            steps.wait_for("delete").await,
+            vec!["delete", "--force", &name],
+            "an I/O error must recover the container"
+        );
+        assert!(
+            futures::poll!(&mut cleaning).is_pending(),
+            "cleanup must not drain between the I/O failure and the end of its recovery"
+        );
+
+        steps.release("delete");
+        running
+            .await
+            .expect("the execution task must not be aborted")
+            .unwrap_err();
+        cleaning.await.unwrap();
+
+        assert_eq!(deleted_names(&runner), vec![name]);
+        assert!(exec.state.session_to_container.is_empty());
+        assert_map_stays_empty_after_cleanup(&exec).await;
+        assert_no_untracked_container(&exec, &runner).await;
+    }
+
+    #[tokio::test]
+    async fn a_future_dropped_off_the_runtime_still_blocks_cleanup_until_recovery_ends() {
+        // Cancellation ownership must not depend on *where* the future is
+        // dropped. The execution is polled inside the runtime, then moved to a
+        // plain OS thread with no current Tokio context and dropped there. The
+        // guard spawns through the runtime handle it captured when it was
+        // armed, so the permit moves into the recovery task exactly as it does
+        // for an in-runtime drop, and cleanup must wait for the CLI task to be
+        // joined and the container deleted.
+        let (runner, mut steps) = FakeRunner::stepped(|_| Ok(ok_output("")));
+        let exec = executor(runner.clone());
+        let ctx = ctx();
+
+        steps.gate("exec");
+        let mut running = Box::pin(exec.execute_command("sleep 100", &ctx));
+        assert!(futures::poll!(&mut running).is_pending());
+        steps.wait_for("exec").await;
+        let name = created_names(&runner)[0].clone();
+
+        // Park the recovery's deletion so it cannot complete on its own.
+        steps.gate("delete");
+        // Scoped so the future may borrow `exec`/`ctx`; joined before anything
+        // else happens, so the drop is genuinely complete and genuinely
+        // off-runtime.
+        std::thread::scope(|scope| {
+            scope
+                .spawn(move || {
+                    assert!(
+                        tokio::runtime::Handle::try_current().is_err(),
+                        "this thread must have no current runtime, or the test proves nothing"
+                    );
+                    drop(running);
+                })
+                .join()
+                .expect("the dropping thread must not panic");
+        });
+
+        // The permit was carried out of that thread into the recovery task.
+        let mut cleaning = Box::pin(exec.cleanup());
+        assert!(
+            futures::poll!(&mut cleaning).is_pending(),
+            "cleanup must wait for a recovery whose future was dropped off the runtime"
+        );
+        assert!(
+            deleted_names(&runner).is_empty(),
+            "nothing may have been deleted yet: {:?}",
+            deleted_names(&runner)
+        );
+
+        // The recovery does run — on the captured handle — and cleanup is still
+        // blocked while it is mid-delete.
+        assert_eq!(
+            steps.wait_for("delete").await,
+            vec!["delete", "--force", &name]
+        );
+        assert!(
+            futures::poll!(&mut cleaning).is_pending(),
+            "cleanup must still wait while the off-runtime drop's recovery is mid-delete"
+        );
+
+        steps.release("delete");
+        cleaning.await.unwrap();
+
+        // The CLI task ended because it observed the cancellation signal, which
+        // is the path on which the runner kills and reaps its child: the join
+        // happened, it was not merely requested.
+        assert_eq!(runner.cancelled_calls(), 1);
+        assert_eq!(deleted_names(&runner), vec![name]);
+        assert!(exec.state.session_to_container.is_empty());
+        assert_map_stays_empty_after_cleanup(&exec).await;
+        assert_no_untracked_container(&exec, &runner).await;
+    }
+
+    #[tokio::test]
+    async fn end_session_after_cleanup_does_not_repopulate_the_map() {
+        // The postcondition the P2 finding was about: `end_session` arriving
+        // after terminal cleanup returned must not insert a tombstone into the
+        // map cleanup drained.
+        let runner = FakeRunner::ok();
+        let exec = executor(runner.clone());
+        let ctx = ctx();
+        exec.execute_command("true", &ctx).await.unwrap();
+        let name = created_names(&runner)[0].clone();
+
+        exec.cleanup().await.unwrap();
+        assert!(deleted_names(&runner).contains(&name));
+        assert!(exec.state.session_to_container.is_empty());
+
+        // Both a session cleanup already reclaimed and one it never saw.
+        exec.end_session(&ctx.session_id).await.unwrap();
+        exec.end_session(&SessionId::new()).await.unwrap();
+
+        assert!(
+            exec.state.session_to_container.is_empty(),
+            "end_session after cleanup must not re-insert a cell: {:?}",
+            exec.state
+                .session_to_container
+                .iter()
+                .map(|kv| *kv.key())
+                .collect::<Vec<_>>()
+        );
+        assert_map_stays_empty_after_cleanup(&exec).await;
+        assert_eq!(
+            deleted_names(&runner),
+            vec![name],
+            "there is nothing left for a post-cleanup end_session to delete"
+        );
+    }
+
+    #[tokio::test]
+    async fn end_session_queued_behind_cleanup_leaves_the_map_empty() {
+        // The harder schedule: `end_session` asks for its read permit while
+        // cleanup already holds the write gate, so it resumes *after* cleanup
+        // has drained and returned. It must still find nothing to insert.
+        let (runner, mut steps) = FakeRunner::stepped(|_| Ok(ok_output("")));
+        let exec = Arc::new(executor(runner.clone()));
+        let ctx = ctx();
+        exec.execute_command("true", &ctx).await.unwrap();
+        let name = created_names(&runner)[0].clone();
+
+        // Park cleanup inside its delete, so it holds the write gate.
+        steps.gate("delete");
+        let cleaning = {
+            let exec = exec.clone();
+            tokio::spawn(async move { exec.cleanup().await })
+        };
+        assert_eq!(
+            steps.wait_for("delete").await,
+            vec!["delete", "--force", &name]
+        );
+
+        // Queued behind that write gate.
+        let mut ending = Box::pin(exec.end_session(&ctx.session_id));
+        assert!(
+            futures::poll!(&mut ending).is_pending(),
+            "end_session must wait behind cleanup's write gate"
+        );
+
+        steps.release("delete");
+        cleaning.await.unwrap().unwrap();
+        ending.await.unwrap();
+
+        assert!(
+            exec.state.session_to_container.is_empty(),
+            "an end_session queued behind cleanup must not repopulate the drained map: {:?}",
+            exec.state
+                .session_to_container
+                .iter()
+                .map(|kv| *kv.key())
+                .collect::<Vec<_>>()
+        );
+        assert_map_stays_empty_after_cleanup(&exec).await;
+        assert_eq!(deleted_names(&runner), vec![name]);
+        assert_no_untracked_container(&exec, &runner).await;
+    }
+
+    #[tokio::test]
+    async fn end_session_after_cleanup_still_retries_a_survivor_cleanup_could_not_delete() {
+        // Refusing to *create* a cell after cleanup must not stop teardown of
+        // one that is still tracked: cleanup re-inserts a container it could
+        // not delete, and a later end_session still owns it.
+        let fail_delete = Arc::new(AtomicBool::new(true));
+        let flag = fail_delete.clone();
+        let runner = FakeRunner::new(move |args| {
+            if args[0] == "delete" && flag.load(Ordering::SeqCst) {
+                Ok(fail_output(1, "resource busy"))
+            } else {
+                Ok(ok_output(""))
+            }
+        });
+        let exec = executor(runner.clone());
+        let ctx = ctx();
+        exec.execute_command("true", &ctx).await.unwrap();
+        let name = created_names(&runner)[0].clone();
+
+        exec.cleanup().await.unwrap_err();
+        assert_eq!(
+            tracked_names(&exec).await,
+            vec![name.clone()],
+            "cleanup must keep a container it could not delete reachable"
+        );
+
+        // Now the delete succeeds, and end_session reclaims the survivor.
+        fail_delete.store(false, Ordering::SeqCst);
+        exec.end_session(&ctx.session_id).await.unwrap();
+        assert!(
+            tracked_names(&exec).await.is_empty(),
+            "the survivor must be reclaimed and untracked"
+        );
+        assert_eq!(deleted_names(&runner), vec![name.clone(), name]);
         assert_no_untracked_container(&exec, &runner).await;
     }
 
