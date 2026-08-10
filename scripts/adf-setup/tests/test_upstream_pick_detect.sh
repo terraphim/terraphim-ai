@@ -11,10 +11,18 @@
 #   reachable  shared ancestor
 #   trailer    `git cherry-pick -x` writes `(cherry picked from commit <sha>)`
 #   trailer    the [ferrox] `Adapted-from: <abbrev> (#NNNNN)` convention
-#   subject    byte-identical subject line, divergent content
 #   patch-id   rebadged subject, no trailer, identical patch content
+#   verified   an operator-attested pair from --verified-picks
 #   MISSING    an upstream commit genuinely absent from the fork
 #   cascade    one upstream commit answered by several fork commits
+#
+# And the negative cases, which are the ones that matter for a security
+# detector -- each asserts that something which looks like evidence does not
+# suppress a genuinely missing commit:
+#   a byte-identical subject with divergent content
+#   a different patch touching the same file
+#   an unresolvable abbreviated trailer ref
+#   a --verified-picks entry whose fork commit is not on the searched branch
 
 set -eu
 
@@ -68,6 +76,14 @@ commit_file e.txt echoed  "fix: echo never picked"
 U_ECHO=$(g rev-parse HEAD)
 commit_file f.txt foxtrot "fix: foxtrot cascade"
 U_FOXTROT=$(g rev-parse HEAD)
+commit_file g.txt golf    "fix: golf attested by hand"
+U_GOLF=$(g rev-parse HEAD)
+commit_file h.txt hotel   "fix: hotel same file different patch"
+U_HOTEL=$(g rev-parse HEAD)
+commit_file i.txt india   "fix: india bogus trailer"
+U_INDIA=$(g rev-parse HEAD)
+commit_file j.txt juliet  "fix: juliet stale attestation"
+U_JULIET=$(g rev-parse HEAD)
 
 g checkout -q -b fork "$SEED"
 
@@ -96,12 +112,45 @@ commit_file f.txt "foxtrot part one" "[ferrox] fix: foxtrot groundwork" \
 commit_file f2.txt "foxtrot part two" "[ferrox] fix: foxtrot follow-up" \
     "Adapted-from: ${U_FOXTROT}"
 
+# 7. Adapted by hand with no trailer and a diverged patch: only an attested
+#    --verified-picks entry can vouch for this, which is how the two historical
+#    [ferrox] picks that predate the trailer convention are handled.
+commit_file g.txt "golf adapted for the fork" "fix: golf adapted"
+F_GOLF=$(g rev-parse HEAD)
+
+# 8. Touches the same file as U_HOTEL with different content. Nothing about this
+#    is evidence, and patch-id must not be fooled by the shared path.
+commit_file h.txt "hotel unrelated fork change" "chore: unrelated hotel edit"
+
+# 9. A trailer naming a SHA that does not exist in this repository. An
+#    unresolvable reference proves nothing and must not suppress.
+commit_file i2.txt "india groundwork" "[ferrox] fix: india" \
+    "Adapted-from: 0123456"
+
+# 10. U_JULIET gets a --verified-picks entry below pointing at a commit that is
+#     never merged into the fork branch, standing in for a stale attestation
+#     left behind by a history rewrite.
+g checkout -q -b abandoned
+commit_file j.txt "juliet abandoned" "fix: juliet abandoned attempt"
+F_JULIET_ABANDONED=$(g rev-parse HEAD)
+g checkout -q fork
+
 # ------------------------------------------------------------------- run
 
+PICKS="${TMP}/verified-picks.tsv"
+cat > "$PICKS" <<PICKS_EOF
+# comment line, and a blank line, both ignored
+
+${U_GOLF} ${F_GOLF}   # attested by hand
+${U_JULIET} ${F_JULIET_ABANDONED}   # stale: fork commit is not on the fork branch
+PICKS_EOF
+
 OUT="${TMP}/verdicts"
+NOTES="${TMP}/notes"
 printf '%s\n' "$SEED" "$U_ALPHA" "$U_BRAVO" "$U_CHARLIE" "$U_DELTA" \
-    "$U_ECHO" "$U_FOXTROT" \
-    | "$DETECT_SH" --repo "$REPO" --fork-ref fork --upstream-ref up > "$OUT"
+    "$U_ECHO" "$U_FOXTROT" "$U_GOLF" "$U_HOTEL" "$U_INDIA" "$U_JULIET" \
+    | "$DETECT_SH" --repo "$REPO" --fork-ref fork --upstream-ref up \
+        --verified-picks "$PICKS" > "$OUT" 2> "$NOTES"
 
 verdict_for() {
     awk -v sha="$1" '$2 == sha { print $1; exit }' "$OUT"
@@ -127,9 +176,34 @@ expect "shared ancestor"        "$SEED"       PRESENT reachable
 expect "cherry-pick -x trailer" "$U_ALPHA"    PRESENT trailer
 expect "Adapted-from trailer"   "$U_BRAVO"    PRESENT trailer
 expect "rebadged subject"       "$U_CHARLIE"  PRESENT patch-id
-expect "identical subject"      "$U_DELTA"    PRESENT subject
 expect "never picked"           "$U_ECHO"     MISSING -
 expect "cascade"                "$U_FOXTROT"  PRESENT trailer
+expect "attested pair"          "$U_GOLF"     PRESENT verified
+
+# --- the negative cases -------------------------------------------------
+#
+# A subject is not provenance. The fork's d.txt commit carries U_DELTA's exact
+# subject over deliberately different content; suppressing on that would let any
+# same-titled fork commit hide a real upstream security fix.
+expect "identical subject alone" "$U_DELTA"   MISSING -
+grep -q "shares its subject with fork commit" "$NOTES" \
+    || fail "identical subject: no advisory note was emitted"
+
+# Same file, different patch. patch-id must compare content, not paths.
+expect "same file different patch" "$U_HOTEL" MISSING -
+
+# An abbreviated trailer ref that resolves to nothing. Before trailer refs were
+# resolved through git this was a bare prefix comparison, so a short ref could
+# vouch for any candidate sharing its leading hex digits.
+expect "unresolvable trailer ref" "$U_INDIA"  MISSING -
+grep -q "is ambiguous or unknown" "$NOTES" \
+    || fail "unresolvable trailer: no advisory note was emitted"
+
+# An attestation naming a fork commit that is not reachable from the searched
+# branch is stale and must be dropped, not honoured.
+expect "stale attestation"      "$U_JULIET"   MISSING -
+grep -q "is not on fork" "$NOTES" \
+    || fail "stale attestation: no advisory note was emitted"
 
 # The patch-id hit must name the rebadged commit, not merely report a mechanism.
 got=$(fork_sha_for "$U_CHARLIE")
@@ -142,8 +216,13 @@ got=$(fork_sha_for "$U_CHARLIE")
     || fail "cascade: expected exactly one verdict line for ${U_FOXTROT}"
 
 # Every candidate must be classified exactly once.
-[ "$(wc -l < "$OUT" | tr -d ' ')" = "7" ] \
-    || fail "expected 7 verdict lines, got $(wc -l < "$OUT" | tr -d ' ')"
+[ "$(wc -l < "$OUT" | tr -d ' ')" = "11" ] \
+    || fail "expected 11 verdict lines, got $(wc -l < "$OUT" | tr -d ' ')"
+
+# The attested verdict must name the commit the operator vouched for.
+got=$(fork_sha_for "$U_GOLF")
+[ "$got" = "$F_GOLF" ] \
+    || fail "attested pair: matched ${got}, wanted ${F_GOLF}"
 
 # Abbreviated candidates must resolve the same way full SHAs do -- the upstream
 # lists this detector consumes carry 10-character abbreviations.

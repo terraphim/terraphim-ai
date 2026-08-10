@@ -26,6 +26,7 @@ ADF_SETUP = Path(__file__).parent.parent
 TEMPLATE = ADF_SETUP / "agents" / "upstream-synchronizer.toml"
 BIGBOX = ADF_SETUP.parent.parent / ".terraphim" / "terraphim.toml.bigbox"
 DETECTOR = ADF_SETUP / "upstream-pick-detect.sh"
+VERIFIED_PICKS = ADF_SETUP / "gitea-verified-picks.tsv"
 
 DETECTOR_PATH = "/opt/ai-dark-factory/bin/upstream-pick-detect.sh"
 
@@ -65,6 +66,74 @@ def test_detector_covers_all_three_mechanisms():
     assert "cherry picked from commit" in source, "lost the -x trailer scan"
     assert "Adapted-from:" in source, "lost the [ferrox] trailer scan"
     assert "patch-id --stable" in source, "lost the patch-id fallback"
+
+
+def test_subject_is_never_a_presence_verdict():
+    """A shared subject must not suppress a candidate.
+
+    Subjects collide and generic security wording recurs, so treating one as
+    proof would let an unrelated fork commit hide a genuinely missing upstream
+    fix. Subject observations are advisory only.
+    """
+    source = DETECTOR.read_text()
+    assert "PRESENT %s subject" not in source, (
+        "subject reinstated as a presence mechanism"
+    )
+    assert "not treated as proof" in source, "lost the subject advisory note"
+
+
+def test_trailer_refs_are_resolved_not_prefix_matched():
+    """Abbreviated trailer refs must be resolved by git, never prefix-compared.
+
+    A prefix comparison lets a short `Adapted-from:` ref vouch for any candidate
+    sharing its leading hex digits.
+    """
+    source = DETECTOR.read_text()
+    assert "rev-parse --verify --quiet \"${ref}^{commit}\"" in source, (
+        "trailer refs are no longer resolved through git"
+    )
+    assert "substr(full, 1, n)" not in source, (
+        "prefix comparison reinstated in the trailer lookup"
+    )
+
+
+def test_verified_picks_entries_are_revalidated():
+    """Attested pairs must be re-checked, not trusted as written."""
+    source = DETECTOR.read_text()
+    assert "--verified-picks" in source, "lost the attested-pair mechanism"
+    assert "is not on ${FORK_REF}, ignoring" in source, (
+        "attested fork commits are no longer checked for reachability"
+    )
+
+
+def test_verified_picks_file_entries_resolve():
+    """Every shipped attested pair must be two full 40-character object IDs.
+
+    Abbreviations here would reintroduce the ambiguity the trailer fix removed.
+    """
+    assert VERIFIED_PICKS.exists(), f"Missing attested pairs: {VERIFIED_PICKS}"
+    entries = 0
+    for raw in VERIFIED_PICKS.read_text().splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split()
+        assert len(parts) == 2, f"malformed entry: {raw!r}"
+        for sha in parts:
+            assert len(sha) == 40, f"not a full object ID: {sha!r}"
+            int(sha, 16)  # raises if not hexadecimal
+        entries += 1
+    assert entries > 0, "attested pairs file has no entries"
+
+
+def test_candidate_scan_tolerates_no_matches():
+    """`grep` exits 1 on no match; under `set -e` that would abort the run."""
+    for name, task in _tasks().items():
+        idx = task.index("CANDIDATES=$(git log")
+        block = task[idx:task.index('if [ -n "$CANDIDATES" ]; then', idx)]
+        assert "|| true" in block, (
+            f"{name}: candidate scan is unguarded against a no-match grep"
+        )
 
 
 def test_candidates_are_filtered_through_the_detector():

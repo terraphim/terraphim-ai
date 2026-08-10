@@ -98,6 +98,7 @@ git log upstream/main..origin/main --oneline 2>/dev/null | head -10
 # through upstream-pick-detect.sh, which additionally reads `cherry picked from
 # commit` / `Adapted-from:` trailers and falls back to patch-id equivalence.
 PICK_DETECT="/opt/ai-dark-factory/bin/upstream-pick-detect.sh"
+VERIFIED_PICKS="/opt/ai-dark-factory/bin/gitea-verified-picks.tsv"
 
 SECURITY_COMMITS=""
 ALREADY_PICKED=""
@@ -113,14 +114,24 @@ if [ "$BEHIND" -gt 0 ]; then
     echo "Deploy scripts/adf-setup/upstream-pick-detect.sh from terraphim-ai."
     exit 1
   fi
+  if [ ! -r "$VERIFIED_PICKS" ]; then
+    echo "ERROR: verified-picks list not found at $VERIFIED_PICKS"
+    echo "Deploy scripts/adf-setup/gitea-verified-picks.tsv from terraphim-ai."
+    exit 1
+  fi
 
+  # grep exits 1 when nothing matches, which under `set -e` would take the whole
+  # assignment down before the informational branch below is ever reached. The
+  # old pipeline ended in `head`, so it never surfaced this.
   CANDIDATES=$(git log origin/main..upstream/main --oneline 2>/dev/null \
-    | grep -iE "CVE|security|vuln|fix.*(sec|auth|xss|sqli|csrf|injection|bypass|escalat)")
+    | grep -iE "CVE|security|vuln|fix.*(sec|auth|xss|sqli|csrf|injection|bypass|escalat)" \
+    || true)
 
   if [ -n "$CANDIDATES" ]; then
     VERDICTS=$(printf '%s\n' "$CANDIDATES" \
       | "$PICK_DETECT" --repo "$GITEA_FORK" \
-          --fork-ref origin/main --upstream-ref upstream/main)
+          --fork-ref origin/main --upstream-ref upstream/main \
+          --verified-picks "$VERIFIED_PICKS")
 
     ALREADY_PICKED=$(printf '%s\n' "$VERDICTS" | grep "^PRESENT " || true)
     if [ -n "$ALREADY_PICKED" ]; then
