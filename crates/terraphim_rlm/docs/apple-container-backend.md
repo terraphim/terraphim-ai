@@ -287,8 +287,16 @@ teardown safe against a concurrent execution:
   in which a created container ends up untracked, including the concurrent
   insertion case where the session was not in the map when cleanup looked.
   The cost of this simplicity is honest and intended: `cleanup()` waits for
-  in-flight executions, so it can take up to `ExecutionContext::timeout_ms` plus
-  the recovery's lifecycle timeout to return.
+  in-flight executions. While every `ProcessRunner` involved honours its
+  cooperative-return contract — returning promptly once cancelled, and within
+  its deadline otherwise — that wait is bounded by
+  `ExecutionContext::timeout_ms` plus the recovery's lifecycle timeout. That
+  bound is a consequence of the contract, not a guarantee `cleanup()` enforces:
+  if a runner or the OS cannot complete an *observed* termination — the child
+  killed and reaped, the drains ended — the owner keeps waiting, and cleanup
+  has **no finite upper bound** and stays blocked fail-closed rather than
+  reporting a terminal state nobody observed. See
+  [Cancelling an execution fails closed](#cancelling-an-execution-fails-closed).
 - Lock order is always **permit before slot**; nothing takes the gate while
   holding a slot mutex, and no task holding a permit ever asks for a second one
   (recoveries inherit their execution's), so neither deadlock is possible.
@@ -470,8 +478,12 @@ two real-process tests:
 The complementary claim — what happens when a runner *violates* the contract —
 is pinned by `a_runner_that_withholds_its_return_blocks_recovery_and_cleanup_forever`.
 Its runner ignores the cancellation signal entirely and returns only on an
-explicit test notification. With virtual time advanced far past the five-second
-grace the old abort backstop used, the test asserts that no `container delete`
+explicit test notification. The five-second grace the old abort backstop used
+was counted on the *owner's* runtime, so that is the clock the test moves: a
+`cfg(test)` hook starts that one session's owner runtime paused and advances its
+virtual time — from a helper task on it, after the cancellation has been
+observed — far past the old deadline. With the owner's own clock that far ahead,
+the test asserts that no `container delete`
 has started, that `cleanup()` is still pending, and that the runner's future was
 never dropped or aborted. Only when the runner finally returns do the recovery,
 the delete and `cleanup()` complete. Blocking is the specified behaviour here,

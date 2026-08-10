@@ -2076,15 +2076,26 @@ impl ExecOwner {
 /// guest command exists yet.
 fn spawn_exec_owner(owner: ExecOwner) -> RlmResult<()> {
     let name = owner.name.clone();
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .thread_name("rlm-apple-exec")
-        .build()
-        .map_err(|e| {
+    // Off in every non-test build, and in tests off for every session but the
+    // one a test explicitly arms. See [`owner_clock`].
+    #[cfg(test)]
+    let clock = owner_clock::armed_for(owner.session_id);
+    let runtime = {
+        let mut builder = tokio::runtime::Builder::new_current_thread();
+        builder.enable_all().thread_name("rlm-apple-exec");
+        #[cfg(test)]
+        builder.start_paused(clock.is_some());
+        builder.build().map_err(|e| {
             init_failed(format!(
                 "could not build the execution runtime for {name} ({e}); no command was run"
             ))
-        })?;
+        })?
+    };
+    // The only thing that can move this runtime's clock is a task on it.
+    #[cfg(test)]
+    if let Some(clock) = clock.clone() {
+        runtime.spawn(owner_clock::serve(clock));
+    }
 
     // Parked in a shared slot rather than moved straight into the closure: a
     // failed `spawn` drops the closure it was handed, and the runtime must be
@@ -2102,6 +2113,12 @@ fn spawn_exec_owner(owner: ExecOwner) -> RlmResult<()> {
                     .take()
                     .expect("the execution payload is claimed exactly once");
                 runtime.block_on(owner.run());
+                // This runtime's clock stops existing here, so a test still
+                // waiting on it is released rather than deadlocked.
+                #[cfg(test)]
+                if let Some(clock) = clock {
+                    clock.owner_finished();
+                }
             })
     };
 
@@ -2121,6 +2138,127 @@ fn spawn_exec_owner(owner: ExecOwner) -> RlmResult<()> {
                 "could not spawn the execution owner thread for {name} ({e}); no command was run"
             )))
         }
+    }
+}
+
+/// Test-only control over the clock of the runtime an [`ExecOwner`] runs on.
+///
+/// An owner is deliberately independent of the caller's runtime, so a test that
+/// pauses and advances *its own* Tokio clock proves nothing about a deadline
+/// installed on the owner's: `#[tokio::test(start_paused = true)]` cannot reach
+/// across the thread boundary. Regression tests for owner-side deadlines
+/// therefore arm this hook for one specific session before the execution
+/// starts, which makes that session's owner runtime start paused and puts a
+/// helper task on it; [`Control::advance`] then drives that runtime's clock
+/// forward from the inside and waits for the advance to have actually happened
+/// over there.
+///
+/// Nothing here is compiled outside `cfg(test)`, and within tests it is inert
+/// for every session but the armed one.
+#[cfg(test)]
+mod owner_clock {
+    use super::SessionId;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+    use tokio::sync::Semaphore;
+
+    /// The one armed session and its control, if any.
+    static TARGET: Mutex<Option<(SessionId, Arc<Control>)>> = Mutex::new(None);
+
+    /// One arming's clock channel, shared between the test and the helper task
+    /// on the owner's runtime.
+    #[derive(Debug)]
+    pub(super) struct Control {
+        /// The pending request's size, in milliseconds. Written before the
+        /// request is posted and read by the single helper that serves it.
+        millis: AtomicU64,
+        /// The two halves of one round trip: the test posts a permit to
+        /// `requested`, the helper advances and posts one to `served`.
+        requested: Semaphore,
+        served: Semaphore,
+    }
+
+    impl Control {
+        /// Advances the armed owner runtime's clock by `by`, returning once
+        /// that runtime has actually made the jump — or immediately, if that
+        /// runtime has already finished and has no clock left to move.
+        pub(super) async fn advance(&self, by: Duration) {
+            self.millis.store(by.as_millis() as u64, Ordering::SeqCst);
+            self.requested.add_permits(1);
+            if let Ok(permit) = self.served.acquire().await {
+                permit.forget();
+            }
+        }
+
+        /// Called when the owner's runtime is about to go away, releasing every
+        /// present and future waiter instead of deadlocking it.
+        pub(super) fn owner_finished(&self) {
+            self.served.close();
+            self.requested.close();
+        }
+
+        /// Serves advance requests for the whole life of the owner's runtime.
+        ///
+        /// `tokio::time::advance` moves the clock of the runtime that calls it
+        /// and no other, which is the entire reason this runs over there.
+        async fn serve(&self) {
+            while let Ok(permit) = self.requested.acquire().await {
+                permit.forget();
+                tokio::time::advance(Duration::from_millis(self.millis.load(Ordering::SeqCst)))
+                    .await;
+                self.served.add_permits(1);
+            }
+        }
+    }
+
+    /// Arms the hook for `session` until the returned guard is dropped.
+    pub(super) fn arm(session: SessionId) -> Armed {
+        let control = Arc::new(Control {
+            millis: AtomicU64::new(0),
+            requested: Semaphore::new(0),
+            served: Semaphore::new(0),
+        });
+        let mut target = TARGET.lock().unwrap_or_else(|e| e.into_inner());
+        assert!(
+            target.is_none(),
+            "the owner clock hook is armed by one test at a time"
+        );
+        *target = Some((session, control.clone()));
+        Armed { control }
+    }
+
+    /// Holds the arming's control and disarms the hook when dropped, so no
+    /// later test can inherit either.
+    pub(super) struct Armed {
+        control: Arc<Control>,
+    }
+
+    impl Armed {
+        pub(super) async fn advance(&self, by: Duration) {
+            self.control.advance(by).await;
+        }
+    }
+
+    impl Drop for Armed {
+        fn drop(&mut self) {
+            *TARGET.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        }
+    }
+
+    /// The control for `session`, if its owner runtime must start paused.
+    pub(super) fn armed_for(session: SessionId) -> Option<Arc<Control>> {
+        TARGET
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .filter(|(armed, _)| *armed == session)
+            .map(|(_, control)| control.clone())
+    }
+
+    /// Entry point for the helper task placed on the owner's runtime.
+    pub(super) async fn serve(control: Arc<Control>) {
+        control.serve().await;
     }
 }
 
@@ -3892,7 +4030,7 @@ mod tests {
         }
     }
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn a_runner_that_withholds_its_return_blocks_recovery_and_cleanup_forever() {
         // The removed abort backstop, stated as a test. A runner that did not
         // return promptly after cancellation used to have its future aborted
@@ -3901,9 +4039,15 @@ mod tests {
         // drains' end. It must now do the opposite: wait, indefinitely, and
         // hold cleanup closed for exactly as long.
         //
-        // Deterministic throughout: the runner returns only on an explicit
-        // notification, and the "long after cancellation" part is virtual time
-        // moved by hand, not a sleep.
+        // The five seconds that must be exceeded were counted on the *owner's*
+        // runtime, so that is the clock this test moves: `owner_clock` starts
+        // this session's owner runtime paused and advances it from a task
+        // running on it, after cancellation has been observed and any such
+        // deadline would already be installed. Pausing this test's own runtime
+        // instead would leave the owner's running in real time and let an
+        // aborting implementation pass. Deterministic throughout: the runner
+        // returns only on an explicit notification, and the "long after
+        // cancellation" part is virtual time moved by hand, not a sleep.
         let inner = FakeRunner::new(|_| Ok(ok_output("")));
         let started = Arc::new(tokio::sync::Notify::new());
         let release = Arc::new(tokio::sync::Notify::new());
@@ -3918,6 +4062,7 @@ mod tests {
         });
         let exec = executor(runner.clone());
         let ctx = ctx();
+        let clock = owner_clock::arm(ctx.session_id);
 
         let mut running = Box::pin(exec.execute_command("sleep 100", &ctx));
         assert!(futures::poll!(&mut running).is_pending());
@@ -3926,8 +4071,17 @@ mod tests {
 
         // Cancel. The owner may now do exactly one thing: wait for the runner.
         drop(running);
-        // A hundred and twenty times the old five-second grace.
-        tokio::time::advance(Duration::from_secs(600)).await;
+        // Let the owner observe the cancellation and reach the point at which
+        // the old backstop armed its deadline, then take its clock a hundred
+        // and twenty times that deadline past it. The second round trip is
+        // ordered strictly after the first has returned from the owner's
+        // runtime, so no deadline installed around the cancellation can escape
+        // being overrun.
+        for _ in 0..256 {
+            tokio::task::yield_now().await;
+        }
+        clock.advance(Duration::from_secs(600)).await;
+        clock.advance(Duration::from_secs(600)).await;
         for _ in 0..256 {
             tokio::task::yield_now().await;
         }
@@ -3951,7 +4105,7 @@ mod tests {
             futures::poll!(&mut cleaning).is_pending(),
             "cleanup must stay blocked on the execution's permit"
         );
-        tokio::time::advance(Duration::from_secs(600)).await;
+        clock.advance(Duration::from_secs(600)).await;
         for _ in 0..256 {
             tokio::task::yield_now().await;
         }

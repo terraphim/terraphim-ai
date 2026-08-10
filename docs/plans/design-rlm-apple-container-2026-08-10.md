@@ -242,7 +242,7 @@ Tests first:
 - map holds nothing reclaimable after a fully successful cleanup, and retains exactly the container a failed removal left behind
 - a failed `end_session` delete is returned to the caller and retried by `cleanup`
 - deterministic lifecycle-race schedules (end_session vs ensure, cleanup vs ensure, cleanup vs in-flight end_session, aborted execution future, cleanup started in the same tick as the cancellation drop, cleanup queued during `container exec` against timeout/vanished/I-O-error/panic recovery, twelve simultaneous cancellations, an execution future dropped on a non-runtime thread, `end_session` after and queued behind cleanup, and no map re-insertion after cleanup returns), forced with gates rather than sleeps or repetition
-- a process runner that withholds its return after cancellation, far past the old five-second abort grace (virtual time, explicit notifications, no sleeps): no delete starts, `cleanup` stays pending, the runner future is never aborted or dropped, and recovery/delete/`cleanup` complete only once the runner itself returns
+- a process runner that withholds its return after cancellation, far past the old five-second abort grace (the *owner* runtime's virtual time, driven from a task on it through a `cfg(test)` clock hook; explicit notifications, no sleeps): no delete starts, `cleanup` stays pending, the runner future is never aborted or dropped, and recovery/delete/`cleanup` complete only once the runner itself returns
 - snapshot methods return `NotSupported` naming `apple-container`
 
 Then implement `end_session` (terminal, tombstoned, error-propagating), `cleanup` (gated, retrying, aggregating), the cancellation guard, and honest `Drop` diagnostics.
