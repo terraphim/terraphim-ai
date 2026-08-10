@@ -60,9 +60,12 @@
 //!   container, all while still holding the permit the execution acquired
 //!   before it started. The permit is moved, never released and re-taken, so
 //!   there is no spawn/register window for `cleanup` to slip through. The
-//!   recovery is spawned on the runtime handle the guard captured when it was
-//!   armed, so this is independent of the thread the execution future is
-//!   dropped on — including a plain `std::thread` with no current runtime.
+//!   recovery runs on a **dedicated OS thread with its own current-thread
+//!   runtime**, so it is independent both of the thread the execution future is
+//!   dropped on — including a plain `std::thread` with no current runtime — and
+//!   of the runtime that started the execution, which may already have been
+//!   shut down. Cleanup on *any* runtime stays blocked by the moved permit
+//!   until that owner finishes.
 //! - A command is never executed twice by this backend. If `container exec`
 //!   reports the session container missing, the container is discarded and the
 //!   failure is returned; whether repeating the command is safe is the caller's
@@ -80,6 +83,7 @@
 
 use async_trait::async_trait;
 use dashmap::DashMap;
+use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
@@ -1279,11 +1283,6 @@ impl AppleContainerExecutor {
             });
             let mut guard = ExecCancelGuard {
                 armed: true,
-                // Captured here, where a runtime is guaranteed (the exec task
-                // above was just spawned on it), so cancellation recovery is
-                // owned by *this* runtime no matter which thread the execution
-                // future is later dropped on.
-                runtime: tokio::runtime::Handle::current(),
                 state: self.state.clone(),
                 session_id: ctx.session_id,
                 cell,
@@ -1837,14 +1836,16 @@ impl super::ExecutionEnvironment for AppleContainerExecutor {
 ///    watching. A cooperative runner kills **and reaps** its child and
 ///    terminates its stdout/stderr readers, then returns.
 /// 3. **Move the owned exec task *and the execution's lifecycle permit* into a
-///    single recovery task.** The permit is moved into the spawned future as it
-///    is constructed, so it is never released; there is no window between
+///    single recovery owner.** The permit is moved into the recovery future as
+///    it is constructed, so it is never released; there is no window between
 ///    "guard dropped" and "recovery running" in which `cleanup` could acquire
-///    the write side. The task is spawned on the runtime handle captured when
-///    the guard was armed, so this holds for a future dropped on a thread with
-///    no current runtime exactly as it does for one dropped inside the runtime.
+///    the write side. The owner is a dedicated OS thread driving its **own**
+///    current-thread Tokio runtime ([`own_cancellation_recovery`]), so it holds
+///    for a future dropped on a thread with no current runtime, and for one
+///    whose originating runtime has already been shut down, exactly as it does
+///    for one dropped inside a live runtime.
 ///
-/// The recovery task is then the single owner of the whole operation:
+/// The recovery owner is then the single owner of the whole operation:
 ///
 /// 4. it awaits the exec task (aborting and awaiting it if the runner ignored
 ///    the signal past [`CANCEL_JOIN_GRACE`]), so host-child termination and
@@ -1857,19 +1858,10 @@ impl super::ExecutionEnvironment for AppleContainerExecutor {
 ///    *fresh* container.
 ///
 /// Nothing in this path is detached and nothing needs registering: terminal
-/// cleanup cannot take the write gate until this task drops the permit, which
-/// happens only after step 6.
+/// cleanup cannot take the write gate until the recovery owner drops the
+/// permit, which happens only after step 6.
 struct ExecCancelGuard {
     armed: bool,
-    /// The runtime that owns the exec task, captured when the guard is armed.
-    ///
-    /// `Drop` may run on *any* thread — a `Send` execution future can be moved
-    /// out of the runtime and dropped on a plain `std::thread`, where
-    /// `Handle::try_current()` fails. Recovery must not depend on that: the
-    /// handle is captured at arming time, when a runtime is guaranteed, and
-    /// every spawn/join below goes through it. There is therefore no drop site
-    /// on which the permit is released without an owner.
-    runtime: tokio::runtime::Handle,
     state: Arc<LifecycleState>,
     session_id: SessionId,
     cell: Arc<SessionCell>,
@@ -1922,19 +1914,24 @@ impl Drop for ExecCancelGuard {
         let runner = self.runner.clone();
         let binary = self.binary.clone();
         let name = self.name.clone();
+        // Kept out of the recovery future so the owner can name the container
+        // in its own diagnostics after moving the future away.
+        let recovery_name = self.name.clone();
         let cell = self.cell.clone();
         let state = self.state.clone();
         let session_id = self.session_id;
-        // (3) One owned recovery task for the whole operation, carrying the
+        // (3) One owned recovery future for the whole operation, carrying the
         // permit so terminal cleanup necessarily waits for it.
         //
-        // Spawned through the handle captured when the guard was armed, never
-        // through `Handle::try_current()`: this `drop` can run on a thread with
-        // no current runtime (a `Send` execution future moved out of the
-        // runtime and dropped there), and on such a thread `try_current` would
-        // leave nobody to join the exec task or delete the container. The
-        // captured handle makes the owner the same either way.
-        self.runtime.spawn(async move {
+        // Handed to an owner that is independent of *every* Tokio runtime, not
+        // to `Handle::try_current()` and not to a handle captured when the
+        // guard was armed. This `drop` can run on a thread with no current
+        // runtime (a `Send` execution future moved out of the runtime and
+        // dropped there), and the runtime that started the execution may
+        // already have been shut down — a task bound to a shut-down runtime is
+        // cancelled before its first poll, which would drop the permit without
+        // joining the exec task or deleting the container.
+        own_cancellation_recovery(&recovery_name, async move {
             log::warn!(
                 "apple-container: execution against {name} was cancelled; terminating the CLI \
                  child and destroying the container, because the guest process cannot be proven \
@@ -1982,6 +1979,138 @@ impl Drop for ExecCancelGuard {
                 )
                 .await;
         });
+    }
+}
+
+/// How many times [`own_cancellation_recovery`] retries the dedicated OS thread
+/// before falling back. Small and bounded: `Drop` must not spin.
+const RECOVERY_THREAD_SPAWN_ATTEMPTS: usize = 3;
+
+/// Pause between those attempts. Long enough for a transient
+/// `EAGAIN`/thread-limit condition to clear, short enough that a `Drop` running
+/// on a runtime worker is not stalled meaningfully.
+const RECOVERY_THREAD_SPAWN_BACKOFF: Duration = Duration::from_millis(50);
+
+/// Give `recovery` an owner that outlives every Tokio runtime in the process.
+///
+/// `recovery` carries the execution's lifecycle permit, so it must be *driven
+/// to completion*: dropping it unrun would release the permit without joining
+/// the CLI task or deleting the container, which is exactly the hole a captured
+/// [`tokio::runtime::Handle`] leaves once its runtime shuts down (a task bound
+/// to a closed runtime is cancelled before its first poll).
+///
+/// The owner is therefore a dedicated OS thread driving a **fresh
+/// current-thread runtime**. The runtime is built *before* the thread is
+/// spawned, so a build failure is observed while the future is still in hand
+/// rather than inside a thread that would drop it; and the payload is parked in
+/// a shared slot so a failed `spawn` — which drops the closure — leaves the
+/// future recoverable for the next attempt instead of destroying it.
+///
+/// Awaiting the exec task's [`tokio::task::JoinHandle`] from this runtime is
+/// sound and is the point of the design: a `JoinHandle` is a plain future over
+/// task-shared state, so it resolves here whether the originating runtime is
+/// still running (normal completion), is shutting down, or is already gone (a
+/// cancelled `JoinError`) — in every case the task is observably finished
+/// before the container is deleted.
+///
+/// Failure is handled fail-closed, never by releasing the permit early:
+///
+/// 1. dedicated thread + own runtime (the normal path);
+/// 2. if the thread cannot be spawned and this drop *is* on a runtime, that
+///    runtime is alive by definition — we are executing on it — so it is a
+///    durable owner and the future is spawned there;
+/// 3. otherwise the future is driven synchronously on this thread. Bounded: the
+///    recovery joins under [`CANCEL_JOIN_GRACE`] and deletes under
+///    [`LIFECYCLE_TIMEOUT`].
+///
+/// Only if the runtime itself cannot be built *and* there is no current runtime
+/// is the permit released without recovery; that is an OS-level resource
+/// failure with no owner left to hand it to, and it is logged as an error with
+/// the manual recovery command.
+fn own_cancellation_recovery<F>(name: &str, recovery: F)
+where
+    F: Future<Output = ()> + Send + 'static,
+{
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .thread_name("rlm-apple-recovery")
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            // No runtime of our own. Only a live current runtime can still own
+            // the permit; there is nothing else to hand it to.
+            if tokio::runtime::Handle::try_current().is_ok() {
+                log::warn!(
+                    "apple-container: could not build a recovery runtime for {name} ({e}); \
+                     driving recovery on the current runtime instead"
+                );
+                tokio::spawn(recovery);
+            } else {
+                log::error!(
+                    "apple-container: could not build a recovery runtime for {name} ({e}) and \
+                     there is no current runtime; the container was NOT reclaimed. Recover with: \
+                     container delete --force {name}"
+                );
+            }
+            return;
+        }
+    };
+
+    // Shared slot so a failed `Builder::spawn` — which drops the closure it was
+    // handed — does not take the permit-carrying future with it.
+    let payload = Arc::new(std::sync::Mutex::new(Some((runtime, recovery))));
+    for attempt in 1..=RECOVERY_THREAD_SPAWN_ATTEMPTS {
+        let payload = payload.clone();
+        let spawned = std::thread::Builder::new()
+            .name("rlm-apple-recovery".to_string())
+            .spawn(move || {
+                let taken = payload
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .take()
+                    .expect("the recovery payload is claimed exactly once");
+                let (runtime, recovery) = taken;
+                runtime.block_on(recovery);
+            });
+        match spawned {
+            // Ownership is durable from here: the thread holds the runtime and
+            // the permit-carrying future and drives it to completion.
+            Ok(_handle) => return,
+            Err(e) => log::warn!(
+                "apple-container: could not spawn the recovery thread for {name} \
+                 (attempt {attempt}/{RECOVERY_THREAD_SPAWN_ATTEMPTS}): {e}"
+            ),
+        }
+        if attempt < RECOVERY_THREAD_SPAWN_ATTEMPTS {
+            std::thread::sleep(RECOVERY_THREAD_SPAWN_BACKOFF);
+        }
+    }
+
+    let Some((runtime, recovery)) = payload.lock().unwrap_or_else(|e| e.into_inner()).take() else {
+        // A thread did start and claimed the payload after its spawn appeared
+        // to fail. It owns the recovery; nothing to do.
+        return;
+    };
+    if tokio::runtime::Handle::try_current().is_ok() {
+        // Cannot `block_on` inside a runtime, and cannot drop a runtime there
+        // either — hence `shutdown_background`. The current runtime is alive
+        // because we are running on it, so it is a durable owner.
+        log::warn!(
+            "apple-container: no recovery thread available for {name}; driving recovery on the \
+             current runtime instead"
+        );
+        tokio::spawn(recovery);
+        runtime.shutdown_background();
+    } else {
+        // Off-runtime and thread-starved: drive it here. Blocking this thread
+        // is the fail-closed choice — the alternative is dropping the permit
+        // with the container still alive.
+        log::warn!(
+            "apple-container: no recovery thread available for {name}; driving recovery \
+             synchronously on the dropping thread"
+        );
+        runtime.block_on(recovery);
     }
 }
 
@@ -2094,6 +2223,30 @@ mod tests {
         holds: StdMutex<std::collections::HashMap<String, Arc<tokio::sync::Semaphore>>>,
         /// How many calls observed the cancellation signal and returned.
         cancelled: std::sync::atomic::AtomicUsize,
+        /// How many calls were *dropped mid-flight* rather than returning — the
+        /// observable trace of a CLI task that was cancelled from outside (for
+        /// example by the shutdown of the runtime that owned it).
+        abandoned: std::sync::atomic::AtomicUsize,
+    }
+
+    /// Counts a [`FakeRunner::run`] whose future was dropped before it returned.
+    struct AbandonedOnDrop<'a> {
+        counter: &'a std::sync::atomic::AtomicUsize,
+        finished: bool,
+    }
+
+    impl AbandonedOnDrop<'_> {
+        fn finished(mut self) {
+            self.finished = true;
+        }
+    }
+
+    impl Drop for AbandonedOnDrop<'_> {
+        fn drop(&mut self) {
+            if !self.finished {
+                self.counter.fetch_add(1, Ordering::SeqCst);
+            }
+        }
     }
 
     /// A one-shot park point: the first call to claim it waits for `notify`.
@@ -2205,6 +2358,7 @@ mod tests {
                 gates: StdMutex::new(std::collections::HashMap::new()),
                 holds: StdMutex::new(std::collections::HashMap::new()),
                 cancelled: std::sync::atomic::AtomicUsize::new(0),
+                abandoned: std::sync::atomic::AtomicUsize::new(0),
             })
         }
 
@@ -2223,6 +2377,7 @@ mod tests {
                 gates: StdMutex::new(std::collections::HashMap::new()),
                 holds: StdMutex::new(std::collections::HashMap::new()),
                 cancelled: std::sync::atomic::AtomicUsize::new(0),
+                abandoned: std::sync::atomic::AtomicUsize::new(0),
             });
             let steps = Steps {
                 events: rx,
@@ -2243,6 +2398,7 @@ mod tests {
                 gates: StdMutex::new(std::collections::HashMap::new()),
                 holds: StdMutex::new(std::collections::HashMap::new()),
                 cancelled: std::sync::atomic::AtomicUsize::new(0),
+                abandoned: std::sync::atomic::AtomicUsize::new(0),
             })
         }
 
@@ -2277,21 +2433,15 @@ mod tests {
             self.cancelled.load(Ordering::SeqCst)
         }
 
-        /// Deadlines recorded for every call whose first argument is `verb`.
-        fn timeouts_for(&self, verb: &str) -> Vec<Duration> {
-            self.calls_with_timeout()
-                .into_iter()
-                .filter(|(argv, _)| argv.first().map(|v| v == verb).unwrap_or(false))
-                .map(|(_, timeout)| timeout)
-                .collect()
+        /// How many calls were dropped mid-flight instead of returning.
+        fn abandoned_calls(&self) -> usize {
+            self.abandoned.load(Ordering::SeqCst)
         }
-    }
 
-    #[async_trait]
-    impl ProcessRunner for FakeRunner {
-        async fn run(
+        /// The body of [`ProcessRunner::run`], wrapped there so a call that is
+        /// dropped before it returns is counted.
+        async fn run_scripted(
             &self,
-            _program: &Path,
             args: &[String],
             timeout: Duration,
             cancel: &CancelSignal,
@@ -2348,6 +2498,37 @@ mod tests {
                 return Err(cancelled_io_error());
             }
             (self.handler)(args)
+        }
+
+        /// Deadlines recorded for every call whose first argument is `verb`.
+        fn timeouts_for(&self, verb: &str) -> Vec<Duration> {
+            self.calls_with_timeout()
+                .into_iter()
+                .filter(|(argv, _)| argv.first().map(|v| v == verb).unwrap_or(false))
+                .map(|(_, timeout)| timeout)
+                .collect()
+        }
+    }
+
+    #[async_trait]
+    impl ProcessRunner for FakeRunner {
+        async fn run(
+            &self,
+            _program: &Path,
+            args: &[String],
+            timeout: Duration,
+            cancel: &CancelSignal,
+        ) -> std::io::Result<CommandOutput> {
+            // Armed for the whole call and disarmed only on a real return, so a
+            // call whose future is dropped mid-flight — the trace a cancelled
+            // CLI task leaves — is observable to tests.
+            let abandoned = AbandonedOnDrop {
+                counter: &self.abandoned,
+                finished: false,
+            };
+            let output = self.run_scripted(args, timeout, cancel).await;
+            abandoned.finished();
+            output
         }
     }
 
@@ -4099,6 +4280,115 @@ mod tests {
         assert!(exec.state.session_to_container.is_empty());
         assert_map_stays_empty_after_cleanup(&exec).await;
         assert_no_untracked_container(&exec, &runner).await;
+    }
+
+    #[test]
+    fn recovery_outlives_the_shutdown_of_the_runtime_that_started_the_execution() {
+        // The schedule a captured `Handle` cannot survive: the execution is
+        // polled to pending on runtime A, runtime A is shut down entirely, the
+        // still-pending future is dropped on a plain OS thread, and cleanup is
+        // run on a *different* runtime B.
+        //
+        // A recovery bound to runtime A's closed handle would be cancelled
+        // before its first poll, releasing the permit without joining the CLI
+        // task or deleting the container — and cleanup on B would sail through.
+        // The owner is runtime-independent, so cleanup on B must still block
+        // until the CLI task has observably ended and the container is gone.
+        //
+        // Deliberately not `#[tokio::test]`: this test owns its runtimes.
+        let (runner, mut steps) = FakeRunner::stepped(|_| Ok(ok_output("")));
+        let exec = executor(runner.clone());
+        let ctx = ctx();
+
+        let runtime_a = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime A must build");
+
+        // Park the CLI so the execution is pending with `container exec` in
+        // flight, owned by runtime A.
+        steps.gate("exec");
+        let mut running = Box::pin(exec.execute_command("sleep 100", &ctx));
+        runtime_a.block_on(async {
+            assert!(futures::poll!(&mut running).is_pending());
+            steps.wait_for("exec").await;
+        });
+        let name = created_names(&runner)[0].clone();
+        assert_eq!(
+            runner.abandoned_calls(),
+            0,
+            "the CLI call is still in flight at this point"
+        );
+
+        // Park the recovery's deletion so it cannot complete on its own, then
+        // destroy runtime A. Shutting it down cancels the owned exec task,
+        // which is what leaves its `JoinHandle` resolvable only as a cancelled
+        // join — the case the recovery must still observe.
+        steps.gate("delete");
+        runtime_a.shutdown_timeout(Duration::from_secs(30));
+        assert_eq!(
+            runner.abandoned_calls(),
+            1,
+            "runtime A's shutdown must have dropped the in-flight CLI call"
+        );
+
+        // Drop the outer future off-runtime, after its runtime is gone.
+        std::thread::scope(|scope| {
+            scope
+                .spawn(move || {
+                    assert!(
+                        tokio::runtime::Handle::try_current().is_err(),
+                        "this thread must have no current runtime, or the test proves nothing"
+                    );
+                    drop(running);
+                })
+                .join()
+                .expect("the dropping thread must not panic");
+        });
+
+        // Everything from here runs on a runtime that never saw the execution.
+        let runtime_b = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime B must build");
+        runtime_b.block_on(async {
+            let mut cleaning = Box::pin(exec.cleanup());
+            assert!(
+                futures::poll!(&mut cleaning).is_pending(),
+                "cleanup on a different runtime must wait for the recovery of an execution whose \
+                 own runtime is gone"
+            );
+            assert!(
+                deleted_names(&runner).is_empty(),
+                "nothing may have been deleted yet: {:?}",
+                deleted_names(&runner)
+            );
+
+            // The recovery does run — on its own thread and its own runtime,
+            // with no live Tokio runtime inherited from anywhere — and it is
+            // holding cleanup off while it is mid-delete.
+            assert_eq!(
+                steps.wait_for("delete").await,
+                vec!["delete", "--force", &name]
+            );
+            assert!(
+                futures::poll!(&mut cleaning).is_pending(),
+                "cleanup must still wait while the recovery is mid-delete"
+            );
+            assert_eq!(
+                runner.abandoned_calls(),
+                1,
+                "the recovery deletes only after the CLI task's termination was observed"
+            );
+
+            steps.release("delete");
+            cleaning.await.unwrap();
+
+            assert_eq!(deleted_names(&runner), vec![name.clone()]);
+            assert!(exec.state.session_to_container.is_empty());
+            assert_map_stays_empty_after_cleanup(&exec).await;
+            assert_no_untracked_container(&exec, &runner).await;
+        });
     }
 
     #[tokio::test]
