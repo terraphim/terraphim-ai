@@ -262,9 +262,9 @@ teardown safe against a concurrent execution:
   is the whole lifecycle rule, and it replaces the recovery registry and bounded
   join rounds an earlier revision used. An owned read permit on the lifecycle
   gate is acquired *before* an operation can create, use or reclaim a container
-  — before `container run`, before `container exec` — and it is held, in the
-  task that owns the work, until that operation **and every recovery it
-  triggers** has finished. Timeout, vanished-container, runner-I/O-error,
+  — before `container run`, before `container exec` — and it is held, by the
+  owner of the work, until that operation **and every recovery it triggers**
+  has finished. Timeout, vanished-container, runner-I/O-error,
   panicked-exec and cancellation recovery all run the same unbind →
   force-delete → retrack path under the permit their execution already held, so
   none of them can start after cleanup has drained. The cell is (re-)inserted into the session map, so
@@ -316,7 +316,7 @@ are pinned separately:
 
 - `cleanup_started_in_the_same_tick_as_the_cancellation_drop_still_waits`
   starts `cleanup()` in the same tick as `ExecCancelGuard::drop`, before the
-  recovery task has been polled at all, and asserts it is pending.
+  owner has taken a single recovery step, and asserts it is pending.
 - `cleanup_queued_during_exec_waits_for_timeout_recovery`,
   `..._for_vanished_container_recovery` and `..._for_panicked_exec_recovery`
   queue `cleanup()` for the write side **while `container exec` is still
@@ -339,72 +339,81 @@ are pinned separately:
   pins that refusing to *insert* did not cost the ability to reclaim a container
   that is already tracked.
 
+### Execution ownership is runtime-independent from the start
+
+An execution is not owned by the future the caller awaits, and not by the
+runtime polling it. Once the lifecycle permit is held and the container is
+resolved — and **before the guest command is launched** — the permit and the
+entire `container exec` operation are moved into a dedicated **execution owner**
+running on its own OS thread with its own current-thread Tokio runtime. The
+owner owns:
+
+- the `ProcessRunner` call, and therefore the CLI child and its stdout/stderr
+  drain tasks;
+- the outcome (success, non-zero exit, timeout, vanished container, host I/O
+  error, panicked exec task); and
+- every recovery those paths need, plus cancellation recovery.
+
+The caller keeps only a result channel. Establishing ownership *first* is what
+makes its failure trivial: if the current-thread runtime cannot be built or the
+OS thread cannot be spawned, the owner — permit included — is dropped, no
+`container exec` was ever issued, and the caller gets a `BackendInitFailed`
+naming the container. There is nothing to fail closed over, because no guest
+command exists yet. That is the whole reason ownership is established up front
+rather than manufactured inside `Drop`: a `Drop` that must create an owner has
+branches on which it cannot, and each of those branches would have to choose
+between releasing the permit early and leaking it.
+
 ### Cancelling an execution fails closed
 
 `kill_on_drop(true)` kills the host `container exec` child, but killing the CLI
 does not prove the guest process died. So dropping or aborting an
-`execute_code`/`execute_command` future runs the same recovery the elapsed-time
-timeout does. Synchronously, before the drop returns:
+`execute_code`/`execute_command` future must run the same recovery the
+elapsed-time timeout does — and, because the owner already exists, dropping the
+future does not have to *arrange* any of it. Synchronously, before the drop
+returns, the guard:
 
-1. the session slot is **quarantined**, so no later call can reuse that
-   container;
-2. a cancellation signal is raised on the in-flight CLI call; and
-3. the owned CLI task **and the execution's lifecycle permit** are moved into a
-   single recovery owner.
+1. claims the execution's outcome, so a completion that already settled is not
+   disturbed and a cancellation cannot be settled twice;
+2. **quarantines** the session slot, so no later call can reuse that container;
+   and
+3. raises a cancellation signal on the in-flight CLI call.
 
-Step 3 is what closes the race a registry could not. The permit was acquired
-before `container exec` was launched, and it is *moved* into the recovery future
-as that future is constructed — never released and re-taken — so there is no
-window, however small, in which `cleanup()` could acquire the write side. The
-drop guard registers nothing; the permit it already holds is the registration.
+It spawns nothing, moves nothing and registers nothing. The permit was acquired
+before `container exec` was launched and has never left the owner, so there is
+no window — however small — in which `cleanup()` could acquire the write side.
 
-Step 3 is also **independent of every Tokio runtime**, not just of the thread the
+This holds **independently of every Tokio runtime**, not just of the thread the
 future is dropped on. An execution future is `Send`, so it can be moved out of
 the runtime and dropped on a plain OS thread where `Handle::try_current()` would
 fail — and the runtime that started the execution may itself already have been
-shut down by then. A handle captured when the guard was armed does not survive
-that second case: Tokio closes its task set during shutdown, so a task bound to
-a closed runtime is cancelled before its first poll, which would drop the
-permit-carrying recovery future unrun.
+shut down by then. Neither event touches the owner: it was never a task on that
+runtime, so its child is not dropped, its drain tasks are not dropped, and its
+permit is not released. The earlier design, which transferred a `JoinHandle`
+after the fact, could only observe that the CLI *future* had been destroyed by
+runtime shutdown; it could not show the child had been reaped or the drains
+joined. Now there is nothing to transfer.
 
-The recovery owner is therefore a **dedicated OS thread driving its own
-current-thread runtime**, created at drop time. Its runtime is built *before*
-that thread is spawned, so a build failure is seen while the future is still in
-hand, and the payload is parked in a shared slot so a failed `spawn` — which
-drops the closure it was handed — leaves the future recoverable for the next
-attempt. Awaiting the CLI task's `JoinHandle` from that runtime is sound and is
-the point of the design: a `JoinHandle` is a plain future over task-shared
-state, so it resolves whether the originating runtime is still running, is
-shutting down, or is already gone (a cancelled join) — in every case the task is
-observably finished before the container is deleted.
+The owner then finishes the operation, and its completion is observable:
 
-Thread exhaustion is handled fail-closed, never by releasing the permit early:
-the spawn is retried a bounded number of times; if it still fails and the drop
-is happening *on* a runtime, that runtime is alive by definition and the
-recovery is spawned there; otherwise the recovery is driven synchronously on the
-dropping thread, bounded by the 5s join grace and the 60s lifecycle timeout.
-There is no drop site on which the permit is released without an owner, and no
-drop site on which the CLI task is merely aborted instead of joined.
-
-The recovery owner then owns the rest, and its completion is observable:
-
-4. it awaits the CLI task. The process runner returns only after it has killed
+4. it awaits the CLI call. The process runner returns only after it has killed
    **and reaped** its child and stopped its stdout/stderr readers, so
    termination is observed rather than assumed. A runner that ignores the signal
-   for 5s is aborted, and the abort is awaited.
+   for 5s is aborted, and the abort is awaited — on the owner's own live
+   runtime, so `kill_on_drop` still reaps.
 5. it force-deletes the container under the 60s lifecycle timeout, still holding
-   that permit, with the name tracked as pending first — so `cleanup()` waits
-   for it and a failed delete stays reclaimable;
+   the permit, with the name tracked as pending first — so `cleanup()` waits for
+   it and a failed delete stays reclaimable;
 6. only once the runtime confirms the container gone does it drop the name from
    tracking and lift the quarantine, letting the session start a *fresh*
    container. If the delete fails, the session stays refused and the container
    stays tracked for `cleanup()` to retry.
 
-Nothing on this path is detached, and the permit is released only when the
-recovery future ends — so terminal cleanup, **on any runtime**, cannot return
-while a cancelled execution's child termination or container deletion is
-outstanding, whichever thread the cancellation happened on and whether or not
-the runtime that started the execution still exists.
+Nothing on this path is detached, and the permit is released only when the owner
+returns — so terminal cleanup, **on any runtime**, cannot return while a
+cancelled execution's child termination or container deletion is outstanding,
+whichever thread the cancellation happened on and whether or not the runtime
+that started the execution still exists.
 
 Pinned by `aborting_an_execution_future_fails_the_session_closed`,
 `a_cancelled_execution_marks_its_slot_unusable_before_the_drop_returns`,
@@ -414,21 +423,36 @@ Pinned by `aborting_an_execution_future_fails_the_session_closed`,
 `a_future_dropped_off_the_runtime_still_blocks_cleanup_until_recovery_ends` —
 which polls the execution inside the runtime, moves it to an OS thread that
 asserts it has no current runtime, drops it there, and then shows `cleanup()`
-pending until the CLI task has been joined (the runner reports it returned on
-the cancellation signal) and the container deleted — and by
+pending until the CLI call has ended (the runner reports it returned on the
+cancellation signal) and the container deleted — and by
 `recovery_outlives_the_shutdown_of_the_runtime_that_started_the_execution`,
 which uses two explicit runtimes: it polls the execution to pending on runtime
-A, shuts A down entirely (observably dropping the in-flight CLI call), drops the
-outer future on a non-runtime thread, and then runs `cleanup()` on a separate
-runtime B, showing it pending until the recovery's own thread has deleted the
-container, with no re-inserted cell and no untracked container afterwards. Both
-run on the fake runner, and are joined by
-`cancelling_a_real_child_kills_and_reaps_it_and_stops_the_drains` on a **real
-local process**: that test cancels a live `/bin/sh`, then asserts the child pid
-is gone from the process table (`kill -0` fails — it would still succeed for a
-zombie, so this is reap evidence) and that the call returned promptly even
-though a surviving grandchild still holds the stdout pipe open, which is what
-the readers being terminated buys.
+A, shuts A down entirely, drops the outer future on a non-runtime thread, and
+then runs `cleanup()` on a separate runtime B, showing it pending until the
+owner's own thread has deleted the container, with no re-inserted cell and no
+untracked container afterwards. It also asserts that runtime A's shutdown
+abandoned **no** CLI call, which is the property the owner-first design adds.
+
+Those two run on the fake runner. The claim they cannot make — that a real host
+child was reaped and real drains stopped across a runtime shutdown — is made by
+two real-process tests:
+
+- `cancelling_a_real_child_kills_and_reaps_it_and_stops_the_drains` cancels a
+  live `/bin/sh`, then asserts the child pid is gone from the process table
+  (`kill -0` fails — it would still succeed for a zombie, so this is reap
+  evidence) and that the call returned promptly even though a surviving
+  grandchild still holds the stdout pipe open, which is what the readers being
+  terminated buys.
+- `a_real_child_is_reaped_before_cleanup_on_another_runtime_can_finish` runs the
+  full two-runtime schedule against a real child: the guest command is an actual
+  `/bin/sh` process started while runtime A exists, runtime A is shut down (and
+  the child is asserted **still alive**, proving A never owned it), the outer
+  future is dropped on a non-runtime thread, and `cleanup()` runs on runtime B.
+  When the owner's gated `container delete` starts, the test asserts the child
+  pid is absent from the process table — zombies included — and that the
+  grandchild still holds the pipe, so both reaping and drain termination
+  happened before the container was deleted; `cleanup()` is asserted pending
+  until the delete is released.
 
 `Drop` is best effort and does not claim success. It logs a warning
 **unconditionally, before** attempting anything — every path through it is best
@@ -450,8 +474,9 @@ lifecycle race listed above. A few tests deliberately use **real local
 processes** instead, because host-child kill/reap and reader termination cannot
 be demonstrated by a fake runner:
 `tokio_runner_timeout_kills_and_reaps_child_preserving_partial_output`,
-`tokio_runner_captures_exit_code_and_streams`, and
-`cancelling_a_real_child_kills_and_reaps_it_and_stops_the_drains`.
+`tokio_runner_captures_exit_code_and_streams`,
+`cancelling_a_real_child_kills_and_reaps_it_and_stops_the_drains`, and
+`a_real_child_is_reaped_before_cleanup_on_another_runtime_can_finish`.
 
 ```bash
 cargo test -p terraphim_rlm --features apple-container-backend
