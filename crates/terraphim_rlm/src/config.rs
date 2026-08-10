@@ -4,6 +4,14 @@
 //! backend selection, budget limits, security settings, and operational parameters.
 
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+/// Default OCI image used by the Apple Container backend.
+pub const DEFAULT_APPLE_CONTAINER_IMAGE: &str = "python:3.11-slim";
+
+fn default_apple_container_image() -> String {
+    DEFAULT_APPLE_CONTAINER_IMAGE.to_string()
+}
 
 /// Main configuration for the RLM system.
 #[derive(Clone, Serialize, Deserialize)]
@@ -131,6 +139,17 @@ pub struct RlmConfig {
     /// Per-backend session model configuration.
     pub backend_session_models: Vec<BackendSessionConfig>,
 
+    /// Optional absolute path to the Apple `container` CLI.
+    ///
+    /// When `None` (the default) the binary is resolved as `container` from
+    /// `PATH`. Only used by the Apple Container backend.
+    #[serde(default)]
+    pub apple_container_binary: Option<PathBuf>,
+
+    /// OCI image used for Apple Container sessions.
+    #[serde(default = "default_apple_container_image")]
+    pub apple_container_image: String,
+
     // ============================================
     // LLM Configuration
     // ============================================
@@ -200,6 +219,8 @@ impl std::fmt::Debug for RlmConfig {
             )
             .field("e2b_template", &self.e2b_template)
             .field("backend_session_models", &self.backend_session_models)
+            .field("apple_container_binary", &self.apple_container_binary)
+            .field("apple_container_image", &self.apple_container_image)
             // LLM
             .field("llm_provider", &self.llm_provider)
             .field("default_model", &self.default_model)
@@ -263,6 +284,7 @@ impl Default for RlmConfig {
             backend_preference: vec![
                 BackendType::Firecracker,
                 BackendType::E2b,
+                BackendType::AppleContainer,
                 BackendType::Docker,
                 BackendType::Local,
             ],
@@ -278,6 +300,10 @@ impl Default for RlmConfig {
                     session_model: SessionModel::Stateless,
                 },
                 BackendSessionConfig {
+                    backend: BackendType::AppleContainer,
+                    session_model: SessionModel::Affinity,
+                },
+                BackendSessionConfig {
                     backend: BackendType::Docker,
                     session_model: SessionModel::Affinity,
                 },
@@ -286,6 +312,8 @@ impl Default for RlmConfig {
                     session_model: SessionModel::Affinity,
                 },
             ],
+            apple_container_binary: None,
+            apple_container_image: default_apple_container_image(),
 
             // LLM
             llm_provider: None,
@@ -334,6 +362,11 @@ impl RlmConfig {
         }
         if self.backend_preference.is_empty() {
             return Err("backend_preference cannot be empty".to_string());
+        }
+        if self.apple_container_image.trim().is_empty() {
+            // An empty image yields `container run ... "" sleep infinity`,
+            // whose CLI error names neither the field nor the cause.
+            return Err("apple_container_image cannot be empty".to_string());
         }
         Ok(())
     }
@@ -391,6 +424,14 @@ pub enum BackendType {
     Firecracker,
     /// E2B cloud sandboxes (cloud-hosted Firecracker).
     E2b,
+    /// Apple `container` CLI (one lightweight Linux VM per container,
+    /// Apple silicon + macOS 26 only).
+    ///
+    /// The canonical serialized identity is `apple-container`. The
+    /// `applecontainer` alias is accepted for backward compatibility with
+    /// the container-level `rename_all = "lowercase"` spelling.
+    #[serde(rename = "apple-container", alias = "applecontainer")]
+    AppleContainer,
     /// Docker containers (gVisor or runc).
     Docker,
     /// Local process execution (no isolation, direct command execution).
@@ -402,6 +443,7 @@ impl std::fmt::Display for BackendType {
         match self {
             BackendType::Firecracker => write!(f, "firecracker"),
             BackendType::E2b => write!(f, "e2b"),
+            BackendType::AppleContainer => write!(f, "apple-container"),
             BackendType::Docker => write!(f, "docker"),
             BackendType::Local => write!(f, "local"),
         }
@@ -449,6 +491,18 @@ mod tests {
     }
 
     #[test]
+    fn empty_apple_container_image_is_rejected() {
+        for image in ["", "   "] {
+            let config = RlmConfig {
+                apple_container_image: image.to_string(),
+                ..Default::default()
+            };
+            let err = config.validate().unwrap_err();
+            assert!(err.contains("apple_container_image"), "{err}");
+        }
+    }
+
+    #[test]
     fn test_kg_strictness_behavior() {
         assert!(!KgStrictness::Permissive.blocks_unknown());
         assert!(!KgStrictness::Normal.blocks_unknown());
@@ -469,6 +523,72 @@ mod tests {
         assert_eq!(
             config.session_model_for_backend(BackendType::E2b),
             SessionModel::Stateless
+        );
+    }
+
+    #[test]
+    fn apple_container_backend_serializes_as_kebab_case() {
+        let json = serde_json::to_string(&BackendType::AppleContainer).unwrap();
+        assert_eq!(json, "\"apple-container\"");
+        assert_eq!(BackendType::AppleContainer.to_string(), "apple-container");
+    }
+
+    #[test]
+    fn apple_container_alias_deserializes() {
+        let canonical: BackendType = serde_json::from_str("\"apple-container\"").unwrap();
+        assert_eq!(canonical, BackendType::AppleContainer);
+        let alias: BackendType = serde_json::from_str("\"applecontainer\"").unwrap();
+        assert_eq!(alias, BackendType::AppleContainer);
+    }
+
+    #[test]
+    fn apple_container_default_session_model_is_affinity() {
+        let config = RlmConfig::default();
+        assert_eq!(
+            config.session_model_for_backend(BackendType::AppleContainer),
+            SessionModel::Affinity
+        );
+    }
+
+    #[test]
+    fn apple_container_precedes_docker_and_local_in_default_preference() {
+        let prefs = RlmConfig::default().backend_preference;
+        let idx = |b: BackendType| prefs.iter().position(|p| *p == b).unwrap();
+        assert!(idx(BackendType::AppleContainer) < idx(BackendType::Docker));
+        assert!(idx(BackendType::AppleContainer) < idx(BackendType::Local));
+        assert!(idx(BackendType::Firecracker) < idx(BackendType::AppleContainer));
+        assert!(idx(BackendType::E2b) < idx(BackendType::AppleContainer));
+    }
+
+    #[test]
+    fn apple_container_settings_round_trip_through_json() {
+        let config = RlmConfig {
+            apple_container_binary: Some(PathBuf::from("/opt/homebrew/bin/container")),
+            apple_container_image: "python:3.12-slim".to_string(),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let restored: RlmConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            restored.apple_container_binary,
+            config.apple_container_binary
+        );
+        assert_eq!(restored.apple_container_image, config.apple_container_image);
+        assert_eq!(restored.backend_preference, config.backend_preference);
+    }
+
+    #[test]
+    fn apple_container_settings_default_when_absent_from_json() {
+        // Configs written before this backend existed must still load.
+        let mut value = serde_json::to_value(RlmConfig::default()).unwrap();
+        let obj = value.as_object_mut().unwrap();
+        obj.remove("apple_container_binary");
+        obj.remove("apple_container_image");
+        let restored: RlmConfig = serde_json::from_value(value).unwrap();
+        assert_eq!(restored.apple_container_binary, None);
+        assert_eq!(
+            restored.apple_container_image,
+            DEFAULT_APPLE_CONTAINER_IMAGE
         );
     }
 

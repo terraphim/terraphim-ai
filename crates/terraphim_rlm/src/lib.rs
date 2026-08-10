@@ -20,6 +20,8 @@
 //!
 //! ExecutionEnvironment trait
 //!     ├── FirecrackerExecutor (primary, full isolation)
+//!     ├── AppleContainerExecutor (macOS 26 / Apple silicon, one lightweight
+//!     │                           Linux VM per container via the `container` CLI)
 //!     ├── DockerExecutor (fallback, gVisor/runc)
 //!     └── E2bExecutor (cloud option)
 //! ```

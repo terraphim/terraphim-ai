@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Apple Container RLM backend** `terraphim_rlm` gains `BackendType::AppleContainer` and an argv-safe, session-affine `AppleContainerExecutor` driving Apple's `container` CLI (one lightweight Linux VM per container on Apple silicon / macOS 26). Feature-gated by `apple-container-backend` (included in `full`, no new dependency); availability requires macOS/aarch64 plus a healthy `container system version`/`status` and never auto-starts the host service; timeouts kill the CLI child and destroy the session container. See `crates/terraphim_rlm/docs/apple-container-backend.md` (Refs #3192, 2026-08-10)
 - **`RUNNER_POLL_TIMEOUT` env var** `terraphim_gitea_runner` now reads `RUNNER_POLL_TIMEOUT` (default `2h`) to control how long a runner waits for a job before timing out; prevents silent hangs during long builds (PR #2978, 2026-06-25)
 - **Spawner post-exit fallback** `terraphim_spawner` detects early process exits and falls back gracefully via `post_exit_fallback` + `ExitDetected` event, reducing silent failures during agent restarts (2026-06-23)
 - **Weather report markdown output** `terraphim_weather_report` CLI now accepts `--format markdown` to emit a human-readable tier table alongside the existing JSON and table formats (2026-06-23)

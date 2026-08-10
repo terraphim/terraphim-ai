@@ -9,7 +9,8 @@ use crate::types::SessionId;
 
 /// The core trait for execution backends.
 ///
-/// All execution backends (Firecracker, Docker, E2B) implement this trait
+/// All execution backends (Firecracker, Apple Container, Docker, E2B) implement
+/// this trait
 /// to provide a unified interface for:
 /// - Code execution (Python, bash)
 /// - Command validation (knowledge graph)
@@ -134,6 +135,8 @@ pub trait ExecutionEnvironment: Send + Sync {
     ///
     /// Different backends may have different capabilities:
     /// - Firecracker: Full isolation, snapshots, network audit
+    /// - Apple Container: One lightweight Linux VM per container on Apple
+    ///   silicon; VM + container isolation, no snapshots
     /// - Docker: Container isolation, may lack snapshots
     /// - E2B: Cloud execution, may have network restrictions
     fn capabilities(&self) -> &[Capability];
