@@ -82,7 +82,9 @@ Add minimal backend config to `RlmConfig`:
 
 - `apple_container_binary: Option<PathBuf>` — optional absolute CLI override; default resolves `container` from `PATH`.
 - `apple_container_image: String` — default `python:3.11-slim`.
-- Reuse the current 512 MiB memory profile and outbound-network policy; expose no speculative knobs in this issue.
+- `apple_container_cpus: u32` — default `1`; forwarded verbatim as `--cpus`.
+- `apple_container_memory: String` — default `512M`; validated to be a positive integer with an optional case-insensitive `K`/`M`/`G`/`T`/`P` suffix and no surrounding whitespace, because it is forwarded verbatim as `--memory`.
+- Keep the outbound-network policy as-is. CPU and memory are configurable because operators must be able to size a per-session VM for the workload; nothing else is exposed in this issue.
 
 Add `BackendSessionConfig { backend: AppleContainer, session_model: Affinity }` to defaults. Debug output must not expose unexpected environment values.
 
@@ -94,8 +96,17 @@ Create `crates/terraphim_rlm/src/executor/apple_container.rs` behind feature `ap
 
 - command runner/CLI path;
 - image and resource profile;
-- `DashMap<SessionId, Arc<Mutex<Option<ContainerHandle>>>>` to serialize first creation exactly as Docker does;
+- `DashMap<SessionId, Arc<SessionCell>>` to serialize first creation. A `SessionCell` is a `Mutex<SessionSlot>` plus an `AtomicBool` "unusable" flag: `SessionSlot` is `Active { bound: Option<name>, pending: Vec<name> }` or `Closing { pending: Vec<name> }`, and the atomic exists so a cancellation `Drop` — which cannot await the mutex — can quarantine the slot synchronously. `pending` holds every name whose deletion is unconfirmed, including a name generated for a `container run` that failed. A bare `Option` cell (Docker's shape) is **not** sufficient: it cannot distinguish "no container yet" from "this session is being torn down", nor hold a survivor alongside a binding, which are the leaks this design must avoid;
+- an executor-wide lifecycle `RwLock` gate plus a terminal `closing` flag, governed by **one rule**: an *owned* read permit is acquired **before** an operation can create, use or reclaim a container — before `container run`, before `container exec` — and it is held, in the task that owns the work, until that operation *and every recovery it triggers* (timeout, vanished container, panicked exec, cancellation) has finished. `cleanup` takes the write side, and acquiring it is by itself the proof that no earlier operation is outstanding. No recovery registry, no join list and no bounded retry rounds: the permit is the registration, and it exists from before the work starts rather than being installed after it. Lock order is always **permit before slot**, and no permit holder ever acquires a second permit, so neither deadlock is possible;
 - validator and capabilities.
+
+Lifecycle semantics:
+
+- `end_session` is **terminal for that session id**. The `Closing` tombstone stays in the map, so no concurrent or later `ensure_container` can resurrect the session.
+- Teardown failures **propagate** to the caller and stay tracked (in `pending`), so `cleanup` retries and aggregates them. A container is never dropped from tracking while it may still exist; a container `cleanup` cannot remove is re-inserted for a repeated `cleanup`/`Drop`. `TerraphimRlm::destroy_session` propagates the executor's error too, while retry ownership stays with the executor's `cleanup`.
+- A generated name is tracked as `pending` **before** `container run` is spawned, and a session with any pending name refuses to create a replacement. So a failed or timed-out creation cannot leave an anonymous container, and a failed deletion is never displaced by a newer one.
+- `cleanup` waits — through the write gate alone — for in-flight creation, in-flight execution, in-flight `end_session` deletion *and* every in-flight recovery, including one that has not started yet but whose execution's permit is still held. Once it returns, no cell can be re-inserted into the drained map. Then it refuses all further creation. The honest cost: `cleanup` blocks for as long as an in-flight execution plus its recovery takes.
+- Cancelling an execution future fails **closed**: synchronously the slot is quarantined, a cancellation signal is raised on the CLI call, and the owned CLI task is handed to one recovery task. That recovery awaits the CLI task (the runner kills **and reaps** its child and stops its stdout/stderr readers before returning, with an abort-and-join backstop), then force-deletes the container under the lifecycle timeout, lifting the quarantine only on confirmed deletion. The execution's lifecycle permit is **moved** into that recovery task as the future is constructed — never released and re-taken — so there is no spawn/register gap for `cleanup` to slip through. Nothing is detached.
 
 For each session:
 
@@ -107,7 +118,7 @@ For each session:
    - image `python:3.11-slim`
    - guest command `sleep infinity`
 3. Execute Python as argv `container exec <name> python3 -c <code>`.
-4. Execute shell commands as argv `container exec <name> bash -lc <cmd>`. The command is one guest argument; it is never interpolated by a host shell.
+4. Execute shell commands as argv `container exec <name> bash -c <cmd>`. The command is one guest argument; it is never interpolated by a host shell. `-c`, not `-lc`: a login shell sources the guest image's profile scripts, which can rewrite `PATH` and the environment this backend passes in via `--env`, making the same command behave differently per image.
 5. Capture stdout/stderr/exit code and elapsed time into `ExecutionResult`.
 6. On `end_session`, stop with a bounded grace period, then delete/remove the named container. Treat already-gone as idempotent success; surface other cleanup failures with the backend and container name.
 7. `cleanup()` drains all tracked sessions and attempts all removals, returning an aggregate error only after every cleanup was attempted.
@@ -199,7 +210,7 @@ Then implement `ensure_container` and lifecycle state.
 Tests first:
 
 - Python code is passed as one argv value after `python3 -c`
-- shell metacharacters/newlines remain one guest argv value after `bash -lc`
+- shell metacharacters/newlines remain one guest argv value after `bash -c` (not `-lc`: no guest profile is sourced, so the environment passed via `--env` is what the command sees)
 - stdout, stderr, non-zero exit, elapsed time, and metadata map correctly
 - validator behavior matches Local/Docker
 - command output is not mistaken for container ID; creation reads the authoritative name/ID contract
@@ -227,10 +238,12 @@ Tests first:
 - end-session stop/remove order is correct
 - already-absent container is success
 - cleanup attempts every tracked session even when one removal fails
-- map is empty after cleanup
+- map holds nothing reclaimable after a fully successful cleanup, and retains exactly the container a failed removal left behind
+- a failed `end_session` delete is returned to the caller and retried by `cleanup`
+- deterministic lifecycle-race schedules (end_session vs ensure, cleanup vs ensure, cleanup vs in-flight end_session, aborted execution future, cleanup started in the same tick as the cancellation drop, cleanup queued during `container exec` against timeout/vanished/panic recovery, twelve simultaneous cancellations, and no map re-insertion after cleanup returns), forced with gates rather than sleeps or repetition
 - snapshot methods return `NotSupported` naming `apple-container`
 
-Then implement `end_session`, `cleanup`, and honest `Drop` diagnostics.
+Then implement `end_session` (terminal, tombstoned, error-propagating), `cleanup` (gated, retrying, aggregating), the cancellation guard, and honest `Drop` diagnostics.
 
 ### 7. Integrate docs/demo/status
 
@@ -297,7 +310,8 @@ Capture CLI/server versions and test output in the PR. A Linux fake-runner pass 
 - [ ] One VM-backed container is created exactly once per RLM session under concurrency.
 - [ ] Python and bash execute through argv-safe CLI calls with correct result/exit mapping.
 - [ ] Timeout kills/reaps the CLI process, destroys the session container, clears affinity, and preserves partial output.
-- [ ] `end_session` and `cleanup` are idempotent and leave no tracked resources; multi-failure cleanup attempts all resources.
+- [ ] `end_session` is terminal for a session id, propagates deletion failures (as does the public `destroy_session`), and leaves nothing reclaimable on success; `cleanup` is idempotent, coordinates with in-flight execution, in-flight `end_session` *and* in-flight recovery (including a recovery that has not begun yet), cannot have its drained map repopulated after it returns, attempts all resources on multi-failure, and retains what it could not remove. Every possibly-created name — including one from a failed `container run` — stays tracked until confirmed deleted, and blocks a replacement meanwhile.
+- [ ] Cancelling an execution future fails closed: the slot is unusable before the drop returns, the CLI child is killed and reaped and the stream readers terminated on an owned path that carries the execution's lifecycle permit, so terminal cleanup necessarily waits for it, and the container is force-deleted before that permit is released. Proven on a real local process, not only on the fake runner.
 - [ ] No host directories, SSH sockets, secret environment, or privileged capabilities are exposed by default.
 - [ ] Snapshot calls return typed `NotSupported`; capability claims are truthful.
 - [ ] Focused portable tests and repo gates pass.
@@ -321,7 +335,7 @@ Capture CLI/server versions and test output in the PR. A Linux fake-runner pass 
 - **Leaked VMs after timeout/crash:** fail-closed timeout destroys the affinity container; explicit teardown is primary; names are prefix-scoped for recovery.
 - **Prompting/system mutation:** health probing only; no automatic `system start` or kernel install.
 - **False security claims:** document default outbound network and unsupported snapshots; do not imply DNS allowlist enforcement.
-- **Concurrent creation races:** mirror Docker's per-session `Arc<Mutex<Option<_>>>` and pin with a concurrent test.
+- **Concurrent creation and teardown races:** per-session `Arc<SessionCell>` with an explicit `SessionSlot` lifecycle state (not Docker's bare `Option` cell, which reintroduces the detached-slot leak), an executor-wide gate whose owned read permit is taken before the work and held through its recovery (permit-before-slot lock ordering), and a retained `Closing` tombstone. Pinned by *deterministic* tests: a gated fake runner parks the CLI call at each lifecycle point and the racing operation is driven from there — no sleeps, no repetition.
 - **Apple memory behavior:** Apple documents that freed guest pages may not immediately return to macOS; bounded 512 MiB VMs plus prompt teardown limit exposure.
 
 ## Execution

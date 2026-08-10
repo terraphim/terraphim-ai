@@ -31,6 +31,19 @@ third-party Rust dependency, so Linux and Intel-Mac builds are unaffected.
 | --- | --- | --- |
 | `apple_container_binary` | `None` → `container` from `PATH` | Absolute path to the CLI |
 | `apple_container_image` | `python:3.11-slim` | OCI image for session containers |
+| `apple_container_cpus` | `1` | `container run --cpus` per session container |
+| `apple_container_memory` | `512M` | `container run --memory` per session container |
+
+All four are optional in serialized config: a config written before this backend
+existed still loads and gets exactly the defaults above. `RlmConfig::validate()`
+rejects an empty image, `apple_container_cpus == 0`, and any
+`apple_container_memory` that is not a positive integer with an optional
+`K`/`M`/`G`/`T`/`P` suffix — the suffix set Apple's `--memory` documents. A typo
+like `512MB` is caught there rather than surfacing as a `container run` failure
+that names neither the field nor the cause. The value is forwarded to the CLI
+**verbatim**, so surrounding whitespace is rejected rather than trimmed: `"
+512M "` fails validation instead of passing it and then reaching `container` as
+a different string than the one that was validated.
 
 The backend appears in `backend_preference` between E2B and Docker:
 
@@ -45,7 +58,9 @@ in one call is visible to the next.
 {
   "backend_preference": ["apple-container", "docker", "local"],
   "apple_container_binary": "/opt/homebrew/bin/container",
-  "apple_container_image": "python:3.11-slim"
+  "apple_container_image": "python:3.11-slim",
+  "apple_container_cpus": 1,
+  "apple_container_memory": "512M"
 }
 ```
 
@@ -94,10 +109,16 @@ container run --detach --name terraphim-rlm-<ulid> \
   python:3.11-slim sleep infinity
 ```
 
+(`--cpus`/`--memory` are `apple_container_cpus`/`apple_container_memory`; the
+values shown are the defaults.)
+
 - Every CLI call is an argument vector. No host shell is ever constructed, so
   guest code cannot escape into host-side word splitting. Python is passed as one
   argv element after `python3 -c`; shell commands as one argv element after
-  `bash -lc`, interpreted by bash **inside the guest**.
+  `bash -c`, interpreted by bash **inside the guest**. `-c` and not `-lc`: a
+  login shell sources the image's profile scripts, which could rewrite `PATH`
+  and the environment passed in via `--env`, so the same command would behave
+  differently per image.
 - Container names are derived from a fresh ULID, never from user input.
 - **No** host directory mounts, home directory, SSH agent forwarding, Docker
   socket, registry credentials, or inherited host environment.
@@ -127,7 +148,9 @@ When a call exceeds `ExecutionContext::timeout_ms`:
    otherwise be proven dead;
 3. the session→container mapping is cleared, so the next call gets a fresh VM;
 4. `ExecutionResult::timeout(partial_stdout, partial_stderr)` is returned with
-   the elapsed time.
+   the elapsed time **and the usual `backend`/`container` metadata**, so a
+   timed-out call can still be correlated with the container it ran in and with
+   the recovery that followed.
 
 A timeout therefore never leaves work running inside a container that a later
 call would reuse — at the cost of losing that session's in-container state.
@@ -136,29 +159,222 @@ call would reuse — at the cost of losing that session's in-container state.
 
 If a session's container disappears between calls (removed by hand, service
 restarted, host slept), `container exec` fails with the CLI's own
-"container not found". The backend recognises *CLI-originated* absence errors
-only — a guest's `bash: foo: command not found` is a guest failure and is passed
-through untouched — clears the affinity mapping, and retries the call **once**
-against a fresh container. Session state is lost, but the session is not wedged.
-A second consecutive disappearance is reported as `RlmError::ExecutionFailed`
-rather than as a guest exit code, so callers do not retry it as if the guest had
-misbehaved.
+"container not found". The backend then:
+
+1. unbinds the container from the session (compare-and-clear, see below);
+2. force-removes it; and
+3. returns `RlmError::ExecutionFailed` naming the container, rather than a guest
+   exit code the caller might mistake for the command's own result.
+
+**The command is never re-run.** The backend issues exactly one `container exec`
+per call, always. Replaying would mean executing the caller's command twice, and
+the only available trigger for a replay is `container exec` stderr — which is
+mixed with output the guest writes byte for byte, and which names a container
+whose name the caller already knows, because every `ExecutionResult` returns it
+in `metadata["container"]`. Any non-idempotent action the command performed
+before that text appeared would happen a second time. Whether re-issuing a
+particular command is safe is knowledge the caller has and this backend does
+not, so the decision is left to the caller: the session is clean and unwedged,
+and the next command it chooses to send starts in a fresh container.
+
+The "container missing" match is therefore a **recovery heuristic, not
+provenance**. Its whole effect is discarding the session's own container, so a
+caller that echoes the disclosed name back through guest stderr achieves nothing
+it could not achieve by killing its own container — no replay, no amplification.
+
+- **The absence phrase must be accompanied by the container name.** This is what
+  keeps ordinary guest failures (`bash: foo: command not found`, exit 127) from
+  needlessly destroying a healthy session. An `Error:` prefix on its own is not
+  accepted. A genuine CLI absence message that omits the name is passed through
+  as an ordinary failure; that direction is safe.
+- **The unbind is a compare-and-clear under the session mutex.** The mapping is
+  cleared only if it still points at the container that failed, so a stale
+  failure arriving after a concurrent call already installed a replacement
+  cannot unbind that replacement.
+- **The observed container is force-removed either way.** Names are ULIDs and
+  are never reused, and `delete --force` treats an absent container as success —
+  so this is a no-op when the container really vanished, and closes the leak if
+  the report was wrong.
 
 ## Cleanup and recovery
 
-`end_session` stops the container with a 5s grace period and then deletes it;
-an already-absent container counts as success. `cleanup()` attempts **every**
-tracked session even if one removal fails, and reports an aggregate error
-afterwards.
+`end_session` stops the session's container(s) with a 5s grace period and then
+deletes them; an already-absent container counts as success. It is **terminal
+for that session id**, and a deletion failure is **returned** to the caller
+rather than logged and swallowed. `cleanup()` attempts **every** tracked session
+even if one removal fails, and reports an aggregate error afterwards.
 
-`cleanup()` empties the session map *before* attempting removal, so a container
-whose deletion fails becomes untracked: `Drop` will not retry it, and it is
-named only in the returned error and the warning log. Recover those with the
-prefix sweep below.
+The public `TerraphimRlm::destroy_session` propagates that failure too: it
+destroys the logical session and then returns the executor's error, so a caller
+is never told a session was cleanly destroyed while its VM may still be running.
+Retry ownership stays with the executor — the container remains tracked and
+`cleanup()` retries it — so the recovery is `cleanup()`, not calling
+`destroy_session` again (which is terminal for the session id).
 
-`Drop` is best effort and does not claim success: outside a Tokio runtime it logs
-the leaked names with a ready-to-run recovery command. Because every name is
-prefixed, manual recovery is:
+### Teardown cannot be raced into leaking a container
+
+Each session's map entry holds an explicit lifecycle state — `Active { bound,
+pending }` or `Closing { pending }` — rather than a bare optional name. `bound`
+is the container the session executes in; `pending` holds every name whose
+deletion has been started but not confirmed. That distinction is what keeps
+teardown safe against a concurrent execution:
+
+- `end_session` marks the session `Closing` **while holding the same per-session
+  mutex** and while the entry is still reachable from the map, then stops and
+  deletes the container. The `Closing` entry is **kept in the map as a
+  tombstone**: a caller that resolved the entry before teardown began, *and* one
+  that looks the session up afterwards, both find `Closing` and **refuse to
+  create**. A session id that has been ended is never resurrected. The refusal
+  is a `BackendInitFailed`, not a guest exit code: no command ran.
+- `end_session` holds an owned **read** permit on the executor-wide lifecycle
+  gate for its whole stop-and-delete, and `cleanup()` takes the **write** side.
+  So cleanup waits for an in-flight session deletion instead of clearing the map
+  out from under it and reporting terminal success while a delete is still
+  outstanding.
+- **Failures stay tracked.** `pending` retains a container until the runtime
+  confirms it gone, so a failed `end_session` delete is retried and aggregated
+  by `cleanup()`, and a container `cleanup()` itself could not remove is
+  re-inserted so a repeated `cleanup()` (and `Drop`) still sees it. A container
+  this backend created is never dropped from tracking while it may still exist.
+- **A name is tracked before it can name anything.** The generated name is put
+  in `pending` *before* `container run` is spawned, so a `container run` that
+  fails or times out — which may still have created a container — leaves a
+  tracked name rather than an anonymous VM. The failed creation is force-deleted
+  immediately; if that delete also fails, the name stays pending.
+- **No replacement while a name is unconfirmed.** A session whose slot has any
+  pending name refuses to create a container (`BackendInitFailed`, no command
+  ran). One unconfirmed container per session is already one too many, and
+  allowing a replacement is what previously forced a failed deletion to choose
+  between orphaning a live replacement and losing the old container. Recovery is
+  `cleanup()`, or the manual prefix sweep below.
+- **One permit, acquired before the work and held through its recovery.** This
+  is the whole lifecycle rule, and it replaces the recovery registry and bounded
+  join rounds an earlier revision used. An owned read permit on the lifecycle
+  gate is acquired *before* an operation can create, use or reclaim a container
+  — before `container run`, before `container exec` — and it is held, in the
+  task that owns the work, until that operation **and every recovery it
+  triggers** has finished. Timeout, vanished-container, panicked-exec and
+  cancellation recovery all run the same unbind → force-delete → retrack path
+  under the permit their execution already held, so none of them can start after
+  cleanup has drained. The cell is (re-)inserted into the session map, so
+  nothing is restored into a cell terminal cleanup has detached.
+- `cleanup()` is executor-wide and terminal. It raises a closing flag, then
+  takes the **write** side. Acquiring it is by itself the proof: a write cannot
+  be taken while a single read permit is outstanding, so by the time cleanup
+  holds it, every execution, creation, `end_session` and recovery that started
+  earlier has run to completion. There is nothing to register, nothing to join
+  and no round limit — and equally, once cleanup returns, no permit-holding
+  operation from before it exists, so **the drained map cannot be repopulated**.
+  Any operation that starts later blocks on the gate and then sees the closing
+  flag and refuses, before it could insert a map entry. There is no interleaving
+  in which a created container ends up untracked, including the concurrent
+  insertion case where the session was not in the map when cleanup looked.
+  The cost of this simplicity is honest and intended: `cleanup()` waits for
+  in-flight executions, so it can take up to `ExecutionContext::timeout_ms` plus
+  the recovery's lifecycle timeout to return.
+- Lock order is always **permit before slot**; nothing takes the gate while
+  holding a slot mutex, and no task holding a permit ever asks for a second one
+  (recoveries inherit their execution's), so neither deadlock is possible.
+- After `cleanup()` the executor is deliberately not reusable: it creates no
+  further session containers. Build a new executor instead.
+
+Each schedule above is pinned by a *deterministic* test — a gated fake runner
+parks the CLI call at the exact lifecycle point, and the racing operation is
+driven to completion (or polled and asserted pending) from there. None of these
+tests relies on sleeping or on repetition:
+`end_session_in_flight_refuses_a_racing_ensure_and_stays_terminal`,
+`cleanup_waits_for_an_in_flight_creation_and_then_deletes_it`,
+`cleanup_waits_for_an_in_flight_end_session_deletion`,
+`cleanup_forced_between_abandonment_unbind_and_delete_reclaims_the_container`,
+`cleanup_stays_pending_until_a_cancellation_recovery_completes`,
+`a_failed_end_session_delete_is_returned_and_retried_by_cleanup`,
+`a_failed_abandonment_delete_blocks_a_replacement_and_stays_tracked`,
+`a_partially_created_container_that_cannot_be_deleted_stays_tracked`,
+`cleanup_retains_a_container_it_could_not_delete`, and
+`ensure_holding_a_stale_slot_refuses_to_create_after_end_session`.
+
+The schedules that specifically exercise "cleanup versus an operation that has
+not yet asked for the gate" — the ones a registry-based design could not close —
+are pinned separately:
+
+- `cleanup_started_in_the_same_tick_as_the_cancellation_drop_still_waits`
+  starts `cleanup()` in the same tick as `ExecCancelGuard::drop`, before the
+  recovery task has been polled at all, and asserts it is pending.
+- `cleanup_queued_during_exec_waits_for_timeout_recovery`,
+  `..._for_vanished_container_recovery` and `..._for_panicked_exec_recovery`
+  queue `cleanup()` for the write side **while `container exec` is still
+  running**, then let the exec complete into each recovery path and assert
+  cleanup is *still* pending once the recovery has started its force-delete.
+- `cleanup_waits_for_far_more_cancellations_than_the_old_bounded_rounds`
+  cancels twelve simultaneous executions — comfortably past the eight rounds the
+  removed bounded-join mechanism allowed — and asserts cleanup waits for all of
+  them and deletes every container.
+- `nothing_can_reinsert_a_cell_after_cleanup_returns` asserts the postcondition
+  directly: after `cleanup()` returns, the map stays empty across repeated
+  scheduler yields, and a caller arriving afterwards is refused before it could
+  insert a session cell.
+
+### Cancelling an execution fails closed
+
+`kill_on_drop(true)` kills the host `container exec` child, but killing the CLI
+does not prove the guest process died. So dropping or aborting an
+`execute_code`/`execute_command` future runs the same recovery the elapsed-time
+timeout does. Synchronously, before the drop returns:
+
+1. the session slot is **quarantined**, so no later call can reuse that
+   container;
+2. a cancellation signal is raised on the in-flight CLI call; and
+3. the owned CLI task **and the execution's lifecycle permit** are moved into a
+   single recovery task.
+
+Step 3 is what closes the race a registry could not. The permit was acquired
+before `container exec` was launched, and it is *moved* into the recovery future
+as that future is constructed — never released and re-taken — so there is no
+window, however small, in which `cleanup()` could acquire the write side. The
+drop guard registers nothing; the permit it already holds is the registration.
+
+The recovery task then owns the rest, and its completion is observable:
+
+4. it awaits the CLI task. The process runner returns only after it has killed
+   **and reaped** its child and stopped its stdout/stderr readers, so
+   termination is observed rather than assumed. A runner that ignores the signal
+   for 5s is aborted, and the abort is awaited.
+5. it force-deletes the container under the 60s lifecycle timeout, still holding
+   that permit, with the name tracked as pending first — so `cleanup()` waits
+   for it and a failed delete stays reclaimable;
+6. only once the runtime confirms the container gone does it drop the name from
+   tracking and lift the quarantine, letting the session start a *fresh*
+   container. If the delete fails, the session stays refused and the container
+   stays tracked for `cleanup()` to retry.
+
+Nothing on this path is detached, and the permit is released only when the
+recovery future ends — so terminal cleanup cannot return while a cancelled
+execution's child termination or container deletion is outstanding. The one
+exception is documented rather than hidden: when the future is dropped **outside
+a Tokio runtime** there is no task to carry the permit, so the guard aborts the
+CLI task, releases the permit and logs loudly that the container was not deleted
+and must be reclaimed by hand. The container is still tracked as pending, so a
+later `cleanup()` on a live runtime retries it.
+
+Pinned by `aborting_an_execution_future_fails_the_session_closed`,
+`a_cancelled_execution_marks_its_slot_unusable_before_the_drop_returns`,
+`cleanup_started_in_the_same_tick_as_the_cancellation_drop_still_waits`,
+`cleanup_waits_for_far_more_cancellations_than_the_old_bounded_rounds` and
+`cleanup_stays_pending_until_a_cancellation_recovery_completes` on the fake
+runner, and by
+`cancelling_a_real_child_kills_and_reaps_it_and_stops_the_drains` on a **real
+local process**: that test cancels a live `/bin/sh`, then asserts the child pid
+is gone from the process table (`kill -0` fails — it would still succeed for a
+zombie, so this is reap evidence) and that the call returned promptly even
+though a surviving grandchild still holds the stdout pipe open, which is what
+the readers being terminated buys.
+
+`Drop` is best effort and does not claim success. It logs a warning
+**unconditionally, before** attempting anything — every path through it is best
+effort, including the common one where names are resolved and handed to a
+detached cleanup task whose outcome is never observed — and outside a Tokio
+runtime it also logs the leaked names with a ready-to-run recovery command.
+Because every name is prefixed, manual recovery is:
 
 ```bash
 container list --all --format json | grep terraphim-rlm-
@@ -168,7 +384,13 @@ container delete --force terraphim-rlm-<ulid>
 ## Testing
 
 Portable tests (Linux included) use an injected fake process runner and pin the
-argv contract, exactly-once creation, timeout teardown, and cleanup:
+argv contract, exactly-once creation, timeout teardown, cleanup, and every
+lifecycle race listed above. A few tests deliberately use **real local
+processes** instead, because host-child kill/reap and reader termination cannot
+be demonstrated by a fake runner:
+`tokio_runner_timeout_kills_and_reaps_child_preserving_partial_output`,
+`tokio_runner_captures_exit_code_and_streams`, and
+`cancelling_a_real_child_kills_and_reaps_it_and_stops_the_drains`.
 
 ```bash
 cargo test -p terraphim_rlm --features apple-container-backend
@@ -181,10 +403,26 @@ image present:
 ```bash
 container system version --format json
 container system status --format json
+container image pull python:3.11-slim   # see below
+
+# Direct executor: argv contract, affinity, timeout teardown, no leaks.
 cargo test -p terraphim_rlm --features apple-container-backend \
-    --test backend_demo apple_container -- --ignored --nocapture
+    --test backend_demo demo_apple_container_executor -- --ignored --nocapture
+
+# Through select_executor(), the path production takes.
+cargo test -p terraphim_rlm --features apple-container-backend \
+    --test backend_demo apple_container_via_select -- --ignored --nocapture
+
 container list --all --format json    # expect no terraphim-rlm-* resources
 ```
 
-Tests never pull images implicitly; pull `python:3.11-slim` explicitly first if
-it is not cached.
+Both real-host tests must be run: the direct one proves the executor works, and
+`demo_apple_container_via_select_executor` proves `select_executor` actually
+*chooses* this backend and drives it end to end (it offers Apple Container as
+the only preference, so a silent fall-through fails rather than passes).
+
+Pull the image first. The demos do not pull it themselves, but `container run`
+**does** pull implicitly when the image is not cached — and that pull runs
+inside this backend's 60s lifecycle timeout, so an uncached image usually shows
+up as a `container run` failure rather than as a slow first call. Pre-pulling
+keeps the run measuring the backend instead of the network.

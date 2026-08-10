@@ -219,6 +219,23 @@ impl TerraphimRlm {
     /// This releases all resources associated with the session, including
     /// the VM, snapshots, and budget tracker.
     ///
+    /// # Errors
+    ///
+    /// Returns the executor's teardown error when the backend could not
+    /// release the session's resources — for example when Apple Container
+    /// reports that the session's VM could not be deleted. **The logical
+    /// session is still destroyed** in that case, and the error is what tells
+    /// the caller that a backend resource outlived it: reporting success while
+    /// a VM is still running would hide exactly the failure this backend goes
+    /// out of its way to detect.
+    ///
+    /// Retry ownership stays with the executor, not the caller: a container
+    /// whose deletion failed remains tracked by the backend, so
+    /// [`crate::executor::ExecutionEnvironment::cleanup`] (and the executor's
+    /// `Drop`) retries it. Calling `destroy_session` again is not the recovery
+    /// path — the session id is gone, and for backends like Apple Container it
+    /// is deliberately terminal.
+    ///
     /// # Arguments
     ///
     /// * `session_id` - The session to destroy
@@ -228,20 +245,33 @@ impl TerraphimRlm {
             let _ = sender.send(()).await;
         }
 
-        // Release executor-side per-session resources (Docker container,
-        // Firecracker VM via the trait's default Ok(()) on backends without
-        // per-session state). Errors are logged but not propagated: session
-        // teardown must succeed even if the backend is unreachable.
-        if let Err(e) = self.executor.end_session(session_id).await {
-            log::warn!(
-                "executor.end_session({}) failed during destroy_session: {}",
-                session_id,
-                e
-            );
+        // Release executor-side per-session resources (Docker container, Apple
+        // Container VM, Firecracker VM via the trait's default Ok(()) on
+        // backends without per-session state).
+        let teardown = self.executor.end_session(session_id).await;
+
+        // The logical session is destroyed either way: the executor's teardown
+        // is terminal for that session id, so keeping the record would leave a
+        // session no backend would serve.
+        if let Err(e) = self.session_manager.destroy_session(session_id) {
+            if let Err(teardown_error) = teardown {
+                log::warn!(
+                    "executor.end_session({session_id}) failed during destroy_session: \
+                     {teardown_error}"
+                );
+            }
+            return Err(e);
         }
 
-        // Destroy the session
-        self.session_manager.destroy_session(session_id)?;
+        teardown.map_err(|e| {
+            log::warn!(
+                "executor.end_session({session_id}) failed during destroy_session: {e}. \
+                 The session record was removed; the backend still tracks the resource it \
+                 could not release and retries it in cleanup()."
+            );
+            e
+        })?;
+
         log::info!("Destroyed session: {}", session_id);
         Ok(())
     }
@@ -1138,6 +1168,9 @@ mod tests {
     struct MockExecutor {
         capabilities: Vec<Capability>,
         end_session_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        /// Teardown failure the backend reports, as Apple Container does when a
+        /// session VM cannot be deleted.
+        end_session_error: Option<String>,
     }
 
     impl MockExecutor {
@@ -1145,6 +1178,15 @@ mod tests {
             Self {
                 capabilities: vec![Capability::PythonExecution, Capability::BashExecution],
                 end_session_calls: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+                end_session_error: None,
+            }
+        }
+
+        /// A backend whose per-session teardown fails.
+        fn failing_end_session(message: &str) -> Self {
+            Self {
+                end_session_error: Some(message.to_string()),
+                ..Self::new()
             }
         }
 
@@ -1319,7 +1361,12 @@ mod tests {
         async fn end_session(&self, _session_id: &SessionId) -> Result<(), Self::Error> {
             self.end_session_calls
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            Ok(())
+            match &self.end_session_error {
+                Some(message) => Err(RlmError::Internal {
+                    message: message.clone(),
+                }),
+                None => Ok(()),
+            }
         }
     }
 
@@ -1373,6 +1420,30 @@ mod tests {
             counter.load(std::sync::atomic::Ordering::SeqCst),
             1,
             "destroy_session must invoke executor.end_session exactly once"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_destroy_session_propagates_executor_teardown_failure() {
+        // The public API must not report a clean destruction when the backend
+        // says it could not release the session's resources: an Apple Container
+        // VM that failed to delete is still running, and a caller told `Ok(())`
+        // has no way to learn that.
+        let config = RlmConfig::minimal();
+        let executor = MockExecutor::failing_end_session("container delete failed: resource busy");
+        let counter = executor.end_session_counter();
+        let rlm = TerraphimRlm::with_executor(config, executor).unwrap();
+
+        let session = rlm.create_session().await.unwrap();
+        let err = rlm.destroy_session(&session.id).await.unwrap_err();
+        assert!(err.to_string().contains("resource busy"), "{err}");
+        assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+        // The logical session is still gone, and retry ownership stays with the
+        // executor: destroy_session is not the retry path, cleanup() is.
+        assert!(
+            rlm.get_session(&session.id).is_err(),
+            "the session record must not survive a reported teardown failure"
         );
     }
 

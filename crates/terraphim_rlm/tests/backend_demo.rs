@@ -114,8 +114,10 @@ async fn demo_docker_executor() {
 }
 
 /// Real Apple Container evidence. Requires Apple silicon, macOS 26,
-/// `brew install container`, `container system start`, and the
-/// `python:3.11-slim` image present (or pulled explicitly).
+/// `brew install container`, `container system start`, and `python:3.11-slim`
+/// pre-pulled (`container image pull python:3.11-slim`) — `container run` pulls
+/// implicitly, but that pull runs inside the 60s lifecycle timeout, so an
+/// uncached image surfaces as a `container run` failure.
 ///
 /// ```bash
 /// cargo test -p terraphim_rlm --features apple-container-backend \
@@ -214,4 +216,93 @@ async fn demo_apple_container_executor() {
     );
 
     println!("\n  Apple Container executor works, no leaked containers.\n");
+}
+
+/// Real Apple Container evidence **through `select_executor`**, the path
+/// production actually takes. Constructing `AppleContainerExecutor` directly
+/// (as `demo_apple_container_executor` does) proves the executor works but says
+/// nothing about selection: a backend that is never chosen, or that is chosen
+/// with a config the direct constructor bypasses, would leave that test green.
+///
+/// Same host requirements as `demo_apple_container_executor`.
+///
+/// ```bash
+/// cargo test -p terraphim_rlm --features apple-container-backend \
+///     --test backend_demo apple_container_via_select -- --ignored --nocapture
+/// ```
+#[cfg(feature = "apple-container-backend")]
+#[tokio::test]
+#[ignore = "requires Apple silicon macOS 26 with `container` installed and started; run with --ignored"]
+async fn demo_apple_container_via_select_executor() {
+    use terraphim_rlm::executor::{ExecutionContext, select_executor};
+    use terraphim_rlm::types::SessionId;
+
+    println!("\n═══════════════════════════════════════════");
+    println!("  APPLE CONTAINER via select_executor()");
+    println!("═══════════════════════════════════════════\n");
+
+    // Only Apple Container is offered: selection must not silently fall through
+    // to a less isolated backend and still pass.
+    let config = RlmConfig {
+        backend_preference: vec![BackendType::AppleContainer],
+        ..RlmConfig::minimal()
+    };
+    let exec = select_executor(&config)
+        .await
+        .expect("select_executor must choose Apple Container on a prepared host");
+    assert_eq!(exec.backend_type(), BackendType::AppleContainer);
+    println!("  [Select]  backend = {}", exec.backend_type());
+
+    let ctx = ExecutionContext {
+        session_id: SessionId::new(),
+        timeout_ms: 120_000,
+        ..Default::default()
+    };
+
+    let r = exec.execute_code("print(2+2)", &ctx).await.unwrap();
+    println!(
+        "  [Python]  2+2 = {} (exit {})",
+        r.stdout.trim(),
+        r.exit_code
+    );
+    assert!(r.is_success());
+    assert_eq!(r.stdout.trim(), "4");
+
+    // `bash -c`, not `-lc`: no guest profile is sourced, so the `--env` value
+    // this backend passes in is what the command sees.
+    let r = exec
+        .execute_command(
+            "echo \"$RLM_MARKER\"",
+            &ctx.clone().with_env("RLM_MARKER", "via-select"),
+        )
+        .await
+        .unwrap();
+    println!("  [Env]     RLM_MARKER = {}", r.stdout.trim());
+    assert_eq!(r.stdout.trim(), "via-select");
+
+    // The result identifies where it ran.
+    assert_eq!(
+        r.metadata.get("backend").map(String::as_str),
+        Some("apple-container")
+    );
+    assert!(
+        r.metadata["container"].starts_with("terraphim-rlm-"),
+        "{:?}",
+        r.metadata
+    );
+
+    exec.end_session(&ctx.session_id).await.unwrap();
+    exec.cleanup().await.unwrap();
+
+    let list = std::process::Command::new("container")
+        .args(["list", "--all", "--format", "json"])
+        .output()
+        .expect("container list");
+    let listing = String::from_utf8_lossy(&list.stdout);
+    assert!(
+        !listing.contains("terraphim-rlm-"),
+        "leaked containers after teardown:\n{listing}"
+    );
+
+    println!("\n  select_executor picked Apple Container, no leaked containers.\n");
 }

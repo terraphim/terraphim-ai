@@ -9,8 +9,46 @@ use std::path::PathBuf;
 /// Default OCI image used by the Apple Container backend.
 pub const DEFAULT_APPLE_CONTAINER_IMAGE: &str = "python:3.11-slim";
 
+/// Default CPU allocation per Apple Container session container.
+pub const DEFAULT_APPLE_CONTAINER_CPUS: u32 = 1;
+
+/// Default memory allocation per Apple Container session container.
+pub const DEFAULT_APPLE_CONTAINER_MEMORY: &str = "512M";
+
 fn default_apple_container_image() -> String {
     DEFAULT_APPLE_CONTAINER_IMAGE.to_string()
+}
+
+fn default_apple_container_cpus() -> u32 {
+    DEFAULT_APPLE_CONTAINER_CPUS
+}
+
+fn default_apple_container_memory() -> String {
+    DEFAULT_APPLE_CONTAINER_MEMORY.to_string()
+}
+
+/// Whether `value` is a memory size Apple's `container --memory` accepts.
+///
+/// Accepted shape, matching Apple's documented `--memory` contract exactly: a
+/// positive integer with an optional `K`/`M`/`G`/`T`/`P` unit suffix
+/// (case-insensitive), e.g. `512M`, `2G`, `4P`, `1048576`. Validating here keeps
+/// a typo from becoming a `container run` failure whose CLI message names
+/// neither the field nor the cause.
+///
+/// Surrounding whitespace is **rejected rather than trimmed**: the configured
+/// string is forwarded verbatim as the `--memory` argument, so accepting
+/// `" 512M "` here and passing it unchanged to the CLI would let validation and
+/// the actual argv disagree.
+fn is_valid_memory_size(value: &str) -> bool {
+    let digits = match value
+        .strip_suffix(|c: char| matches!(c.to_ascii_uppercase(), 'K' | 'M' | 'G' | 'T' | 'P'))
+    {
+        Some(rest) => rest,
+        None => value,
+    };
+    !digits.is_empty()
+        && digits.bytes().all(|b| b.is_ascii_digit())
+        && digits.parse::<u64>().is_ok_and(|n| n > 0)
 }
 
 /// Main configuration for the RLM system.
@@ -150,6 +188,17 @@ pub struct RlmConfig {
     #[serde(default = "default_apple_container_image")]
     pub apple_container_image: String,
 
+    /// CPU allocation passed to `container run --cpus` for session containers.
+    #[serde(default = "default_apple_container_cpus")]
+    pub apple_container_cpus: u32,
+
+    /// Memory allocation passed to `container run --memory` for session
+    /// containers: a positive integer with an optional `K`/`M`/`G`/`T`/`P`
+    /// suffix (e.g. `512M`, `2G`). Forwarded verbatim, so no surrounding
+    /// whitespace is accepted.
+    #[serde(default = "default_apple_container_memory")]
+    pub apple_container_memory: String,
+
     // ============================================
     // LLM Configuration
     // ============================================
@@ -221,6 +270,8 @@ impl std::fmt::Debug for RlmConfig {
             .field("backend_session_models", &self.backend_session_models)
             .field("apple_container_binary", &self.apple_container_binary)
             .field("apple_container_image", &self.apple_container_image)
+            .field("apple_container_cpus", &self.apple_container_cpus)
+            .field("apple_container_memory", &self.apple_container_memory)
             // LLM
             .field("llm_provider", &self.llm_provider)
             .field("default_model", &self.default_model)
@@ -314,6 +365,8 @@ impl Default for RlmConfig {
             ],
             apple_container_binary: None,
             apple_container_image: default_apple_container_image(),
+            apple_container_cpus: default_apple_container_cpus(),
+            apple_container_memory: default_apple_container_memory(),
 
             // LLM
             llm_provider: None,
@@ -367,6 +420,16 @@ impl RlmConfig {
             // An empty image yields `container run ... "" sleep infinity`,
             // whose CLI error names neither the field nor the cause.
             return Err("apple_container_image cannot be empty".to_string());
+        }
+        if self.apple_container_cpus == 0 {
+            return Err("apple_container_cpus must be at least 1".to_string());
+        }
+        if !is_valid_memory_size(&self.apple_container_memory) {
+            return Err(format!(
+                "apple_container_memory must be a positive integer with an optional \
+                 K/M/G/T/P suffix and no surrounding whitespace, such as `512M` or `2G`, got `{}`",
+                self.apple_container_memory
+            ));
         }
         Ok(())
     }
@@ -565,6 +628,8 @@ mod tests {
         let config = RlmConfig {
             apple_container_binary: Some(PathBuf::from("/opt/homebrew/bin/container")),
             apple_container_image: "python:3.12-slim".to_string(),
+            apple_container_cpus: 4,
+            apple_container_memory: "2G".to_string(),
             ..Default::default()
         };
         let json = serde_json::to_string(&config).unwrap();
@@ -574,6 +639,8 @@ mod tests {
             config.apple_container_binary
         );
         assert_eq!(restored.apple_container_image, config.apple_container_image);
+        assert_eq!(restored.apple_container_cpus, 4);
+        assert_eq!(restored.apple_container_memory, "2G");
         assert_eq!(restored.backend_preference, config.backend_preference);
     }
 
@@ -584,12 +651,84 @@ mod tests {
         let obj = value.as_object_mut().unwrap();
         obj.remove("apple_container_binary");
         obj.remove("apple_container_image");
+        obj.remove("apple_container_cpus");
+        obj.remove("apple_container_memory");
         let restored: RlmConfig = serde_json::from_value(value).unwrap();
         assert_eq!(restored.apple_container_binary, None);
         assert_eq!(
             restored.apple_container_image,
             DEFAULT_APPLE_CONTAINER_IMAGE
         );
+        assert_eq!(restored.apple_container_cpus, DEFAULT_APPLE_CONTAINER_CPUS);
+        assert_eq!(
+            restored.apple_container_memory,
+            DEFAULT_APPLE_CONTAINER_MEMORY
+        );
+    }
+
+    #[test]
+    fn apple_container_resource_defaults_are_the_documented_values() {
+        let config = RlmConfig::default();
+        assert_eq!(config.apple_container_cpus, 1);
+        assert_eq!(config.apple_container_memory, "512M");
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn invalid_apple_container_resources_are_rejected() {
+        let zero_cpus = RlmConfig {
+            apple_container_cpus: 0,
+            ..Default::default()
+        };
+        assert!(
+            zero_cpus
+                .validate()
+                .unwrap_err()
+                .contains("apple_container_cpus")
+        );
+
+        // Whitespace-padded values are rejected, not trimmed: the string is
+        // forwarded verbatim as the `--memory` argv element, so accepting
+        // `" 512M "` would let validation and the actual argv diverge.
+        for memory in [
+            "",
+            "   ",
+            "M",
+            "P",
+            "0",
+            "0G",
+            "0P",
+            "512MB",
+            "half a gig",
+            "-1G",
+            " 512M",
+            "512M ",
+            " 512M ",
+            "\t2G",
+            "2G\n",
+        ] {
+            let config = RlmConfig {
+                apple_container_memory: memory.to_string(),
+                ..Default::default()
+            };
+            let err = config.validate().unwrap_err();
+            assert!(
+                err.contains("apple_container_memory"),
+                "memory `{memory}` should be rejected, got: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn valid_apple_container_memory_sizes_are_accepted() {
+        // Every suffix Apple's `--memory` documents, including `P`.
+        for memory in ["512M", "2G", "1048576", "1t", "64k", "4P", "8p"] {
+            let config = RlmConfig {
+                apple_container_memory: memory.to_string(),
+                ..Default::default()
+            };
+            assert!(config.validate().is_ok(), "`{memory}` should be accepted");
+        }
     }
 
     #[test]
