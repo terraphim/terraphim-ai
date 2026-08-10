@@ -359,7 +359,10 @@ makes its failure trivial: if the current-thread runtime cannot be built or the
 OS thread cannot be spawned, the owner — permit included — is dropped, no
 `container exec` was ever issued, and the caller gets a `BackendInitFailed`
 naming the container. There is nothing to fail closed over, because no guest
-command exists yet. That is the whole reason ownership is established up front
+command exists yet. Container *resolution* happens before this point, so a
+fresh session may already have had its container created by `container run`;
+that container stays tracked, bound and reusable exactly like any other session
+container. That is the whole reason ownership is established up front
 rather than manufactured inside `Drop`: a `Drop` that must create an owner has
 branches on which it cannot, and each of those branches would have to choose
 between releasing the permit early and leaking it.
@@ -396,11 +399,21 @@ joined. Now there is nothing to transfer.
 
 The owner then finishes the operation, and its completion is observable:
 
-4. it awaits the CLI call. The process runner returns only after it has killed
-   **and reaped** its child and stopped its stdout/stderr readers, so
-   termination is observed rather than assumed. A runner that ignores the signal
-   for 5s is aborted, and the abort is awaited — on the owner's own live
-   runtime, so `kill_on_drop` still reaps.
+4. it awaits the CLI call — unconditionally, with no timeout, no abort and no
+   drop of the future that holds the child and the drain handles. The process
+   runner returns only after it has killed **and reaped** its child and stopped
+   its stdout/stderr readers, so termination is *observed* rather than assumed.
+   There is no bounded backstop, deliberately: aborting the call would destroy
+   the handles that carry the proof and would leave the owner deleting the
+   container and releasing the permit on an assumption. `kill_on_drop` requests
+   termination; it does not promise a reap.
+
+   Prompt termination is therefore a hard requirement on `ProcessRunner`, not a
+   best effort. A runner (or an OS) that never returns keeps the execution's
+   lifecycle permit held indefinitely, so `cleanup()` blocks and the backend
+   **fails closed** rather than reporting a terminal state it has not observed.
+   A hung teardown is the intended, diagnosable consequence of a violated runner
+   contract; a false "all clean" is not.
 5. it force-deletes the container under the 60s lifecycle timeout, still holding
    the permit, with the name tracked as pending first — so `cleanup()` waits for
    it and a failed delete stays reclaimable;
@@ -453,6 +466,16 @@ two real-process tests:
   grandchild still holds the pipe, so both reaping and drain termination
   happened before the container was deleted; `cleanup()` is asserted pending
   until the delete is released.
+
+The complementary claim — what happens when a runner *violates* the contract —
+is pinned by `a_runner_that_withholds_its_return_blocks_recovery_and_cleanup_forever`.
+Its runner ignores the cancellation signal entirely and returns only on an
+explicit test notification. With virtual time advanced far past the five-second
+grace the old abort backstop used, the test asserts that no `container delete`
+has started, that `cleanup()` is still pending, and that the runner's future was
+never dropped or aborted. Only when the runner finally returns do the recovery,
+the delete and `cleanup()` complete. Blocking is the specified behaviour here,
+not a bug to be timed out of.
 
 `Drop` is best effort and does not claim success. It logs a warning
 **unconditionally, before** attempting anything — every path through it is best

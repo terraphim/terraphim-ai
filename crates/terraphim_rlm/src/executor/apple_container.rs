@@ -61,8 +61,11 @@
 //!   panic / cancellation recovery; the caller only awaits a result channel.
 //!   Establishing the owner *before* anything can run in the guest is what
 //!   makes its failure trivial: a runtime that cannot be built or a thread that
-//!   cannot be spawned is an ordinary error return with no child, no container
-//!   state change and nothing to recover.
+//!   cannot be spawned is an ordinary error return issued before any
+//!   `container exec` — so no guest command was launched and there is nothing
+//!   to recover. Container *resolution* runs earlier, so a fresh session may by
+//!   then have had its container created; it stays tracked and reusable exactly
+//!   as any other resolved session container does.
 //! - Cancellation therefore fails **closed** by construction
 //!   ([`ExecCancelGuard`]). Dropping or aborting an execution future
 //!   synchronously quarantines the session slot and raises a [`CancelSignal`];
@@ -129,13 +132,6 @@ const STOP_GRACE_SECS: &str = "5";
 /// block until the grandchild exits, which is exactly the hang the timeout
 /// contract exists to prevent.
 const DRAIN_GRACE: Duration = Duration::from_secs(2);
-/// How long a cancellation recovery waits for the cancelled CLI task to finish
-/// on its own before aborting it and awaiting the abort.
-///
-/// Cancellation is cooperative first ([`CancelSignal`]) so the runner can kill
-/// **and reap** its child and terminate its drain tasks on a known path; the
-/// abort is only the backstop for a runner that ignores the signal.
-const CANCEL_JOIN_GRACE: Duration = Duration::from_secs(5);
 
 /// An owned share of the executor-wide lifecycle gate.
 ///
@@ -242,6 +238,15 @@ pub(crate) trait ProcessRunner: Send + Sync + std::fmt::Debug {
     /// return [`std::io::ErrorKind::Interrupted`]. Returning is what makes
     /// termination observable: the execution owner awaits this call before it
     /// force-deletes the container.
+    ///
+    /// This return is a hard requirement, not a best effort, because the owner
+    /// never abandons the call: it does not abort the task and never drops the
+    /// future holding the child and drain handles, since dropping it would
+    /// prove only that the future is gone, not that the host child was reaped.
+    /// An implementation (or an OS) that never returns therefore leaves the
+    /// execution's lifecycle permit held **forever**: `cleanup` blocks and the
+    /// backend fails closed rather than reporting a terminal state it cannot
+    /// observe. Violating this contract hangs teardown by design.
     async fn run(
         &self,
         program: &Path,
@@ -1292,7 +1297,9 @@ impl AppleContainerExecutor {
     ///
     /// Ownership is established **before** anything can run in the guest, so
     /// the failure mode of establishing it is a plain error return with no
-    /// unknown guest state to recover.
+    /// unknown guest state to recover: no `container exec` was issued. Any
+    /// session container created by the preceding resolution remains normally
+    /// tracked and reusable.
     async fn exec_once(
         &self,
         guest_argv: &[String],
@@ -1313,9 +1320,11 @@ impl AppleContainerExecutor {
         let (result_tx, result_rx) = tokio::sync::oneshot::channel();
 
         // If this fails, the permit and the result channel are dropped and
-        // `container exec` was never launched: there is no child, no container
-        // state change and nothing to recover. That is why ownership is
-        // established here rather than manufactured later.
+        // `container exec` was never launched: there is no child and no guest
+        // command to recover from. The container resolved above (possibly
+        // created by this very call) stays tracked and reusable like any other
+        // session container. That is why ownership is established here rather
+        // than manufactured later.
         spawn_exec_owner(ExecOwner {
             state: self.state.clone(),
             runner: self.runner.clone(),
@@ -1872,8 +1881,10 @@ impl ExecOwner {
 
         let start = Instant::now();
         // Spawned on *this* runtime, so the child and its drain tasks belong to
-        // it. Keeping the runner in a task rather than inline is what keeps the
-        // abort backstop below available for a runner that ignores the signal.
+        // it. The task exists for one reason only: a panicking runner surfaces
+        // as a `JoinError` that [`Self::settle`] can recover from, instead of
+        // unwinding the owner thread and stranding the permit. It is never
+        // aborted and its future is never dropped.
         let mut task = {
             let runner = runner.clone();
             let binary = binary.clone();
@@ -1881,30 +1892,28 @@ impl ExecOwner {
             tokio::spawn(async move { runner.run(&binary, &argv, deadline, signal.as_ref()).await })
         };
 
-        let settled = tokio::select! {
+        // Cancellation is cooperative, and *only* cooperative: the runner kills
+        // and reaps its child, stops its readers, and returns. This owner waits
+        // for that return unconditionally, because only the return proves the
+        // host child was reaped and the drains ended — aborting the task would
+        // destroy the very handles that hold that proof and let recovery,
+        // permit release and terminal cleanup proceed on an assumption.
+        //
+        // A runner that never returns therefore never releases the permit, and
+        // `cleanup` stays blocked: fail-closed, by construction. That is a
+        // violated [`ProcessRunner`] contract, not a state this owner may paper
+        // over by claiming a terminal outcome it has not observed.
+        let joined = tokio::select! {
             biased;
-            joined = &mut task => Some(joined),
-            _ = signal.cancelled() => None,
-        };
-        let joined = match settled {
-            Some(joined) => joined,
-            // Cancellation is cooperative first: the runner kills and reaps its
-            // child and stops its readers, then returns. The abort is only the
-            // backstop for a runner that ignores the signal, and it is awaited
-            // so the runner future is dropped — killing the child through
-            // `kill_on_drop` on this still-live runtime — before the container
-            // is deleted.
-            None => match tokio::time::timeout(CANCEL_JOIN_GRACE, &mut task).await {
-                Ok(joined) => joined,
-                Err(_) => {
-                    log::warn!(
-                        "apple-container: cancelled `container exec` task for {name} did not \
-                         finish within {CANCEL_JOIN_GRACE:?}; aborting it"
-                    );
-                    task.abort();
-                    task.await
-                }
-            },
+            joined = &mut task => joined,
+            _ = signal.cancelled() => {
+                log::warn!(
+                    "apple-container: `container exec` for {name} was cancelled; waiting for the \
+                     process runner to kill and reap its child and stop its readers before the \
+                     container is destroyed"
+                );
+                task.await
+            }
         };
         let execution_time_ms = start.elapsed().as_millis() as u64;
         let cli = Cli {
@@ -3817,6 +3826,164 @@ mod tests {
         assert!(exec.state.session_to_container.is_empty());
         assert_map_stays_empty_after_cleanup(&exec).await;
         assert_no_untracked_container(&exec, &runner).await;
+    }
+
+    /// Sets a flag if it is dropped before being disarmed.
+    struct SetOnDrop {
+        flag: Arc<AtomicBool>,
+        armed: bool,
+    }
+
+    impl Drop for SetOnDrop {
+        fn drop(&mut self) {
+            if self.armed {
+                self.flag.store(true, Ordering::SeqCst);
+            }
+        }
+    }
+
+    /// A [`ProcessRunner`] that deliberately violates the cancellation contract
+    /// on one `container exec`: it ignores the signal and returns only when the
+    /// test says so, arbitrarily long after cancellation. Every other verb is
+    /// delegated to the inner [`FakeRunner`], so creation and deletion stay
+    /// observable.
+    #[derive(Debug)]
+    struct WithheldExecRunner {
+        inner: Arc<FakeRunner>,
+        /// Notified once the withheld `exec` call is in flight.
+        started: Arc<tokio::sync::Notify>,
+        /// The test's permission for that call to finally return.
+        release: Arc<tokio::sync::Notify>,
+        /// Set when the withheld call returns of its own accord.
+        returned: Arc<AtomicBool>,
+        /// Set if its future is destroyed instead of returning — the trace an
+        /// abort backstop would leave behind.
+        destroyed: Arc<AtomicBool>,
+    }
+
+    #[async_trait]
+    impl ProcessRunner for WithheldExecRunner {
+        async fn run(
+            &self,
+            program: &Path,
+            args: &[String],
+            timeout: Duration,
+            cancel: &CancelSignal,
+        ) -> std::io::Result<CommandOutput> {
+            if args.first().map(|v| v == "exec").unwrap_or(false) {
+                self.inner
+                    .calls
+                    .lock()
+                    .unwrap()
+                    .push((args.to_vec(), timeout));
+                let mut destroyed = SetOnDrop {
+                    flag: self.destroyed.clone(),
+                    armed: true,
+                };
+                self.started.notify_one();
+                // Deliberately does *not* select on `cancel`: withholding the
+                // return is the whole point of this runner.
+                self.release.notified().await;
+                destroyed.armed = false;
+                self.returned.store(true, Ordering::SeqCst);
+                return Err(cancelled_io_error());
+            }
+            self.inner.run(program, args, timeout, cancel).await
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_runner_that_withholds_its_return_blocks_recovery_and_cleanup_forever() {
+        // The removed abort backstop, stated as a test. A runner that did not
+        // return promptly after cancellation used to have its future aborted
+        // after five seconds, and the owner then deleted the container and
+        // released its permit having observed neither the child's reap nor the
+        // drains' end. It must now do the opposite: wait, indefinitely, and
+        // hold cleanup closed for exactly as long.
+        //
+        // Deterministic throughout: the runner returns only on an explicit
+        // notification, and the "long after cancellation" part is virtual time
+        // moved by hand, not a sleep.
+        let inner = FakeRunner::new(|_| Ok(ok_output("")));
+        let started = Arc::new(tokio::sync::Notify::new());
+        let release = Arc::new(tokio::sync::Notify::new());
+        let returned = Arc::new(AtomicBool::new(false));
+        let destroyed = Arc::new(AtomicBool::new(false));
+        let runner = Arc::new(WithheldExecRunner {
+            inner: inner.clone(),
+            started: started.clone(),
+            release: release.clone(),
+            returned: returned.clone(),
+            destroyed: destroyed.clone(),
+        });
+        let exec = executor(runner.clone());
+        let ctx = ctx();
+
+        let mut running = Box::pin(exec.execute_command("sleep 100", &ctx));
+        assert!(futures::poll!(&mut running).is_pending());
+        started.notified().await;
+        let name = created_names(&inner)[0].clone();
+
+        // Cancel. The owner may now do exactly one thing: wait for the runner.
+        drop(running);
+        // A hundred and twenty times the old five-second grace.
+        tokio::time::advance(Duration::from_secs(600)).await;
+        for _ in 0..256 {
+            tokio::task::yield_now().await;
+        }
+
+        assert!(
+            deleted_names(&inner).is_empty(),
+            "no container may be deleted while the runner still owns the child and the drains"
+        );
+        assert!(
+            !returned.load(Ordering::SeqCst),
+            "the runner has not been released yet"
+        );
+        assert!(
+            !destroyed.load(Ordering::SeqCst),
+            "the runner future must never be aborted or dropped, however long it withholds its \
+             return"
+        );
+
+        let mut cleaning = Box::pin(exec.cleanup());
+        assert!(
+            futures::poll!(&mut cleaning).is_pending(),
+            "cleanup must stay blocked on the execution's permit"
+        );
+        tokio::time::advance(Duration::from_secs(600)).await;
+        for _ in 0..256 {
+            tokio::task::yield_now().await;
+        }
+        assert!(
+            futures::poll!(&mut cleaning).is_pending(),
+            "cleanup must fail closed rather than report a terminal state it cannot observe"
+        );
+        assert!(deleted_names(&inner).is_empty());
+        assert!(!destroyed.load(Ordering::SeqCst));
+        assert_eq!(
+            pending_containers(&exec, &ctx.session_id).await,
+            Vec::<String>::new(),
+            "the container's deletion has not even been attempted yet"
+        );
+
+        // The runner finally honours its contract, and everything downstream of
+        // it — recovery, delete, permit release, cleanup — completes.
+        release.notify_one();
+        cleaning.await.unwrap();
+
+        assert!(
+            returned.load(Ordering::SeqCst),
+            "the recovery must have been unblocked by the runner's own return"
+        );
+        assert!(!destroyed.load(Ordering::SeqCst));
+        assert!(
+            deleted_names(&inner).contains(&name),
+            "the cancelled container must be destroyed once the runner has returned"
+        );
+        assert!(exec.state.session_to_container.is_empty());
+        assert_map_stays_empty_after_cleanup(&exec).await;
+        assert_no_untracked_container(&exec, &inner).await;
     }
 
     #[tokio::test]
