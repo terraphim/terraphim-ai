@@ -100,6 +100,7 @@ git log upstream/main..origin/main --oneline 2>/dev/null | head -10
 PICK_DETECT="/opt/ai-dark-factory/bin/upstream-pick-detect.sh"
 
 SECURITY_COMMITS=""
+ALREADY_PICKED=""
 if [ "$BEHIND" -gt 0 ]; then
   echo ""
   echo "=== Upstream commits we are missing (top 20) ==="
@@ -139,6 +140,13 @@ if [ "$BEHIND" -gt 0 ]; then
     echo ""
     echo "=== SECURITY-RELEVANT UPSTREAM COMMITS ==="
     echo "$SECURITY_COMMITS"
+  elif [ -n "$ALREADY_PICKED" ]; then
+    # Total suppression is a distinct outcome from "the grep matched nothing":
+    # candidates were found and every one is already on main. Section 7 then
+    # takes the informational branch, so the standing drift issue stops
+    # receiving updates -- this line is the only record of why.
+    echo ""
+    echo "All security-relevant upstream commits are already on main -- nothing to report"
   else
     echo ""
     echo "No security-relevant commits in upstream gap"

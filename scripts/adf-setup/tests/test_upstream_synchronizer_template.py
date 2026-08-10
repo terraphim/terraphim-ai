@@ -119,6 +119,26 @@ def test_cap_is_applied_after_filtering():
         assert cap_at > filter_at, f"{name}: cap applied before filtering"
 
 
+def test_total_suppression_is_distinguishable_in_the_log():
+    """"Every candidate already picked" must not read as "nothing matched".
+
+    Filtering introduced a new outcome: candidates are found and all of them
+    are suppressed, so SECURITY_COMMITS is empty and the issue-creation gate in
+    section 7 takes the informational branch. The standing drift issue then
+    stops receiving updates, and this log line is the only record of why.
+    """
+    for name, task in _tasks().items():
+        assert 'elif [ -n "$ALREADY_PICKED" ]; then' in task, (
+            f"{name}: total suppression is indistinguishable from no matches"
+        )
+        assert "already on main -- nothing to report" in task, (
+            f"{name}: lost the total-suppression log line"
+        )
+        assert 'ALREADY_PICKED=""' in task, (
+            f"{name}: ALREADY_PICKED must be initialised before the scan"
+        )
+
+
 def test_comparison_is_pinned_to_origin_main():
     """The scan compares against `origin/main`, not the checked-out branch.
 
