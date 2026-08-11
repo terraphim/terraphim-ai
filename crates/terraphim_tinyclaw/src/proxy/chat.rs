@@ -1,47 +1,82 @@
 //! `POST /v1/chat/completions` — main OpenAI-compatible endpoint.
 //!
-//! Translates the OpenAI Chat Completions request shape into a TinyClaw
-//! agent call and returns an OpenAI-shaped response. Stream mode is not
-//! yet implemented.
+//! When an upstream proxy is configured (see [`super::ProxyState::upstream`])
+//! the request body is forwarded **verbatim** (raw JSON) so no OpenAI fields
+//! are lost — clients sending `tools`, `max_tokens`, `response_format`, etc.
+//! get them passed through unchanged. Without an upstream, TinyClaw answers
+//! with a hermetic echo stub (stream mode returns 501).
 
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
 use chrono::Utc;
-use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use super::ProxyState;
 
-/// OpenAI Chat Completions request body (partial — only fields we use).
-#[derive(Debug, Deserialize)]
-pub struct ChatRequest {
-    pub model: String,
-    pub messages: Vec<ChatMessage>,
-    #[serde(default)]
-    pub stream: bool,
-    #[serde(default)]
-    pub temperature: Option<f32>,
-}
-
-/// Single message in the conversation.
-#[derive(Debug, Clone, Deserialize)]
-pub struct ChatMessage {
-    pub role: String,
-    pub content: String,
+/// Forward a request body to the upstream proxy and map the response back.
+async fn forward_to_upstream(state: &ProxyState, path: &str, body: &Value) -> Response {
+    let upstream = match &state.upstream {
+        Some(u) => u.clone(),
+        None => return StatusCode::BAD_GATEWAY.into_response(),
+    };
+    let url = format!("{}{}", upstream.base_url, path);
+    let mut req = state.client.post(&url).json(body);
+    if let Some(key) = &upstream.api_key {
+        req = req.bearer_auth(key);
+    }
+    match req.send().await {
+        Ok(resp) => {
+            let status = resp.status();
+            let content_type = resp
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .cloned();
+            let bytes = match resp.bytes().await {
+                Ok(b) => b.to_vec(),
+                Err(e) => {
+                    return (
+                        StatusCode::BAD_GATEWAY,
+                        Json(json!({
+                            "error": { "message": format!("upstream read error: {e}"), "type": "upstream_error" }
+                        })),
+                    )
+                        .into_response();
+                }
+            };
+            let mut builder = axum::http::Response::builder().status(status);
+            if let Some(ct) = content_type {
+                builder = builder.header("content-type", ct);
+            }
+            builder
+                .body(axum::body::Body::from(bytes))
+                .unwrap_or_else(|_| StatusCode::BAD_GATEWAY.into_response())
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({
+                "error": { "message": format!("upstream unreachable: {e}"), "type": "upstream_error" }
+            })),
+        )
+            .into_response(),
+    }
 }
 
 /// `POST /v1/chat/completions`
 ///
-/// For Wave 5 we don't actually invoke an LLM (no model credentials wired).
-/// Instead we echo the last user message back as the assistant response.
-/// This is the minimum to satisfy OpenAI-compatible clients for testing.
-pub async fn chat_completions(
-    State(_state): State<ProxyState>,
-    Json(body): Json<ChatRequest>,
-) -> impl IntoResponse {
-    if body.stream {
+/// With an upstream configured, the raw JSON body is forwarded verbatim and
+/// the upstream response (status, body, content-type) is returned unchanged.
+/// Without an upstream we echo the last user message back as the assistant
+/// response — the hermetic fallback (no model credentials wired).
+pub async fn chat_completions(State(state): State<ProxyState>, body: Json<Value>) -> Response {
+    if state.upstream.is_some() {
+        return forward_to_upstream(&state, "/v1/chat/completions", &body.0).await;
+    }
+
+    // Echo path: parse just enough to answer.
+    let stream = body["stream"].as_bool().unwrap_or(false);
+    if stream {
         return (
             StatusCode::NOT_IMPLEMENTED,
             Json(json!({
@@ -55,12 +90,14 @@ pub async fn chat_completions(
             .into_response();
     }
 
-    let last_user = body
-        .messages
-        .iter()
+    let model = body["model"].as_str().unwrap_or("tinyclaw-default");
+    let last_user = body["messages"]
+        .as_array()
+        .into_iter()
+        .flatten()
         .rev()
-        .find(|m| m.role == "user")
-        .map(|m| m.content.clone())
+        .find(|m| m["role"] == "user")
+        .and_then(|m| m["content"].as_str())
         .unwrap_or_default();
 
     let now = Utc::now().timestamp();
@@ -69,7 +106,7 @@ pub async fn chat_completions(
         "id": id,
         "object": "chat.completion",
         "created": now,
-        "model": body.model,
+        "model": model,
         "choices": [{
             "index": 0,
             "message": {

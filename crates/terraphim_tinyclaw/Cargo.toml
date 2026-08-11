@@ -99,14 +99,15 @@ terraphim_persistence = { version = "1.20.4" }
 opendal = "0.54"
 
 # Wave 5 (Phase C2) OpenAI-compatible HTTP proxy — TinyClaw provides its own
-# minimal proxy here. We attempted to leverage the sibling
-# `terraphim-llm-proxy` crate (0.1.12), but it is unbuildable as a git
-# dep because its `claude_code_agents` git submodule is registered
-# (gitlink in HEAD) but missing from `.gitmodules` (no URL configured).
-# The submodule content is therefore not fetchable. Until the
-# `terraphim-llm-proxy` maintainer publishes a clean version (or
-# fixes `.gitmodules`), TinyClaw ships a minimal echo proxy.
-# See ADR-0010 for the full investigation notes (2026-08-08).
+# minimal proxy here. Rather than depending on the sibling `terraphim-llm-proxy`
+# crate (0.1.12) as a git dep (blocked: its `claude_code_agents` git submodule is
+# registered in HEAD but missing from `.gitmodules`, so it is unfetchable from a
+# fresh clone), TinyClaw forwards to the DEPLOYED proxy instance when
+# `TERRAPHIM_LLM_PROXY_URL` is set (bigbox: http://100.106.66.7:3456,
+# `PROXY_API_KEY` via `TERRAPHIM_LLM_PROXY_API_KEY`). Without the env var the
+# proxy stays a hermetic echo stub so tests remain self-contained.
+# See ADR-0010 for the full investigation notes (2026-08-08) and the deployed-
+# leverage resolution (2026-08-11).
 
 # Wave 4 (Phase B) Email channel — leverage the existing `jmap_client`
 # crate (path: `terraphim-private/crates/haystack_jmap`). Brings in
