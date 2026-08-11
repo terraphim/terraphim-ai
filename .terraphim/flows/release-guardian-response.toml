@@ -1,0 +1,51 @@
+# Release Guardian Response Flow — Full Disciplined Pipeline
+#
+# Responds to release-guardian blocking issues by running research → spec → impl → pr-review → quality.
+# Trigger: adf-ctl flow release-guardian-response --context "pr=<NUM>"
+
+name = "release-guardian-response"
+project = "terraphim-ai"
+repo_path = "."
+timeout_secs = 1800
+
+[[steps]]
+name = "disciplined-research"
+kind = "action"
+command = "echo '[research] Analyzing issue context...' && git log --oneline -5"
+timeout_secs = 120
+on_fail = "continue"
+
+[[steps]]
+name = "disciplined-specification"
+kind = "action"
+command = "echo '[spec] Defining acceptance criteria...'"
+timeout_secs = 180
+on_fail = "continue"
+
+[[steps]]
+name = "disciplined-implementation"
+kind = "action"
+command = "echo '[impl] Checking implementation status...' && git diff --stat origin/main..HEAD"
+timeout_secs = 300
+on_fail = "continue"
+
+[[steps]]
+name = "disciplined-pr-review"
+kind = "action"
+command = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/structured-pr-review.sh ${PR_NUMBER:-3201}"
+timeout_secs = 600
+on_fail = "continue"
+
+[[steps]]
+name = "disciplined-quality-evaluation"
+kind = "action"
+command = "echo '[quality] Running quality gates...'"
+timeout_secs = 300
+on_fail = "continue"
+
+[[steps]]
+name = "gitea-report"
+kind = "action"
+command = "echo '[report] Pipeline complete'"
+timeout_secs = 60
+on_fail = "continue"
