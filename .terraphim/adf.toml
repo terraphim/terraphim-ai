@@ -140,3 +140,12 @@ cli_tool = "echo"
 task = "Quality phase: run test suite, clippy, fmt, verify acceptance criteria"
 project = "terraphim-ai"
 schedule = "on_demand"
+
+
+[[agents]]
+name = "auto-merge"
+layer = "Core"
+cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/auto-merge.sh"
+task = "Check structural review confidence score on the active PR. Merge if score >= 4/5 with no P0 or P1 findings."
+project = "terraphim-ai"
+schedule = "on_demand"

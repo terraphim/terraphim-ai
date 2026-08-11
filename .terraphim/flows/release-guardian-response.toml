@@ -49,3 +49,10 @@ kind = "action"
 command = "echo '[report] Pipeline complete'"
 timeout_secs = 60
 on_fail = "continue"
+
+[[steps]]
+name = "auto-merge"
+kind = "action"
+command = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/auto-merge.sh ${PR_NUMBER:-3201}"
+timeout_secs = 120
+on_fail = "continue"
