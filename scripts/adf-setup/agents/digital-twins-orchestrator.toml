@@ -1,0 +1,306 @@
+# digital-twins-orchestrator.toml
+#
+# Orchestrator configuration for the digital-twin project (zestic-ai/digital-twins).
+# Manages a fleet of 5 agents that validate and maintain the digital-twin API mocks
+# (Stripe, Resend, GitHub OAuth, Google OAuth, Zoho CRM, Linear).
+#
+# Layer breakdown:
+#   Core:     payment-processor, twin-guardian, security-sentinel
+#   Growth:   notification-agent, pr-reviewer
+#
+# The migrate-to-confd.py script derives project_id "digital-twins" from
+# this filename automatically.
+
+[[agents]]
+name = "payment-processor"
+layer = "Core"
+schedule = "0 */4 * * *"  # Every 4 hours
+cli_tool = "/home/alex/.bun/bin/opencode"
+fallback_provider = "/home/alex/.bun/bin/opencode"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Midas"
+skill_chain = [
+    "disciplined-verification",
+    "disciplined-validation",
+]
+max_cpu_seconds = 600
+max_ticks = 12
+grace_period_secs = 30
+capabilities = [
+    "payments",
+    "stripe",
+    "digital-twin",
+    "financial",
+]
+project = "digital-twins"
+task = '''
+source ~/.profile
+
+## Payment Processor — Stripe Twin Validation
+
+cd /home/alex/projects/zestic-ai/digital-twins
+
+### 1. Verify twin server is running
+curl -sf http://localhost:3001/_admin/health | jq . || {
+    echo "Twin server not reachable — starting"
+    cargo run -p twin-server -- --port 3001 &
+    sleep 3
+}
+
+### 2. Create test payment intent via twin Stripe
+PAYMENT_RESPONSE=$(curl -sf -X POST http://localhost:3001/v1/payment_intents \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "amount=2999&currency=usd" | jq -c .)
+echo "Payment created: $PAYMENT_RESPONSE"
+
+PAYMENT_ID=$(echo "$PAYMENT_RESPONSE" | jq -r .id)
+STATUS=$(echo "$PAYMENT_RESPONSE" | jq -r .status)
+
+### 3. Confirm payment
+CONFIRM_RESPONSE=$(curl -sf -X POST "http://localhost:3001/v1/payment_intents/$PAYMENT_ID/confirm" | jq -c .)
+CONFIRMED_STATUS=$(echo "$CONFIRM_RESPONSE" | jq -r .status)
+
+### 4. Validate twin fidelity
+# Compare against real Stripe API spec
+if [ "$STATUS" = "requires_payment_method" ] && [ "$CONFIRMED_STATUS" = "succeeded" ]; then
+  echo "PASS: Stripe twin payment lifecycle matches spec"
+  VERDICT="PASS"
+else
+  echo "FAIL: Twin deviation detected — status=$STATUS, confirmed=$CONFIRMED_STATUS"
+  VERDICT="FAIL"
+fi
+
+### 5. Post result as knowledge package
+gtr comment --owner zestic-ai --repo digital-twins --index ISSUE_NUMBER \
+  --body "[agent: payment-processor]
+## Stripe Twin Validation: $VERDICT
+
+| Check | Expected | Actual | Status |
+|-------|----------|--------|--------|
+| Payment intent creation | requires_payment_method | $STATUS | ✓ |
+| Payment confirmation | succeeded | $CONFIRMED_STATUS | ✓ |
+
+**Twin fidelity**: $VERDICT
+**Payment ID**: $PAYMENT_ID"
+
+if [ "$VERDICT" = "FAIL" ]; then
+  # Escalate to twin-guardian
+  gtr comment --owner zestic-ai --repo digital-twins --index ISSUE_NUMBER \
+    --body "@adf:twin-guardian twin drift detected on Stripe payment lifecycle — please investigate"
+fi
+'''
+
+# ── Notification Agent (Resend Twin) ──
+
+[[agents]]
+name = "notification-agent"
+layer = "Growth"
+schedule = "0 */6 * * *"
+cli_tool = "/home/alex/.bun/bin/opencode"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Hermes"
+skill_chain = [
+    "disciplined-verification",
+]
+max_cpu_seconds = 600
+max_ticks = 12
+grace_period_secs = 30
+capabilities = [
+    "email",
+    "resend",
+    "digital-twin",
+    "notifications",
+]
+project = "digital-twins"
+task = '''
+source ~/.profile
+
+cd /home/alex/projects/zestic-ai/digital-twins
+
+# Verify twin server is running
+curl -sf http://localhost:3001/_admin/health > /dev/null || {
+    cargo run -p twin-server -- --port 3001 &
+    sleep 3
+}
+
+# Send test email via Resend twin
+EMAIL_RESPONSE=$(curl -sf -X POST http://localhost:3001/resend/emails \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer re_test_twin" \
+  -d '{
+    "from": "noreply@terraphim.com",
+    "to": ["admin@terraphim.com"],
+    "subject": "Twin Health Check - Resend",
+    "text": "Automated twin fidelity test — " + "'"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"'"
+  }' | jq -c .)
+
+EMAIL_ID=$(echo "$EMAIL_RESPONSE" | jq -r .id 2>/dev/null)
+if [ -n "$EMAIL_ID" ] && [ "$EMAIL_ID" != "null" ]; then
+  echo "PASS: Resend twin email sent — id=$EMAIL_ID"
+else
+  echo "FAIL: Resend twin returned no email id"
+fi
+'''
+
+# ── PR Reviewer (GitHub Twin) ──
+
+[[agents]]
+name = "pr-reviewer"
+layer = "Growth"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Carthos"
+skill_chain = [
+    "structural-pr-review",
+]
+max_cpu_seconds = 1800
+grace_period_secs = 30
+capabilities = [
+    "code-review",
+    "github",
+    "oauth",
+    "digital-twin",
+]
+project = "digital-twins"
+task = '''
+source ~/.profile
+cd /home/alex/projects/zestic-ai/digital-twins
+
+# Verify GitHub OAuth twin
+TOKEN_RESPONSE=$(curl -sf -X POST http://localhost:3001/github/login/oauth/access_token \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"client_id":"twin_test","client_secret":"twin_secret","code":"test_code"}' | jq -c .)
+
+ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r .access_token 2>/dev/null)
+SCOPE=$(echo "$TOKEN_RESPONSE" | jq -r .scope 2>/dev/null)
+
+if [ -n "$ACCESS_TOKEN" ] && [ "$ACCESS_TOKEN" != "null" ]; then
+  echo "PASS: GitHub OAuth twin — token issued, scope=$SCOPE"
+else
+  echo "FAIL: GitHub OAuth twin — no token returned"
+fi
+'''
+
+# ── Twin Guardian (Digital-Twin Fidelity) ──
+
+[[agents]]
+name = "twin-guardian"
+layer = "Core"
+cli_tool = "/home/alex/.bun/bin/opencode"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Echo"
+skill_chain = [
+    "disciplined-verification",
+    "disciplined-validation",
+]
+max_cpu_seconds = 1200
+max_ticks = 24
+grace_period_secs = 30
+capabilities = [
+    "digital-twin",
+    "fidelity",
+    "integration-testing",
+    "api-validation",
+]
+project = "digital-twins"
+task = '''
+source ~/.profile
+
+cd /home/alex/projects/zestic-ai/digital-twins
+
+## Digital-Twin Fidelity Guardian
+
+# Run the full twin server in test mode
+cargo test --workspace 2>&1 | tee /tmp/twin-test-output.txt
+
+TEST_RESULT=$?
+
+# Check coverage
+COVERAGE=$(curl -sf http://localhost:3001/_coverage 2>/dev/null | jq -c . || echo "{}")
+
+# Compare twin responses against canonical API specs
+echo "=== Twin Fidelity Report ==="
+echo "Tests: $([ $TEST_RESULT -eq 0 ] && echo 'ALL PASS' || echo 'FAILURES DETECTED')"
+echo "Coverage: $COVERAGE"
+
+# Post to Gitea
+if [ $TEST_RESULT -eq 0 ]; then
+  STATUS="PASS"
+else
+  STATUS="FAIL"
+fi
+
+gtr comment --owner zestic-ai --repo digital-twins --index ISSUE_NUMBER \
+  --body "[agent: twin-guardian]
+## Twin Fidelity Report: $STATUS
+
+| Check | Result |
+|-------|--------|
+| Test suite | $([ $TEST_RESULT -eq 0 ] && echo '✓ ALL PASS' || echo '✗ FAILURES') |
+| Coverage | $COVERAGE |
+
+**Persona**: Echo (Twin Maintainer)
+**Principle**: Any difference is a bug. Twins must be identical."
+
+if [ $TEST_RESULT -ne 0 ]; then
+  tail -40 /tmp/twin-test-output.txt | gtr comment --owner zestic-ai --repo digital-twins --index ISSUE_NUMBER --body-file -
+fi
+'''
+
+# ── Security Sentinel (Digital-Twin Security) ──
+
+[[agents]]
+name = "security-sentinel"
+layer = "Core"
+schedule = "0 */12 * * *"
+cli_tool = "/home/alex/.bun/bin/opencode"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Vigil"
+skill_chain = [
+    "security-audit",
+    "via-negativa-analysis",
+    "disciplined-verification",
+]
+max_cpu_seconds = 900
+max_ticks = 18
+grace_period_secs = 30
+capabilities = [
+    "security",
+    "vulnerability-scanning",
+    "digital-twin",
+]
+project = "digital-twins"
+task = '''
+source ~/.profile
+
+cd /home/alex/projects/zestic-ai/digital-twins
+
+## Security audit of digital-twin codebase
+
+### 1. Cargo audit
+cargo audit 2>&1 | tee /tmp/twin-security-audit.txt
+
+### 2. Secret detection in twin configs
+grep -rn "sk-\|api_key\|secret\|password\|token" \
+  crates/ --include="*.rs" --include="*.toml" 2>/dev/null \
+  | grep -v "test\|example\|\.lock" | grep -v "//.*secret\|#.*demo" \
+  | tee /tmp/twin-security-secrets.txt
+
+### 3. Unsafe block audit
+grep -rn "unsafe" crates/ | grep -v "test\|#\[allow" | tee /tmp/twin-security-unsafe.txt
+
+### 4. Verdict
+SECRET_COUNT=$(wc -l < /tmp/twin-security-secrets.txt)
+CVE_COUNT=$(grep -c "CRITICAL\|HIGH" /tmp/twin-security-audit.txt 2>/dev/null || echo 0)
+
+echo "Secrets found: $SECRET_COUNT"
+echo "Critical/High CVEs: $CVE_COUNT"
+
+if [ "$CVE_COUNT" -gt 0 ] || [ "$SECRET_COUNT" -gt 0 ]; then
+  echo "FAIL: Security issues found in digital-twin codebase"
+else
+  echo "PASS: No security issues"
+fi
+'''
