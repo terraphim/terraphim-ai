@@ -75,6 +75,10 @@ New concepts are written to `kg_path/learned-<slug>.md` with synonyms and relati
 terraphim-grep --role devops --thesaurus .terraphim/thesaurus-devops.json --paths . "pipeline"
 ```
 
+Paths are **repo-relative** — the root of the repository is the default haystack root.
+Use `--paths .` to search the entire repository or specify subdirectories relative to
+the repo root.
+
 ### With RLM synthesis + KG curation
 ```bash
 OPENROUTER_API_KEY=sk-or-... terraphim-grep --role devops \
