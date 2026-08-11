@@ -18,7 +18,7 @@ readme = "../../README.md"
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-ulid = { version = "1.1", features = ["serde"] }
+ulid = { version = "2.0", features = ["serde"] }
 jiff = { version = "0.2", features = ["serde"] }
 async-trait.workspace = true
 thiserror.workspace = true
