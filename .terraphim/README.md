@@ -93,3 +93,30 @@ When adding new concepts:
 2. Include synonyms using the `synonyms::` directive
 3. Regenerate the thesaurus JSON
 4. Test with `terraphim-grep --role {role} --answer "your query"`
+
+
+## Fleet roles (added 2026-08-08)
+
+Additional Terraphim-AI domain roles (fleet standard §8):
+
+| Role | shortname | KG |
+|------|-----------|-----|
+| Terraphim AI Developer | `taidev` | `.terraphim/kg-taidev/` |
+| Terraphim AI Architect | `taiarch` | `.terraphim/kg-taiarch/` |
+
+These coexist with the existing `Rust Engineer` / `kg/<role>/` layout.
+
+```bash
+python3 .terraphim/scripts/bootstrap.py   # materialize {REPO} + refresh thesauri
+```
+
+Skills manifest: `.terraphim/skills.toml` (`tsm install <name>`).
+Repo agent memory: `memory/` at repo root.
+
+## Path portability
+
+Fleet roles use **repo-relative** haystack and KG paths (`.`, `crates`, `memory`, …).
+`scripts/bootstrap.py` regenerates thesauri and normalizes absolute/`{REPO}` paths
+that resolve **inside this repo** back to relative form. Foreign absolute haystacks
+are left untouched. The script never writes machine-absolute paths into tracked config.
+

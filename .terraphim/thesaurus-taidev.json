@@ -1,0 +1,325 @@
+{
+  "name": "Terraphim AI Developer",
+  "data": {
+    "agent": {
+      "id": 100,
+      "nterm": "agent"
+    },
+    "repl": {
+      "id": 100,
+      "nterm": "agent"
+    },
+    "terraphim-agent": {
+      "id": 100,
+      "nterm": "agent"
+    },
+    "hook": {
+      "id": 100,
+      "nterm": "agent"
+    },
+    "guard": {
+      "id": 100,
+      "nterm": "agent"
+    },
+    "robot mode": {
+      "id": 100,
+      "nterm": "agent"
+    },
+    "learning capture": {
+      "id": 100,
+      "nterm": "agent"
+    },
+    "/search": {
+      "id": 100,
+      "nterm": "agent"
+    },
+    "/role": {
+      "id": 100,
+      "nterm": "agent"
+    },
+    "/graph": {
+      "id": 100,
+      "nterm": "agent"
+    },
+    "automata": {
+      "id": 101,
+      "nterm": "automata"
+    },
+    "aho-corasick": {
+      "id": 101,
+      "nterm": "automata"
+    },
+    "automaton": {
+      "id": 101,
+      "nterm": "automata"
+    },
+    "thesaurus": {
+      "id": 101,
+      "nterm": "automata"
+    },
+    "autocomplete": {
+      "id": 101,
+      "nterm": "automata"
+    },
+    "matcher": {
+      "id": 101,
+      "nterm": "automata"
+    },
+    "linkify": {
+      "id": 101,
+      "nterm": "automata"
+    },
+    "term linking": {
+      "id": 101,
+      "nterm": "automata"
+    },
+    "automatapath": {
+      "id": 101,
+      "nterm": "automata"
+    },
+    "terraphimautomata": {
+      "id": 101,
+      "nterm": "automata"
+    },
+    "config": {
+      "id": 102,
+      "nterm": "config"
+    },
+    "settings": {
+      "id": 102,
+      "nterm": "config"
+    },
+    "secret": {
+      "id": 102,
+      "nterm": "config"
+    },
+    "1password": {
+      "id": 102,
+      "nterm": "config"
+    },
+    "op://": {
+      "id": 102,
+      "nterm": "config"
+    },
+    "secretloader": {
+      "id": 102,
+      "nterm": "config"
+    },
+    "environmentloader": {
+      "id": 102,
+      "nterm": "config"
+    },
+    "vault": {
+      "id": 102,
+      "nterm": "config"
+    },
+    "haystack": {
+      "id": 103,
+      "nterm": "haystack"
+    },
+    "ripgrep": {
+      "id": 103,
+      "nterm": "haystack"
+    },
+    "grepapp": {
+      "id": 103,
+      "nterm": "haystack"
+    },
+    "queryrs": {
+      "id": 103,
+      "nterm": "haystack"
+    },
+    "atomic": {
+      "id": 103,
+      "nterm": "haystack"
+    },
+    "jmap": {
+      "id": 103,
+      "nterm": "haystack"
+    },
+    "atlassian": {
+      "id": 103,
+      "nterm": "haystack"
+    },
+    "discourse": {
+      "id": 103,
+      "nterm": "haystack"
+    },
+    "data source": {
+      "id": 103,
+      "nterm": "haystack"
+    },
+    "search source": {
+      "id": 103,
+      "nterm": "haystack"
+    },
+    "hooks": {
+      "id": 104,
+      "nterm": "hooks"
+    },
+    "text replacement": {
+      "id": 104,
+      "nterm": "hooks"
+    },
+    "validate": {
+      "id": 104,
+      "nterm": "hooks"
+    },
+    "pre-commit": {
+      "id": 104,
+      "nterm": "hooks"
+    },
+    "replace": {
+      "id": 104,
+      "nterm": "hooks"
+    },
+    "mcp": {
+      "id": 105,
+      "nterm": "mcp"
+    },
+    "mcp server": {
+      "id": 105,
+      "nterm": "mcp"
+    },
+    "model context protocol": {
+      "id": 105,
+      "nterm": "mcp"
+    },
+    "mcp tools": {
+      "id": 105,
+      "nterm": "mcp"
+    },
+    "search tool": {
+      "id": 105,
+      "nterm": "mcp"
+    },
+    "orchestrator": {
+      "id": 106,
+      "nterm": "orchestrator"
+    },
+    "multi-agent": {
+      "id": 106,
+      "nterm": "orchestrator"
+    },
+    "supervisor": {
+      "id": 106,
+      "nterm": "orchestrator"
+    },
+    "registry": {
+      "id": 106,
+      "nterm": "orchestrator"
+    },
+    "messaging": {
+      "id": 106,
+      "nterm": "orchestrator"
+    },
+    "evolution": {
+      "id": 106,
+      "nterm": "orchestrator"
+    },
+    "spawner": {
+      "id": 106,
+      "nterm": "orchestrator"
+    },
+    "fleet": {
+      "id": 106,
+      "nterm": "orchestrator"
+    },
+    "swarm": {
+      "id": 106,
+      "nterm": "orchestrator"
+    },
+    "persistence": {
+      "id": 107,
+      "nterm": "persistence"
+    },
+    "storage": {
+      "id": 107,
+      "nterm": "persistence"
+    },
+    "opendal": {
+      "id": 107,
+      "nterm": "persistence"
+    },
+    "redb": {
+      "id": 107,
+      "nterm": "persistence"
+    },
+    "sqlite": {
+      "id": 107,
+      "nterm": "persistence"
+    },
+    "dashmap": {
+      "id": 107,
+      "nterm": "persistence"
+    },
+    "devicestorage": {
+      "id": 107,
+      "nterm": "persistence"
+    },
+    "cache": {
+      "id": 107,
+      "nterm": "persistence"
+    },
+    "write-back": {
+      "id": 107,
+      "nterm": "persistence"
+    },
+    "memory backend": {
+      "id": 107,
+      "nterm": "persistence"
+    },
+    "s3 backend": {
+      "id": 107,
+      "nterm": "persistence"
+    },
+    "rolegraph": {
+      "id": 108,
+      "nterm": "rolegraph"
+    },
+    "role graph": {
+      "id": 108,
+      "nterm": "rolegraph"
+    },
+    "co-occurrence": {
+      "id": 108,
+      "nterm": "rolegraph"
+    },
+    "graph rank": {
+      "id": 108,
+      "nterm": "rolegraph"
+    },
+    "terraphim-graph": {
+      "id": 108,
+      "nterm": "rolegraph"
+    },
+    "relevance": {
+      "id": 108,
+      "nterm": "rolegraph"
+    },
+    "graph ranking": {
+      "id": 108,
+      "nterm": "rolegraph"
+    },
+    "session": {
+      "id": 109,
+      "nterm": "session"
+    },
+    "sessions": {
+      "id": 109,
+      "nterm": "session"
+    },
+    "session analyzer": {
+      "id": 109,
+      "nterm": "session"
+    },
+    "resume": {
+      "id": 109,
+      "nterm": "session"
+    },
+    "transcript": {
+      "id": 109,
+      "nterm": "session"
+    }
+  }
+}

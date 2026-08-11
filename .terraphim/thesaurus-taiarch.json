@@ -1,0 +1,129 @@
+{
+  "name": "Terraphim AI Architect",
+  "data": {
+    "knowledge-graph": {
+      "id": 100,
+      "nterm": "knowledge-graph"
+    },
+    "knowledge graph": {
+      "id": 100,
+      "nterm": "knowledge-graph"
+    },
+    "kg": {
+      "id": 100,
+      "nterm": "knowledge-graph"
+    },
+    "thesaurus": {
+      "id": 100,
+      "nterm": "knowledge-graph"
+    },
+    "synonyms": {
+      "id": 100,
+      "nterm": "knowledge-graph"
+    },
+    "logseq": {
+      "id": 100,
+      "nterm": "knowledge-graph"
+    },
+    "concept": {
+      "id": 100,
+      "nterm": "knowledge-graph"
+    },
+    "term expansion": {
+      "id": 100,
+      "nterm": "knowledge-graph"
+    },
+    "privacy": {
+      "id": 101,
+      "nterm": "privacy"
+    },
+    "local-first": {
+      "id": 101,
+      "nterm": "privacy"
+    },
+    "no telemetry": {
+      "id": 101,
+      "nterm": "privacy"
+    },
+    "offline": {
+      "id": 101,
+      "nterm": "privacy"
+    },
+    "relevance": {
+      "id": 102,
+      "nterm": "relevance"
+    },
+    "ranking": {
+      "id": 102,
+      "nterm": "relevance"
+    },
+    "title-scorer": {
+      "id": 102,
+      "nterm": "relevance"
+    },
+    "bm25": {
+      "id": 102,
+      "nterm": "relevance"
+    },
+    "scorer": {
+      "id": 102,
+      "nterm": "relevance"
+    },
+    "rank": {
+      "id": 102,
+      "nterm": "relevance"
+    },
+    "role": {
+      "id": 103,
+      "nterm": "role"
+    },
+    "roles": {
+      "id": 103,
+      "nterm": "role"
+    },
+    "role config": {
+      "id": 103,
+      "nterm": "role"
+    },
+    "default_role": {
+      "id": 103,
+      "nterm": "role"
+    },
+    "selected_role": {
+      "id": 103,
+      "nterm": "role"
+    },
+    "haystack set": {
+      "id": 103,
+      "nterm": "role"
+    },
+    "search-pipeline": {
+      "id": 104,
+      "nterm": "search-pipeline"
+    },
+    "pipeline": {
+      "id": 104,
+      "nterm": "search-pipeline"
+    },
+    "search flow": {
+      "id": 104,
+      "nterm": "search-pipeline"
+    },
+    "query expansion": {
+      "id": 104,
+      "nterm": "search-pipeline"
+    },
+    "middleware": {
+      "id": 104,
+      "nterm": "search-pipeline"
+    },
+    "axum": {
+      "id": 104,
+      "nterm": "search-pipeline"
+    },
+    "async search": {
+      "id": 104,
+      "nterm": "search-pipeline"
+    }
+  }
+}

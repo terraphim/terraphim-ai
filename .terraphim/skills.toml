@@ -1,9 +1,10 @@
 # Terraphim skills manifest for terraphim-ai
 # Fleet standard §1.7: skills.toml required baseline.
-# Verify names with `tsm list`.
+# Names verified against `tsm list` 2026-08-08.
+# Registry: https://terraphim-skills.md
 
-# Required baseline per rust-fleet-standard §1.7:
-required = [
+[required]
+skills = [
   "disciplined-research",
   "disciplined-specification",
   "disciplined-design",
@@ -19,8 +20,8 @@ required = [
   "rust-fleet-standard",
 ]
 
-# Recommended for terraphim-ai specifically:
-recommended = [
+[recommended]
+skills = [
   "rust-development",
   "rust-ci-cd",
   "rust-quality-convergence",
@@ -42,11 +43,15 @@ recommended = [
   "testing",
   "acceptance-testing",
   "hermes-parity",  # session log of parity work
+  # github/main additions:
+  "architecture",
+  "documentation",
+  "deterministic-rlm-review",
 ]
 
 # Decision (ADOPT/ADAPT/REJECT):
-# - ADOPT: required baseline as written
-# - ADAPT: added `hermes-parity` to recommended (session-derived skill)
+# - ADOPT: required baseline as written (both gitea + github sides reconciled)
+# - ADAPT: merged github/main recommended additions into gitea recommended list
 # - REJECT: none of the required baseline (the fleet standard does not
 #   permit silent rejection; if a skill in required[] does not apply,
 #   file a fleet-standard issue rather than dropping it from this list)
