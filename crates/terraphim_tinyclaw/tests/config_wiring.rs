@@ -8,8 +8,8 @@ use terraphim_tinyclaw::config::{Config, ToolsConfig, WebToolsConfig};
 use terraphim_tinyclaw::tools::create_default_registry;
 
 /// Test that web tools configuration is wired through to the registry.
-#[test]
-fn test_web_tools_config_wired_to_registry() {
+#[tokio::test]
+async fn test_web_tools_config_wired_to_registry() {
     common::scrub_env();
 
     // Create a config with specific web tools settings
@@ -26,7 +26,7 @@ fn test_web_tools_config_wired_to_registry() {
 
     // Create registry with the web tools config
     let web_tools_config = config.tools.web.as_ref();
-    let registry = create_default_registry(None, web_tools_config, None);
+    let registry = create_default_registry(None, web_tools_config, None).await;
 
     // Verify web_search tool is present
     let web_search = registry.get("web_search");
@@ -38,12 +38,12 @@ fn test_web_tools_config_wired_to_registry() {
 }
 
 /// Test that registry works with no web tools config.
-#[test]
-fn test_registry_without_web_tools_config() {
+#[tokio::test]
+async fn test_registry_without_web_tools_config() {
     common::scrub_env();
 
     // Create registry without web tools config
-    let registry = create_default_registry(None, None, None);
+    let registry = create_default_registry(None, None, None).await;
 
     // Verify web_search tool is still present (with defaults)
     let web_search = registry.get("web_search");
@@ -61,11 +61,11 @@ fn test_registry_without_web_tools_config() {
 }
 
 /// Test that all expected tools are registered.
-#[test]
-fn test_all_expected_tools_registered() {
+#[tokio::test]
+async fn test_all_expected_tools_registered() {
     common::scrub_env();
 
-    let registry = create_default_registry(None, None, None);
+    let registry = create_default_registry(None, None, None).await;
 
     let expected_tools = [
         "filesystem",

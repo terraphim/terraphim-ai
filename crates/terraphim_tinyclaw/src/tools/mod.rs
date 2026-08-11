@@ -1,10 +1,13 @@
 //! Tool registry and implementations for TinyClaw agent.
 
 pub mod agent_memory;
+pub mod browser;
 pub mod edit;
 pub mod filesystem;
+pub mod sandbox;
 pub mod session_tools;
 pub mod shell;
+pub mod subagent;
 pub mod voice_transcribe;
 pub mod web;
 
@@ -47,6 +50,9 @@ pub enum ToolError {
 
     #[error("Tool '{tool}' timed out after {seconds}s")]
     Timeout { tool: String, seconds: u64 },
+
+    #[error("Tool '{tool}' backend unavailable: {message}")]
+    BackendUnavailable { tool: String, message: String },
 
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -155,10 +161,24 @@ impl Default for ToolRegistry {
 /// * `sessions` - Optional session manager for session-aware tools
 /// * `web_tools_config` - Optional web tools configuration
 /// * `memory_config` - Optional memory bridge configuration
-pub fn create_default_registry(
+pub async fn create_default_registry(
     sessions: Option<std::sync::Arc<tokio::sync::Mutex<crate::session::SessionManager>>>,
     web_tools_config: Option<&crate::config::WebToolsConfig>,
     memory_config: Option<&crate::config::MemoryConfig>,
+) -> ToolRegistry {
+    create_default_registry_with_parity(sessions, web_tools_config, memory_config, None, None, None)
+        .await
+}
+
+/// Create a standard tool registry including the Hermes-parity tools
+/// (sandbox / subagent / browser) when their configs are enabled.
+pub async fn create_default_registry_with_parity(
+    sessions: Option<std::sync::Arc<tokio::sync::Mutex<crate::session::SessionManager>>>,
+    web_tools_config: Option<&crate::config::WebToolsConfig>,
+    memory_config: Option<&crate::config::MemoryConfig>,
+    sandbox_config: Option<&crate::config::SandboxConfig>,
+    subagent_config: Option<&crate::config::SubagentConfig>,
+    browser_config: Option<&crate::config::BrowserConfig>,
 ) -> ToolRegistry {
     use crate::tools::agent_memory::{
         AgentMemoryConfig, LearnCaptureTool, MemoryApplyTool, MemoryCaptureTool, MemoryRetrieveTool,
@@ -194,6 +214,32 @@ pub fn create_default_registry(
         registry.register(Box::new(MemoryRetrieveTool::new(agent_mem_cfg.clone())));
         registry.register(Box::new(MemoryApplyTool::new(agent_mem_cfg.clone())));
         registry.register(Box::new(LearnCaptureTool::new(agent_mem_cfg)));
+    }
+
+    // Register Hermes-parity tools (sandbox / subagent / browser).
+    // Each is off by default; enabled via tinyclaw.toml sections.
+    if let Some(cfg) = sandbox_config
+        && cfg.enabled
+    {
+        match crate::tools::sandbox::SandboxTool::from_config(cfg).await {
+            Ok(tool) => registry.register(Box::new(tool)),
+            Err(e) => log::warn!("sandbox tool disabled: {}", e),
+        }
+    }
+    if let Some(cfg) = subagent_config
+        && cfg.enabled
+    {
+        registry.register(Box::new(crate::tools::subagent::SubagentTool::from_config(
+            cfg,
+        )));
+    }
+    if let Some(cfg) = browser_config
+        && cfg.enabled
+    {
+        match crate::tools::browser::BrowserTool::from_config(cfg) {
+            Ok(tool) => registry.register(Box::new(tool)),
+            Err(e) => log::warn!("browser tool disabled: {}", e),
+        }
     }
 
     registry

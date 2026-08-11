@@ -187,11 +187,9 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     } else {
         None
     };
-    let tools = Arc::new(create_default_registry(
-        Some(sessions.clone()),
-        web_tools_config,
-        memory_config,
-    ));
+    let tools = Arc::new(
+        create_default_registry(Some(sessions.clone()), web_tools_config, memory_config).await,
+    );
 
     // Create hybrid LLM router
     let router = build_router(&config)?;
@@ -250,11 +248,9 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     } else {
         None
     };
-    let tools = Arc::new(create_default_registry(
-        Some(sessions.clone()),
-        web_tools_config,
-        memory_config_gw,
-    ));
+    let tools = Arc::new(
+        create_default_registry(Some(sessions.clone()), web_tools_config, memory_config_gw).await,
+    );
 
     // Create hybrid LLM router
     let router = build_router(&config)?;

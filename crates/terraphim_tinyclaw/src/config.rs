@@ -28,6 +28,25 @@ pub struct Config {
     /// memory context is injected into the system prompt.
     #[serde(default)]
     pub memory: MemoryConfig,
+
+    /// RLM sandbox configuration (#3146). **Default: disabled.**
+    /// When `sandbox.enabled = true`, `SandboxTool` (rlm_code / rlm_bash /
+    /// rlm_query + session ops) is registered, wrapping `terraphim_rlm`.
+    #[serde(default)]
+    pub sandbox: SandboxConfig,
+
+    /// Subagent configuration (#3145). **Default: disabled.**
+    /// When `subagent.enabled = true`, `SubagentTool` (spawn/status/list/
+    /// terminate/collect) is registered, wrapping `terraphim_spawner`.
+    #[serde(default)]
+    pub subagent: SubagentConfig,
+
+    /// Browser automation configuration (#3148). **Default: disabled.**
+    /// When `browser.enabled = true`, `BrowserTool` (navigate/extract/api)
+    /// is registered. Uses reqwest directly (deployed terraphim-agent
+    /// binary has web_operations disabled).
+    #[serde(default)]
+    pub browser: BrowserConfig,
 }
 
 impl Config {
@@ -1066,6 +1085,141 @@ impl Default for MemoryConfig {
     }
 }
 
+/// RLM sandbox configuration (#3146).
+///
+/// **Default behaviour: disabled.** When enabled, `SandboxTool` wraps
+/// `terraphim_rlm` for isolated code/shell execution with backend fallback.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SandboxConfig {
+    /// Master switch. `false` = no sandbox tools registered.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Execution backend preference: `"local"` (default) or `"docker"`.
+    /// Firecracker/E2B are compile-time options of terraphim_rlm and are
+    /// not selectable here.
+    #[serde(default = "default_sandbox_backend")]
+    pub backend: String,
+
+    /// Per-execution timeout in seconds (RLM time budget).
+    #[serde(default = "default_sandbox_timeout")]
+    pub timeout_secs: u64,
+
+    /// Maximum output bytes surfaced per execution result.
+    #[serde(default = "default_sandbox_max_output")]
+    pub max_output_bytes: usize,
+}
+
+fn default_sandbox_backend() -> String {
+    "local".to_string()
+}
+
+fn default_sandbox_timeout() -> u64 {
+    120
+}
+
+fn default_sandbox_max_output() -> usize {
+    64 * 1024
+}
+
+impl Default for SandboxConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            backend: default_sandbox_backend(),
+            timeout_secs: default_sandbox_timeout(),
+            max_output_bytes: default_sandbox_max_output(),
+        }
+    }
+}
+
+/// Subagent configuration (#3145).
+///
+/// **Default behaviour: disabled.** When enabled, `SubagentTool` wraps
+/// `terraphim_spawner`'s AgentPool for isolated subagent lifecycle.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SubagentConfig {
+    /// Master switch. `false` = no subagent tools registered.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Provider id used to spawn agents (maps to a Provider in
+    /// terraphim_types::capability, e.g. `"claude-code"`).
+    #[serde(default = "default_subagent_provider")]
+    pub provider: String,
+
+    /// Optional default model for spawned agents.
+    #[serde(default)]
+    pub model: Option<String>,
+
+    /// Timeout for waiting on spawned agents in seconds.
+    #[serde(default = "default_subagent_timeout")]
+    pub timeout_secs: u64,
+}
+
+fn default_subagent_provider() -> String {
+    "claude-code".to_string()
+}
+
+fn default_subagent_timeout() -> u64 {
+    600
+}
+
+impl Default for SubagentConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: default_subagent_provider(),
+            model: None,
+            timeout_secs: default_subagent_timeout(),
+        }
+    }
+}
+
+/// Browser automation configuration (#3148).
+///
+/// **Default behaviour: disabled.** When enabled, `BrowserTool` provides
+/// navigate / extract / api operations over reqwest. Browser-native ops
+/// (click/type/screenshot) report `BackendUnavailable` because the
+/// deployed terraphim-agent binary has web_operations compiled out.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BrowserConfig {
+    /// Master switch. `false` = no browser tools registered.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// HTTP timeout in seconds for browser operations.
+    #[serde(default = "default_browser_timeout")]
+    pub timeout_secs: u64,
+
+    /// Maximum response bytes captured per operation.
+    #[serde(default = "default_browser_max_bytes")]
+    pub max_bytes: usize,
+
+    /// Optional proxy URL (e.g. `http://proxy:8080`).
+    #[serde(default)]
+    pub proxy: Option<String>,
+}
+
+fn default_browser_timeout() -> u64 {
+    30
+}
+
+fn default_browser_max_bytes() -> usize {
+    512 * 1024
+}
+
+impl Default for BrowserConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            timeout_secs: default_browser_timeout(),
+            max_bytes: default_browser_max_bytes(),
+            proxy: None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod credentials_config_tests {
     use super::*;
@@ -1193,5 +1347,60 @@ enabled = true
         assert!(cfg.role.is_none());
         assert_eq!(cfg.binary, "terraphim-agent");
         assert_eq!(cfg.timeout_secs, 10);
+    }
+}
+
+#[cfg(test)]
+mod parity_tools_config_tests {
+    use super::*;
+
+    #[test]
+    fn sandbox_config_defaults() {
+        let cfg = SandboxConfig::default();
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.backend, "local");
+        assert_eq!(cfg.timeout_secs, 120);
+        assert_eq!(cfg.max_output_bytes, 64 * 1024);
+    }
+
+    #[test]
+    fn sandbox_config_parse() {
+        let toml = r#"
+enabled = true
+backend = "docker"
+timeout_secs = 30
+"#;
+        let cfg: SandboxConfig = toml::from_str(toml).expect("parse");
+        assert!(cfg.enabled);
+        assert_eq!(cfg.backend, "docker");
+        assert_eq!(cfg.timeout_secs, 30);
+        assert_eq!(cfg.max_output_bytes, 64 * 1024);
+    }
+
+    #[test]
+    fn subagent_config_defaults() {
+        let cfg = SubagentConfig::default();
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.provider, "claude-code");
+        assert!(cfg.model.is_none());
+        assert_eq!(cfg.timeout_secs, 600);
+    }
+
+    #[test]
+    fn browser_config_defaults_and_parse() {
+        let cfg = BrowserConfig::default();
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.timeout_secs, 30);
+
+        let toml = r#"
+enabled = true
+max_bytes = 1024
+proxy = "http://localhost:8080"
+"#;
+        let cfg: BrowserConfig = toml::from_str(toml).expect("parse");
+        assert!(cfg.enabled);
+        assert_eq!(cfg.max_bytes, 1024);
+        assert_eq!(cfg.proxy.as_deref(), Some("http://localhost:8080"));
+        assert_eq!(cfg.timeout_secs, 30);
     }
 }

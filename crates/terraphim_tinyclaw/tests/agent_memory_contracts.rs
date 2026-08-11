@@ -199,8 +199,7 @@ async fn contract_stdout_cap_rejects_oversized_export() {
     common::scrub_env();
 
     let tmp = tempfile::tempdir().unwrap();
-    let script = format!(
-        r#"#!/bin/sh
+    let script = r#"#!/bin/sh
 case "$1 $2" in
   "memory export")
     # Emit > 1 MiB of JSON-ish junk.
@@ -212,9 +211,8 @@ case "$1 $2" in
     exit 1
     ;;
 esac
-"#
-    );
-    let shim = write_shim(tmp.path(), &script);
+"#;
+    let shim = write_shim(tmp.path(), script);
     let cfg = make_config(shim);
 
     let tool = MemoryRetrieveTool::new(cfg);
@@ -384,8 +382,8 @@ esac
 // Contract 8: create_default_registry registers memory tools when enabled
 // ---------------------------------------------------------------------------
 
-#[test]
-fn contract_registry_includes_memory_tools_when_enabled() {
+#[tokio::test]
+async fn contract_registry_includes_memory_tools_when_enabled() {
     common::scrub_env();
 
     let mem_cfg = MemoryConfig {
@@ -393,7 +391,8 @@ fn contract_registry_includes_memory_tools_when_enabled() {
         ..Default::default()
     };
 
-    let registry = terraphim_tinyclaw::tools::create_default_registry(None, None, Some(&mem_cfg));
+    let registry =
+        terraphim_tinyclaw::tools::create_default_registry(None, None, Some(&mem_cfg)).await;
 
     assert!(registry.has("memory_capture"), "memory_capture missing");
     assert!(registry.has("memory_retrieve"), "memory_retrieve missing");
@@ -401,8 +400,8 @@ fn contract_registry_includes_memory_tools_when_enabled() {
     assert!(registry.has("learn_capture"), "learn_capture missing");
 }
 
-#[test]
-fn contract_registry_excludes_memory_tools_when_disabled() {
+#[tokio::test]
+async fn contract_registry_excludes_memory_tools_when_disabled() {
     common::scrub_env();
 
     let mem_cfg = MemoryConfig {
@@ -410,7 +409,8 @@ fn contract_registry_excludes_memory_tools_when_disabled() {
         ..Default::default()
     };
 
-    let registry = terraphim_tinyclaw::tools::create_default_registry(None, None, Some(&mem_cfg));
+    let registry =
+        terraphim_tinyclaw::tools::create_default_registry(None, None, Some(&mem_cfg)).await;
 
     assert!(
         !registry.has("memory_capture"),

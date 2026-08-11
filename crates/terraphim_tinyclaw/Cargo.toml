@@ -119,6 +119,18 @@ jmap_client = { path = "../../../terraphim-private/crates/haystack_jmap" }
 hmac = "0.12"
 sha2 = "0.10"
 
+# Wave 5 (Phase E) Hermes parity tools — sandbox, subagents, browser.
+# terraphim_rlm: sandboxed execution (Local/Docker backends). Not a
+# workspace member (firecracker-excluded) — path dep, minimal features:
+# llm (LLM bridge), kg-validation (validator types), docker-backend.
+# Sessions are in-memory (DashMap) so a CLI bridge cannot hold them;
+# the crate must be called in-process (see research-tinyclaw-parity-tools).
+terraphim_rlm = { path = "../terraphim_rlm", default-features = false, features = ["llm", "kg-validation", "docker-backend"] }
+# terraphim_spawner: subagent pool + handles. Tiny standalone crate.
+terraphim_spawner = { path = "../terraphim_spawner" }
+# Provider/ProviderType/Capability types used by the subagent tool.
+terraphim_types = { version = "1.20.2", registry = "terraphim" }
+
 # Wave 5 (Phase C1) dashboard: axum-based HTTP server (Hermes parity).
 axum = { version = "0.8", features = ["macros"] }
 tower = "0.5"
