@@ -1,0 +1,31 @@
+# Operator-attested upstream/fork commit pairs for the terraphim gitea fork.
+#
+# Format: <upstream-sha> <fork-sha>   # evidence
+#
+# Read by upstream-pick-detect.sh via --verified-picks. An entry asserts that a
+# human compared the two commits and confirmed the upstream change is present in
+# the fork. Use it ONLY where no machine-checkable evidence exists: the fork
+# commit carries no `cherry picked from commit` or `Adapted-from:` trailer and
+# its patch-id differs because the pick was adapted to fork-local code.
+#
+# This is the weakest mechanism in the detector -- it is a recorded human
+# judgement, not a check. Both SHAs are re-resolved at run time and the fork
+# commit must still be reachable from the searched branch, so a typo or a
+# rewritten history drops the entry rather than suppressing a real gap. But if
+# an adaptation were later reverted, the entry would keep suppressing. Prefer
+# adding an `Adapted-from:` trailer to new picks over adding a line here.
+#
+# Both entries below predate the trailer convention. Evidence is recorded in
+# .docs/research-43.md rows 6 and 9 in the terraphim/gitea repository, each
+# cross-checked against the pull request that landed the pick.
+
+# "Fix basic auth bug (#37486)". Same two files as upstream
+# (services/auth/basic.go, tests/integration/oauth_test.go); patch-id differs by
+# a single line in the integration test. Landed by terraphim/gitea PR #27.
+48cea1fb79d8804627cbe828f5f67f0e3204840a	060ab6274e2b97832d45234b6bf4ef1f07d81b3f
+
+# "Fix URL related escaping for oauth2 (#37334)". Adapted to the fork's OAuth
+# template layout (upstream external_auth_methods.tmpl vs the fork's
+# oauth_container.tmpl); remaining 13 files match upstream. Landed by
+# terraphim/gitea PR #31.
+aee6628bf527ba53ee812cb3328fc9c81ab7d51b	1901bb181c076a7ec978b487f4bfe73789f66f43
