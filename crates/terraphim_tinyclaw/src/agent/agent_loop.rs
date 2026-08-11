@@ -9,12 +9,18 @@ use crate::commands::CommandRegistry;
 use crate::config::{AgentConfig, DirectLlmConfig};
 use crate::credentials::{CredentialPool, CredentialSource, EnvVarSource, ProviderId};
 use crate::session::{ChatMessage, MessageRole, SessionManager};
+use crate::tools::agent_memory::{AgentMemoryConfig, run_agent};
 use crate::tools::{ToolError, ToolRegistry};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
+
+/// Minimum interval between `memory apply` subprocess runs. Prevents a
+/// subprocess spawn + full-store scan on every single turn (PR review P2).
+const MEMORY_APPLY_COOLDOWN: Duration = Duration::from_secs(30);
 
 /// Configuration for the tool-calling loop.
 #[derive(Debug, Clone)]
@@ -429,6 +435,13 @@ pub struct ToolCallingLoop {
     commands: Arc<Mutex<CommandRegistry>>,
     system_prompt: String,
     shutdown: CancellationToken,
+    /// Whether agent memory injection is enabled.
+    memory_enabled: bool,
+    /// Shared config for the agent-memory subprocess bridge.
+    memory_config: Option<Arc<AgentMemoryConfig>>,
+    /// Last time `memory apply` ran (cooldown guard — avoids a subprocess
+    /// spawn on every single turn).
+    memory_last_apply: Arc<Mutex<std::time::Instant>>,
 }
 
 impl ToolCallingLoop {
@@ -439,6 +452,7 @@ impl ToolCallingLoop {
         tools: Arc<ToolRegistry>,
         sessions: Arc<Mutex<SessionManager>>,
         system_prompt: String,
+        memory_config: Option<&crate::config::MemoryConfig>,
     ) -> Self {
         // Initialize command registry with defaults
         let mut commands = CommandRegistry::with_defaults();
@@ -452,6 +466,7 @@ impl ToolCallingLoop {
             sessions,
             system_prompt,
             commands,
+            memory_config,
         )
     }
 
@@ -463,7 +478,13 @@ impl ToolCallingLoop {
         sessions: Arc<Mutex<SessionManager>>,
         system_prompt: String,
         commands: CommandRegistry,
+        memory_config: Option<&crate::config::MemoryConfig>,
     ) -> Self {
+        let (memory_enabled, mem_cfg_arc) = match memory_config {
+            Some(cfg) if cfg.enabled => (true, Some(Arc::new(AgentMemoryConfig::from(cfg)))),
+            _ => (false, None),
+        };
+
         Self {
             config: ToolCallingConfig {
                 max_iterations: agent_config.max_iterations,
@@ -476,6 +497,9 @@ impl ToolCallingLoop {
             commands: Arc::new(Mutex::new(commands)),
             system_prompt,
             shutdown: CancellationToken::new(),
+            memory_enabled,
+            memory_config: mem_cfg_arc,
+            memory_last_apply: Arc::new(Mutex::new(std::time::Instant::now())),
         }
     }
 
@@ -611,6 +635,57 @@ impl ToolCallingLoop {
             build_proxy_messages(&session.messages, session.summary.as_deref())
         };
 
+        // Memory context injection: prepend retrieved memories to system prompt.
+        // Cooldown: `memory apply` spawns a subprocess — run it at most once
+        // per MEMORY_APPLY_COOLDOWN to avoid per-turn latency (PR review P2).
+        let effective_system_prompt = if self.memory_enabled {
+            let mut last = self.memory_last_apply.lock().await;
+            let within_cooldown = last.elapsed() < MEMORY_APPLY_COOLDOWN;
+            if !within_cooldown {
+                if let Some(ref mem_config) = self.memory_config {
+                    // Extract the user's latest message as the query.
+                    let query = proxy_messages
+                        .iter()
+                        .rev()
+                        .find(|m| m.role == "user")
+                        .map(|m| m.content.as_str())
+                        .unwrap_or("");
+
+                    let result =
+                        run_agent(mem_config, &["memory", "apply", "--prompt", query], None).await;
+                    match result {
+                        Ok(context) if !context.trim().is_empty() => {
+                            // Token-budget guard: truncate to max_context_chars,
+                            // walking back to a UTF-8 char boundary so non-ASCII
+                            // content (emoji, Cyrillic, CJK) can't panic the slice.
+                            let truncated = if context.len() > mem_config.max_context_chars {
+                                let mut end = mem_config.max_context_chars;
+                                while end > 0 && !context.is_char_boundary(end) {
+                                    end -= 1;
+                                }
+                                &context[..end]
+                            } else {
+                                &context
+                            };
+                            *last = std::time::Instant::now();
+                            format!("{}\n\n## Memory Context\n{}", self.system_prompt, truncated)
+                        }
+                        Ok(_) => self.system_prompt.clone(),
+                        Err(e) => {
+                            log::warn!("Memory apply failed (non-fatal): {}", e);
+                            self.system_prompt.clone()
+                        }
+                    }
+                } else {
+                    self.system_prompt.clone()
+                }
+            } else {
+                self.system_prompt.clone()
+            }
+        } else {
+            self.system_prompt.clone()
+        };
+
         // Get tool definitions
         let tool_definitions: Vec<ToolDefinition> = self
             .tools
@@ -628,11 +703,16 @@ impl ToolCallingLoop {
 
         // Call LLM with tool-calling loop
         let final_response = if self.router.tools_available() && !tool_definitions.is_empty() {
-            self.run_tool_loop(proxy_messages, tool_definitions).await?
+            self.run_tool_loop_with_prompt(
+                proxy_messages,
+                tool_definitions,
+                &effective_system_prompt,
+            )
+            .await?
         } else {
             // Fallback to text-only mode
             self.router
-                .text_only(proxy_messages, Some(self.system_prompt.clone()))
+                .text_only(proxy_messages, Some(effective_system_prompt))
                 .await?
         };
 
@@ -661,32 +741,27 @@ impl ToolCallingLoop {
         Ok(())
     }
 
-    /// Run the iterative tool-calling loop.
-    async fn run_tool_loop(
+    /// Run the iterative tool-calling loop with explicit system prompt.
+    async fn run_tool_loop_with_prompt(
         &self,
         mut messages: Vec<Message>,
         tools: Vec<ToolDefinition>,
+        system_prompt: &str,
     ) -> anyhow::Result<String> {
+        let prompt = system_prompt.to_string();
         for iteration in 0..self.config.max_iterations {
             log::debug!("Tool-calling iteration {}", iteration + 1);
 
             // Call LLM with tools
             let response = match self
                 .router
-                .tool_call(
-                    messages.clone(),
-                    Some(self.system_prompt.clone()),
-                    tools.clone(),
-                )
+                .tool_call(messages.clone(), Some(prompt.clone()), tools.clone())
                 .await
             {
                 Ok(resp) => resp,
                 Err(e) => {
                     log::warn!("Tool call failed: {}. Falling back to text-only.", e);
-                    return self
-                        .router
-                        .text_only(messages, Some(self.system_prompt.clone()))
-                        .await;
+                    return self.router.text_only(messages, Some(prompt.clone())).await;
                 }
             };
 
@@ -903,6 +978,7 @@ mod tests {
             tools,
             Arc::new(Mutex::new(sessions)),
             "Test system prompt".to_string(),
+            None,
         );
 
         let msg = InboundMessage::new("cli", "user1", "chat1", "/reset");
@@ -930,6 +1006,7 @@ mod tests {
             tools,
             Arc::new(Mutex::new(sessions)),
             "Test".to_string(),
+            None,
         );
 
         let msg = InboundMessage::new("cli", "user1", "chat1", "/help");

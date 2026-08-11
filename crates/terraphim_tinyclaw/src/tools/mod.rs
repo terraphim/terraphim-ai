@@ -1,5 +1,6 @@
 //! Tool registry and implementations for TinyClaw agent.
 
+pub mod agent_memory;
 pub mod edit;
 pub mod filesystem;
 pub mod session_tools;
@@ -153,10 +154,15 @@ impl Default for ToolRegistry {
 /// # Arguments
 /// * `sessions` - Optional session manager for session-aware tools
 /// * `web_tools_config` - Optional web tools configuration
+/// * `memory_config` - Optional memory bridge configuration
 pub fn create_default_registry(
     sessions: Option<std::sync::Arc<tokio::sync::Mutex<crate::session::SessionManager>>>,
     web_tools_config: Option<&crate::config::WebToolsConfig>,
+    memory_config: Option<&crate::config::MemoryConfig>,
 ) -> ToolRegistry {
+    use crate::tools::agent_memory::{
+        AgentMemoryConfig, LearnCaptureTool, MemoryApplyTool, MemoryCaptureTool, MemoryRetrieveTool,
+    };
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
     use crate::tools::session_tools::{SessionHistoryTool, SessionListTool, SessionSendTool};
@@ -177,6 +183,17 @@ pub fn create_default_registry(
         registry.register(Box::new(SessionListTool::new(sessions.clone())));
         registry.register(Box::new(SessionHistoryTool::new(sessions.clone())));
         registry.register(Box::new(SessionSendTool::new(sessions)));
+    }
+
+    // Register agent memory tools if memory bridge is enabled
+    if let Some(mem_cfg) = memory_config
+        && mem_cfg.enabled
+    {
+        let agent_mem_cfg = std::sync::Arc::new(AgentMemoryConfig::from(mem_cfg));
+        registry.register(Box::new(MemoryCaptureTool::new(agent_mem_cfg.clone())));
+        registry.register(Box::new(MemoryRetrieveTool::new(agent_mem_cfg.clone())));
+        registry.register(Box::new(MemoryApplyTool::new(agent_mem_cfg.clone())));
+        registry.register(Box::new(LearnCaptureTool::new(agent_mem_cfg)));
     }
 
     registry

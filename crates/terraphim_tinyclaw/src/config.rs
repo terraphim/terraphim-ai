@@ -22,6 +22,12 @@ pub struct Config {
     /// connects to an external MCP server.
     #[serde(default)]
     pub mcp: McpConfig,
+
+    /// Agent memory bridge configuration. **Default: disabled.**
+    /// When `memory.enabled = true`, memory tools are registered and
+    /// memory context is injected into the system prompt.
+    #[serde(default)]
+    pub memory: MemoryConfig,
 }
 
 impl Config {
@@ -1008,6 +1014,58 @@ pub struct McpConfig {
     pub server_command: Option<String>,
 }
 
+/// Agent memory bridge configuration. When `enabled = false` (the default),
+/// no memory tools are registered and no memory context is injected.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MemoryConfig {
+    /// Master switch. `false` = memory bridge disabled.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Optional role for scoped memory retrieval. When set, memory
+    /// retrieve/apply calls include `--role <role>`.
+    #[serde(default)]
+    pub role: Option<String>,
+
+    /// Path to the terraphim-agent binary. Defaults to "terraphim-agent"
+    /// (resolved via PATH lookup).
+    #[serde(default = "default_agent_binary")]
+    pub binary: String,
+
+    /// Timeout for terraphim-agent subprocess calls in seconds.
+    #[serde(default = "default_memory_timeout")]
+    pub timeout_secs: u64,
+
+    /// Maximum characters of memory context injected into the system
+    /// prompt per request. Prevents token-budget overflow.
+    #[serde(default = "default_max_context_chars")]
+    pub max_context_chars: usize,
+}
+
+fn default_agent_binary() -> String {
+    "terraphim-agent".to_string()
+}
+
+fn default_memory_timeout() -> u64 {
+    10
+}
+
+fn default_max_context_chars() -> usize {
+    4000
+}
+
+impl Default for MemoryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            role: None,
+            binary: default_agent_binary(),
+            timeout_secs: default_memory_timeout(),
+            max_context_chars: default_max_context_chars(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod credentials_config_tests {
     use super::*;
@@ -1069,5 +1127,71 @@ model = "llama3"
         let cfg: Config = toml::from_str(toml).expect("parse");
         assert!(!cfg.credentials.enabled);
         assert!(cfg.credentials.entries.is_empty());
+        // Memory config also defaults when missing.
+        assert!(!cfg.memory.enabled);
+        assert!(cfg.memory.role.is_none());
+    }
+}
+
+#[cfg(test)]
+mod memory_config_tests {
+    use super::*;
+
+    #[test]
+    fn memory_config_default_is_disabled() {
+        let cfg = MemoryConfig::default();
+        assert!(!cfg.enabled);
+        assert!(cfg.role.is_none());
+        assert_eq!(cfg.binary, "terraphim-agent");
+        assert_eq!(cfg.timeout_secs, 10);
+        assert_eq!(cfg.max_context_chars, 4000);
+    }
+
+    #[test]
+    fn memory_config_round_trip() {
+        let toml = r#"
+enabled = true
+role = "Terraphim Engineer"
+binary = "/usr/local/bin/terraphim-agent"
+timeout_secs = 30
+max_context_chars = 8000
+"#;
+        let cfg: MemoryConfig = toml::from_str(toml).expect("parse");
+        assert!(cfg.enabled);
+        assert_eq!(cfg.role.as_deref(), Some("Terraphim Engineer"));
+        assert_eq!(cfg.binary, "/usr/local/bin/terraphim-agent");
+        assert_eq!(cfg.timeout_secs, 30);
+        assert_eq!(cfg.max_context_chars, 8000);
+    }
+
+    #[test]
+    fn memory_config_missing_section_uses_defaults() {
+        let toml = r#"
+[agent]
+max_iterations = 10
+workspace = "/tmp/tinyclaw-test"
+[llm]
+[llm.proxy]
+base_url = "http://x"
+[llm.direct]
+provider = "ollama"
+model = "llama3"
+"#;
+        let cfg: Config = toml::from_str(toml).expect("parse");
+        assert!(!cfg.memory.enabled);
+        assert!(cfg.memory.role.is_none());
+        assert_eq!(cfg.memory.binary, "terraphim-agent");
+    }
+
+    #[test]
+    fn memory_config_partial_override() {
+        let toml = r#"
+enabled = true
+"#;
+        let cfg: MemoryConfig = toml::from_str(toml).expect("parse");
+        assert!(cfg.enabled);
+        assert!(cfg.role.is_none());
+        assert_eq!(cfg.binary, "terraphim-agent");
+        assert_eq!(cfg.timeout_secs, 10);
     }
 }

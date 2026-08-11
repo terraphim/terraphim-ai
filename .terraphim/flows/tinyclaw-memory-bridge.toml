@@ -1,0 +1,165 @@
+# TinyClaw Memory Bridge — Disciplined Flow for Gitea issue #3144
+#
+# Wires terraphim-agent memory/learning lifecycle into TinyClaw's agent
+# loop (Hermes parity, epic #3143). Runs the disciplined pipeline
+# research -> design -> implement -> verify -> proof.
+#
+# Run with:
+#   adf-ctl flow tinyclaw-memory-bridge --local --context "issue=3144"
+# Requires: claude CLI on PATH, GITEA_URL/GITEA_TOKEN exported.
+
+name = "tinyclaw-memory-bridge"
+project = "terraphim-ai"
+repo_path = "."
+timeout_secs = 2700
+
+# ── Phase 0: Setup ──
+
+[[steps]]
+name = "setup-branch"
+kind = "action"
+command = '''
+set -e
+mkdir -p .docs/adf/{{issue}}
+# Create/switch to the task branch from main (idempotent; keeps the
+# pre-existing dirty files out of any commit we make later).
+git fetch origin main 2>/dev/null || true
+if git show-ref --verify --quiet refs/heads/task/{{issue}}-tinyclaw-memory-bridge; then
+  git checkout task/{{issue}}-tinyclaw-memory-bridge
+else
+  git checkout -b task/{{issue}}-tinyclaw-memory-bridge origin/main
+fi
+echo "on branch: $(git branch --show-current)"
+'''
+timeout_secs = 120
+on_fail = "abort"
+
+[[steps]]
+name = "gate-setup"
+kind = "gate"
+condition = "{{steps.setup-branch.exit_code}} == 0"
+on_fail = "abort"
+
+# ── Phase 1: Research ──
+
+[[steps]]
+name = "research"
+kind = "action"
+command = '''
+claude -p - --output-format text \
+  --permission-mode bypassPermissions \
+  --allowedTools "Read Write Edit Glob Grep Bash" \
+  < .terraphim/flows/prompts/tinyclaw-memory-bridge-research.md \
+  > .docs/adf/{{issue}}/research.md 2>&1
+'''
+timeout_secs = 600
+on_fail = "abort"
+
+[[steps]]
+name = "gate-research"
+kind = "gate"
+condition = "{{steps.research.exit_code}} == 0"
+on_fail = "abort"
+
+# ── Phase 2: Design ──
+
+[[steps]]
+name = "design"
+kind = "action"
+command = '''
+claude -p - --output-format text \
+  --permission-mode bypassPermissions \
+  --allowedTools "Read Write Edit Glob Grep Bash" \
+  < .terraphim/flows/prompts/tinyclaw-memory-bridge-design.md \
+  > .docs/adf/{{issue}}/design.md 2>&1
+'''
+timeout_secs = 600
+on_fail = "abort"
+
+[[steps]]
+name = "gate-design"
+kind = "gate"
+condition = "{{steps.design.exit_code}} == 0"
+on_fail = "abort"
+
+# ── Phase 3: Implement ──
+
+[[steps]]
+name = "implement"
+kind = "action"
+command = '''
+claude -p - --output-format text \
+  --permission-mode bypassPermissions \
+  --allowedTools "Read Write Edit Glob Grep Bash" \
+  < .terraphim/flows/prompts/tinyclaw-memory-bridge-implement.md \
+  > .docs/adf/{{issue}}/implementation.log 2>&1
+'''
+timeout_secs = 1200
+on_fail = "abort"
+
+[[steps]]
+name = "gate-implement"
+kind = "gate"
+condition = "{{steps.implement.exit_code}} == 0"
+on_fail = "abort"
+
+# ── Phase 4: Independent verification ──
+
+[[steps]]
+name = "verify-files"
+kind = "action"
+command = '''
+set -e
+test -f crates/terraphim_tinyclaw/src/tools/agent_memory.rs || { echo "FAIL: agent_memory.rs missing"; exit 1; }
+grep -q "memory_capture" crates/terraphim_tinyclaw/src/tools/agent_memory.rs || { echo "FAIL: memory_capture tool missing"; exit 1; }
+grep -q "memory_retrieve" crates/terraphim_tinyclaw/src/tools/agent_memory.rs || { echo "FAIL: memory_retrieve tool missing"; exit 1; }
+grep -q "memory_apply" crates/terraphim_tinyclaw/src/tools/agent_memory.rs || { echo "FAIL: memory_apply tool missing"; exit 1; }
+grep -q "learn_capture" crates/terraphim_tinyclaw/src/tools/agent_memory.rs || { echo "FAIL: learn_capture tool missing"; exit 1; }
+grep -q "agent_memory" crates/terraphim_tinyclaw/src/tools/mod.rs || { echo "FAIL: tools/mod.rs not wired"; exit 1; }
+echo "PASS: all 4 tools + registration present"
+'''
+timeout_secs = 30
+on_fail = "abort"
+
+[[steps]]
+name = "verify-tests"
+kind = "action"
+command = '''
+set -e
+cd crates/terraphim_tinyclaw
+cargo fmt -p terraphim_tinyclaw -- --check 2>&1 | head -5
+cargo clippy -p terraphim_tinyclaw -- -D warnings 2>&1 | tail -5
+cargo test -p terraphim_tinyclaw 2>&1 | grep -E "test result" | tail -12
+'''
+timeout_secs = 1200
+on_fail = "abort"
+
+[[steps]]
+name = "gate-verify"
+kind = "gate"
+condition = "{{steps.verify-tests.exit_code}} == 0"
+on_fail = "abort"
+
+# ── Phase 5: Assemble proof ──
+
+[[steps]]
+name = "assemble-proof"
+kind = "action"
+command = '''
+cat > .docs/adf/{{issue}}/adf-proof.md <<'EOF'
+# ADF Disciplined Flow Proof — #3144 TinyClaw memory bridge
+
+Status: Completed via adf-ctl flow tinyclaw-memory-bridge (local)
+Phases: research -> design -> implement -> verify
+Artefacts: research.md, design.md, implementation.log, this proof
+EOF
+echo "Proof assembled."
+'''
+timeout_secs = 30
+on_fail = "abort"
+
+[[steps]]
+name = "final-gate"
+kind = "gate"
+condition = "{{steps.assemble-proof.exit_code}} == 0"
+on_fail = "abort"

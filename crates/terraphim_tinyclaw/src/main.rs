@@ -182,16 +182,29 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
 
     // Create tool registry with session manager
     let web_tools_config = config.tools.web.as_ref();
+    let memory_config = if config.memory.enabled {
+        Some(&config.memory)
+    } else {
+        None
+    };
     let tools = Arc::new(create_default_registry(
         Some(sessions.clone()),
         web_tools_config,
+        memory_config,
     ));
 
     // Create hybrid LLM router
     let router = build_router(&config)?;
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt);
+    let agent = ToolCallingLoop::new(
+        &config.agent,
+        router,
+        tools,
+        sessions,
+        system_prompt,
+        memory_config,
+    );
 
     // Spawn agent loop in background
     let bus_clone = bus.clone();
@@ -232,16 +245,29 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
 
     // Create tool registry with session manager
     let web_tools_config = config.tools.web.as_ref();
+    let memory_config_gw = if config.memory.enabled {
+        Some(&config.memory)
+    } else {
+        None
+    };
     let tools = Arc::new(create_default_registry(
         Some(sessions.clone()),
         web_tools_config,
+        memory_config_gw,
     ));
 
     // Create hybrid LLM router
     let router = build_router(&config)?;
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt);
+    let agent = ToolCallingLoop::new(
+        &config.agent,
+        router,
+        tools,
+        sessions,
+        system_prompt,
+        memory_config_gw,
+    );
 
     // Create channel manager and register enabled channels
     let mut channel_manager = ChannelManager::new();
