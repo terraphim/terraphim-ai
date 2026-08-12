@@ -78,8 +78,12 @@ pub struct OrchestratorScheduleStore {
 
 impl OrchestratorScheduleStore {
     /// Create a store writing generated schedule agents to `path`.
+    ///
+    /// No generated-agent CLI tool is assumed. Calls that create jobs fail
+    /// until the caller supplies one with [`Self::with_cli_tool`] or
+    /// [`Self::with_cli_tool_and_project`].
     pub fn new(path: PathBuf) -> Self {
-        Self::with_cli_tool(path, "terraphim-tinyclaw")
+        Self::with_cli_tool(path, "")
     }
 
     /// Create a store with an explicit generated-agent CLI tool.
@@ -93,7 +97,7 @@ impl OrchestratorScheduleStore {
 
     /// Create a store with an explicit generated-agent project id.
     pub fn with_project(path: PathBuf, project: impl Into<String>) -> Self {
-        Self::with_cli_tool_and_project(path, "terraphim-tinyclaw", Some(project.into()))
+        Self::with_cli_tool_and_project(path, "", Some(project.into()))
     }
 
     /// Create a store with explicit generated-agent CLI tool and project id.
@@ -143,6 +147,14 @@ impl OrchestratorScheduleStore {
         deliver: Option<String>,
         model: Option<String>,
     ) -> Result<String, ToolError> {
+        let cli_tool = self.cli_tool.trim();
+        if cli_tool.is_empty() {
+            return Err(ToolError::InvalidArguments {
+                tool: "schedule".to_string(),
+                message: "scheduler.cli_tool is required for orchestrator-backed schedules; configure a CLI that accepts the task as a positional prompt".to_string(),
+            });
+        }
+
         if let Some(deliver) = deliver.as_deref().filter(|value| !value.trim().is_empty()) {
             return Err(ToolError::InvalidArguments {
                 tool: "schedule".to_string(),
@@ -165,7 +177,7 @@ impl OrchestratorScheduleStore {
         let agent = OrchestratorScheduleAgent {
             name: format!("{AGENT_NAME_PREFIX}{id}"),
             layer: "Core".to_string(),
-            cli_tool: self.cli_tool.clone(),
+            cli_tool: cli_tool.to_string(),
             task: prompt,
             schedule: schedule_expr.to_string(),
             project: self.project.clone(),
@@ -220,6 +232,10 @@ impl ScheduleTool {
 
     /// Create a scheduler tool with the default production storage.
     pub async fn from_config(cfg: &crate::config::SchedulerConfig) -> Result<Self, ToolError> {
+        cfg.validate().map_err(|e| ToolError::InvalidArguments {
+            tool: "schedule".to_string(),
+            message: e.to_string(),
+        })?;
         let path =
             cfg.orchestrator_schedule_file
                 .clone()

@@ -50,8 +50,9 @@ pub struct Config {
 
     /// Scheduler configuration (#3147). **Default: disabled.**
     /// When `scheduler.enabled = true`, `ScheduleTool` (create/list/delete)
-    /// is registered for the agent loop; the `schedule` CLI subcommand
-    /// shares the same store.
+    /// is registered for the agent loop. Production scheduling writes
+    /// orchestrator include fragments and requires an explicit
+    /// `scheduler.cli_tool`.
     #[serde(default)]
     pub scheduler: SchedulerConfig,
 
@@ -1335,6 +1336,11 @@ pub struct SchedulerConfig {
     pub orchestrator_schedule_file: Option<PathBuf>,
 
     /// CLI tool recorded on generated orchestrator scheduled agents.
+    ///
+    /// Required when `enabled = true` and `orchestrator_schedule_file` is set.
+    /// TinyClaw itself expects subcommands, while the orchestrator invokes
+    /// agent CLIs with the task as a positional prompt, so this cannot assume
+    /// `terraphim-tinyclaw` is a runnable default.
     #[serde(default = "default_scheduler_cli_tool")]
     pub cli_tool: String,
 
@@ -1352,7 +1358,7 @@ fn default_scheduler_store_key() -> String {
 }
 
 fn default_scheduler_cli_tool() -> String {
-    "terraphim-tinyclaw".to_string()
+    String::new()
 }
 
 impl Default for SchedulerConfig {
@@ -1369,8 +1375,13 @@ impl Default for SchedulerConfig {
 
 impl SchedulerConfig {
     pub fn validate(&self) -> anyhow::Result<()> {
-        if self.cli_tool.trim().is_empty() {
-            anyhow::bail!("scheduler.cli_tool cannot be empty");
+        if self.enabled
+            && self.orchestrator_schedule_file.is_some()
+            && self.cli_tool.trim().is_empty()
+        {
+            anyhow::bail!(
+                "scheduler.cli_tool is required when scheduler.enabled = true and scheduler.orchestrator_schedule_file is set"
+            );
         }
         if let Some(project) = &self.project
             && project.trim().is_empty()
@@ -1876,7 +1887,7 @@ proxy = "http://localhost:8080"
         assert!(!cfg.enabled);
         assert_eq!(cfg.store_key, "tinyclaw_schedules");
         assert!(cfg.orchestrator_schedule_file.is_none());
-        assert_eq!(cfg.cli_tool, "terraphim-tinyclaw");
+        assert!(cfg.cli_tool.is_empty());
         assert!(cfg.project.is_none());
 
         let toml = r#"
@@ -1896,6 +1907,21 @@ project = "tinyclaw"
         assert_eq!(cfg.cli_tool, "codex");
         assert_eq!(cfg.project.as_deref(), Some("tinyclaw"));
         cfg.validate().expect("valid scheduler config");
+    }
+
+    #[test]
+    fn scheduler_config_rejects_enabled_orchestrator_schedule_without_cli_tool() {
+        let toml = r#"
+enabled = true
+orchestrator_schedule_file = "/tmp/tinyclaw-schedules.toml"
+"#;
+        let cfg: SchedulerConfig = toml::from_str(toml).expect("parse");
+        let err = cfg
+            .validate()
+            .expect_err("enabled orchestrator scheduler must require explicit cli_tool");
+        let msg = err.to_string();
+        assert!(msg.contains("scheduler.cli_tool"), "got: {msg}");
+        assert!(msg.contains("required"), "got: {msg}");
     }
 
     #[test]

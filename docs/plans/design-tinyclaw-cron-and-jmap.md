@@ -96,12 +96,14 @@ agents and let the orchestrator load it on startup/restart.
    - `list` → read the include fragment → `{op, count, jobs:[…]}`.
    - `delete {id}` → remove by id → `{op, id, status: "deleted"}`.
    - Production config requires
-     `scheduler.orchestrator_schedule_file = ".../tinyclaw-schedules.toml"`;
+     `scheduler.orchestrator_schedule_file = ".../tinyclaw-schedules.toml"`
+     and an explicit `scheduler.cli_tool` that accepts the task as a
+     positional prompt;
      the operator must include this file from the orchestrator base config.
      `CronStore` remains only for explicit local/test construction.
    - Registered in `create_default_registry_with_parity` when
      `[scheduler] enabled = true` (config section `SchedulerConfig { enabled,
-     store_key }`).
+     store_key, orchestrator_schedule_file, cli_tool }`).
 
 2. **CLI** (`main.rs`):
 

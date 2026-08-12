@@ -174,6 +174,35 @@ async fn schedule_create_with_skills_and_deliver() {
 }
 
 #[tokio::test]
+async fn orchestrator_schedule_rejects_omitted_cli_tool_before_persistence() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("tinyclaw-schedules.toml");
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(fragment.clone()));
+
+    let err = tool
+        .execute(json!({
+            "op": "create",
+            "prompt": "run daily report",
+            "schedule": "0 9 * * *",
+        }))
+        .await
+        .expect_err("orchestrator backend must require explicit scheduler.cli_tool");
+
+    match err {
+        ToolError::InvalidArguments { message, .. } => {
+            assert!(message.contains("scheduler.cli_tool"), "got: {message}");
+            assert!(message.contains("required"), "got: {message}");
+        }
+        other => panic!("expected InvalidArguments, got {other:?}"),
+    }
+    assert!(
+        !fragment.exists(),
+        "cli_tool rejection must happen before persistence"
+    );
+}
+
+#[tokio::test]
 async fn schedule_persists_as_orchestrator_agent_across_restart() {
     common::scrub_env();
     let temp = tempfile::tempdir().expect("tempdir");
@@ -205,7 +234,10 @@ create_prs = false
     )
     .expect("write base config");
 
-    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(fragment.clone()));
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+        fragment.clone(),
+        "echo",
+    ));
     let out = tool
         .execute(json!({
             "op": "create",
@@ -231,7 +263,8 @@ create_prs = false
     assert_eq!(agent.skill_chain, vec!["daily-report".to_string()]);
 
     // Simulated process restart: new store instance reads the durable file.
-    let restarted = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(fragment));
+    let restarted =
+        ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(fragment, "echo"));
     let listed = restarted
         .execute(json!({"op": "list"}))
         .await
@@ -289,7 +322,11 @@ working_dir = "{}"
     )
     .expect("write base config");
 
-    let store = OrchestratorScheduleStore::with_project(fragment.clone(), "tinyclaw");
+    let store = OrchestratorScheduleStore::with_cli_tool_and_project(
+        fragment.clone(),
+        "echo",
+        Some("tinyclaw".to_string()),
+    );
     let tool = ScheduleTool::new_orchestrator(store);
     let out = tool
         .execute(json!({
@@ -352,9 +389,12 @@ working_dir = "{}"
     )
     .expect("write base config");
 
-    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_project(
-        fragment, "missing",
-    ));
+    let tool =
+        ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool_and_project(
+            fragment,
+            "echo",
+            Some("missing".to_string()),
+        ));
     tool.execute(json!({
         "op": "create",
         "prompt": "bad project report",
@@ -414,7 +454,8 @@ working_dir = "{}"
     )
     .expect("write base config");
 
-    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(fragment));
+    let tool =
+        ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(fragment, "echo"));
     tool.execute(json!({
         "op": "create",
         "prompt": "missing project report",
@@ -442,7 +483,10 @@ async fn orchestrator_schedule_rejects_deliver_before_persistence() {
     common::scrub_env();
     let temp = tempfile::tempdir().expect("tempdir");
     let fragment = temp.path().join("tinyclaw-schedules.toml");
-    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(fragment.clone()));
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+        fragment.clone(),
+        "echo",
+    ));
 
     let err = tool
         .execute(json!({
@@ -471,8 +515,9 @@ async fn orchestrator_schedule_rejects_deliver_before_persistence() {
 async fn orchestrator_schedule_rejects_non_cron_expression() {
     common::scrub_env();
     let temp = tempfile::tempdir().expect("tempdir");
-    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
         temp.path().join("tinyclaw-schedules.toml"),
+        "echo",
     ));
 
     let err = tool

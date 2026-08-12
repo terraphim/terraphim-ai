@@ -77,3 +77,17 @@ shell_timeout_secs = 120
 max_file_size = 10485760  # 10MB
 # Blocked commands (always blocked)
 blocked_commands = ["rm -rf /", "mkfs", "dd if=/dev/zero"]
+
+# =============================================================================
+# Scheduler Configuration
+# =============================================================================
+
+# Enable only when the orchestrator includes this fragment from its base config.
+# cli_tool is required and must name a runner that accepts the scheduled task as
+# a positional prompt. Do not point this at terraphim-tinyclaw, which expects
+# subcommands.
+[scheduler]
+enabled = false
+# orchestrator_schedule_file = "/var/lib/terraphim/tinyclaw-schedules.toml"
+# cli_tool = "codex"
+# project = "tinyclaw"
