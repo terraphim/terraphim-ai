@@ -37,19 +37,25 @@ impl TeamsChannel {
             return Ok(None);
         }
 
-        let sender_id = activity.from.id;
+        let sender_id = activity
+            .from
+            .ok_or_else(|| anyhow::anyhow!("Teams message activity missing from"))?
+            .id;
         if !self.is_allowed(&sender_id) {
             return Ok(None);
         }
 
-        let Some(text) = activity.text else {
-            return Ok(None);
-        };
+        let text = activity
+            .text
+            .ok_or_else(|| anyhow::anyhow!("Teams message activity missing text"))?;
         if text.trim().is_empty() {
             return Ok(None);
         }
 
-        let conversation_id = activity.conversation.id;
+        let conversation_id = activity
+            .conversation
+            .ok_or_else(|| anyhow::anyhow!("Teams message activity missing conversation"))?
+            .id;
         let chat_id = match activity.service_url.as_deref() {
             Some(service_url) if !service_url.trim().is_empty() => {
                 format!("{service_url}|{conversation_id}")
@@ -232,8 +238,8 @@ struct TeamsActivity {
     service_url: Option<String>,
     #[serde(rename = "channelId")]
     channel_id: Option<String>,
-    from: TeamsAccount,
-    conversation: TeamsConversation,
+    from: Option<TeamsAccount>,
+    conversation: Option<TeamsConversation>,
     text: Option<String>,
     #[serde(rename = "channelData")]
     channel_data: Option<TeamsChannelData>,
@@ -334,6 +340,28 @@ mod tests {
           "text": "blocked"
         }"#;
         assert!(ch.parse_activity(blocked).unwrap().is_none());
+    }
+
+    #[test]
+    fn ignores_non_message_activities_without_message_fields() {
+        let ch = TeamsChannel::new(test_config("http://127.0.0.1/token"));
+        for body in [
+            br#"{"type": "conversationUpdate"}"#.as_slice(),
+            br#"{"type": "invoke", "name": "composeExtension/query"}"#.as_slice(),
+        ] {
+            assert!(ch.parse_activity(body).unwrap().is_none());
+        }
+    }
+
+    #[test]
+    fn malformed_message_activity_fails_with_required_field_context() {
+        let ch = TeamsChannel::new(test_config("http://127.0.0.1/token"));
+        let body = br#"{"type": "message"}"#;
+
+        let err = ch.parse_activity(body).unwrap_err().to_string();
+
+        assert!(err.contains("Teams message activity missing"));
+        assert!(err.contains("from"));
     }
 
     #[test]

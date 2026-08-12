@@ -60,6 +60,7 @@ impl WhatsAppChannel {
 
         for entry in webhook.entry {
             for change in entry.changes {
+                let contacts = change.value.contacts.unwrap_or_default();
                 for msg in change.value.messages.unwrap_or_default() {
                     if !self.is_allowed(&msg.from) {
                         continue;
@@ -75,11 +76,9 @@ impl WhatsAppChannel {
                         InboundMessage::new(CHANNEL_NAME, msg.from.clone(), msg.from, text);
                     inbound.metadata.insert("message_id".into(), msg.id);
                     inbound.metadata.insert("message_type".into(), msg.kind);
-                    if let Some(profile_name) = change
-                        .value
-                        .contacts
-                        .as_ref()
-                        .and_then(|contacts| contacts.first())
+                    if let Some(profile_name) = contacts
+                        .iter()
+                        .find(|contact| contact.wa_id == inbound.sender_id)
                         .and_then(|contact| contact.profile.as_ref())
                         .and_then(|profile| profile.name.clone())
                     {
@@ -241,6 +240,7 @@ struct WhatsAppValue {
 
 #[derive(Debug, Deserialize)]
 struct WhatsAppContact {
+    wa_id: String,
     profile: Option<WhatsAppProfile>,
 }
 
@@ -303,7 +303,7 @@ mod tests {
           "entry": [{
             "changes": [{
               "value": {
-                "contacts": [{"profile": {"name": "Alice"}}],
+                "contacts": [{"wa_id": "15551234567", "profile": {"name": "Alice"}}],
                 "messages": [
                   {"from":"15551234567","id":"wamid.1","type":"text","text":{"body":"hello"}},
                   {"from":"15550000000","id":"wamid.2","type":"text","text":{"body":"blocked"}},
@@ -322,6 +322,39 @@ mod tests {
         assert_eq!(messages[0].content, "hello");
         assert_eq!(messages[0].metadata["message_id"], "wamid.1");
         assert_eq!(messages[0].metadata["profile_name"], "Alice");
+    }
+
+    #[test]
+    fn parse_webhook_matches_profile_name_to_message_sender() {
+        let cfg = WhatsAppConfig {
+            allow_from: vec!["15551234567".into(), "15557654321".into()],
+            ..test_config("http://127.0.0.1")
+        };
+        let ch = WhatsAppChannel::new(cfg);
+        let body = br#"{
+          "entry": [{
+            "changes": [{
+              "value": {
+                "contacts": [
+                  {"wa_id": "15557654321", "profile": {"name": "Bob"}},
+                  {"wa_id": "15551234567", "profile": {"name": "Alice"}}
+                ],
+                "messages": [
+                  {"from":"15551234567","id":"wamid.1","type":"text","text":{"body":"from alice"}},
+                  {"from":"15557654321","id":"wamid.2","type":"text","text":{"body":"from bob"}}
+                ]
+              }
+            }]
+          }]
+        }"#;
+
+        let messages = ch.parse_webhook(body).unwrap();
+
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0].sender_id, "15551234567");
+        assert_eq!(messages[0].metadata["profile_name"], "Alice");
+        assert_eq!(messages[1].sender_id, "15557654321");
+        assert_eq!(messages[1].metadata["profile_name"], "Bob");
     }
 
     #[tokio::test]
