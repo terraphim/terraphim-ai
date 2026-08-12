@@ -1321,13 +1321,29 @@ pub struct SchedulerConfig {
     #[serde(default)]
     pub enabled: bool,
 
-    /// Storage key for the schedule job index document.
+    /// Deprecated local CronStore key retained for explicit test/local helpers.
     #[serde(default = "default_scheduler_store_key")]
     pub store_key: String,
+
+    /// Orchestrator include fragment written by TinyClaw schedule commands.
+    ///
+    /// The operator must include this file from the base orchestrator config,
+    /// e.g. `include = ["tinyclaw-schedules.toml"]`, so the orchestrator
+    /// reloads schedules after process restart.
+    #[serde(default)]
+    pub orchestrator_schedule_file: Option<PathBuf>,
+
+    /// CLI tool recorded on generated orchestrator scheduled agents.
+    #[serde(default = "default_scheduler_cli_tool")]
+    pub cli_tool: String,
 }
 
 fn default_scheduler_store_key() -> String {
     "tinyclaw_schedules".to_string()
+}
+
+fn default_scheduler_cli_tool() -> String {
+    "terraphim-tinyclaw".to_string()
 }
 
 impl Default for SchedulerConfig {
@@ -1335,6 +1351,8 @@ impl Default for SchedulerConfig {
         Self {
             enabled: false,
             store_key: default_scheduler_store_key(),
+            orchestrator_schedule_file: None,
+            cli_tool: default_scheduler_cli_tool(),
         }
     }
 }
@@ -1833,13 +1851,22 @@ proxy = "http://localhost:8080"
         let cfg = SchedulerConfig::default();
         assert!(!cfg.enabled);
         assert_eq!(cfg.store_key, "tinyclaw_schedules");
+        assert!(cfg.orchestrator_schedule_file.is_none());
+        assert_eq!(cfg.cli_tool, "terraphim-tinyclaw");
 
         let toml = r#"
 enabled = true
 store_key = "custom_schedules"
+orchestrator_schedule_file = "/tmp/tinyclaw-schedules.toml"
+cli_tool = "codex"
 "#;
         let cfg: SchedulerConfig = toml::from_str(toml).expect("parse");
         assert!(cfg.enabled);
         assert_eq!(cfg.store_key, "custom_schedules");
+        assert_eq!(
+            cfg.orchestrator_schedule_file,
+            Some(PathBuf::from("/tmp/tinyclaw-schedules.toml"))
+        );
+        assert_eq!(cfg.cli_tool, "codex");
     }
 }

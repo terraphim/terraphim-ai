@@ -9,7 +9,7 @@ use serde_json::json;
 use std::sync::Arc;
 use terraphim_persistence::DeviceStorage;
 use terraphim_tinyclaw::cron::CronStore;
-use terraphim_tinyclaw::tools::scheduler::ScheduleTool;
+use terraphim_tinyclaw::tools::scheduler::{OrchestratorScheduleStore, ScheduleTool};
 use terraphim_tinyclaw::tools::{Tool, ToolError};
 
 /// Build a schedule tool over a fresh memory-only store. Each caller
@@ -171,4 +171,110 @@ async fn schedule_create_with_skills_and_deliver() {
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(v["status"], "created");
     assert!(v["id"].as_str().unwrap().len() > 8);
+}
+
+#[tokio::test]
+async fn schedule_persists_as_orchestrator_agent_across_restart() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let base_config = temp.path().join("orchestrator.toml");
+    let fragment = temp.path().join("tinyclaw-schedules.toml");
+    std::fs::write(
+        &base_config,
+        format!(
+            r#"
+working_dir = "{}"
+include = ["tinyclaw-schedules.toml"]
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.10
+moderate_threshold = 0.20
+severe_threshold = 0.40
+critical_threshold = 0.70
+
+[compound_review]
+schedule = "0 2 * * *"
+max_duration_secs = 1800
+repo_path = "{}"
+create_prs = false
+"#,
+            temp.path().display(),
+            temp.path().display()
+        ),
+    )
+    .expect("write base config");
+
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(fragment.clone()));
+    let out = tool
+        .execute(json!({
+            "op": "create",
+            "prompt": "run daily report",
+            "schedule": "0 9 * * *",
+            "skills": ["daily-report"],
+            "model": "sonnet",
+        }))
+        .await
+        .expect("create should succeed");
+    let v: serde_json::Value = serde_json::from_str(&out).expect("json output");
+    let id = v["id"].as_str().expect("id present").to_string();
+
+    let config = terraphim_orchestrator::OrchestratorConfig::from_file(&base_config)
+        .expect("orchestrator reloads generated schedule fragment");
+    let agent = config
+        .agents
+        .iter()
+        .find(|agent| agent.name == format!("tinyclaw-{id}"))
+        .expect("scheduled agent in orchestrator config");
+    assert_eq!(agent.schedule.as_deref(), Some("0 9 * * *"));
+    assert_eq!(agent.task, "run daily report");
+    assert_eq!(agent.skill_chain, vec!["daily-report".to_string()]);
+
+    // Simulated process restart: new store instance reads the durable file.
+    let restarted = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(fragment));
+    let listed = restarted
+        .execute(json!({"op": "list"}))
+        .await
+        .expect("list after restart");
+    let listed: serde_json::Value = serde_json::from_str(&listed).expect("json output");
+    assert_eq!(listed["count"], 1);
+    assert_eq!(listed["jobs"][0]["id"], id);
+
+    restarted
+        .execute(json!({"op": "delete", "id": id}))
+        .await
+        .expect("delete");
+    let config = terraphim_orchestrator::OrchestratorConfig::from_file(&base_config)
+        .expect("orchestrator reloads after delete");
+    assert!(
+        config.agents.is_empty(),
+        "delete removes orchestrator agent"
+    );
+}
+
+#[tokio::test]
+async fn orchestrator_schedule_rejects_non_cron_expression() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(
+        temp.path().join("tinyclaw-schedules.toml"),
+    ));
+
+    let err = tool
+        .execute(json!({
+            "op": "create",
+            "prompt": "not orchestrator cron",
+            "schedule": "every 2h",
+        }))
+        .await
+        .expect_err("orchestrator backend accepts only cron");
+    match err {
+        ToolError::InvalidArguments { message, .. } => {
+            assert!(
+                message.contains("invalid orchestrator cron schedule"),
+                "got: {message}"
+            );
+        }
+        other => panic!("expected InvalidArguments, got {other:?}"),
+    }
 }

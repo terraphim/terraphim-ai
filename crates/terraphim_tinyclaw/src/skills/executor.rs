@@ -5,6 +5,7 @@ use crate::cron::CronStore;
 #[cfg(test)]
 use crate::skills::types::SkillInput;
 use crate::skills::types::{Skill, SkillResult, SkillStatus, SkillStep, StepResult};
+use crate::tools::scheduler::ScheduleTool;
 use crate::tools::{ToolCall, ToolRegistry};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -46,9 +47,9 @@ pub struct SkillExecutor {
     cancelled: Arc<AtomicBool>,
     /// Optional tool registry for executing tool steps
     tool_registry: Option<Arc<ToolRegistry>>,
-    /// Optional cron store for `SkillStep::Schedule` (#3147). When unset,
+    /// Optional scheduler tool for `SkillStep::Schedule` (#3147). When unset,
     /// schedule steps fail with a clear "scheduler not configured" error.
-    cron_store: Option<CronStore>,
+    scheduler: Option<Arc<ScheduleTool>>,
 }
 
 impl SkillExecutor {
@@ -61,7 +62,7 @@ impl SkillExecutor {
             storage_dir,
             cancelled: Arc::new(AtomicBool::new(false)),
             tool_registry: None,
-            cron_store: None,
+            scheduler: None,
         })
     }
 
@@ -71,9 +72,15 @@ impl SkillExecutor {
         self
     }
 
-    /// Set the cron store for `SkillStep::Schedule` (#3147).
+    /// Set the cron store for explicit local/test `SkillStep::Schedule` use.
     pub fn with_cron_store(mut self, store: CronStore) -> Self {
-        self.cron_store = Some(store);
+        self.scheduler = Some(Arc::new(ScheduleTool::new(store)));
+        self
+    }
+
+    /// Set the scheduler tool for `SkillStep::Schedule` (#3147).
+    pub fn with_scheduler_tool(mut self, scheduler: Arc<ScheduleTool>) -> Self {
+        self.scheduler = Some(scheduler);
         self
     }
 
@@ -470,32 +477,25 @@ impl SkillExecutor {
         }
     }
 
-    /// Execute a `SkillStep::Schedule` — persist a recurring job in the
-    /// cron store (#3147). The job's prompt runs the named skill with the
-    /// provided inputs when the schedule fires.
+    /// Execute a `SkillStep::Schedule` through the configured scheduler tool.
     async fn execute_schedule_step(
         &self,
         cron: &str,
         skill: &str,
         inputs: &serde_json::Value,
     ) -> Result<String, SkillError> {
-        let store = self.cron_store.clone().ok_or_else(|| {
-            SkillError::Config("scheduler not configured (no cron store wired)".to_string())
+        let scheduler = self.scheduler.as_ref().ok_or_else(|| {
+            SkillError::Config("scheduler not configured (no scheduler tool wired)".to_string())
         })?;
-        let schedule = crate::cron::Schedule::parse(cron)
-            .map_err(|e| SkillError::Config(format!("invalid schedule '{cron}': {e}")))?;
         let prompt = format!(
             "run skill '{}' with inputs {}",
             skill,
             serde_json::to_string(inputs).unwrap_or_else(|_| "{}".to_string())
         );
-        let mut job = crate::cron::CronJob::new(prompt, schedule);
-        job.skills = vec![skill.to_string()];
-
-        let job_id = job.id.clone();
-        let mut jobs = store.load_all().await.map_err(SkillError::Cron)?;
-        jobs.push(job);
-        store.save_all(&jobs).await.map_err(SkillError::Cron)?;
+        let job_id = scheduler
+            .create_job(prompt, cron, vec![skill.to_string()], None, None)
+            .await
+            .map_err(|e| SkillError::Config(e.to_string()))?;
         Ok(format!("scheduled job {job_id}: {cron}"))
     }
 }
@@ -920,6 +920,74 @@ mod tests {
             "got: {}",
             result.output
         );
+    }
+
+    #[tokio::test]
+    async fn schedule_step_persists_orchestrator_agent_when_scheduler_wired() {
+        use crate::tools::scheduler::{OrchestratorScheduleStore, ScheduleTool};
+
+        let temp_dir = TempDir::new().unwrap();
+        let base_config = temp_dir.path().join("orchestrator.toml");
+        let fragment = temp_dir.path().join("tinyclaw-schedules.toml");
+        std::fs::write(
+            &base_config,
+            format!(
+                r#"
+working_dir = "{}"
+include = ["tinyclaw-schedules.toml"]
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.10
+moderate_threshold = 0.20
+severe_threshold = 0.40
+critical_threshold = 0.70
+
+[compound_review]
+schedule = "0 2 * * *"
+max_duration_secs = 1800
+repo_path = "{}"
+create_prs = false
+"#,
+                temp_dir.path().display(),
+                temp_dir.path().display()
+            ),
+        )
+        .unwrap();
+
+        let scheduler = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(fragment));
+        let executor = SkillExecutor::new(temp_dir.path())
+            .unwrap()
+            .with_scheduler_tool(Arc::new(scheduler));
+
+        let skill = Skill {
+            name: "sched-skill-orchestrator".to_string(),
+            version: "1.0.0".to_string(),
+            description: "schedules an orchestrator agent".to_string(),
+            author: None,
+            steps: vec![SkillStep::Schedule {
+                cron: "0 9 * * *".to_string(),
+                skill: "daily-report".to_string(),
+                inputs: serde_json::json!({"topic": "ops"}),
+            }],
+            inputs: vec![],
+        };
+
+        let result = executor
+            .execute_skill(&skill, HashMap::new(), None)
+            .await
+            .unwrap();
+        assert!(
+            result.output.contains("scheduled job"),
+            "got: {}",
+            result.output
+        );
+
+        let config = terraphim_orchestrator::OrchestratorConfig::from_file(&base_config).unwrap();
+        let agent = config.agents.first().expect("generated agent");
+        assert_eq!(agent.schedule.as_deref(), Some("0 9 * * *"));
+        assert_eq!(agent.skill_chain, vec!["daily-report".to_string()]);
+        assert!(agent.task.contains("\"topic\":\"ops\""));
     }
 
     #[tokio::test]

@@ -136,6 +136,7 @@ terraphim_spawner = { path = "../terraphim_spawner" }
 terraphim_engine_events = { path = "../terraphim_engine_events" }
 # Provider/ProviderType/Capability types used by the subagent tool.
 terraphim_types = { version = "1.20.2", registry = "terraphim" }
+terraphim_orchestrator = { version = "1.20.2", registry = "terraphim" }
 
 # Wave 5 (Phase C1) dashboard: axum-based HTTP server (Hermes parity).
 axum = { version = "0.8", features = ["macros"] }

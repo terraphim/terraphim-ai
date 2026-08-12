@@ -275,11 +275,11 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Skill { command } => {
             log::info!("Executing skill command");
-            run_skill_command(command).await?;
+            run_skill_command(command, &config.scheduler).await?;
         }
         Commands::Schedule { command } => {
             log::info!("Executing schedule command");
-            run_schedule_command(command).await?;
+            run_schedule_command(command, &config.scheduler).await?;
         }
         Commands::Mcp { serve } => {
             log::info!("Starting MCP server mode");
@@ -790,9 +790,19 @@ fn build_router(config: &Config) -> anyhow::Result<HybridLlmRouter> {
     ))
 }
 
-async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
-    let executor = SkillExecutor::with_default_storage()
+async fn run_skill_command(
+    command: SkillCommands,
+    scheduler_cfg: &terraphim_tinyclaw::config::SchedulerConfig,
+) -> anyhow::Result<()> {
+    let mut executor = SkillExecutor::with_default_storage()
         .map_err(|e| anyhow::anyhow!("Failed to initialize skill executor: {}", e))?;
+    if scheduler_cfg.enabled {
+        let scheduler =
+            terraphim_tinyclaw::tools::scheduler::ScheduleTool::from_config(scheduler_cfg)
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+        executor = executor.with_scheduler_tool(std::sync::Arc::new(scheduler));
+    }
 
     match command {
         SkillCommands::Save { path } => {
@@ -1026,18 +1036,18 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
 
 /// Execute a schedule subcommand (Hermes parity cron surface, #3147).
 ///
-/// Persists via `terraphim_persistence::DeviceStorage` (same store type
-/// as the dashboard cron CRUD); shares helpers with `ScheduleTool` so the
-/// CLI and the agent-loop tool cannot drift.
-async fn run_schedule_command(command: ScheduleCommands) -> anyhow::Result<()> {
-    use terraphim_tinyclaw::cron::CronStore;
+/// Persists via the configured `terraphim_orchestrator` include fragment;
+/// shares helpers with `ScheduleTool` so the CLI and agent-loop tool cannot
+/// drift.
+async fn run_schedule_command(
+    command: ScheduleCommands,
+    cfg: &terraphim_tinyclaw::config::SchedulerConfig,
+) -> anyhow::Result<()> {
     use terraphim_tinyclaw::tools::scheduler::ScheduleTool;
 
-    let storage = terraphim_persistence::DeviceStorage::arc_instance()
+    let tool = ScheduleTool::from_config(cfg)
         .await
-        .map_err(|e| anyhow::anyhow!("Device storage unavailable: {e}"))?;
-    let store = CronStore::new(storage, "tinyclaw_schedules");
-    let tool = ScheduleTool::new(store);
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     match command {
         ScheduleCommands::Create {
@@ -1063,8 +1073,8 @@ async fn run_schedule_command(command: ScheduleCommands) -> anyhow::Result<()> {
                 println!("Schedules ({} total):", jobs.len());
                 for job in jobs {
                     println!(
-                        "  • {} - {} | state={:?} | enabled={} | next={:?}",
-                        job.id, job.prompt, job.state, job.enabled, job.next_run_at
+                        "  • {} - {} | schedule={} | state={} | enabled={} | next={:?}",
+                        job.id, job.prompt, job.schedule, job.state, job.enabled, job.next_run_at
                     );
                 }
             }

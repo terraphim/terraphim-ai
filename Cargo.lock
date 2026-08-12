@@ -9677,6 +9677,7 @@ dependencies = [
  "tempfile",
  "terraphim_engine_events",
  "terraphim_mcp_search 0.1.3 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
+ "terraphim_orchestrator 1.21.0 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
  "terraphim_persistence",
  "terraphim_rlm",
  "terraphim_spawner 1.21.0",
