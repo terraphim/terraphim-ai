@@ -1,31 +1,38 @@
 //! Email channel adapter (JMAP inbound / SMTP outbound).
 //!
-//! Inbound side leverages the `jmap_client` crate from the
-//! `terraphim-private` workspace (path dep). Outbound is a stub since
-//! sending JMAP `Email/set` requires SMTP for cross-provider delivery.
+//! Inbound side leverages the `haystack_jmap` crate (terraphim registry;
+//! moved out of `terraphim-private` into the `terraphim-service` crates
+//! repo, #3198). Outbound is a stub since sending JMAP `Email/set`
+//! requires SMTP for cross-provider delivery.
 //!
 //! The architectural shape matches Hermes' `gateway/channels/email.py`:
-//! - Inbound: email-search poll via `jmap_client::JMAPClient::search_emails`
+//! - Inbound: email-search poll via `haystack_jmap::JMAPClient::search_emails`
 //! - Outbound: SMTP send (stub)
-//! - Allowlist: `jmap_client::Email::from` field drives `is_allowed`
+//! - Allowlist: `haystack_jmap::Email::from` field drives `is_allowed`
 //!
-//! Type re-use: `jmap_client::{Email, EmailAddress}` are used throughout
+//! Type re-use: `haystack_jmap::{Email, EmailAddress}` are used throughout
 //! so the channel's data shape matches the JMAP spec.
 
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::channel::Channel;
 use async_trait::async_trait;
-use jmap_client::{Email, JMAPClient};
+use haystack_jmap::{Email, JMAPClient};
 use std::sync::Arc;
 
 /// Email channel identifier.
 pub const CHANNEL_NAME: &str = "email";
+
+/// Default bound on inbound search results per poll.
+const SEARCH_LIMIT: u32 = 20;
 
 /// Configuration for the email channel.
 #[derive(Clone)]
 pub struct EmailConfig {
     /// JMAP access token (Bearer credential).
     pub jmap_access_token: String,
+    /// JMAP session endpoint URL (required to connect; e.g.
+    /// `https://api.fastmail.com/jmap/session`).
+    pub jmap_session_url: String,
     /// SMTP server hostname (for outbound).
     pub smtp_host: String,
     /// From-address to send as.
@@ -40,6 +47,7 @@ impl std::fmt::Debug for EmailConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EmailConfig")
             .field("jmap_access_token", &"***REDACTED***")
+            .field("jmap_session_url", &self.jmap_session_url)
             .field("smtp_host", &self.smtp_host)
             .field("from_address", &self.from_address)
             .field("allow_from", &self.allow_from)
@@ -51,6 +59,7 @@ impl Default for EmailConfig {
     fn default() -> Self {
         Self {
             jmap_access_token: String::new(),
+            jmap_session_url: String::new(),
             smtp_host: "smtp.example.com".into(),
             from_address: "agent@example.com".into(),
             allow_from: vec!["alice@example.com".into()],
@@ -81,7 +90,16 @@ impl EmailChannel {
     /// accepts the token. For Wave 4 parity tests we don't call this —
     /// we work directly with parsed `Email` fixtures.
     pub async fn connect(&self) -> anyhow::Result<()> {
-        let client = JMAPClient::new(self.config.jmap_access_token.clone()).await?;
+        if self.config.jmap_session_url.is_empty() {
+            anyhow::bail!(
+                "jmap_session_url is required to connect (set it in the email channel config)"
+            );
+        }
+        let client = JMAPClient::new(
+            self.config.jmap_access_token.clone(),
+            &self.config.jmap_session_url,
+        )
+        .await?;
         *self.client.lock().await = Some(client);
         Ok(())
     }
@@ -90,7 +108,7 @@ impl EmailChannel {
     pub async fn search_emails(&self, query: &str) -> anyhow::Result<Vec<Email>> {
         let guard = self.client.lock().await;
         match guard.as_ref() {
-            Some(client) => Ok(client.search_emails(query).await?),
+            Some(client) => Ok(client.search_emails(query, SEARCH_LIMIT).await?),
             None => Ok(Vec::new()),
         }
     }
@@ -154,13 +172,13 @@ impl Channel for EmailChannel {
     }
 }
 
-/// Re-export common JMAP types so channel consumers don't need jmap_client.
-pub use jmap_client::{BodyValue, Email as JmapEmail, EmailAddress as JmapEmailAddress};
+/// Re-export common JMAP types so channel consumers don't need the crate.
+pub use haystack_jmap::{BodyValue, Email as JmapEmail, EmailAddress as JmapEmailAddress};
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jmap_client::{BodyValue, EmailAddress};
+    use haystack_jmap::{BodyValue, EmailAddress};
     use std::collections::HashMap;
 
     fn make_email(from_email: &str, body: &str) -> Email {
@@ -228,5 +246,15 @@ mod tests {
             ..Default::default()
         });
         assert!(ch.is_allowed("anyone@example.com"));
+    }
+
+    #[tokio::test]
+    async fn connect_requires_session_url() {
+        let ch = EmailChannel::new(EmailConfig::default());
+        let err = ch.connect().await.expect_err("empty session url must fail");
+        assert!(
+            err.to_string().contains("jmap_session_url"),
+            "error should mention jmap_session_url, got: {err}"
+        );
     }
 }

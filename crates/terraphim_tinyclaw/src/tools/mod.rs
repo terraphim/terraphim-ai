@@ -5,6 +5,7 @@ pub mod browser;
 pub mod edit;
 pub mod filesystem;
 pub mod sandbox;
+pub mod scheduler;
 pub mod session_tools;
 pub mod shell;
 pub mod subagent;
@@ -166,8 +167,16 @@ pub async fn create_default_registry(
     web_tools_config: Option<&crate::config::WebToolsConfig>,
     memory_config: Option<&crate::config::MemoryConfig>,
 ) -> ToolRegistry {
-    create_default_registry_with_parity(sessions, web_tools_config, memory_config, None, None, None)
-        .await
+    create_default_registry_with_parity(
+        sessions,
+        web_tools_config,
+        memory_config,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await
 }
 
 /// Create a standard tool registry including the Hermes-parity tools
@@ -179,6 +188,7 @@ pub async fn create_default_registry_with_parity(
     sandbox_config: Option<&crate::config::SandboxConfig>,
     subagent_config: Option<&crate::config::SubagentConfig>,
     browser_config: Option<&crate::config::BrowserConfig>,
+    scheduler_config: Option<&crate::config::SchedulerConfig>,
 ) -> ToolRegistry {
     use crate::tools::agent_memory::{
         AgentMemoryConfig, LearnCaptureTool, MemoryApplyTool, MemoryCaptureTool, MemoryRetrieveTool,
@@ -239,6 +249,14 @@ pub async fn create_default_registry_with_parity(
         match crate::tools::browser::BrowserTool::from_config(cfg) {
             Ok(tool) => registry.register(Box::new(tool)),
             Err(e) => log::warn!("browser tool disabled: {}", e),
+        }
+    }
+    if let Some(cfg) = scheduler_config
+        && cfg.enabled
+    {
+        match crate::tools::scheduler::ScheduleTool::from_config(cfg).await {
+            Ok(tool) => registry.register(Box::new(tool)),
+            Err(e) => log::warn!("schedule tool disabled: {}", e),
         }
     }
 

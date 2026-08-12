@@ -333,7 +333,7 @@ checksum = "31b698c5f9a010f6573133b09e0de5408834d0c82f8d7475a89fc1867a71cd90"
 dependencies = [
  "axum-core",
  "axum-macros",
- "base64 0.22.1",
+ "base64",
  "bytes",
  "form_urlencoded",
  "futures-util",
@@ -431,12 +431,6 @@ dependencies = [
  "gloo-timers",
  "tokio",
 ]
-
-[[package]]
-name = "base64"
-version = "0.21.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "base64"
@@ -590,7 +584,7 @@ version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9d0a013e3d3ee4edd61e779adf117944c08902d375f18630a0c5b8f95659734"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "bollard-stubs",
  "bytes",
  "futures-core",
@@ -2758,7 +2752,7 @@ version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d12aba7e9dc2c4d54654566dc3dc8383b5cb52e0cfc5754989afe0480d933e3"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "bytes",
  "derive_more 2.1.1",
  "eventsource-stream",
@@ -2928,7 +2922,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a36196423282adb0c0b5593c70fcb0ced9dab19a6651db49eea344273a9e7d7"
 dependencies = [
  "anyhow",
- "haystack_core 1.20.3",
+ "haystack_core 1.20.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -3061,18 +3055,38 @@ dependencies = [
 
 [[package]]
 name = "haystack_core"
-version = "0.2.0"
-dependencies = [
- "terraphim_types 0.2.0",
-]
-
-[[package]]
-name = "haystack_core"
 version = "1.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae7488495f75998a1e9092623b1c5e2dfb7784132e336fbf370647ed2ec1f3d7"
 dependencies = [
  "terraphim_types 1.20.4",
+]
+
+[[package]]
+name = "haystack_core"
+version = "1.20.3"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "ae07088aaefd89fc2cbd6163cbcaf3346590dead245cb71e2c7f2cd6b80c89e7"
+dependencies = [
+ "terraphim_types 1.20.2",
+]
+
+[[package]]
+name = "haystack_jmap"
+version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "4f854d47e93374fedb663686cd6a77e71c29821ea0cccfe6cab4710dafcc2601"
+dependencies = [
+ "anyhow",
+ "clap",
+ "env_logger",
+ "haystack_core 1.20.3 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "terraphim_types 1.20.2",
+ "tokio",
 ]
 
 [[package]]
@@ -3356,7 +3370,7 @@ version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96547c2556ec9d12fb1578c4eaf448b04993e7fb79cbaad930a656880a6bdfa0"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "bytes",
  "futures-channel",
  "futures-util",
@@ -3785,21 +3799,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jmap_client"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "base64 0.21.7",
- "clap",
- "haystack_core 0.2.0",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "terraphim_types 0.2.0",
- "tokio",
-]
-
-[[package]]
 name = "jni"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3919,7 +3918,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b8f66fe41fa46a5c83ed1c717b7e0b4635988f427083108c8cf0a882cc13441"
 dependencies = [
  "ahash",
- "base64 0.22.1",
+ "base64",
  "bytecount",
  "email_address",
  "fancy-regex 0.14.0",
@@ -4980,7 +4979,7 @@ checksum = "42afda58fa2cf50914402d132cc1caacff116a85d10c72ab2082bb7c50021754"
 dependencies = [
  "anyhow",
  "backon",
- "base64 0.22.1",
+ "base64",
  "bb8",
  "bytes",
  "chrono",
@@ -5739,7 +5738,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
@@ -6290,7 +6289,7 @@ checksum = "43451dbf3590a7590684c25fb8d12ecdcc90ed3ac123433e500447c7d77ed701"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64",
  "chrono",
  "form_urlencoded",
  "getrandom 0.2.17",
@@ -6317,9 +6316,8 @@ version = "0.12.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eddd3ca559203180a307f12d114c268abf583f59b03cb906fd0b3ff8646c1147"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "bytes",
- "encoding_rs",
  "futures-channel",
  "futures-core",
  "futures-util",
@@ -6333,7 +6331,6 @@ dependencies = [
  "hyper-util",
  "js-sys",
  "log",
- "mime",
  "mime_guess",
  "native-tls",
  "percent-encoding",
@@ -6366,7 +6363,7 @@ version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "219c5811de6525e5416c7d5d53bb656d3afdbc6c5af816e0802bcfa42dbdc1c3"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -6504,7 +6501,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eaa07b85b779d1e1df52dd79f6c6bffbe005b191f07290136cc42a142da3409a"
 dependencies = [
  "async-trait",
- "base64 0.22.1",
+ "base64",
  "chrono",
  "futures",
  "paste",
@@ -7216,7 +7213,7 @@ version = "3.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76a5c54c7310e7b8b9577c286d7e399ddd876c3e12b3ed917a8aabc4b96e9e8c"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "bs58",
  "chrono",
  "hex",
@@ -7263,7 +7260,7 @@ checksum = "9bde37f42765dfdc34e2a039e0c84afbf79a3101c1941763b0beb816c2f17541"
 dependencies = [
  "arrayvec",
  "async-trait",
- "base64 0.22.1",
+ "base64",
  "bitflags 2.13.0",
  "bytes",
  "chrono",
@@ -7533,7 +7530,7 @@ checksum = "9f38066ac7c15d2546c47b787c8f1f6070c5182f738202fb5a7c843f138f3a82"
 dependencies = [
  "async-recursion",
  "async-trait",
- "base64 0.22.1",
+ "base64",
  "bytes",
  "chrono",
  "ctrlc",
@@ -7624,7 +7621,7 @@ version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee6798b1838b6a0f69c007c133b8df5866302197e404e8b6ee8ed3e3a5e68dc6"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "bytes",
  "crc",
  "crossbeam-queue",
@@ -7699,7 +7696,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa003f0038df784eb8fecbbac13affe3da23b45194bd57dba231c8f48199c526"
 dependencies = [
  "atoi",
- "base64 0.22.1",
+ "base64",
  "bitflags 2.13.0",
  "byteorder",
  "bytes",
@@ -7741,7 +7738,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db58fcd5a53cf07c184b154801ff91347e4c30d17a3562a635ff028ad5deda46"
 dependencies = [
  "atoi",
- "base64 0.22.1",
+ "base64",
  "bitflags 2.13.0",
  "byteorder",
  "crc",
@@ -8356,7 +8353,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4676b37242ccbd1aabf56edb093a4827dc49086c0ffd764a5705899e0f35f8f7"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64",
  "bitflags 2.13.0",
  "fancy-regex 0.11.0",
  "filedescriptor",
@@ -8883,7 +8880,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum",
- "base64 0.22.1",
+ "base64",
  "chrono",
  "env_logger",
  "flate2",
@@ -9522,9 +9519,9 @@ dependencies = [
  "dirs 5.0.1",
  "env_home",
  "env_logger",
+ "haystack_jmap",
  "hmac 0.12.1",
  "hound",
- "jmap_client",
  "log",
  "opendal",
  "parking_lot 0.12.5",
@@ -9594,22 +9591,6 @@ dependencies = [
 
 [[package]]
 name = "terraphim_types"
-version = "0.2.0"
-dependencies = [
- "ahash",
- "anyhow",
- "chrono",
- "log",
- "schemars 0.8.22",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "ulid",
- "uuid",
-]
-
-[[package]]
-name = "terraphim_types"
 version = "1.20.2"
 source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
 checksum = "5d531933df3b41b48a6dd93602f2fbce8e0b1cfb487078ca3a5db414ca492a07"
@@ -9657,7 +9638,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19c002d52ff39f108966b236717cddc3c78039819a7c34e262ea39c3b84ec766"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64",
  "chrono",
  "dialoguer",
  "dirs 5.0.1",
@@ -9683,7 +9664,7 @@ name = "terraphim_update"
 version = "1.21.0"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64",
  "chrono",
  "dialoguer",
  "dirs 5.0.1",
@@ -10677,7 +10658,7 @@ version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02d1a66277ed75f640d608235660df48c8e3c19f3b4edb6a263315626cc3c01d"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "flate2",
  "log",
  "once_cell",
@@ -10693,7 +10674,7 @@ version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dea7109cdcd5864d4eeb1b58a1648dc9bf520360d7af16ec26d0a9354bafcfc0"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "flate2",
  "log",
  "percent-encoding",
@@ -10710,7 +10691,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e994ba84b0bd1b1b0cf92878b7ef898a5c1760108fe7b6010327e274917a808c"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "http",
  "httparse",
  "log",
@@ -11872,7 +11853,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a55ebb27e67d9a9d116dd3a19637ee8cc0570c8ef816fb504c453f15448c99"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "ed25519-dalek",
  "thiserror 2.0.18",
  "zip 7.2.0",

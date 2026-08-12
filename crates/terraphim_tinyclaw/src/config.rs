@@ -47,6 +47,13 @@ pub struct Config {
     /// binary has web_operations disabled).
     #[serde(default)]
     pub browser: BrowserConfig,
+
+    /// Scheduler configuration (#3147). **Default: disabled.**
+    /// When `scheduler.enabled = true`, `ScheduleTool` (create/list/delete)
+    /// is registered for the agent loop; the `schedule` CLI subcommand
+    /// shares the same store.
+    #[serde(default)]
+    pub scheduler: SchedulerConfig,
 }
 
 impl Config {
@@ -1220,6 +1227,36 @@ impl Default for BrowserConfig {
     }
 }
 
+/// Scheduler configuration (Hermes-parity cron surface, #3147).
+///
+/// Enables the `schedule` tool for the agent loop plus the
+/// `terraphim-tinyclaw schedule` CLI subcommand. Jobs are persisted via
+/// `terraphim_persistence::DeviceStorage` (same store type as the
+/// dashboard cron CRUD).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SchedulerConfig {
+    /// Master switch. `false` = no schedule tool registered.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Storage key for the schedule job index document.
+    #[serde(default = "default_scheduler_store_key")]
+    pub store_key: String,
+}
+
+fn default_scheduler_store_key() -> String {
+    "tinyclaw_schedules".to_string()
+}
+
+impl Default for SchedulerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            store_key: default_scheduler_store_key(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod credentials_config_tests {
     use super::*;
@@ -1402,5 +1439,20 @@ proxy = "http://localhost:8080"
         assert_eq!(cfg.max_bytes, 1024);
         assert_eq!(cfg.proxy.as_deref(), Some("http://localhost:8080"));
         assert_eq!(cfg.timeout_secs, 30);
+    }
+
+    #[test]
+    fn scheduler_config_defaults_and_parse() {
+        let cfg = SchedulerConfig::default();
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.store_key, "tinyclaw_schedules");
+
+        let toml = r#"
+enabled = true
+store_key = "custom_schedules"
+"#;
+        let cfg: SchedulerConfig = toml::from_str(toml).expect("parse");
+        assert!(cfg.enabled);
+        assert_eq!(cfg.store_key, "custom_schedules");
     }
 }

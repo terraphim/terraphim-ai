@@ -18,7 +18,7 @@ use terraphim_tinyclaw::credentials::{
 };
 use terraphim_tinyclaw::session::SessionManager;
 use terraphim_tinyclaw::skills::{Skill, SkillExecutor};
-use terraphim_tinyclaw::tools::create_default_registry;
+use terraphim_tinyclaw::tools::create_default_registry_with_parity;
 
 /// Multi-channel AI assistant powered by Terraphim.
 #[derive(Parser, Debug)]
@@ -52,6 +52,11 @@ enum Commands {
     Skill {
         #[command(subcommand)]
         command: SkillCommands,
+    },
+    /// Manage recurring schedules (Hermes parity, #3147).
+    Schedule {
+        #[command(subcommand)]
+        command: ScheduleCommands,
     },
     /// Start MCP server on stdio (9-tool channel bridge).
     Mcp {
@@ -97,6 +102,35 @@ enum SkillCommands {
         /// Maximum number of results to display. 0 = no limit.
         #[arg(long, default_value_t = 10)]
         limit: usize,
+    },
+}
+
+/// Schedule subcommands (Hermes-parity cron surface, #3147).
+#[derive(Subcommand, Debug)]
+enum ScheduleCommands {
+    /// Create a recurring schedule. Returns the job id.
+    Create {
+        /// Task prompt to run when the schedule fires.
+        prompt: String,
+        /// Schedule expression: cron ('0 9 * * *'), 'every 30m',
+        /// RFC3339 timestamp, or relative delay ('2h').
+        schedule: String,
+        /// Skill(s) to inject at job start (repeatable).
+        #[arg(long)]
+        skill: Vec<String>,
+        /// Delivery target (e.g. telegram chat id).
+        #[arg(long)]
+        deliver: Option<String>,
+        /// Model override for the job.
+        #[arg(long)]
+        model: Option<String>,
+    },
+    /// List all stored schedules.
+    List,
+    /// Delete a schedule by id.
+    Delete {
+        /// Job id (from `schedule list`).
+        id: String,
     },
 }
 
@@ -147,6 +181,10 @@ async fn main() -> anyhow::Result<()> {
             log::info!("Executing skill command");
             run_skill_command(command).await?;
         }
+        Commands::Schedule { command } => {
+            log::info!("Executing schedule command");
+            run_schedule_command(command).await?;
+        }
         Commands::Mcp { serve } => {
             log::info!("Starting MCP server mode");
             run_mcp_mode(config, serve).await?;
@@ -180,7 +218,8 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     let sessions_dir = config.agent.workspace.join("sessions");
     let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
 
-    // Create tool registry with session manager
+    // Create tool registry with session manager + Hermes-parity tools
+    // (sandbox / subagent / browser / scheduler, each gated by config).
     let web_tools_config = config.tools.web.as_ref();
     let memory_config = if config.memory.enabled {
         Some(&config.memory)
@@ -188,7 +227,16 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
         None
     };
     let tools = Arc::new(
-        create_default_registry(Some(sessions.clone()), web_tools_config, memory_config).await,
+        create_default_registry_with_parity(
+            Some(sessions.clone()),
+            web_tools_config,
+            memory_config,
+            Some(&config.sandbox),
+            Some(&config.subagent),
+            Some(&config.browser),
+            Some(&config.scheduler),
+        )
+        .await,
     );
 
     // Create hybrid LLM router
@@ -249,7 +297,16 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
         None
     };
     let tools = Arc::new(
-        create_default_registry(Some(sessions.clone()), web_tools_config, memory_config_gw).await,
+        create_default_registry_with_parity(
+            Some(sessions.clone()),
+            web_tools_config,
+            memory_config_gw,
+            Some(&config.sandbox),
+            Some(&config.subagent),
+            Some(&config.browser),
+            Some(&config.scheduler),
+        )
+        .await,
     );
 
     // Create hybrid LLM router
@@ -472,6 +529,9 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
                     }
                     terraphim_tinyclaw::skills::SkillStep::Llm { .. } => "llm".to_string(),
                     terraphim_tinyclaw::skills::SkillStep::Shell { .. } => "shell".to_string(),
+                    terraphim_tinyclaw::skills::SkillStep::Schedule { cron, .. } => {
+                        format!("schedule: {}", cron)
+                    }
                 };
                 println!("  {}. {}", i + 1, step_type);
             }
@@ -583,6 +643,9 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
                             terraphim_tinyclaw::skills::SkillStep::Shell { .. } => {
                                 "shell".to_string()
                             }
+                            terraphim_tinyclaw::skills::SkillStep::Schedule { .. } => {
+                                "schedule".to_string()
+                            }
                         })
                         .collect();
                     if let Some(author) = &s.author {
@@ -630,6 +693,67 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
                         format!(" [{}]", entry.tags.join(", "))
                     }
                 );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Execute a schedule subcommand (Hermes parity cron surface, #3147).
+///
+/// Persists via `terraphim_persistence::DeviceStorage` (same store type
+/// as the dashboard cron CRUD); shares helpers with `ScheduleTool` so the
+/// CLI and the agent-loop tool cannot drift.
+async fn run_schedule_command(command: ScheduleCommands) -> anyhow::Result<()> {
+    use terraphim_tinyclaw::cron::CronStore;
+    use terraphim_tinyclaw::tools::scheduler::ScheduleTool;
+
+    let storage = terraphim_persistence::DeviceStorage::arc_instance()
+        .await
+        .map_err(|e| anyhow::anyhow!("Device storage unavailable: {e}"))?;
+    let store = CronStore::new(storage, "tinyclaw_schedules");
+    let tool = ScheduleTool::new(store);
+
+    match command {
+        ScheduleCommands::Create {
+            prompt,
+            schedule,
+            skill,
+            deliver,
+            model,
+        } => {
+            let id = tool
+                .create_job(prompt.clone(), &schedule, skill, deliver, model)
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            println!("✓ Schedule created: {id}");
+            println!("  prompt:   {prompt}");
+            println!("  schedule: {schedule}");
+        }
+        ScheduleCommands::List => {
+            let jobs = tool.list_jobs().await.map_err(|e| anyhow::anyhow!("{e}"))?;
+            if jobs.is_empty() {
+                println!("No schedules. Use 'schedule create' to add one.");
+            } else {
+                println!("Schedules ({} total):", jobs.len());
+                for job in jobs {
+                    println!(
+                        "  • {} - {} | state={:?} | enabled={} | next={:?}",
+                        job.id, job.prompt, job.state, job.enabled, job.next_run_at
+                    );
+                }
+            }
+        }
+        ScheduleCommands::Delete { id } => {
+            let removed = tool
+                .delete_job(&id)
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            if removed {
+                println!("✓ Schedule deleted: {id}");
+            } else {
+                anyhow::bail!("Schedule '{id}' not found (use 'schedule list' to see ids)");
             }
         }
     }
