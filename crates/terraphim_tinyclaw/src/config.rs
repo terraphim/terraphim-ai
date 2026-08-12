@@ -1290,6 +1290,12 @@ pub struct BrowserConfig {
     /// Optional proxy URL (e.g. `http://proxy:8080`).
     #[serde(default)]
     pub proxy: Option<String>,
+
+    /// `terraphim-agent` binary used only to probe browser-native web
+    /// operation availability. Navigate/extract/api continue to use the
+    /// in-process reqwest backend.
+    #[serde(default = "default_browser_agent_binary")]
+    pub agent_binary: Option<String>,
 }
 
 fn default_browser_timeout() -> u64 {
@@ -1300,6 +1306,10 @@ fn default_browser_max_bytes() -> usize {
     512 * 1024
 }
 
+fn default_browser_agent_binary() -> Option<String> {
+    Some("terraphim-agent".to_string())
+}
+
 impl Default for BrowserConfig {
     fn default() -> Self {
         Self {
@@ -1307,6 +1317,7 @@ impl Default for BrowserConfig {
             timeout_secs: default_browser_timeout(),
             max_bytes: default_browser_max_bytes(),
             proxy: None,
+            agent_binary: default_browser_agent_binary(),
         }
     }
 }
@@ -1872,16 +1883,19 @@ timeout_secs = 30
         let cfg = BrowserConfig::default();
         assert!(!cfg.enabled);
         assert_eq!(cfg.timeout_secs, 30);
+        assert_eq!(cfg.agent_binary.as_deref(), Some("terraphim-agent"));
 
         let toml = r#"
 enabled = true
 max_bytes = 1024
 proxy = "http://localhost:8080"
+agent_binary = "/opt/terraphim-agent"
 "#;
         let cfg: BrowserConfig = toml::from_str(toml).expect("parse");
         assert!(cfg.enabled);
         assert_eq!(cfg.max_bytes, 1024);
         assert_eq!(cfg.proxy.as_deref(), Some("http://localhost:8080"));
+        assert_eq!(cfg.agent_binary.as_deref(), Some("/opt/terraphim-agent"));
         assert_eq!(cfg.timeout_secs, 30);
     }
 
