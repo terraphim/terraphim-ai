@@ -133,6 +133,7 @@ async fn browser_click_type_screenshot_unavailable() {
     }
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn browser_native_ops_probe_agent_capability_and_fail_closed_when_disabled() {
     let temp = tempfile::tempdir().unwrap();
@@ -166,6 +167,7 @@ exit 2
     }
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn browser_native_ops_reject_placeholder_agent_web_protocol() {
     let temp = tempfile::tempdir().unwrap();
