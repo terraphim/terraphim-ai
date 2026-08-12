@@ -955,7 +955,9 @@ create_prs = false
         )
         .unwrap();
 
-        let scheduler = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(fragment));
+        let scheduler = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+            fragment, "echo",
+        ));
         let executor = SkillExecutor::new(temp_dir.path())
             .unwrap()
             .with_scheduler_tool(Arc::new(scheduler));
