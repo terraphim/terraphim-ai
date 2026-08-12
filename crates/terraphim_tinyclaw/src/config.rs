@@ -124,6 +124,7 @@ impl Config {
         self.agent.validate()?;
         self.channels.validate()?;
         self.llm.validate()?;
+        self.scheduler.validate()?;
         Ok(())
     }
 
@@ -1336,6 +1337,14 @@ pub struct SchedulerConfig {
     /// CLI tool recorded on generated orchestrator scheduled agents.
     #[serde(default = "default_scheduler_cli_tool")]
     pub cli_tool: String,
+
+    /// Optional orchestrator project id recorded on generated agents.
+    ///
+    /// Set this when `orchestrator_schedule_file` is included by a
+    /// multi-project orchestrator config. Leave unset for legacy
+    /// single-project configs.
+    #[serde(default)]
+    pub project: Option<String>,
 }
 
 fn default_scheduler_store_key() -> String {
@@ -1353,7 +1362,22 @@ impl Default for SchedulerConfig {
             store_key: default_scheduler_store_key(),
             orchestrator_schedule_file: None,
             cli_tool: default_scheduler_cli_tool(),
+            project: None,
         }
+    }
+}
+
+impl SchedulerConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.cli_tool.trim().is_empty() {
+            anyhow::bail!("scheduler.cli_tool cannot be empty");
+        }
+        if let Some(project) = &self.project
+            && project.trim().is_empty()
+        {
+            anyhow::bail!("scheduler.project cannot be empty");
+        }
+        Ok(())
     }
 }
 
@@ -1853,12 +1877,14 @@ proxy = "http://localhost:8080"
         assert_eq!(cfg.store_key, "tinyclaw_schedules");
         assert!(cfg.orchestrator_schedule_file.is_none());
         assert_eq!(cfg.cli_tool, "terraphim-tinyclaw");
+        assert!(cfg.project.is_none());
 
         let toml = r#"
 enabled = true
 store_key = "custom_schedules"
 orchestrator_schedule_file = "/tmp/tinyclaw-schedules.toml"
 cli_tool = "codex"
+project = "tinyclaw"
 "#;
         let cfg: SchedulerConfig = toml::from_str(toml).expect("parse");
         assert!(cfg.enabled);
@@ -1868,5 +1894,17 @@ cli_tool = "codex"
             Some(PathBuf::from("/tmp/tinyclaw-schedules.toml"))
         );
         assert_eq!(cfg.cli_tool, "codex");
+        assert_eq!(cfg.project.as_deref(), Some("tinyclaw"));
+        cfg.validate().expect("valid scheduler config");
+    }
+
+    #[test]
+    fn scheduler_config_rejects_blank_project() {
+        let toml = r#"
+project = "  "
+"#;
+        let cfg: SchedulerConfig = toml::from_str(toml).expect("parse");
+        let err = cfg.validate().expect_err("blank project must fail");
+        assert!(err.to_string().contains("scheduler.project"));
     }
 }

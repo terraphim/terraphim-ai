@@ -253,6 +253,221 @@ create_prs = false
 }
 
 #[tokio::test]
+async fn orchestrator_schedule_persists_project_and_validates_in_multi_project_config() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let base_config = temp.path().join("orchestrator.toml");
+    let fragment = temp.path().join("tinyclaw-schedules.toml");
+    std::fs::write(
+        &base_config,
+        format!(
+            r#"
+working_dir = "{}"
+include = ["tinyclaw-schedules.toml"]
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.10
+moderate_threshold = 0.20
+severe_threshold = 0.40
+critical_threshold = 0.70
+
+[compound_review]
+schedule = "0 2 * * *"
+max_duration_secs = 1800
+repo_path = "{}"
+create_prs = false
+
+[[projects]]
+id = "tinyclaw"
+working_dir = "{}"
+"#,
+            temp.path().display(),
+            temp.path().display(),
+            temp.path().display()
+        ),
+    )
+    .expect("write base config");
+
+    let store = OrchestratorScheduleStore::with_project(fragment.clone(), "tinyclaw");
+    let tool = ScheduleTool::new_orchestrator(store);
+    let out = tool
+        .execute(json!({
+            "op": "create",
+            "prompt": "multi-project report",
+            "schedule": "0 9 * * *",
+        }))
+        .await
+        .expect("create should succeed");
+    let v: serde_json::Value = serde_json::from_str(&out).expect("json output");
+    let id = v["id"].as_str().expect("id present").to_string();
+
+    let config = terraphim_orchestrator::OrchestratorConfig::from_file(&base_config)
+        .expect("orchestrator reloads generated schedule fragment");
+    let agent = config
+        .agents
+        .iter()
+        .find(|agent| agent.name == format!("tinyclaw-{id}"))
+        .expect("scheduled agent in orchestrator config");
+    assert_eq!(agent.project.as_deref(), Some("tinyclaw"));
+    config
+        .validate()
+        .expect("merged multi-project config remains valid");
+}
+
+#[tokio::test]
+async fn orchestrator_schedule_unknown_project_fails_validation_clearly() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let base_config = temp.path().join("orchestrator.toml");
+    let fragment = temp.path().join("tinyclaw-schedules.toml");
+    std::fs::write(
+        &base_config,
+        format!(
+            r#"
+working_dir = "{}"
+include = ["tinyclaw-schedules.toml"]
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.10
+moderate_threshold = 0.20
+severe_threshold = 0.40
+critical_threshold = 0.70
+
+[compound_review]
+schedule = "0 2 * * *"
+max_duration_secs = 1800
+repo_path = "{}"
+create_prs = false
+
+[[projects]]
+id = "known"
+working_dir = "{}"
+"#,
+            temp.path().display(),
+            temp.path().display(),
+            temp.path().display()
+        ),
+    )
+    .expect("write base config");
+
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_project(
+        fragment, "missing",
+    ));
+    tool.execute(json!({
+        "op": "create",
+        "prompt": "bad project report",
+        "schedule": "0 9 * * *",
+    }))
+    .await
+    .expect("create writes fragment; orchestrator validates project refs");
+
+    let config = terraphim_orchestrator::OrchestratorConfig::from_file(&base_config)
+        .expect("orchestrator reloads generated schedule fragment");
+    let err = config.validate().expect_err("unknown project must fail");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("tinyclaw-"),
+        "agent name should be clear: {msg}"
+    );
+    assert!(
+        msg.contains("missing"),
+        "unknown project should be clear: {msg}"
+    );
+}
+
+#[tokio::test]
+async fn orchestrator_schedule_missing_project_fails_multi_project_validation_clearly() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let base_config = temp.path().join("orchestrator.toml");
+    let fragment = temp.path().join("tinyclaw-schedules.toml");
+    std::fs::write(
+        &base_config,
+        format!(
+            r#"
+working_dir = "{}"
+include = ["tinyclaw-schedules.toml"]
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.10
+moderate_threshold = 0.20
+severe_threshold = 0.40
+critical_threshold = 0.70
+
+[compound_review]
+schedule = "0 2 * * *"
+max_duration_secs = 1800
+repo_path = "{}"
+create_prs = false
+
+[[projects]]
+id = "known"
+working_dir = "{}"
+"#,
+            temp.path().display(),
+            temp.path().display(),
+            temp.path().display()
+        ),
+    )
+    .expect("write base config");
+
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(fragment));
+    tool.execute(json!({
+        "op": "create",
+        "prompt": "missing project report",
+        "schedule": "0 9 * * *",
+    }))
+    .await
+    .expect("legacy no-project write still succeeds");
+
+    let config = terraphim_orchestrator::OrchestratorConfig::from_file(&base_config)
+        .expect("orchestrator reloads generated schedule fragment");
+    let err = config.validate().expect_err("missing project must fail");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("tinyclaw-"),
+        "agent name should be clear: {msg}"
+    );
+    assert!(
+        msg.contains("project"),
+        "project mode should be clear: {msg}"
+    );
+}
+
+#[tokio::test]
+async fn orchestrator_schedule_rejects_deliver_before_persistence() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("tinyclaw-schedules.toml");
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::new(fragment.clone()));
+
+    let err = tool
+        .execute(json!({
+            "op": "create",
+            "prompt": "deliver somewhere",
+            "schedule": "0 9 * * *",
+            "deliver": "telegram:123",
+        }))
+        .await
+        .expect_err("orchestrator backend must not silently drop deliver");
+
+    match err {
+        ToolError::InvalidArguments { message, .. } => {
+            assert!(message.contains("deliver"), "got: {message}");
+            assert!(message.contains("not supported"), "got: {message}");
+        }
+        other => panic!("expected InvalidArguments, got {other:?}"),
+    }
+    assert!(
+        !fragment.exists(),
+        "deliver rejection must happen before persistence"
+    );
+}
+
+#[tokio::test]
 async fn orchestrator_schedule_rejects_non_cron_expression() {
     common::scrub_env();
     let temp = tempfile::tempdir().expect("tempdir");

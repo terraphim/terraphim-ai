@@ -53,6 +53,8 @@ struct OrchestratorScheduleAgent {
     task: String,
     schedule: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    project: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     model: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     skill_chain: Vec<String>,
@@ -71,6 +73,7 @@ fn default_enabled() -> bool {
 pub struct OrchestratorScheduleStore {
     path: PathBuf,
     cli_tool: String,
+    project: Option<String>,
 }
 
 impl OrchestratorScheduleStore {
@@ -84,6 +87,25 @@ impl OrchestratorScheduleStore {
         Self {
             path,
             cli_tool: cli_tool.into(),
+            project: None,
+        }
+    }
+
+    /// Create a store with an explicit generated-agent project id.
+    pub fn with_project(path: PathBuf, project: impl Into<String>) -> Self {
+        Self::with_cli_tool_and_project(path, "terraphim-tinyclaw", Some(project.into()))
+    }
+
+    /// Create a store with explicit generated-agent CLI tool and project id.
+    pub fn with_cli_tool_and_project(
+        path: PathBuf,
+        cli_tool: impl Into<String>,
+        project: Option<String>,
+    ) -> Self {
+        Self {
+            path,
+            cli_tool: cli_tool.into(),
+            project,
         }
     }
 
@@ -118,9 +140,18 @@ impl OrchestratorScheduleStore {
         prompt: String,
         schedule_expr: &str,
         skills: Vec<String>,
-        _deliver: Option<String>,
+        deliver: Option<String>,
         model: Option<String>,
     ) -> Result<String, ToolError> {
+        if let Some(deliver) = deliver.as_deref().filter(|value| !value.trim().is_empty()) {
+            return Err(ToolError::InvalidArguments {
+                tool: "schedule".to_string(),
+                message: format!(
+                    "deliver target '{deliver}' is not supported by the orchestrator schedule backend; omit deliver or use the local scheduler backend"
+                ),
+            });
+        }
+
         if !terraphim_orchestrator::is_cron_schedule_valid(schedule_expr) {
             return Err(ToolError::InvalidArguments {
                 tool: "schedule".to_string(),
@@ -137,6 +168,7 @@ impl OrchestratorScheduleStore {
             cli_tool: self.cli_tool.clone(),
             task: prompt,
             schedule: schedule_expr.to_string(),
+            project: self.project.clone(),
             model,
             skill_chain: skills,
             capabilities: vec!["tinyclaw-schedule".to_string()],
@@ -196,7 +228,11 @@ impl ScheduleTool {
                     message: "scheduler.orchestrator_schedule_file is required; configure an orchestrator include fragment and include it from orchestrator.toml".to_string(),
                 })?;
         Ok(Self::new_orchestrator(
-            OrchestratorScheduleStore::with_cli_tool(path, cfg.cli_tool.clone()),
+            OrchestratorScheduleStore::with_cli_tool_and_project(
+                path,
+                cfg.cli_tool.clone(),
+                cfg.project.clone(),
+            ),
         ))
     }
 
