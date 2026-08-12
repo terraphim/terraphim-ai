@@ -23,3 +23,5 @@ pub mod email;
 pub mod gitea;
 pub mod github;
 pub mod linear;
+pub mod teams;
+pub mod whatsapp;

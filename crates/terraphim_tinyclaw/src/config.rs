@@ -324,6 +324,11 @@ pub struct ChannelsConfig {
     // Note: matrix config disabled due to sqlite dependency conflict
     // #[cfg(feature = "matrix")]
     // pub matrix: Option<MatrixConfig>,
+    /// WhatsApp Cloud API channel configuration.
+    pub whatsapp: Option<WhatsAppConfig>,
+
+    /// Microsoft Teams Bot Framework channel configuration.
+    pub teams: Option<TeamsConfig>,
 }
 
 impl ChannelsConfig {
@@ -343,6 +348,14 @@ impl ChannelsConfig {
             cfg.validate()?;
         }
 
+        if let Some(ref cfg) = self.whatsapp {
+            cfg.validate()?;
+        }
+
+        if let Some(ref cfg) = self.teams {
+            cfg.validate()?;
+        }
+
         // Note: matrix validation disabled due to sqlite dependency conflict
         // #[cfg(feature = "matrix")]
         // if let Some(ref cfg) = self.matrix {
@@ -351,6 +364,142 @@ impl ChannelsConfig {
 
         Ok(())
     }
+}
+
+/// WhatsApp Cloud API channel configuration.
+#[derive(Clone, Deserialize, Serialize)]
+pub struct WhatsAppConfig {
+    /// Meta Graph API access token.
+    pub access_token: String,
+    /// WhatsApp Business phone number ID used in Cloud API send URLs.
+    pub phone_number_id: String,
+    /// Meta webhook verify token used for GET subscription challenge.
+    pub verify_token: String,
+    /// Meta app secret used for X-Hub-Signature-256 verification.
+    pub app_secret: String,
+    /// Graph API base URL. Defaults to https://graph.facebook.com.
+    #[serde(default = "default_whatsapp_graph_base_url")]
+    pub graph_base_url: String,
+    /// Graph API version path segment. Defaults to v20.0.
+    #[serde(default = "default_whatsapp_api_version")]
+    pub api_version: String,
+    /// List of allowed WhatsApp sender phone numbers. Must be non-empty.
+    pub allow_from: Vec<String>,
+}
+
+impl std::fmt::Debug for WhatsAppConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WhatsAppConfig")
+            .field("access_token", &"***REDACTED***")
+            .field("phone_number_id", &self.phone_number_id)
+            .field("verify_token", &"***REDACTED***")
+            .field("app_secret", &"***REDACTED***")
+            .field("graph_base_url", &self.graph_base_url)
+            .field("api_version", &self.api_version)
+            .field("allow_from", &self.allow_from)
+            .finish()
+    }
+}
+
+impl WhatsAppConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.access_token.trim().is_empty() {
+            anyhow::bail!("whatsapp.access_token cannot be empty");
+        }
+        if self.phone_number_id.trim().is_empty() {
+            anyhow::bail!("whatsapp.phone_number_id cannot be empty");
+        }
+        if self.verify_token.trim().is_empty() {
+            anyhow::bail!("whatsapp.verify_token cannot be empty");
+        }
+        if self.app_secret.trim().is_empty() {
+            anyhow::bail!("whatsapp.app_secret cannot be empty");
+        }
+        if self.graph_base_url.trim().is_empty() {
+            anyhow::bail!("whatsapp.graph_base_url cannot be empty");
+        }
+        if self.api_version.trim().is_empty() {
+            anyhow::bail!("whatsapp.api_version cannot be empty");
+        }
+        if self.allow_from.is_empty() {
+            anyhow::bail!("whatsapp.allow_from cannot be empty");
+        }
+        Ok(())
+    }
+
+    pub fn is_allowed(&self, sender_id: &str) -> bool {
+        crate::channel::is_sender_allowed(&self.allow_from, sender_id)
+    }
+}
+
+fn default_whatsapp_graph_base_url() -> String {
+    "https://graph.facebook.com".to_string()
+}
+
+fn default_whatsapp_api_version() -> String {
+    "v20.0".to_string()
+}
+
+/// Microsoft Teams Bot Framework channel configuration.
+#[derive(Clone, Deserialize, Serialize)]
+pub struct TeamsConfig {
+    /// Microsoft app/client ID for the bot.
+    pub app_id: String,
+    /// Microsoft app password/client secret for the bot.
+    pub app_password: String,
+    /// OAuth token endpoint for Bot Framework client credentials.
+    #[serde(default = "default_teams_token_url")]
+    pub token_url: String,
+    /// OAuth scope for Bot Framework API.
+    #[serde(default = "default_teams_scope")]
+    pub scope: String,
+    /// List of allowed Teams user IDs. Must be non-empty.
+    pub allow_from: Vec<String>,
+}
+
+impl std::fmt::Debug for TeamsConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TeamsConfig")
+            .field("app_id", &self.app_id)
+            .field("app_password", &"***REDACTED***")
+            .field("token_url", &self.token_url)
+            .field("scope", &self.scope)
+            .field("allow_from", &self.allow_from)
+            .finish()
+    }
+}
+
+impl TeamsConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.app_id.trim().is_empty() {
+            anyhow::bail!("teams.app_id cannot be empty");
+        }
+        if self.app_password.trim().is_empty() {
+            anyhow::bail!("teams.app_password cannot be empty");
+        }
+        if self.token_url.trim().is_empty() {
+            anyhow::bail!("teams.token_url cannot be empty");
+        }
+        if self.scope.trim().is_empty() {
+            anyhow::bail!("teams.scope cannot be empty");
+        }
+        if self.allow_from.is_empty() {
+            anyhow::bail!("teams.allow_from cannot be empty");
+        }
+        Ok(())
+    }
+
+    pub fn is_allowed(&self, sender_id: &str) -> bool {
+        crate::channel::is_sender_allowed(&self.allow_from, sender_id)
+    }
+}
+
+fn default_teams_token_url() -> String {
+    "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token".to_string()
+}
+
+fn default_teams_scope() -> String {
+    "https://api.botframework.com/.default".to_string()
 }
 
 /// Telegram channel configuration.
@@ -658,6 +807,92 @@ mod tests {
         // username + homeserver_url are not secrets; verify they render
         assert!(out.contains("@user:example.com"));
         assert!(out.contains("matrix.example.com"));
+    }
+
+    #[test]
+    fn whatsapp_config_debug_redacts_secrets() {
+        let cfg = WhatsAppConfig {
+            access_token: "wa-access-secret".into(),
+            phone_number_id: "phone-id".into(),
+            verify_token: "wa-verify-secret".into(),
+            app_secret: "wa-app-secret".into(),
+            graph_base_url: "https://graph.facebook.com".into(),
+            api_version: "v20.0".into(),
+            allow_from: vec!["15551234567".into()],
+        };
+        let out = format!("{cfg:?}");
+        assert!(!out.contains("wa-access-secret"));
+        assert!(!out.contains("wa-verify-secret"));
+        assert!(!out.contains("wa-app-secret"));
+        assert!(out.contains("phone-id"));
+    }
+
+    #[test]
+    fn teams_config_debug_redacts_secret() {
+        let cfg = TeamsConfig {
+            app_id: "app-id".into(),
+            app_password: "teams-password-secret".into(),
+            token_url: "https://login.microsoftonline.com/token".into(),
+            scope: "https://api.botframework.com/.default".into(),
+            allow_from: vec!["29:user".into()],
+        };
+        let out = format!("{cfg:?}");
+        assert!(out.contains("app-id"));
+        assert!(!out.contains("teams-password-secret"));
+    }
+
+    #[test]
+    fn channel_config_parses_whatsapp_and_teams_defaults() {
+        let toml = r#"
+[whatsapp]
+access_token = "token"
+phone_number_id = "phone-id"
+verify_token = "verify"
+app_secret = "secret"
+allow_from = ["15551234567"]
+
+[teams]
+app_id = "app-id"
+app_password = "password"
+allow_from = ["29:user"]
+"#;
+
+        let cfg: ChannelsConfig = toml::from_str(toml).unwrap();
+        let whatsapp = cfg.whatsapp.unwrap();
+        assert_eq!(whatsapp.graph_base_url, "https://graph.facebook.com");
+        assert_eq!(whatsapp.api_version, "v20.0");
+        assert!(whatsapp.validate().is_ok());
+
+        let teams = cfg.teams.unwrap();
+        assert_eq!(
+            teams.token_url,
+            "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token"
+        );
+        assert_eq!(teams.scope, "https://api.botframework.com/.default");
+        assert!(teams.validate().is_ok());
+    }
+
+    #[test]
+    fn channel_config_rejects_empty_whatsapp_or_teams_allowlist() {
+        let whatsapp = WhatsAppConfig {
+            access_token: "token".into(),
+            phone_number_id: "phone-id".into(),
+            verify_token: "verify".into(),
+            app_secret: "secret".into(),
+            graph_base_url: "https://graph.facebook.com".into(),
+            api_version: "v20.0".into(),
+            allow_from: vec![],
+        };
+        assert!(whatsapp.validate().is_err());
+
+        let teams = TeamsConfig {
+            app_id: "app-id".into(),
+            app_password: "password".into(),
+            token_url: "https://login.microsoftonline.com/token".into(),
+            scope: "https://api.botframework.com/.default".into(),
+            allow_from: vec![],
+        };
+        assert!(teams.validate().is_err());
     }
 
     #[test]
