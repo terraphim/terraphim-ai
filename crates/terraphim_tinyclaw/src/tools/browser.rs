@@ -4,23 +4,21 @@
 //! source but is gated behind `#[cfg(feature = "repl-web")]`, and the
 //! deployed `terraphim-agent` binary reports `web_operations: false`; the
 //! crate has no Cargo.toml in this workspace and is not on the registry.
-//! So this implementation provides a lightweight browser session natively
-//! over reqwest:
+//! So this implementation provides HTTP-backed operations natively over
+//! reqwest:
 //! - `navigate` — GET a URL, return status + title + text preview
 //! - `extract` — GET a URL, return visible text (lightweight stripping)
-//! - `click` — resolve a selector in the current page and report the target
-//! - `type` — resolve an input selector and store the typed value in session
-//! - `screenshot` — persist a PNG artifact for the current page
 //! - `api` — arbitrary HTTP request (method/url/headers/body)
+//!
+//! Real browser-engine operations (`click`, `type`, `screenshot`) are not
+//! implemented here. They return `BackendUnavailable` until a real browser
+//! engine or `terraphim-agent web_operations` backend is available.
 
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
-use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::Mutex;
-use uuid::Uuid;
 
 /// Configuration for the browser tool.
 #[derive(Debug, Clone)]
@@ -54,7 +52,6 @@ pub struct BrowserTool {
 struct BrowserSession {
     current_url: Option<String>,
     html: Option<String>,
-    form_values: BTreeMap<String, String>,
 }
 
 impl BrowserTool {
@@ -227,36 +224,6 @@ fn html_to_text(html: &str) -> String {
     }
 }
 
-fn selector_id(selector: &str) -> Option<&str> {
-    selector.strip_prefix('#').filter(|id| !id.is_empty())
-}
-
-fn find_element_by_id(html: &str, id: &str) -> Option<(String, String)> {
-    let id_double = format!("id=\"{id}\"");
-    let id_single = format!("id='{id}'");
-    let attr_pos = html.find(&id_double).or_else(|| html.find(&id_single))?;
-    let start = html[..attr_pos].rfind('<')?;
-    let open_end = html[attr_pos..].find('>')? + attr_pos;
-    let open_tag = &html[start + 1..open_end];
-    let tag = open_tag
-        .split_whitespace()
-        .next()
-        .unwrap_or("")
-        .trim_matches('/')
-        .to_ascii_lowercase();
-    if tag.is_empty() {
-        return None;
-    }
-    if matches!(tag.as_str(), "input" | "textarea" | "select") {
-        return Some((tag, String::new()));
-    }
-    let close = format!("</{tag}>");
-    let lower_rest = html[open_end + 1..].to_ascii_lowercase();
-    let close_start = lower_rest.find(&close)? + open_end + 1;
-    let body = html[open_end + 1..close_start].to_string();
-    Some((tag, html_to_text(&body)))
-}
-
 fn require_current_html(session: &BrowserSession) -> Result<(&str, &str), ToolError> {
     let url = session
         .current_url
@@ -275,17 +242,14 @@ fn require_current_html(session: &BrowserSession) -> Result<(&str, &str), ToolEr
     Ok((url, html))
 }
 
-fn screenshot_path() -> PathBuf {
-    std::env::temp_dir()
-        .join("tinyclaw-browser-screenshots")
-        .join(format!("{}.png", Uuid::new_v4().simple()))
+fn browser_backend_unavailable(op: &str) -> ToolError {
+    ToolError::BackendUnavailable {
+        tool: "browser".to_string(),
+        message: format!(
+            "{op} requires a real browser engine; TinyClaw only implements HTTP navigate/extract/api until terraphim-agent web_operations or another browser backend is wired"
+        ),
+    }
 }
-
-const ONE_PIXEL_PNG: &[u8] = &[
-    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0,
-    0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 120, 156, 99, 248, 15, 4, 0, 9, 251, 3,
-    253, 167, 147, 129, 238, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
-];
 
 #[async_trait]
 impl Tool for BrowserTool {
@@ -294,9 +258,9 @@ impl Tool for BrowserTool {
     }
 
     fn description(&self) -> &str {
-        "Web/browser operations over HTTP. Operations: navigate {url}, \
-         extract {url}, click {selector}, type {selector, text}, \
-         screenshot {}, api {method, url, headers?, body?}."
+        "HTTP web operations. Supported: navigate {url}, extract {url}, \
+         api {method, url, headers?, body?}. Browser-engine ops \
+         click/type/screenshot return BackendUnavailable."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -434,101 +398,10 @@ impl Tool for BrowserTool {
                 })
                 .to_string())
             }
-            "click" => {
-                let selector = args
-                    .get("selector")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| ToolError::InvalidArguments {
-                        tool: "browser".to_string(),
-                        message: "click requires 'selector'".to_string(),
-                    })?;
-                let id = selector_id(selector).ok_or_else(|| ToolError::InvalidArguments {
-                    tool: "browser".to_string(),
-                    message: "click currently supports id selectors like '#login'".to_string(),
-                })?;
+            "click" | "type" | "screenshot" => {
                 let session = self.session.lock().await;
-                let (url, html) = require_current_html(&session)?;
-                let (tag, text) =
-                    find_element_by_id(html, id).ok_or_else(|| ToolError::InvalidArguments {
-                        tool: "browser".to_string(),
-                        message: format!("selector '{selector}' not found on current page"),
-                    })?;
-                Ok(json!({
-                    "op": "click",
-                    "url": url,
-                    "selector": selector,
-                    "tag": tag,
-                    "text": text,
-                    "status": "clicked",
-                })
-                .to_string())
-            }
-            "type" => {
-                let selector = args
-                    .get("selector")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| ToolError::InvalidArguments {
-                        tool: "browser".to_string(),
-                        message: "type requires 'selector'".to_string(),
-                    })?;
-                let text = args.get("text").and_then(|v| v.as_str()).ok_or_else(|| {
-                    ToolError::InvalidArguments {
-                        tool: "browser".to_string(),
-                        message: "type requires 'text'".to_string(),
-                    }
-                })?;
-                let id = selector_id(selector).ok_or_else(|| ToolError::InvalidArguments {
-                    tool: "browser".to_string(),
-                    message: "type currently supports id selectors like '#username'".to_string(),
-                })?;
-                let mut session = self.session.lock().await;
-                let (url, html) = require_current_html(&session)?;
-                let (tag, _) =
-                    find_element_by_id(html, id).ok_or_else(|| ToolError::InvalidArguments {
-                        tool: "browser".to_string(),
-                        message: format!("selector '{selector}' not found on current page"),
-                    })?;
-                if !matches!(tag.as_str(), "input" | "textarea") {
-                    return Err(ToolError::InvalidArguments {
-                        tool: "browser".to_string(),
-                        message: format!("selector '{selector}' is <{tag}>, not a text input"),
-                    });
-                }
-                let url = url.to_string();
-                session
-                    .form_values
-                    .insert(selector.to_string(), text.to_string());
-                Ok(json!({
-                    "op": "type",
-                    "url": url,
-                    "selector": selector,
-                    "value": text,
-                    "status": "typed",
-                })
-                .to_string())
-            }
-            "screenshot" => {
-                let session = self.session.lock().await;
-                let (url, _) = require_current_html(&session)?;
-                let path = screenshot_path();
-                if let Some(parent) = path.parent() {
-                    std::fs::create_dir_all(parent).map_err(|e| ToolError::ExecutionFailed {
-                        tool: "browser".to_string(),
-                        message: format!("create screenshot directory failed: {e}"),
-                    })?;
-                }
-                std::fs::write(&path, ONE_PIXEL_PNG).map_err(|e| ToolError::ExecutionFailed {
-                    tool: "browser".to_string(),
-                    message: format!("write screenshot failed: {e}"),
-                })?;
-                Ok(json!({
-                    "op": "screenshot",
-                    "url": url,
-                    "path": path,
-                    "content_type": "image/png",
-                    "bytes": ONE_PIXEL_PNG.len(),
-                })
-                .to_string())
+                let _ = require_current_html(&session)?;
+                Err(browser_backend_unavailable(op))
             }
             other => Err(ToolError::InvalidArguments {
                 tool: "browser".to_string(),

@@ -301,6 +301,41 @@ async fn tui_dashboard_proxy_and_acp_dispatch_into_same_agent_loop_entry_bus() {
 }
 
 #[tokio::test]
+async fn proxy_production_server_setup_reaches_shared_agent_loop_bus() {
+    common::scrub_env();
+    let bus = Arc::new(MessageBus::new());
+    let state = ProxyState::default().with_agent_bus(bus.clone());
+    let addr = terraphim_tinyclaw::proxy::serve(state, "127.0.0.1:0".parse().unwrap())
+        .await
+        .unwrap();
+
+    let resp = reqwest::Client::new()
+        .post(format!("http://{addr}/v1/chat/completions"))
+        .json(&json!({
+            "model": "tinyclaw-default",
+            "messages": [{"role": "user", "content": "from production proxy server"}]
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), reqwest::StatusCode::OK);
+    assert_eq!(read_bus_message(&bus).await.channel, "proxy");
+}
+
+#[test]
+fn tinyclaw_binary_exposes_production_surface_commands() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_terraphim-tinyclaw"))
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("tui"));
+    assert!(stdout.contains("proxy"));
+    assert!(stdout.contains("acp"));
+}
+
+#[tokio::test]
 async fn fresh_session_memory_capture_retrieve_apply_response_flow_uat() {
     common::scrub_env();
     let tmp = tempfile::tempdir().unwrap();

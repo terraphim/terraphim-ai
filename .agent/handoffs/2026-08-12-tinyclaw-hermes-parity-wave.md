@@ -8,13 +8,13 @@
 
 ## Progress Summary
 
-- **Completed work**: The Hermes-parity wave for `terraphim_tinyclaw` is **fully delivered and merged**. Four PRs landed on `main` between 2026-08-11 and 2026-08-12:
+- **Completed work**: The Hermes-parity wave for `terraphim_tinyclaw` delivered several verified partial fixes, but it is **not fully closed**. Four PRs landed on `main` between 2026-08-11 and 2026-08-12:
   - #3204 — proxy upstream forwarding to deployed `terraphim-llm-proxy` (Refs #3166)
   - #3205 — agent memory/learning bridge via `terraphim-agent` CLI (Refs #3144)
   - #3206 — parity tools: rlm sandbox (#3146), subagents (#3145), browser (#3148)
   - #3210 — cron scheduling surface (#3147) + jmap registry relocation (#3198)
-- **Current implementation state**: `main` at `aa6c96aa6`; all four PRs squash-merged; issues #3144, #3145, #3146, #3147, #3148, #3198 all closed with verification comments.
-- **Working vs blocked**: suite **440/440 green**, clippy + fmt clean. Nothing in this wave is blocked. Two infrastructure items remain (see Risks).
+- **Current implementation state**: `main` at `aa6c96aa6`; all four PRs squash-merged. Any closure claims for #3147/#3148/#3165 must be treated as superseded by the structural review: those requirements remain blocked.
+- **Working vs blocked**: suite was green for the partial implementation, but blocked requirements remain. #3147 lacks `terraphim_orchestrator`; #3148 lacks `terraphim-agent web_operations` and real browser click/type/screenshot; #3165 lacks WhatsApp/Teams live-tier candidates.
 
 ## Artifact Index
 
@@ -33,14 +33,16 @@
 - Memory bridge: UTF-8-safe truncation, 1 MiB stdout cap, 30s cooldown.
 - Sandbox tool (`terraphim_rlm` in-process, Local→Docker backend fallback, Permissive KG validation).
 - Subagent tool (`terraphim_spawner` via persistent `SpawnBridge`; durable registry via `terraphim_persistence::DeviceStorage` — production-wired in `from_config`).
-- Browser tool (native reqwest; click/type/screenshot → `BackendUnavailable`; Content-Length cap; http(s)-only).
+- Browser tool (native reqwest `navigate`/`extract`/`api`; click/type/screenshot → `BackendUnavailable`; Content-Length cap; http(s)-only).
 - Scheduler (`ScheduleTool` + CLI `schedule create/list/delete` + `SkillStep::Schedule`; `[scheduler]` config).
 - `haystack_jmap` consumed from terraphim registry (1.20.2); private copy deleted.
 - main.rs agent+gateway now wire ALL parity config sections (was: plain registry, parity tools unreachable in production).
 
 ### Partially working
 - `recursive_query` (sandbox) needs a wired LLM client inside RLM to be useful; errors gracefully otherwise.
-- Browser click/type/screenshot are v1-deferred (no engine in deployed `terraphim-agent`, `web_operations: false`).
+- #3147 is blocked: no `terraphim_orchestrator`-backed scheduler is wired here.
+- #3148 is blocked: browser click/type/screenshot are v1-deferred (no engine in deployed `terraphim-agent`, `web_operations: false`).
+- #3165 is blocked: WhatsApp/Teams live-tier scope is not implemented.
 - `SkillStep::Schedule` persists jobs; a real skill-runner inside the cron `JobExecutor` at fire time is a follow-up.
 
 ### Risky or broken

@@ -3,6 +3,7 @@
 
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_mcp_search::{SkillEntry, mcp_search_skills};
@@ -19,6 +20,7 @@ use terraphim_tinyclaw::credentials::{
 use terraphim_tinyclaw::session::SessionManager;
 use terraphim_tinyclaw::skills::{Skill, SkillExecutor};
 use terraphim_tinyclaw::tools::{ParityConfig, create_default_registry_with_parity};
+use terraphim_tinyclaw::tui::TuiSurface;
 
 /// Routing decision for the session memory backend (#3227 review P1).
 ///
@@ -118,6 +120,18 @@ enum Commands {
     Gateway,
     /// Run the local terminal UI surface.
     Tui,
+    /// Run OpenAI-compatible proxy server attached to the shared agent loop.
+    Proxy {
+        /// Address to bind.
+        #[arg(long, default_value = "127.0.0.1:3456")]
+        addr: SocketAddr,
+    },
+    /// Run ACP JSON-RPC stdio server attached to the shared agent loop.
+    Acp {
+        /// Run in server mode (default).
+        #[arg(long, default_value_t = true)]
+        serve: bool,
+    },
     /// Manage skills (workflows).
     Skill {
         #[command(subcommand)]
@@ -249,7 +263,15 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Tui => {
             log::info!("Starting in TUI mode");
-            run_agent_mode(config, None).await?;
+            run_tui_mode(config).await?;
+        }
+        Commands::Proxy { addr } => {
+            log::info!("Starting proxy mode on {addr}");
+            run_proxy_mode(config, addr).await?;
+        }
+        Commands::Acp { serve } => {
+            log::info!("Starting ACP server mode");
+            run_acp_mode(config, serve).await?;
         }
         Commands::Skill { command } => {
             log::info!("Executing skill command");
@@ -352,6 +374,149 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     agent_handle.abort();
 
     Ok(())
+}
+
+async fn spawn_agent_loop(
+    config: &Config,
+    bus: Arc<MessageBus>,
+    system_prompt: String,
+) -> anyhow::Result<tokio::task::JoinHandle<()>> {
+    let sessions_dir = config.agent.workspace.join("sessions");
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
+    let web_tools_config = config.tools.web.as_ref();
+    let memory_config = if config.memory.enabled {
+        Some(&config.memory)
+    } else {
+        None
+    };
+    let tools = Arc::new(
+        create_default_registry_with_parity(
+            Some(sessions.clone()),
+            web_tools_config,
+            memory_config,
+            ParityConfig {
+                sandbox: Some(&config.sandbox),
+                subagent: Some(&config.subagent),
+                browser: Some(&config.browser),
+                scheduler: Some(&config.scheduler),
+                homeassistant: Some(&config.homeassistant),
+                vision: Some(&config.vision),
+                image_gen: Some(&config.image_gen),
+                tts: Some(&config.tts),
+                moa: Some(&config.moa),
+                rl: Some(&config.rl),
+            },
+        )
+        .await,
+    );
+    let router = build_router(config)?;
+    let agent = ToolCallingLoop::new(
+        &config.agent,
+        router,
+        tools,
+        sessions,
+        system_prompt,
+        memory_config,
+    );
+
+    Ok(tokio::spawn(async move {
+        if let Err(e) = agent.run(bus).await {
+            log::error!("Agent loop error: {}", e);
+        }
+    }))
+}
+
+async fn load_default_system_prompt(config: &Config) -> String {
+    if let Ok(content) = tokio::fs::read_to_string(&config.agent.system_prompt_path()).await {
+        content
+    } else {
+        "You are TinyClaw, a helpful AI assistant.".to_string()
+    }
+}
+
+async fn run_tui_mode(config: Config) -> anyhow::Result<()> {
+    use std::io::{self, Write};
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
+    println!("TinyClaw TUI Mode");
+    println!("=================");
+
+    let bus = Arc::new(MessageBus::new());
+    let _agent_handle = spawn_agent_loop(
+        &config,
+        bus.clone(),
+        load_default_system_prompt(&config).await,
+    )
+    .await?;
+
+    let outbound_bus = bus.clone();
+    tokio::spawn(async move {
+        let mut outbound_rx = outbound_bus.outbound_rx.lock().await;
+        while let Some(msg) = outbound_rx.recv().await {
+            println!("\n[{}]: {}\n", msg.channel, msg.content);
+            print!("> ");
+            let _ = io::stdout().flush();
+        }
+    });
+
+    let surface = TuiSurface::new();
+    let stdin = tokio::io::stdin();
+    let reader = BufReader::new(stdin);
+    let mut lines = reader.lines();
+
+    println!("Type your messages and press Enter. Use /quit or /exit to exit.");
+    print!("> ");
+    io::stdout().flush()?;
+
+    while let Some(line) = lines.next_line().await? {
+        let input = line.trim();
+        if input == "/quit" || input == "/exit" {
+            break;
+        }
+        if !input.is_empty() {
+            surface.submit(bus.clone(), input).await?;
+        }
+        print!("> ");
+        io::stdout().flush()?;
+    }
+
+    Ok(())
+}
+
+async fn run_proxy_mode(config: Config, addr: SocketAddr) -> anyhow::Result<()> {
+    println!("TinyClaw Proxy Mode");
+    println!("===================");
+
+    let bus = Arc::new(MessageBus::new());
+    let _agent_handle = spawn_agent_loop(
+        &config,
+        bus.clone(),
+        load_default_system_prompt(&config).await,
+    )
+    .await?;
+    let state = terraphim_tinyclaw::proxy::ProxyState::from_env().with_agent_bus(bus);
+    let bound = terraphim_tinyclaw::proxy::serve(state, addr).await?;
+    println!("Proxy listening on http://{bound}");
+
+    tokio::signal::ctrl_c().await?;
+    Ok(())
+}
+
+async fn run_acp_mode(config: Config, serve: bool) -> anyhow::Result<()> {
+    if !serve {
+        anyhow::bail!("ACP client mode is not implemented; use --serve");
+    }
+
+    let bus = Arc::new(MessageBus::new());
+    let _agent_handle = spawn_agent_loop(
+        &config,
+        bus.clone(),
+        load_default_system_prompt(&config).await,
+    )
+    .await?;
+    let sessions_dir = config.agent.workspace.join("acp-sessions");
+    let state = terraphim_tinyclaw::acp::AcpState::with_bus(sessions_dir, bus);
+    terraphim_tinyclaw::acp::router::serve_stdio(state).await
 }
 
 async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {

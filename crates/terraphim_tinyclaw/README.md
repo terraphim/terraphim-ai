@@ -374,10 +374,13 @@ spawn a subagent to run cargo test in crates/terraphim_tinyclaw
 run python print(1+1) in a local sandbox
 schedule daily-report every day at 09:00
 browse https://example.com and extract the heading
-click #login
-type alex into #username
-take a screenshot
 ```
+
+`browser` currently supports HTTP-backed `navigate`, `extract`, and `api`
+operations only. Real browser-engine operations (`click`, `type`, and
+`screenshot`) return `BackendUnavailable` until `terraphim-agent
+web_operations` or another real browser backend is wired; do not use README
+examples as evidence that #3148 is closed.
 
 CLI surfaces:
 
@@ -385,9 +388,16 @@ CLI surfaces:
 terraphim-tinyclaw agent
 terraphim-tinyclaw tui
 terraphim-tinyclaw gateway
+terraphim-tinyclaw proxy --addr 127.0.0.1:3456
+terraphim-tinyclaw acp --serve
 terraphim-tinyclaw schedule create "daily-report" "0 9 * * *" --skill daily-report
 terraphim-tinyclaw mcp --serve
 ```
+
+Current parity blockers: #3147 remains blocked because there is no
+`terraphim_orchestrator`-backed scheduler in this workspace; #3148 remains
+blocked for `terraphim-agent web_operations` browser automation; #3165 remains
+blocked for WhatsApp/Teams live-tier scope.
 
 Live-tier interoperability tests are opt-in and ignored by default. Set the
 documented `LIVE_TINYCLAW_*` env flags in the relevant tests for MCP, GitHub,

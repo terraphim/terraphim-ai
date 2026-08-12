@@ -103,7 +103,7 @@ async fn browser_api_post_round_trip() {
 }
 
 #[tokio::test]
-async fn browser_click_type_screenshot_drive_local_page() {
+async fn browser_click_type_screenshot_report_backend_unavailable() {
     let base = spawn_test_server().await;
     let tool = make_browser();
 
@@ -114,32 +114,20 @@ async fn browser_click_type_screenshot_drive_local_page() {
     let clicked = tool
         .execute(json!({"op": "click", "selector": "#login"}))
         .await
-        .expect("click should succeed against local page");
-    let click_json: Value = serde_json::from_str(&clicked).unwrap();
-    assert_eq!(click_json["op"], "click");
-    assert_eq!(click_json["selector"], "#login");
-    assert_eq!(click_json["text"], "Login");
+        .expect_err("click must not be faked by cached HTML");
+    assert!(matches!(clicked, ToolError::BackendUnavailable { .. }));
 
     let typed = tool
         .execute(json!({"op": "type", "selector": "#username", "text": "alex"}))
         .await
-        .expect("type should update local form state");
-    let type_json: Value = serde_json::from_str(&typed).unwrap();
-    assert_eq!(type_json["op"], "type");
-    assert_eq!(type_json["selector"], "#username");
-    assert_eq!(type_json["value"], "alex");
+        .expect_err("type must not be faked by cached HTML");
+    assert!(matches!(typed, ToolError::BackendUnavailable { .. }));
 
     let shot = tool
         .execute(json!({"op": "screenshot"}))
         .await
-        .expect("screenshot should write a file");
-    let shot_json: Value = serde_json::from_str(&shot).unwrap();
-    let path = shot_json["path"].as_str().expect("path should be returned");
-    assert!(
-        std::path::Path::new(path).exists(),
-        "screenshot path exists"
-    );
-    assert_eq!(shot_json["content_type"], "image/png");
+        .expect_err("screenshot must not emit a placeholder artifact");
+    assert!(matches!(shot, ToolError::BackendUnavailable { .. }));
 }
 
 #[tokio::test]
