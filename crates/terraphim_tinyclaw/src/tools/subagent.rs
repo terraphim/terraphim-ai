@@ -85,8 +85,8 @@ pub struct SubagentTool {
     /// Bridge to a persistent current-thread runtime where spawns run
     /// (the spawner's future is !Send; capture tasks need a live runtime).
     bridge: Arc<SpawnBridge>,
-    /// id -> live handle registry.
-    handles: Arc<Mutex<HashMap<String, AgentHandle>>>,
+    /// Live handles plus reserved spawn slots.
+    registry: Arc<Mutex<SubagentState>>,
     /// Optional durable registry (`terraphim_persistence::DeviceStorage`)
     /// so spawned-subagent metadata survives restarts. None = memory only.
     persist: Option<SubagentRegistry>,
@@ -119,7 +119,7 @@ impl SubagentTool {
             default_model,
             grace: Duration::from_secs(timeout_secs),
             bridge: Arc::new(SpawnBridge::start()),
-            handles: Arc::new(Mutex::new(HashMap::new())),
+            registry: Arc::new(Mutex::new(SubagentState::default())),
             persist: None,
             max_agents,
         }
@@ -232,14 +232,19 @@ impl Tool for SubagentTool {
                     .and_then(|v| v.as_str())
                     .or(self.default_model.as_deref());
                 let id = Self::new_handle_id();
-                if self.handles.lock().await.len() >= self.max_agents {
-                    return Err(ToolError::ExecutionFailed {
-                        tool: "subagent".to_string(),
-                        message: format!(
-                            "subagent pool capacity exceeded (max_agents={})",
-                            self.max_agents
-                        ),
-                    });
+                {
+                    let mut registry = self.registry.lock().await;
+                    registry.cleanup_finished();
+                    if registry.reserved_slots() >= self.max_agents {
+                        return Err(ToolError::ExecutionFailed {
+                            tool: "subagent".to_string(),
+                            message: format!(
+                                "subagent pool capacity exceeded (max_agents={})",
+                                self.max_agents
+                            ),
+                        });
+                    }
+                    registry.reserve_slot();
                 }
 
                 // The spawner holds a tracing `EnteredSpan` across an await
@@ -248,7 +253,7 @@ impl Tool for SubagentTool {
                 // runtime (SpawnBridge) so the Tool trait's Send future
                 // contract is preserved AND the output-capture tasks stay
                 // alive for the handle's lifetime.
-                let handle = self
+                let spawn_result = self
                     .bridge
                     .spawn(
                         self.spawner.clone(),
@@ -256,19 +261,23 @@ impl Tool for SubagentTool {
                         task.to_string(),
                         model.map(|m| m.to_string()),
                     )
-                    .await?;
+                    .await;
+                let handle = match spawn_result {
+                    Ok(handle) => handle,
+                    Err(e) => {
+                        self.registry.lock().await.release_slot();
+                        return Err(e);
+                    }
+                };
 
-                self.handles.lock().await.insert(id.clone(), handle);
+                let pid = handle.process_id().0;
+                {
+                    let mut registry = self.registry.lock().await;
+                    registry.insert_reserved(id.clone(), handle);
+                }
 
                 // Persist metadata so the spawn survives restarts (best effort).
                 if let Some(reg) = &self.persist {
-                    let pid = self
-                        .handles
-                        .lock()
-                        .await
-                        .get(&id)
-                        .map(|h| h.process_id().0)
-                        .unwrap_or(0);
                     let record = SubagentRecord {
                         id: id.clone(),
                         pid,
@@ -290,8 +299,11 @@ impl Tool for SubagentTool {
             }
             "status" => {
                 let id = require_id(&args)?;
-                let handles = self.handles.lock().await;
-                let handle = handles.get(&id).ok_or_else(|| unknown_id(id.clone()))?;
+                let registry = self.registry.lock().await;
+                let handle = registry
+                    .handles
+                    .get(&id)
+                    .ok_or_else(|| unknown_id(id.clone()))?;
                 let status = handle.health_status();
                 let pid = handle.process_id().0;
                 Ok(json!({
@@ -303,27 +315,31 @@ impl Tool for SubagentTool {
                 .to_string())
             }
             "list" => {
-                let handles = self.handles.lock().await;
-                let mut agents: Vec<Value> = handles
-                    .iter()
-                    .map(|(id, h)| {
-                        json!({
-                            "id": id,
-                            "pid": h.process_id().0,
-                            "health": format!("{:?}", h.health_status()),
-                            "live": true,
+                let (mut agents, live_ids) = {
+                    let registry = self.registry.lock().await;
+                    let agents: Vec<Value> = registry
+                        .handles
+                        .iter()
+                        .map(|(id, h)| {
+                            json!({
+                                "id": id,
+                                "pid": h.process_id().0,
+                                "health": format!("{:?}", h.health_status()),
+                                "live": true,
+                            })
                         })
-                    })
-                    .collect();
+                        .collect();
+                    let live_ids: std::collections::HashSet<String> =
+                        registry.handles.keys().cloned().collect();
+                    (agents, live_ids)
+                };
                 // Include persisted-but-not-live records (e.g. before a
                 // restart) with live=false so users can see they existed.
                 if let Some(reg) = &self.persist
                     && let Ok(records) = reg.all().await
                 {
-                    let live_ids: std::collections::HashSet<&str> =
-                        handles.keys().map(|s| s.as_str()).collect();
                     for r in records {
-                        if !live_ids.contains(r.id.as_str()) {
+                        if !live_ids.contains(&r.id) {
                             agents.push(json!({
                                 "id": r.id,
                                 "pid": r.pid,
@@ -344,8 +360,13 @@ impl Tool for SubagentTool {
             }
             "terminate" => {
                 let id = require_id(&args)?;
-                let mut handles = self.handles.lock().await;
-                let mut handle = handles.remove(&id).ok_or_else(|| unknown_id(id.clone()))?;
+                let mut handle = {
+                    let mut registry = self.registry.lock().await;
+                    registry
+                        .handles
+                        .remove(&id)
+                        .ok_or_else(|| unknown_id(id.clone()))?
+                };
                 let graceful =
                     handle
                         .shutdown(self.grace)
@@ -367,8 +388,11 @@ impl Tool for SubagentTool {
             }
             "collect" => {
                 let id = require_id(&args)?;
-                let handles = self.handles.lock().await;
-                let handle = handles.get(&id).ok_or_else(|| unknown_id(id.clone()))?;
+                let registry = self.registry.lock().await;
+                let handle = registry
+                    .handles
+                    .get(&id)
+                    .ok_or_else(|| unknown_id(id.clone()))?;
                 let events = handle.output_capture().captured_events();
                 let lines: Vec<String> = events
                     .iter()
@@ -393,6 +417,45 @@ impl Tool for SubagentTool {
                 tool: "subagent".to_string(),
                 message: format!("unknown op '{other}'"),
             }),
+        }
+    }
+}
+
+#[derive(Default)]
+struct SubagentState {
+    handles: HashMap<String, AgentHandle>,
+    in_flight: usize,
+}
+
+impl SubagentState {
+    fn reserved_slots(&self) -> usize {
+        self.handles.len() + self.in_flight
+    }
+
+    fn reserve_slot(&mut self) {
+        self.in_flight += 1;
+    }
+
+    fn release_slot(&mut self) {
+        self.in_flight = self.in_flight.saturating_sub(1);
+    }
+
+    fn insert_reserved(&mut self, id: String, handle: AgentHandle) {
+        self.release_slot();
+        self.handles.insert(id, handle);
+    }
+
+    fn cleanup_finished(&mut self) {
+        let finished: Vec<String> = self
+            .handles
+            .iter_mut()
+            .filter_map(|(id, handle)| match handle.try_wait() {
+                Ok(Some(_)) => Some(id.clone()),
+                Ok(None) | Err(_) => None,
+            })
+            .collect();
+        for id in finished {
+            self.handles.remove(&id);
         }
     }
 }
