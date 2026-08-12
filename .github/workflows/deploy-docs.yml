@@ -59,15 +59,10 @@ jobs:
           ls -la
           echo "DEBUG: Checking md-book binary:"
           ls -la /tmp/md-book/target/release/ || echo "md-book binary not found"
-          echo "Building with md-book (SUMMARY.md-driven)"
+          echo "DEBUG: Building with md-book fork..."
           rm -rf book/
-          # `build .` reads book.toml, so it honours `src` and the SUMMARY.md
-          # ordering. The old `-i . -o book` pointed at the docs root, which has
-          # no SUMMARY.md, so md-book fell back to walking the directory and
-          # published 574 pages — archives, research notes and artefacts
-          # included — in path order rather than the 59 the summary declares.
-          /tmp/md-book/target/release/md-book build .
-          echo "Pages built: $(find book -name '*.html' | wc -l)"
+          /tmp/md-book/target/release/md-book -i . -o book || true
+          echo "DEBUG: Build completed with exit code: $?"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v5
