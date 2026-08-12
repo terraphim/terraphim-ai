@@ -11,12 +11,15 @@
 //!
 //! Browser-native ops (click/type/screenshot) return
 //! `ToolError::BackendUnavailable` — they need a real browser engine that
-//! the deployed stack does not currently expose.
+//! the deployed stack does not currently expose. The tool probes
+//! `terraphim-agent` first and includes capability/protocol evidence in the
+//! error so placeholder CLI output is never reported as success.
 
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::time::Duration;
+use tokio::process::Command;
 
 /// Configuration for the browser tool.
 #[derive(Debug, Clone)]
@@ -27,6 +30,8 @@ pub struct BrowserToolConfig {
     pub max_bytes: usize,
     /// Optional proxy URL.
     pub proxy: Option<String>,
+    /// Optional terraphim-agent binary used to probe browser-native backend availability.
+    pub agent_binary: Option<String>,
 }
 
 impl From<&crate::config::BrowserConfig> for BrowserToolConfig {
@@ -35,6 +40,7 @@ impl From<&crate::config::BrowserConfig> for BrowserToolConfig {
             timeout_secs: cfg.timeout_secs,
             max_bytes: cfg.max_bytes,
             proxy: cfg.proxy.clone(),
+            agent_binary: cfg.agent_binary.clone(),
         }
     }
 }
@@ -78,6 +84,133 @@ impl BrowserTool {
             end -= 1;
         }
         format!("{}… (truncated, {} bytes)", &s[..end], s.len())
+    }
+
+    async fn browser_native_unavailable(&self, op: &str, args: &Value) -> ToolError {
+        let evidence = match &self.config.agent_binary {
+            Some(binary) => probe_agent_web_operations(binary, op, args).await,
+            None => {
+                "agent_binary is disabled; no terraphim-agent browser-native backend configured"
+                    .to_string()
+            }
+        };
+        ToolError::BackendUnavailable {
+            tool: "browser".to_string(),
+            message: format!(
+                "'{op}' requires a verified terraphim-agent web_operations backend; {evidence}. \
+                 TinyClaw will not simulate browser-native success. Use navigate/extract/api for \
+                 HTTP-backed operations."
+            ),
+        }
+    }
+}
+
+fn preview_output(bytes: &[u8]) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    collapsed.chars().take(240).collect()
+}
+
+async fn run_agent(binary: &str, args: &[&str]) -> Result<std::process::Output, String> {
+    Command::new(binary)
+        .args(args)
+        .output()
+        .await
+        .map_err(|e| format!("failed to execute {binary}: {e}"))
+}
+
+fn capabilities_web_enabled(stdout: &[u8]) -> Result<(bool, bool), String> {
+    let value: Value = serde_json::from_slice(stdout).map_err(|e| {
+        format!(
+            "capabilities output is not JSON: {e}; stdout='{}'",
+            preview_output(stdout)
+        )
+    })?;
+    let web_operations = value
+        .pointer("/features/web_operations")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let command_advertised = value
+        .get("commands")
+        .and_then(Value::as_array)
+        .map(|commands| commands.iter().any(|v| v.as_str() == Some("web")))
+        .unwrap_or(false);
+    Ok((web_operations, command_advertised))
+}
+
+async fn probe_agent_web_operations(binary: &str, op: &str, args: &Value) -> String {
+    let caps = match run_agent(
+        binary,
+        &["--robot", "--format", "json", "robot", "capabilities"],
+    )
+    .await
+    {
+        Ok(output) => output,
+        Err(e) => return e,
+    };
+    if !caps.status.success() {
+        return format!(
+            "capability probe failed with status {:?}; stderr='{}'",
+            caps.status.code(),
+            preview_output(&caps.stderr)
+        );
+    }
+    let (web_operations, web_command_advertised) = match capabilities_web_enabled(&caps.stdout) {
+        Ok(v) => v,
+        Err(e) => return e,
+    };
+    if !web_operations {
+        return "capability probe reports web_operations=false".to_string();
+    }
+
+    let help = match run_agent(binary, &["--help"]).await {
+        Ok(output) => output,
+        Err(e) => return e,
+    };
+    let help_mentions_web = preview_output(&help.stdout)
+        .split_whitespace()
+        .any(|word| word == "web");
+    if !web_command_advertised || !help.status.success() || !help_mentions_web {
+        return format!(
+            "capability probe reports web_operations=true, but no usable web subcommand is advertised (commands_has_web={web_command_advertised}, help_status={:?})",
+            help.status.code()
+        );
+    }
+
+    let url = args.get("url").and_then(Value::as_str).unwrap_or("");
+    let candidate = match op {
+        "screenshot" => vec!["web", "screenshot", url],
+        "click" => {
+            let selector = args.get("selector").and_then(Value::as_str).unwrap_or("");
+            vec!["web", "click", url, selector]
+        }
+        "type" => {
+            let selector = args.get("selector").and_then(Value::as_str).unwrap_or("");
+            let text = args.get("text").and_then(Value::as_str).unwrap_or("");
+            vec!["web", "type", url, selector, text]
+        }
+        _ => vec!["web", op, url],
+    };
+    match run_agent(binary, &candidate).await {
+        Ok(output) => {
+            let stdout = preview_output(&output.stdout);
+            let stderr = preview_output(&output.stderr);
+            if stdout.to_ascii_lowercase().contains("not yet implemented")
+                || stdout.to_ascii_lowercase().contains("not implemented")
+            {
+                format!("agent web protocol is placeholder-only: stdout='{stdout}'")
+            } else if !output.status.success() {
+                format!(
+                    "agent web protocol probe failed with status {:?}; stderr='{stderr}' stdout='{stdout}'",
+                    output.status.code()
+                )
+            } else {
+                format!(
+                    "agent reports web_operations=true, but TinyClaw has no verified JSON/result protocol for '{op}'; stdout='{stdout}'"
+                )
+            }
+        }
+        Err(e) => e,
     }
 }
 
@@ -341,14 +474,9 @@ impl Tool for BrowserTool {
                 })
                 .to_string())
             }
-            "click" | "type" | "screenshot" => Err(ToolError::BackendUnavailable {
-                tool: "browser".to_string(),
-                message: format!(
-                    "'{op}' requires a browser engine; the deployed terraphim-agent \
-                     build has web_operations disabled (feature 'repl-web'). \
-                     Use navigate/extract/api instead."
-                ),
-            }),
+            "click" | "type" | "screenshot" => {
+                Err(self.browser_native_unavailable(op, &args).await)
+            }
             other => Err(ToolError::InvalidArguments {
                 tool: "browser".to_string(),
                 message: format!("unknown op '{other}'"),

@@ -1,6 +1,6 @@
 # Implementation Plan: TinyClaw Hermes Parity Tools — Sandbox, Subagents, Browser
 
-**Status**: Review
+**Status**: Review; #3148 issue-scoped update added 2026-08-12
 **Canonical Path**: `docs/plans/design-tinyclaw-parity-tools.md`
 **Change Slug**: `tinyclaw-parity-tools`
 **Research**: `docs/plans/research-tinyclaw-parity-tools.md`
@@ -14,7 +14,36 @@
 Add three `Tool`-trait tools to `terraphim_tinyclaw`, wired through `create_default_registry`:
 - `SandboxTool` (rlm_code / rlm_bash / rlm_query + session ops) wrapping `terraphim_rlm`
 - `SubagentTool` (spawn / status / list / terminate / collect) wrapping `terraphim_spawner`
-- `BrowserTool` (navigate / extract / api) native reqwest (agent binary lacks web ops)
+- `BrowserTool` (navigate / extract / api) native reqwest, plus an explicit
+  `terraphim-agent` web-operations availability probe for browser-native ops
+  (click/type/screenshot) so TinyClaw fails closed instead of treating missing
+  or placeholder agent web commands as success.
+
+### Issue #3148 Update (2026-08-12)
+
+The literal #3148 request is to use `terraphim-agent` web operations for
+browser/web/API operations when genuinely available. Re-checking the current
+checkout and installed binary shows the backend is still unavailable:
+
+- `cargo metadata --format-version 1 --no-deps` has no `terraphim_agent`
+  package, and `crates/terraphim_agent/` has no `Cargo.toml`; TinyClaw cannot
+  add a real library dependency today.
+- `crates/terraphim_agent/src/repl/web_operations.rs` is absent in this
+  checkout; references only exist in generated documentation/reports.
+- `crates/terraphim_agent/src/repl/handler.rs` has a `repl-web` `handle_web`
+  branch, but each web operation prints "functionality is not yet implemented"
+  and returns `Ok(())`; this is not a trustworthy browser automation backend.
+- Installed `terraphim-agent robot capabilities` reports
+  `"web_operations": false`.
+- Installed `terraphim-agent web get ...` exits with an unrecognized-subcommand
+  error.
+
+Design consequence: keep the existing real reqwest backend for navigate,
+extract, and API operations because those produce real side effects against a
+target HTTP server. Add only the smallest enabling prerequisite for future
+`terraphim-agent` browser automation: a capability/protocol probe used by
+browser-native operations. Until the probe proves both capability and protocol,
+click/type/screenshot return `ToolError::BackendUnavailable` with evidence.
 
 ### Approach
 Crate dependencies (path) for RLM + spawner (both verified standalone-buildable). Permissive KG validation for RLM. Hermetic contract tests per tool (mock executor, trivial agent provider, local axum server).
@@ -61,7 +90,7 @@ agent_loop → ToolRegistry.execute(name, args) → tool.execute(args)
 | RLM as crate dep | Sessions in-memory; CLI can't hold them | CLI bridge (fails) |
 | Permissive + no thesaurus | Validator would reject normal code | Strict (broken UX) |
 | `with_executor` mock in tests | Hermetic, no live backend | Live docker (not in CI) |
-| Browser native reqwest | Deployed agent has web_operations:false | terraphim_agent dep (no manifest) |
+| Browser native reqwest + fail-closed agent probe | Deployed agent has `web_operations:false`; current source has no callable web engine; placeholder CLI output must not be accepted as success | Simulated click/type/screenshot success; direct `terraphim_agent` dep (no manifest/API); blind subprocess call |
 | Path deps to non-member crates | Both build standalone | Adding to workspace (out of scope, touches root Cargo.toml) |
 
 ## File Changes
@@ -116,7 +145,8 @@ pub struct BrowserTool { client: reqwest::Client, security: BrowserSecurity }
 // ops: "navigate" {url} -> status+title+first N chars;
 //      "extract" {url, selector?} -> text (simple strip);
 //      "api" {method, url, headers?, body?} -> status+body
-// unsupported ops (click/type/screenshot) -> ToolError::BackendUnavailable
+// browser-native ops (click/type/screenshot) probe terraphim-agent capability
+// and protocol; unavailable/placeholder backend -> ToolError::BackendUnavailable
 ```
 
 ### Error Types
