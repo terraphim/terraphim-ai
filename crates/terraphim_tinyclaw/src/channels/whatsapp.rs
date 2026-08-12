@@ -153,7 +153,7 @@ impl Channel for WhatsAppChannel {
     }
 
     async fn send(&self, msg: OutboundMessage) -> anyhow::Result<()> {
-        for chunk in crate::format::chunk_message(&msg.content, MAX_TEXT_CHARS) {
+        for chunk in crate::format::chunk_message_with_hard_limit(&msg.content, MAX_TEXT_CHARS) {
             self.send_chunk(&msg.chat_id, &chunk).await?;
         }
         Ok(())
@@ -343,6 +343,35 @@ mod tests {
         assert_eq!(body["type"], "text");
         assert_eq!(body["text"]["preview_url"], false);
         assert_eq!(body["text"]["body"], "hello");
+    }
+
+    #[tokio::test]
+    async fn splits_uninterrupted_unicode_text_within_whatsapp_limit_losslessly() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let base = spawn_capture_server(tx).await;
+        let ch = WhatsAppChannel::new(test_config(&base));
+        let content = "漢".repeat(MAX_TEXT_CHARS + 17);
+
+        ch.send(OutboundMessage::new(
+            "whatsapp",
+            "15551234567",
+            content.clone(),
+        ))
+        .await
+        .unwrap();
+
+        let mut reconstructed = String::new();
+        while let Some((_path, _auth, body)) = rx.recv().await {
+            let chunk = body["text"]["body"].as_str().unwrap();
+            assert!(chunk.chars().count() <= MAX_TEXT_CHARS);
+            assert!(chunk.len() <= MAX_TEXT_CHARS);
+            reconstructed.push_str(chunk);
+            if reconstructed.chars().count() == content.chars().count() {
+                break;
+            }
+        }
+
+        assert_eq!(reconstructed, content);
     }
 
     #[tokio::test]

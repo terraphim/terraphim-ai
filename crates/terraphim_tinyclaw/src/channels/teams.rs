@@ -49,8 +49,14 @@ impl TeamsChannel {
             return Ok(None);
         }
 
-        let mut inbound =
-            InboundMessage::new(CHANNEL_NAME, sender_id, activity.conversation.id, text);
+        let conversation_id = activity.conversation.id;
+        let chat_id = match activity.service_url.as_deref() {
+            Some(service_url) if !service_url.trim().is_empty() => {
+                format!("{service_url}|{conversation_id}")
+            }
+            _ => conversation_id,
+        };
+        let mut inbound = InboundMessage::new(CHANNEL_NAME, sender_id, chat_id, text);
         if let Some(id) = activity.id {
             inbound.metadata.insert("activity_id".into(), id);
         }
@@ -179,7 +185,7 @@ impl Channel for TeamsChannel {
 
     async fn send(&self, msg: OutboundMessage) -> anyhow::Result<()> {
         let (service_url, conversation_id) = parse_chat_id(&msg.chat_id)?;
-        for chunk in crate::format::chunk_message(&msg.content, MAX_TEXT_CHARS) {
+        for chunk in crate::format::chunk_message_with_hard_limit(&msg.content, MAX_TEXT_CHARS) {
             self.send_chunk(service_url, conversation_id, &chunk)
                 .await?;
         }
@@ -301,7 +307,7 @@ mod tests {
         let msg = ch.parse_activity(body).unwrap().unwrap();
         assert_eq!(msg.channel, "teams");
         assert_eq!(msg.sender_id, "29:user");
-        assert_eq!(msg.chat_id, "conv-1");
+        assert_eq!(msg.chat_id, "https://smba.trafficmanager.net/emea/|conv-1");
         assert_eq!(msg.content, "hello teams");
         assert_eq!(msg.metadata["activity_id"], "activity-1");
         assert_eq!(
@@ -373,6 +379,69 @@ mod tests {
         let body: serde_json::Value = serde_json::from_str(&send_request.body_text).unwrap();
         assert_eq!(body["type"], "message");
         assert_eq!(body["text"], "hello teams");
+    }
+
+    #[tokio::test]
+    async fn parsed_activity_chat_id_can_be_used_for_direct_reply() {
+        let (tx, mut rx) = mpsc::channel(2);
+        let base = spawn_capture_server(tx).await;
+        let ch = TeamsChannel::new(test_config(&format!("{base}/token")));
+        let body = format!(
+            r#"{{
+              "type": "message",
+              "id": "activity-1",
+              "serviceUrl": "{base}/",
+              "from": {{"id": "29:user"}},
+              "conversation": {{"id": "conv-1"}},
+              "text": "hello teams"
+            }}"#
+        );
+
+        let inbound = ch.parse_activity(body.as_bytes()).unwrap().unwrap();
+        ch.send(OutboundMessage::new("teams", inbound.chat_id, "reply"))
+            .await
+            .unwrap();
+
+        let token_request = rx.recv().await.unwrap();
+        assert_eq!(token_request.path, "/token");
+
+        let send_request = rx.recv().await.unwrap();
+        assert_eq!(send_request.path, "/v3/conversations/conv-1/activities");
+        let body: serde_json::Value = serde_json::from_str(&send_request.body_text).unwrap();
+        assert_eq!(body["text"], "reply");
+    }
+
+    #[tokio::test]
+    async fn splits_uninterrupted_unicode_text_within_teams_limit_losslessly() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let base = spawn_capture_server(tx).await;
+        let ch = TeamsChannel::new(test_config(&format!("{base}/token")));
+        let content = "漢".repeat(MAX_TEXT_CHARS + 17);
+
+        ch.send(OutboundMessage::new(
+            "teams",
+            format!("{base}|conv-1"),
+            content.clone(),
+        ))
+        .await
+        .unwrap();
+
+        let mut reconstructed = String::new();
+        while let Some(request) = rx.recv().await {
+            if request.path == "/token" {
+                continue;
+            }
+            let body: serde_json::Value = serde_json::from_str(&request.body_text).unwrap();
+            let chunk = body["text"].as_str().unwrap();
+            assert!(chunk.chars().count() <= MAX_TEXT_CHARS);
+            assert!(chunk.len() <= MAX_TEXT_CHARS);
+            reconstructed.push_str(chunk);
+            if reconstructed.chars().count() == content.chars().count() {
+                break;
+            }
+        }
+
+        assert_eq!(reconstructed, content);
     }
 
     #[tokio::test]

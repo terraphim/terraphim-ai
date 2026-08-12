@@ -176,6 +176,40 @@ pub fn chunk_message(text: &str, max_length: usize) -> Vec<String> {
     final_chunks
 }
 
+/// Split text semantically first, then hard-split any uninterrupted Unicode runs.
+pub fn chunk_message_with_hard_limit(text: &str, max_chars: usize) -> Vec<String> {
+    chunk_message(text, max_chars)
+        .into_iter()
+        .flat_map(|chunk| hard_split_utf8_bytes(&chunk, max_chars))
+        .collect()
+}
+
+fn hard_split_utf8_bytes(text: &str, max_bytes: usize) -> Vec<String> {
+    if max_bytes == 0 || text.len() <= max_bytes {
+        return vec![text.to_string()];
+    }
+
+    let mut chunks = Vec::new();
+    let mut start = 0;
+    let mut current_bytes = 0;
+
+    for (idx, ch) in text.char_indices() {
+        let char_bytes = ch.len_utf8();
+        if current_bytes > 0 && current_bytes + char_bytes > max_bytes {
+            chunks.push(text[start..idx].to_string());
+            start = idx;
+            current_bytes = 0;
+        }
+        current_bytes += char_bytes;
+    }
+
+    if start < text.len() {
+        chunks.push(text[start..].to_string());
+    }
+
+    chunks
+}
+
 fn replace_bold(text: &str) -> String {
     let mut result = text.to_string();
     // **text**
