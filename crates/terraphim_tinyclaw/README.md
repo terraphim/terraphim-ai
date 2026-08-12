@@ -334,6 +334,65 @@ See the [examples/](examples/) directory for:
 - Example skills (code review, documentation, security scan)
 - Deployment scripts
 
+### Hermes-Parity Tools
+
+Enable parity tools in `tinyclaw.toml`:
+
+```toml
+[memory]
+enabled = true
+binary = "terraphim-agent"
+role = "Project Engineer"
+
+[sandbox]
+enabled = true
+backend = "local" # or "docker" with local fallback
+timeout_secs = 120
+max_output_bytes = 65536
+
+[subagent]
+enabled = true
+provider = "codex"
+timeout_secs = 300
+
+[browser]
+enabled = true
+timeout_secs = 30
+max_bytes = 524288
+
+[scheduler]
+enabled = true
+store_key = "tinyclaw/schedules"
+```
+
+Example chat requests:
+
+```text
+remember my default Rust test runner is cargo nextest
+how should I run tests?
+spawn a subagent to run cargo test in crates/terraphim_tinyclaw
+run python print(1+1) in a local sandbox
+schedule daily-report every day at 09:00
+browse https://example.com and extract the heading
+click #login
+type alex into #username
+take a screenshot
+```
+
+CLI surfaces:
+
+```bash
+terraphim-tinyclaw agent
+terraphim-tinyclaw tui
+terraphim-tinyclaw gateway
+terraphim-tinyclaw schedule create "daily-report" "0 9 * * *" --skill daily-report
+terraphim-tinyclaw mcp --serve
+```
+
+Live-tier interoperability tests are opt-in and ignored by default. Set the
+documented `LIVE_TINYCLAW_*` env flags in the relevant tests for MCP, GitHub,
+Linear, or Slack when real credentials/reference servers are available.
+
 ## Troubleshooting
 
 ### Bot Not Responding

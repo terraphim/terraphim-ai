@@ -116,6 +116,8 @@ enum Commands {
     },
     /// Run as gateway server with all enabled channels.
     Gateway,
+    /// Run the local terminal UI surface.
+    Tui,
     /// Manage skills (workflows).
     Skill {
         #[command(subcommand)]
@@ -244,6 +246,10 @@ async fn main() -> anyhow::Result<()> {
         Commands::Gateway => {
             log::info!("Starting in gateway mode");
             run_gateway_mode(config).await?;
+        }
+        Commands::Tui => {
+            log::info!("Starting in TUI mode");
+            run_agent_mode(config, None).await?;
         }
         Commands::Skill { command } => {
             log::info!("Executing skill command");

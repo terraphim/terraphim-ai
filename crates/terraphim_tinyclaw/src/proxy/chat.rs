@@ -100,6 +100,21 @@ pub async fn chat_completions(State(state): State<ProxyState>, body: Json<Value>
         .and_then(|m| m["content"].as_str())
         .unwrap_or_default();
 
+    if let Some(bus) = &state.bus
+        && !last_user.is_empty()
+    {
+        let _ = crate::agent::entry::dispatch_to_agent_loop(
+            bus,
+            crate::bus::InboundMessage::new(
+                "proxy",
+                "openai-client",
+                "chat-completions",
+                last_user,
+            ),
+        )
+        .await;
+    }
+
     let now = Utc::now().timestamp();
     let id = format!("chatcmpl-{:x}", now);
     let response = json!({

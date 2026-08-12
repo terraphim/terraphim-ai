@@ -599,7 +599,11 @@ impl ToolCallingLoop {
             memory_enabled,
             memory_config: mem_cfg_arc,
             workspace: agent_config.workspace.clone(),
-            memory_last_apply: Arc::new(Mutex::new(std::time::Instant::now())),
+            memory_last_apply: Arc::new(Mutex::new(
+                std::time::Instant::now()
+                    .checked_sub(MEMORY_APPLY_COOLDOWN)
+                    .unwrap_or_else(std::time::Instant::now),
+            )),
             evolution_config: None,
             evo_state: Arc::new(Mutex::new(TriggerState::default())),
         }

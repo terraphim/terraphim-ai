@@ -23,18 +23,28 @@ pub use protocol::{AgentCapabilities, AgentInfo, InitializeResult};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use crate::bus::MessageBus;
 use crate::session::SessionManager;
 
 /// Shared ACP server state.
 #[derive(Clone)]
 pub struct AcpState {
     pub sessions: Arc<Mutex<SessionManager>>,
+    pub bus: Arc<MessageBus>,
 }
 
 impl AcpState {
     pub fn new(sessions_dir: std::path::PathBuf) -> Self {
         Self {
             sessions: Arc::new(Mutex::new(SessionManager::new(sessions_dir))),
+            bus: Arc::new(MessageBus::new()),
+        }
+    }
+
+    pub fn with_bus(sessions_dir: std::path::PathBuf, bus: Arc<MessageBus>) -> Self {
+        Self {
+            sessions: Arc::new(Mutex::new(SessionManager::new(sessions_dir))),
+            bus,
         }
     }
 }

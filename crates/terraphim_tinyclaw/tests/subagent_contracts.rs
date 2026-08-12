@@ -5,6 +5,8 @@
 //! runs on a dedicated current-thread runtime (its spawn future is !Send
 //! due to a tracing span), which the tool handles internally.
 
+mod common;
+
 use serde_json::json;
 use std::path::PathBuf;
 use terraphim_persistence::DeviceStorage;
@@ -14,6 +16,7 @@ use terraphim_tinyclaw::tools::{Tool, ToolError};
 use terraphim_types::capability::{Capability, Provider, ProviderType};
 
 fn make_tool() -> SubagentTool {
+    common::scrub_env();
     // `sh` provider: the spawner appends the task as the `-c` script body.
     let provider = Provider::new(
         "@test-agent",
@@ -26,6 +29,27 @@ fn make_tool() -> SubagentTool {
         vec![Capability::CodeGeneration],
     );
     SubagentTool::with_spawner(AgentSpawner::new(), provider, None, 15)
+}
+
+fn make_tool_in_dir(dir: &std::path::Path, capacity: usize, timeout_secs: u64) -> SubagentTool {
+    common::scrub_env();
+    let provider = Provider::new(
+        "@test-agent",
+        "Test Agent",
+        ProviderType::Agent {
+            agent_id: "@test".to_string(),
+            cli_command: "sh".to_string(),
+            working_dir: dir.to_path_buf(),
+        },
+        vec![Capability::CodeGeneration],
+    );
+    SubagentTool::with_spawner_and_capacity(
+        AgentSpawner::new().with_working_dir(dir),
+        provider,
+        None,
+        timeout_secs,
+        capacity,
+    )
 }
 
 #[tokio::test]
@@ -125,6 +149,67 @@ async fn subagent_terminate_removes_handle() {
         .await
         .expect_err("status of terminated agent must fail");
     assert!(matches!(err, ToolError::ExecutionFailed { .. }));
+}
+
+#[tokio::test]
+async fn subagent_spawn_uses_temp_workdir_isolation() {
+    common::scrub_env();
+    let tmp = tempfile::tempdir().unwrap();
+    let marker = tmp.path().join("subagent-marker.txt");
+    let tool = make_tool_in_dir(tmp.path(), 2, 15);
+    let out = tool
+        .execute(json!({"op": "spawn", "task": "pwd > subagent-marker.txt"}))
+        .await
+        .unwrap();
+    let id = out.parse::<serde_json::Value>().unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+    let _ = tool
+        .execute(json!({"op": "collect", "id": id}))
+        .await
+        .unwrap();
+    assert!(
+        marker.exists(),
+        "spawned process should write inside temp workdir"
+    );
+    let cwd = std::fs::read_to_string(marker).unwrap();
+    assert_eq!(cwd.trim(), tmp.path().to_string_lossy());
+}
+
+#[tokio::test]
+async fn subagent_capacity_is_enforced_until_terminate_cleanup() {
+    common::scrub_env();
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = make_tool_in_dir(tmp.path(), 1, 1);
+    let out = tool
+        .execute(json!({"op": "spawn", "task": "sleep 30"}))
+        .await
+        .unwrap();
+    let id = out.parse::<serde_json::Value>().unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let err = tool
+        .execute(json!({"op": "spawn", "task": "echo should-not-start"}))
+        .await
+        .expect_err("capacity must reject second live subagent");
+    assert!(format!("{err}").contains("capacity"));
+
+    let term = tool
+        .execute(json!({"op": "terminate", "id": id}))
+        .await
+        .expect("terminate should free capacity");
+    let term_json: serde_json::Value = serde_json::from_str(&term).unwrap();
+    assert_eq!(term_json["op"], "terminate");
+
+    let second = tool
+        .execute(json!({"op": "spawn", "task": "echo after-cleanup"}))
+        .await
+        .expect("capacity freed after terminate cleanup");
+    assert!(second.contains("\"op\":\"spawn\""));
 }
 
 #[tokio::test]

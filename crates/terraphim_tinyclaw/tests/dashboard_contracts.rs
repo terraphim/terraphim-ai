@@ -8,6 +8,8 @@
 //! - `GET/DELETE /api/cron/jobs/{id}`
 //! - `GET /api/sessions`
 
+mod common;
+
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::{Value, json};
@@ -22,6 +24,7 @@ use tokio::sync::Mutex;
 use tower::ServiceExt; // for oneshot
 
 async fn make_app() -> (DashboardState, axum::Router) {
+    common::scrub_env();
     use terraphim_persistence::DeviceStorage;
     use terraphim_tinyclaw::cron::CronStore;
     use uuid::Uuid;

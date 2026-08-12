@@ -27,3 +27,4 @@ pub mod proxy;
 pub mod session;
 pub mod skills;
 pub mod tools;
+pub mod tui;

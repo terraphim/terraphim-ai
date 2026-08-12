@@ -14,6 +14,7 @@
 //! `dashboard::serve()`.
 
 pub mod cron;
+pub mod dispatch;
 pub mod health;
 pub mod sessions;
 pub mod status;
@@ -66,6 +67,7 @@ pub fn router(state: DashboardState) -> Router {
     Router::new()
         .route("/api/health", get(health::get_health))
         .route("/api/status", get(status::get_status))
+        .route("/api/agent/messages", post(dispatch::post_message))
         .route("/api/cron/fire", post(cron::fire_webhook))
         .route(
             "/api/cron/jobs",

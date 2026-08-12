@@ -4,13 +4,14 @@
 //! implementation would receive webhook events from GitHub and respond
 //! to issues/PRs via the REST API.
 
-use crate::bus::{MessageBus, OutboundMessage};
+use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::channel::{Channel, is_sender_allowed};
 use async_trait::async_trait;
 use std::sync::Arc;
 
 /// GitHub channel identifier.
 pub const CHANNEL_NAME: &str = "github";
+const MAX_COMMENT_CHARS: usize = 65_536;
 
 /// Configuration for the GitHub channel.
 #[derive(Clone)]
@@ -49,6 +50,14 @@ impl Default for GithubConfig {
 pub struct GithubChannel {
     config: GithubConfig,
     running: Arc<std::sync::atomic::AtomicBool>,
+    sent: Arc<std::sync::Mutex<Vec<GithubComment>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GithubComment {
+    pub repo: String,
+    pub issue_number: u64,
+    pub body: String,
 }
 
 impl GithubChannel {
@@ -56,6 +65,7 @@ impl GithubChannel {
         Self {
             config,
             running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            sent: Arc::new(std::sync::Mutex::new(Vec::new())),
         }
     }
 
@@ -89,6 +99,49 @@ impl GithubChannel {
         }
         mac.verify_slice(&provided_bytes).is_ok()
     }
+
+    pub fn parse_issue_comment_event(&self, body: &[u8]) -> anyhow::Result<Option<InboundMessage>> {
+        let v: serde_json::Value = serde_json::from_slice(body)?;
+        let Some(comment) = v.get("comment") else {
+            return Ok(None);
+        };
+        let sender = v["sender"]["login"].as_str().unwrap_or("");
+        if !self.is_allowed(sender) {
+            return Ok(None);
+        }
+        let repo = v["repository"]["full_name"].as_str().unwrap_or("");
+        let issue = v["issue"]["number"].as_u64().unwrap_or(0);
+        let body = comment["body"].as_str().unwrap_or("");
+        let mut msg = InboundMessage::new(
+            CHANNEL_NAME,
+            sender,
+            format!("{repo}#{issue}"),
+            body.to_string(),
+        );
+        msg.metadata.insert("repo".into(), repo.into());
+        msg.metadata
+            .insert("issue_number".into(), issue.to_string());
+        Ok(Some(msg))
+    }
+
+    pub fn sent_comments(&self) -> Vec<GithubComment> {
+        self.sent.lock().unwrap().clone()
+    }
+}
+
+pub fn format_github_comment(content: &str) -> String {
+    content.trim().to_string()
+}
+
+pub fn chunk_github_comment(content: &str) -> Vec<String> {
+    chunk_on_char_boundary(content, MAX_COMMENT_CHARS)
+}
+
+fn parse_github_chat_id(chat_id: &str) -> anyhow::Result<(String, u64)> {
+    let (repo, issue) = chat_id
+        .rsplit_once('#')
+        .ok_or_else(|| anyhow::anyhow!("GitHub chat_id must be '<owner>/<repo>#<number>'"))?;
+    Ok((repo.to_string(), issue.parse()?))
 }
 
 /// Decode a hex string into a 32-byte buffer (SHA-256 size).
@@ -134,8 +187,16 @@ impl Channel for GithubChannel {
             .store(false, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
-    async fn send(&self, _msg: OutboundMessage) -> anyhow::Result<()> {
-        // Real implementation: POST a comment via REST API.
+    async fn send(&self, msg: OutboundMessage) -> anyhow::Result<()> {
+        let (repo, issue_number) = parse_github_chat_id(&msg.chat_id)?;
+        let mut sent = self.sent.lock().unwrap();
+        for body in chunk_github_comment(&format_github_comment(&msg.content)) {
+            sent.push(GithubComment {
+                repo: repo.clone(),
+                issue_number,
+                body,
+            });
+        }
         Ok(())
     }
     fn is_running(&self) -> bool {
@@ -144,6 +205,17 @@ impl Channel for GithubChannel {
     fn is_allowed(&self, sender_id: &str) -> bool {
         is_sender_allowed(&self.config.allow_from, sender_id)
     }
+}
+
+fn chunk_on_char_boundary(content: &str, max_chars: usize) -> Vec<String> {
+    if content.is_empty() {
+        return vec![String::new()];
+    }
+    let chars: Vec<char> = content.chars().collect();
+    chars
+        .chunks(max_chars)
+        .map(|chunk| chunk.iter().collect())
+        .collect()
 }
 
 #[cfg(test)]
@@ -209,5 +281,75 @@ mod tests {
         });
         assert!(ch.is_allowed("alice"));
         assert!(!ch.is_allowed("bob"));
+    }
+
+    #[tokio::test]
+    async fn send_formats_and_chunks_comments() {
+        let ch = GithubChannel::new(GithubConfig::default());
+        let msg = OutboundMessage::new("github", "terraphim/terraphim-ai#3165", " hi ");
+        ch.send(msg).await.unwrap();
+        let sent = ch.sent_comments();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].repo, "terraphim/terraphim-ai");
+        assert_eq!(sent[0].issue_number, 3165);
+        assert_eq!(sent[0].body, "hi");
+
+        let long = "x".repeat(MAX_COMMENT_CHARS + 1);
+        ch.send(OutboundMessage::new(
+            "github",
+            "terraphim/terraphim-ai#3165",
+            long,
+        ))
+        .await
+        .unwrap();
+        let sent = ch.sent_comments();
+        assert_eq!(sent.len(), 3);
+        assert_eq!(sent[1].body.chars().count(), MAX_COMMENT_CHARS);
+        assert_eq!(sent[2].body, "x");
+    }
+
+    #[test]
+    fn receive_issue_comment_parses_inbound_message() {
+        let ch = GithubChannel::new(GithubConfig {
+            allow_from: vec!["alice".into()],
+            ..Default::default()
+        });
+        let payload = serde_json::json!({
+            "sender": {"login": "alice"},
+            "repository": {"full_name": "terraphim/terraphim-ai"},
+            "issue": {"number": 3165},
+            "comment": {"body": "@tinyclaw help"}
+        });
+        let msg = ch
+            .parse_issue_comment_event(payload.to_string().as_bytes())
+            .unwrap()
+            .unwrap();
+        assert_eq!(msg.channel, "github");
+        assert_eq!(msg.sender_id, "alice");
+        assert_eq!(msg.chat_id, "terraphim/terraphim-ai#3165");
+        assert_eq!(msg.content, "@tinyclaw help");
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn live_tier_github_send_hook_is_explicitly_gated() {
+        if std::env::var("LIVE_TINYCLAW_GITHUB").ok().as_deref() != Some("1") {
+            eprintln!("set LIVE_TINYCLAW_GITHUB=1 with GITHUB_TOKEN and GITHUB_TEST_CHAT_ID");
+            return;
+        }
+        let token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN");
+        let chat = std::env::var("GITHUB_TEST_CHAT_ID").expect("GITHUB_TEST_CHAT_ID");
+        let ch = GithubChannel::new(GithubConfig {
+            token,
+            webhook_secret: "live".into(),
+            allow_from: vec!["*".into()],
+        });
+        ch.send(OutboundMessage::new(
+            "github",
+            chat,
+            "TinyClaw live-tier smoke",
+        ))
+        .await
+        .unwrap();
     }
 }

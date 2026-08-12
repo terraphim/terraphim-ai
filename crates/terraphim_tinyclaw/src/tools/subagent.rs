@@ -36,6 +36,8 @@ pub struct SubagentToolConfig {
     pub model: Option<String>,
     /// Timeout for waiting on spawned agents.
     pub timeout_secs: u64,
+    /// Maximum live subagents.
+    pub max_agents: usize,
 }
 
 impl From<&crate::config::SubagentConfig> for SubagentToolConfig {
@@ -44,6 +46,7 @@ impl From<&crate::config::SubagentConfig> for SubagentToolConfig {
             provider: cfg.provider.clone(),
             model: cfg.model.clone(),
             timeout_secs: cfg.timeout_secs,
+            max_agents: cfg.max_agents,
         }
     }
 }
@@ -87,6 +90,8 @@ pub struct SubagentTool {
     /// Optional durable registry (`terraphim_persistence::DeviceStorage`)
     /// so spawned-subagent metadata survives restarts. None = memory only.
     persist: Option<SubagentRegistry>,
+    /// Maximum live handles.
+    max_agents: usize,
 }
 
 impl SubagentTool {
@@ -97,6 +102,17 @@ impl SubagentTool {
         default_model: Option<String>,
         timeout_secs: u64,
     ) -> Self {
+        Self::with_spawner_and_capacity(spawner, provider, default_model, timeout_secs, 4)
+    }
+
+    /// Create a subagent tool with explicit capacity.
+    pub fn with_spawner_and_capacity(
+        spawner: AgentSpawner,
+        provider: Provider,
+        default_model: Option<String>,
+        timeout_secs: u64,
+        max_agents: usize,
+    ) -> Self {
         Self {
             spawner,
             provider,
@@ -105,6 +121,7 @@ impl SubagentTool {
             bridge: Arc::new(SpawnBridge::start()),
             handles: Arc::new(Mutex::new(HashMap::new())),
             persist: None,
+            max_agents,
         }
     }
 
@@ -118,11 +135,12 @@ impl SubagentTool {
     pub fn from_config(cfg: &crate::config::SubagentConfig) -> Self {
         let tool_cfg = SubagentToolConfig::from(cfg);
         let provider = provider_from_config(&tool_cfg);
-        let mut tool = Self::with_spawner(
+        let mut tool = Self::with_spawner_and_capacity(
             AgentSpawner::new(),
             provider,
             tool_cfg.model,
             tool_cfg.timeout_secs,
+            tool_cfg.max_agents,
         );
         // Attach the durable registry when DeviceStorage is available
         // (graceful degradation: tool stays fully functional in-memory).
@@ -214,6 +232,15 @@ impl Tool for SubagentTool {
                     .and_then(|v| v.as_str())
                     .or(self.default_model.as_deref());
                 let id = Self::new_handle_id();
+                if self.handles.lock().await.len() >= self.max_agents {
+                    return Err(ToolError::ExecutionFailed {
+                        tool: "subagent".to_string(),
+                        message: format!(
+                            "subagent pool capacity exceeded (max_agents={})",
+                            self.max_agents
+                        ),
+                    });
+                }
 
                 // The spawner holds a tracing `EnteredSpan` across an await
                 // point inside spawn_with_model (lib.rs:671), making the

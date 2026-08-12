@@ -5,6 +5,8 @@
 //! produces the same `Session` shape after round-trip, regardless of
 //! which backend is used.
 
+mod common;
+
 use std::path::PathBuf;
 
 use terraphim_persistence::DeviceStorage;
@@ -14,6 +16,7 @@ use uuid::Uuid;
 
 /// Shared test scenario: persist a session with messages, reload, compare.
 async fn round_trip_test(backend: &dyn MemoryBackend, id: &str) -> Session {
+    common::scrub_env();
     let mut session = backend.get_or_create(id).await;
     session.add_message(ChatMessage::user("hello", "user-1"));
     session.add_message(ChatMessage::assistant("world"));

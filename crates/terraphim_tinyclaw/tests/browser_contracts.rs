@@ -3,6 +3,8 @@
 //! Uses a local axum server as the target so no external network is
 //! needed in CI.
 
+mod common;
+
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::{Value, json};
@@ -11,6 +13,7 @@ use terraphim_tinyclaw::tools::browser::BrowserTool;
 use terraphim_tinyclaw::tools::{Tool, ToolError};
 
 fn make_browser() -> BrowserTool {
+    common::scrub_env();
     let cfg = terraphim_tinyclaw::config::BrowserConfig {
         enabled: true,
         timeout_secs: 10,
@@ -28,7 +31,7 @@ async fn spawn_test_server() -> String {
             get(|| async {
                 (
                     [("content-type", "text/html")],
-                    "<html><head><title>Test Page</title></head><body><h1>Hello World</h1><p>some body text</p></body></html>",
+                    "<html><head><title>Test Page</title></head><body><h1>Hello World</h1><p>some body text</p><button id=\"login\">Login</button><input id=\"username\" name=\"username\" /></body></html>",
                 )
             }),
         )
@@ -100,18 +103,43 @@ async fn browser_api_post_round_trip() {
 }
 
 #[tokio::test]
-async fn browser_click_type_screenshot_unavailable() {
+async fn browser_click_type_screenshot_drive_local_page() {
+    let base = spawn_test_server().await;
     let tool = make_browser();
-    for op in ["click", "type", "screenshot"] {
-        let err = tool
-            .execute(json!({"op": op, "url": "http://example.com"}))
-            .await
-            .expect_err(&format!("{op} must be unavailable"));
-        assert!(
-            matches!(err, ToolError::BackendUnavailable { .. }),
-            "{op} should be BackendUnavailable, got: {err:?}"
-        );
-    }
+
+    tool.execute(json!({"op": "navigate", "url": format!("{base}/page")}))
+        .await
+        .expect("navigate should establish a browser session");
+
+    let clicked = tool
+        .execute(json!({"op": "click", "selector": "#login"}))
+        .await
+        .expect("click should succeed against local page");
+    let click_json: Value = serde_json::from_str(&clicked).unwrap();
+    assert_eq!(click_json["op"], "click");
+    assert_eq!(click_json["selector"], "#login");
+    assert_eq!(click_json["text"], "Login");
+
+    let typed = tool
+        .execute(json!({"op": "type", "selector": "#username", "text": "alex"}))
+        .await
+        .expect("type should update local form state");
+    let type_json: Value = serde_json::from_str(&typed).unwrap();
+    assert_eq!(type_json["op"], "type");
+    assert_eq!(type_json["selector"], "#username");
+    assert_eq!(type_json["value"], "alex");
+
+    let shot = tool
+        .execute(json!({"op": "screenshot"}))
+        .await
+        .expect("screenshot should write a file");
+    let shot_json: Value = serde_json::from_str(&shot).unwrap();
+    let path = shot_json["path"].as_str().expect("path should be returned");
+    assert!(
+        std::path::Path::new(path).exists(),
+        "screenshot path exists"
+    );
+    assert_eq!(shot_json["content_type"], "image/png");
 }
 
 #[tokio::test]

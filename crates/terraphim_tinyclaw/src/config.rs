@@ -1235,6 +1235,10 @@ pub struct SubagentConfig {
     /// Timeout for waiting on spawned agents in seconds.
     #[serde(default = "default_subagent_timeout")]
     pub timeout_secs: u64,
+
+    /// Maximum live subagents tracked by this TinyClaw process.
+    #[serde(default = "default_subagent_max_agents")]
+    pub max_agents: usize,
 }
 
 fn default_subagent_provider() -> String {
@@ -1245,6 +1249,10 @@ fn default_subagent_timeout() -> u64 {
     600
 }
 
+fn default_subagent_max_agents() -> usize {
+    4
+}
+
 impl Default for SubagentConfig {
     fn default() -> Self {
         Self {
@@ -1252,6 +1260,7 @@ impl Default for SubagentConfig {
             provider: default_subagent_provider(),
             model: None,
             timeout_secs: default_subagent_timeout(),
+            max_agents: default_subagent_max_agents(),
         }
     }
 }

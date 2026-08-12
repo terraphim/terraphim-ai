@@ -8,6 +8,8 @@
 //! sibling `terraphim-llm-proxy` crate but it's not published to any
 //! registry and its path-only dep pulls in the whole monorepo.
 
+mod common;
+
 use axum::Json;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -24,6 +26,7 @@ async fn send(
     path: &str,
     body: Option<Value>,
 ) -> (StatusCode, Value) {
+    common::scrub_env();
     let mut builder = Request::builder().method(method).uri(path);
     let body = match body {
         Some(v) => {

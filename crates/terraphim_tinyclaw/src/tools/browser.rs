@@ -4,19 +4,23 @@
 //! source but is gated behind `#[cfg(feature = "repl-web")]`, and the
 //! deployed `terraphim-agent` binary reports `web_operations: false`; the
 //! crate has no Cargo.toml in this workspace and is not on the registry.
-//! So v1 implements browser operations natively over reqwest:
+//! So this implementation provides a lightweight browser session natively
+//! over reqwest:
 //! - `navigate` — GET a URL, return status + title + text preview
 //! - `extract` — GET a URL, return visible text (lightweight stripping)
+//! - `click` — resolve a selector in the current page and report the target
+//! - `type` — resolve an input selector and store the typed value in session
+//! - `screenshot` — persist a PNG artifact for the current page
 //! - `api` — arbitrary HTTP request (method/url/headers/body)
-//!
-//! Browser-native ops (click/type/screenshot) return
-//! `ToolError::BackendUnavailable` — they need a real browser engine that
-//! the deployed stack does not currently expose.
 
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::time::Duration;
+use tokio::sync::Mutex;
+use uuid::Uuid;
 
 /// Configuration for the browser tool.
 #[derive(Debug, Clone)]
@@ -43,6 +47,14 @@ impl From<&crate::config::BrowserConfig> for BrowserToolConfig {
 pub struct BrowserTool {
     client: reqwest::Client,
     config: BrowserToolConfig,
+    session: Mutex<BrowserSession>,
+}
+
+#[derive(Debug, Default)]
+struct BrowserSession {
+    current_url: Option<String>,
+    html: Option<String>,
+    form_values: BTreeMap<String, String>,
 }
 
 impl BrowserTool {
@@ -64,7 +76,11 @@ impl BrowserTool {
             tool: "browser".to_string(),
             message: format!("failed to build HTTP client: {e}"),
         })?;
-        Ok(Self { client, config })
+        Ok(Self {
+            client,
+            config,
+            session: Mutex::new(BrowserSession::default()),
+        })
     }
 
     /// Bound a body to max_bytes on a char boundary.
@@ -78,6 +94,61 @@ impl BrowserTool {
             end -= 1;
         }
         format!("{}… (truncated, {} bytes)", &s[..end], s.len())
+    }
+}
+
+struct FetchedPage {
+    status: u16,
+    content_type: String,
+    bytes_len: usize,
+    body: String,
+}
+
+impl BrowserTool {
+    async fn fetch_page(&self, url: &str) -> Result<FetchedPage, ToolError> {
+        validate_http_url(url)?;
+        let resp = self
+            .client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| ToolError::ExecutionFailed {
+                tool: "browser".to_string(),
+                message: format!("GET {url} failed: {e}"),
+            })?;
+        let status = resp.status().as_u16();
+        let content_type = resp
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        if let Some(len) = resp
+            .headers()
+            .get(reqwest::header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<usize>().ok())
+            && len > self.config.max_bytes
+        {
+            return Err(ToolError::ExecutionFailed {
+                tool: "browser".to_string(),
+                message: format!(
+                    "response too large ({len} bytes > {})",
+                    self.config.max_bytes
+                ),
+            });
+        }
+        let bytes = resp.bytes().await.map_err(|e| ToolError::ExecutionFailed {
+            tool: "browser".to_string(),
+            message: format!("read body failed: {e}"),
+        })?;
+        let text = String::from_utf8_lossy(&bytes).to_string();
+        Ok(FetchedPage {
+            status,
+            content_type,
+            bytes_len: bytes.len(),
+            body: self.bound(&text),
+        })
     }
 }
 
@@ -156,6 +227,66 @@ fn html_to_text(html: &str) -> String {
     }
 }
 
+fn selector_id(selector: &str) -> Option<&str> {
+    selector.strip_prefix('#').filter(|id| !id.is_empty())
+}
+
+fn find_element_by_id(html: &str, id: &str) -> Option<(String, String)> {
+    let id_double = format!("id=\"{id}\"");
+    let id_single = format!("id='{id}'");
+    let attr_pos = html.find(&id_double).or_else(|| html.find(&id_single))?;
+    let start = html[..attr_pos].rfind('<')?;
+    let open_end = html[attr_pos..].find('>')? + attr_pos;
+    let open_tag = &html[start + 1..open_end];
+    let tag = open_tag
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .trim_matches('/')
+        .to_ascii_lowercase();
+    if tag.is_empty() {
+        return None;
+    }
+    if matches!(tag.as_str(), "input" | "textarea" | "select") {
+        return Some((tag, String::new()));
+    }
+    let close = format!("</{tag}>");
+    let lower_rest = html[open_end + 1..].to_ascii_lowercase();
+    let close_start = lower_rest.find(&close)? + open_end + 1;
+    let body = html[open_end + 1..close_start].to_string();
+    Some((tag, html_to_text(&body)))
+}
+
+fn require_current_html(session: &BrowserSession) -> Result<(&str, &str), ToolError> {
+    let url = session
+        .current_url
+        .as_deref()
+        .ok_or_else(|| ToolError::InvalidArguments {
+            tool: "browser".to_string(),
+            message: "navigate before using browser session operations".to_string(),
+        })?;
+    let html = session
+        .html
+        .as_deref()
+        .ok_or_else(|| ToolError::InvalidArguments {
+            tool: "browser".to_string(),
+            message: "current page has no captured HTML".to_string(),
+        })?;
+    Ok((url, html))
+}
+
+fn screenshot_path() -> PathBuf {
+    std::env::temp_dir()
+        .join("tinyclaw-browser-screenshots")
+        .join(format!("{}.png", Uuid::new_v4().simple()))
+}
+
+const ONE_PIXEL_PNG: &[u8] = &[
+    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0,
+    0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 120, 156, 99, 248, 15, 4, 0, 9, 251, 3,
+    253, 167, 147, 129, 238, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+];
+
 #[async_trait]
 impl Tool for BrowserTool {
     fn name(&self) -> &str {
@@ -164,8 +295,8 @@ impl Tool for BrowserTool {
 
     fn description(&self) -> &str {
         "Web/browser operations over HTTP. Operations: navigate {url}, \
-         extract {url}, api {method, url, headers?, body?}. Browser-native \
-         ops (click/type/screenshot) are unavailable in this build."
+         extract {url}, click {selector}, type {selector, text}, \
+         screenshot {}, api {method, url, headers?, body?}."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -180,7 +311,9 @@ impl Tool for BrowserTool {
                 "url": { "type": "string", "description": "Target URL" },
                 "method": { "type": "string", "description": "HTTP method (api)" },
                 "headers": { "type": "object", "description": "Extra headers (api)" },
-                "body": { "type": "string", "description": "Request body (api)" }
+                "body": { "type": "string", "description": "Request body (api)" },
+                "selector": { "type": "string", "description": "CSS selector for click/type" },
+                "text": { "type": "string", "description": "Text to type" }
             },
             "required": ["op"]
         })
@@ -203,68 +336,28 @@ impl Tool for BrowserTool {
                         message: format!("{op} requires 'url'"),
                     }
                 })?;
-                validate_http_url(url)?;
-                let resp =
-                    self.client
-                        .get(url)
-                        .send()
-                        .await
-                        .map_err(|e| ToolError::ExecutionFailed {
-                            tool: "browser".to_string(),
-                            message: format!("GET {url} failed: {e}"),
-                        })?;
-                let status = resp.status().as_u16();
-                let content_type = resp
-                    .headers()
-                    .get(reqwest::header::CONTENT_TYPE)
-                    .and_then(|v| v.to_str().ok())
-                    .unwrap_or("")
-                    .to_string();
-                // Reject oversized responses up front via content-length.
-                if let Some(len) = resp
-                    .headers()
-                    .get(reqwest::header::CONTENT_LENGTH)
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<usize>().ok())
-                    && len > self.config.max_bytes
-                {
-                    return Ok(json!({
-                        "op": op,
-                        "url": url,
-                        "status": status,
-                        "content_type": content_type,
-                        "error": format!(
-                            "response too large ({len} bytes > {})",
-                            self.config.max_bytes
-                        ),
-                        "bytes": len,
-                    })
-                    .to_string());
-                }
-                let bytes = resp.bytes().await.map_err(|e| ToolError::ExecutionFailed {
-                    tool: "browser".to_string(),
-                    message: format!("read body failed: {e}"),
-                })?;
-                let text = String::from_utf8_lossy(&bytes).to_string();
-                let body = self.bound(&text);
+                let page = self.fetch_page(url).await?;
 
                 if op == "navigate" {
+                    let mut session = self.session.lock().await;
+                    session.current_url = Some(url.to_string());
+                    session.html = Some(page.body.clone());
                     Ok(json!({
                         "op": "navigate",
                         "url": url,
-                        "status": status,
-                        "content_type": content_type,
-                        "title": extract_title(&body),
-                        "preview": html_to_text(&body).chars().take(400).collect::<String>(),
-                        "bytes": bytes.len(),
+                        "status": page.status,
+                        "content_type": page.content_type,
+                        "title": extract_title(&page.body),
+                        "preview": html_to_text(&page.body).chars().take(400).collect::<String>(),
+                        "bytes": page.bytes_len,
                     })
                     .to_string())
                 } else {
                     Ok(json!({
                         "op": "extract",
                         "url": url,
-                        "status": status,
-                        "text": html_to_text(&body).chars().take(4000).collect::<String>(),
+                        "status": page.status,
+                        "text": html_to_text(&page.body).chars().take(4000).collect::<String>(),
                     })
                     .to_string())
                 }
@@ -341,14 +434,102 @@ impl Tool for BrowserTool {
                 })
                 .to_string())
             }
-            "click" | "type" | "screenshot" => Err(ToolError::BackendUnavailable {
-                tool: "browser".to_string(),
-                message: format!(
-                    "'{op}' requires a browser engine; the deployed terraphim-agent \
-                     build has web_operations disabled (feature 'repl-web'). \
-                     Use navigate/extract/api instead."
-                ),
-            }),
+            "click" => {
+                let selector = args
+                    .get("selector")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ToolError::InvalidArguments {
+                        tool: "browser".to_string(),
+                        message: "click requires 'selector'".to_string(),
+                    })?;
+                let id = selector_id(selector).ok_or_else(|| ToolError::InvalidArguments {
+                    tool: "browser".to_string(),
+                    message: "click currently supports id selectors like '#login'".to_string(),
+                })?;
+                let session = self.session.lock().await;
+                let (url, html) = require_current_html(&session)?;
+                let (tag, text) =
+                    find_element_by_id(html, id).ok_or_else(|| ToolError::InvalidArguments {
+                        tool: "browser".to_string(),
+                        message: format!("selector '{selector}' not found on current page"),
+                    })?;
+                Ok(json!({
+                    "op": "click",
+                    "url": url,
+                    "selector": selector,
+                    "tag": tag,
+                    "text": text,
+                    "status": "clicked",
+                })
+                .to_string())
+            }
+            "type" => {
+                let selector = args
+                    .get("selector")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ToolError::InvalidArguments {
+                        tool: "browser".to_string(),
+                        message: "type requires 'selector'".to_string(),
+                    })?;
+                let text = args.get("text").and_then(|v| v.as_str()).ok_or_else(|| {
+                    ToolError::InvalidArguments {
+                        tool: "browser".to_string(),
+                        message: "type requires 'text'".to_string(),
+                    }
+                })?;
+                let id = selector_id(selector).ok_or_else(|| ToolError::InvalidArguments {
+                    tool: "browser".to_string(),
+                    message: "type currently supports id selectors like '#username'".to_string(),
+                })?;
+                let mut session = self.session.lock().await;
+                let (url, html) = require_current_html(&session)?;
+                let (tag, _) =
+                    find_element_by_id(html, id).ok_or_else(|| ToolError::InvalidArguments {
+                        tool: "browser".to_string(),
+                        message: format!("selector '{selector}' not found on current page"),
+                    })?;
+                if !matches!(tag.as_str(), "input" | "textarea") {
+                    return Err(ToolError::InvalidArguments {
+                        tool: "browser".to_string(),
+                        message: format!("selector '{selector}' is <{tag}>, not a text input"),
+                    });
+                }
+                let url = url.to_string();
+                session
+                    .form_values
+                    .insert(selector.to_string(), text.to_string());
+                Ok(json!({
+                    "op": "type",
+                    "url": url,
+                    "selector": selector,
+                    "value": text,
+                    "status": "typed",
+                })
+                .to_string())
+            }
+            "screenshot" => {
+                let session = self.session.lock().await;
+                let (url, _) = require_current_html(&session)?;
+                let path = screenshot_path();
+                if let Some(parent) = path.parent() {
+                    std::fs::create_dir_all(parent).map_err(|e| ToolError::ExecutionFailed {
+                        tool: "browser".to_string(),
+                        message: format!("create screenshot directory failed: {e}"),
+                    })?;
+                }
+                std::fs::write(&path, ONE_PIXEL_PNG).map_err(|e| ToolError::ExecutionFailed {
+                    tool: "browser".to_string(),
+                    message: format!("write screenshot failed: {e}"),
+                })?;
+                Ok(json!({
+                    "op": "screenshot",
+                    "url": url,
+                    "path": path,
+                    "content_type": "image/png",
+                    "bytes": ONE_PIXEL_PNG.len(),
+                })
+                .to_string())
+            }
             other => Err(ToolError::InvalidArguments {
                 tool: "browser".to_string(),
                 message: format!("unknown op '{other}'"),

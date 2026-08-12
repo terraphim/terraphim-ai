@@ -10,6 +10,8 @@
 //! - `cancel` is a no-op success for known sessions, error for unknown
 //! - `load_session` for unknown session returns `-32004`
 
+mod common;
+
 use serde_json::{Value, json};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use terraphim_tinyclaw::acp::AcpState;
@@ -20,6 +22,7 @@ use terraphim_tinyclaw::acp::router::{JsonRpcRequest, dispatch};
 static TEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn make_state() -> AcpState {
+    common::scrub_env();
     let n = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
     let dir = std::env::temp_dir().join(format!("acp_test_{n}_{}", uuid::Uuid::new_v4().simple()));
     std::fs::create_dir_all(&dir).unwrap();

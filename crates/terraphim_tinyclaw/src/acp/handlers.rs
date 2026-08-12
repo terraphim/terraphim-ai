@@ -116,6 +116,7 @@ pub async fn handle_send_message(
     state: &AcpState,
     req: SendMessageRequest,
 ) -> Result<SendMessageResult, AcpError> {
+    let content = req.content.clone();
     let msg = match req.role.as_str() {
         "user" => crate::session::ChatMessage::user(req.content, "acp"),
         "assistant" => crate::session::ChatMessage::assistant(req.content),
@@ -144,6 +145,17 @@ pub async fn handle_send_message(
     manager.save(session_ref).map_err(|e| AcpError {
         code: -32603,
         message: format!("save failed: {e}"),
+    })?;
+    drop(manager);
+
+    crate::agent::entry::dispatch_to_agent_loop(
+        &state.bus,
+        crate::bus::InboundMessage::new("acp", "acp", session_id.clone(), content),
+    )
+    .await
+    .map_err(|e| AcpError {
+        code: -32603,
+        message: format!("agent dispatch failed: {e}"),
     })?;
 
     Ok(SendMessageResult {
