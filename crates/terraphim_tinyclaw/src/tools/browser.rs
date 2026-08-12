@@ -18,7 +18,9 @@
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
 use serde_json::{Value, json};
+use std::process::Stdio;
 use std::time::Duration;
+use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
 /// Configuration for the browser tool.
@@ -86,9 +88,9 @@ impl BrowserTool {
         format!("{}… (truncated, {} bytes)", &s[..end], s.len())
     }
 
-    async fn browser_native_unavailable(&self, op: &str, args: &Value) -> ToolError {
+    async fn browser_native_unavailable(&self, op: &str, _args: &Value) -> ToolError {
         let evidence = match &self.config.agent_binary {
-            Some(binary) => probe_agent_web_operations(binary, op, args).await,
+            Some(binary) => probe_agent_web_operations(binary, self.config.timeout_secs, op).await,
             None => {
                 "agent_binary is disabled; no terraphim-agent browser-native backend configured"
                     .to_string()
@@ -111,12 +113,79 @@ fn preview_output(bytes: &[u8]) -> String {
     collapsed.chars().take(240).collect()
 }
 
-async fn run_agent(binary: &str, args: &[&str]) -> Result<std::process::Output, String> {
-    Command::new(binary)
+async fn run_agent(
+    binary: &str,
+    args: &[&str],
+    timeout_secs: u64,
+) -> Result<std::process::Output, String> {
+    let mut child = Command::new(binary)
         .args(args)
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(|e| format!("failed to execute {binary}: {e}"))?;
+
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| format!("failed to capture stdout for {binary}"))?;
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| format!("failed to capture stderr for {binary}"))?;
+
+    let stdout_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        stdout.read_to_end(&mut buf).await.map(|_| buf)
+    });
+    let stderr_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        stderr.read_to_end(&mut buf).await.map(|_| buf)
+    });
+
+    let status = match tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait()).await {
+        Ok(Ok(status)) => status,
+        Ok(Err(e)) => {
+            stdout_task.abort();
+            stderr_task.abort();
+            return Err(format!("failed to wait for {binary}: {e}"));
+        }
+        Err(_) => {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            let stdout = stdout_task
+                .await
+                .ok()
+                .and_then(Result::ok)
+                .unwrap_or_default();
+            let stderr = stderr_task
+                .await
+                .ok()
+                .and_then(Result::ok)
+                .unwrap_or_default();
+            return Err(format!(
+                "probe timed out after {timeout_secs}s; killed terraphim-agent subprocess; stdout='{}' stderr='{}'",
+                preview_output(&stdout),
+                preview_output(&stderr)
+            ));
+        }
+    };
+
+    let stdout = stdout_task
         .await
-        .map_err(|e| format!("failed to execute {binary}: {e}"))
+        .map_err(|e| format!("failed to join stdout reader for {binary}: {e}"))?
+        .map_err(|e| format!("failed to read stdout from {binary}: {e}"))?;
+    let stderr = stderr_task
+        .await
+        .map_err(|e| format!("failed to join stderr reader for {binary}: {e}"))?
+        .map_err(|e| format!("failed to read stderr from {binary}: {e}"))?;
+
+    Ok(std::process::Output {
+        status,
+        stdout,
+        stderr,
+    })
 }
 
 fn capabilities_web_enabled(stdout: &[u8]) -> Result<(bool, bool), String> {
@@ -138,10 +207,11 @@ fn capabilities_web_enabled(stdout: &[u8]) -> Result<(bool, bool), String> {
     Ok((web_operations, command_advertised))
 }
 
-async fn probe_agent_web_operations(binary: &str, op: &str, args: &Value) -> String {
+async fn probe_agent_web_operations(binary: &str, timeout_secs: u64, op: &str) -> String {
     let caps = match run_agent(
         binary,
         &["--robot", "--format", "json", "robot", "capabilities"],
+        timeout_secs,
     )
     .await
     {
@@ -163,7 +233,7 @@ async fn probe_agent_web_operations(binary: &str, op: &str, args: &Value) -> Str
         return "capability probe reports web_operations=false".to_string();
     }
 
-    let help = match run_agent(binary, &["--help"]).await {
+    let help = match run_agent(binary, &["--help"], timeout_secs).await {
         Ok(output) => output,
         Err(e) => return e,
     };
@@ -177,41 +247,9 @@ async fn probe_agent_web_operations(binary: &str, op: &str, args: &Value) -> Str
         );
     }
 
-    let url = args.get("url").and_then(Value::as_str).unwrap_or("");
-    let candidate = match op {
-        "screenshot" => vec!["web", "screenshot", url],
-        "click" => {
-            let selector = args.get("selector").and_then(Value::as_str).unwrap_or("");
-            vec!["web", "click", url, selector]
-        }
-        "type" => {
-            let selector = args.get("selector").and_then(Value::as_str).unwrap_or("");
-            let text = args.get("text").and_then(Value::as_str).unwrap_or("");
-            vec!["web", "type", url, selector, text]
-        }
-        _ => vec!["web", op, url],
-    };
-    match run_agent(binary, &candidate).await {
-        Ok(output) => {
-            let stdout = preview_output(&output.stdout);
-            let stderr = preview_output(&output.stderr);
-            if stdout.to_ascii_lowercase().contains("not yet implemented")
-                || stdout.to_ascii_lowercase().contains("not implemented")
-            {
-                format!("agent web protocol is placeholder-only: stdout='{stdout}'")
-            } else if !output.status.success() {
-                format!(
-                    "agent web protocol probe failed with status {:?}; stderr='{stderr}' stdout='{stdout}'",
-                    output.status.code()
-                )
-            } else {
-                format!(
-                    "agent reports web_operations=true, but TinyClaw has no verified JSON/result protocol for '{op}'; stdout='{stdout}'"
-                )
-            }
-        }
-        Err(e) => e,
-    }
+    format!(
+        "agent reports web_operations=true and advertises web, but TinyClaw has no verified non-mutating JSON/result protocol for '{op}'"
+    )
 }
 
 /// Validate that a URL uses http/https (matches `web_fetch` behaviour;
@@ -482,5 +520,126 @@ impl Tool for BrowserTool {
                 message: format!("unknown op '{other}'"),
             }),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::BrowserConfig;
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::{Path, PathBuf};
+    use tempfile::TempDir;
+
+    fn write_shim(dir: &Path, body: &str) -> PathBuf {
+        let path = dir.join("terraphim-agent-shim");
+        fs::write(&path, body).expect("write shim");
+        let mut perms = fs::metadata(&path).expect("shim metadata").permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&path, perms).expect("chmod shim");
+        path
+    }
+
+    fn read_log(path: &Path) -> String {
+        fs::read_to_string(path).unwrap_or_default()
+    }
+
+    fn browser_with_agent(agent_binary: String, timeout_secs: u64) -> BrowserTool {
+        let cfg = BrowserConfig {
+            enabled: true,
+            timeout_secs,
+            max_bytes: 4096,
+            proxy: None,
+            agent_binary: Some(agent_binary),
+        };
+        BrowserTool::from_config(&cfg).expect("browser tool")
+    }
+
+    #[tokio::test]
+    async fn browser_native_probe_does_not_execute_requested_mutating_command() {
+        let temp = TempDir::new().expect("tempdir");
+        let log = temp.path().join("invocations.log");
+        let shim = write_shim(
+            temp.path(),
+            &format!(
+                r#"#!/bin/sh
+printf '%s\n' "$*" >> '{}'
+if [ "$*" = "--robot --format json robot capabilities" ]; then
+  printf '%s\n' '{{"features":{{"web_operations":true}},"commands":["web"]}}'
+  exit 0
+fi
+if [ "$*" = "--help" ]; then
+  printf '%s\n' 'Usage: terraphim-agent web'
+  exit 0
+fi
+printf '%s\n' 'mutating web command executed' >&2
+exit 23
+"#,
+                log.display()
+            ),
+        );
+        let tool = browser_with_agent(shim.display().to_string(), 2);
+
+        let err = tool
+            .execute(json!({
+                "op": "click",
+                "url": "https://example.com",
+                "selector": "#submit"
+            }))
+            .await
+            .expect_err("click should fail closed");
+
+        assert!(matches!(err, ToolError::BackendUnavailable { .. }));
+        let invocations = read_log(&log);
+        assert!(invocations.contains("--robot --format json robot capabilities"));
+        assert!(invocations.contains("--help"));
+        assert!(
+            !invocations.contains("web click"),
+            "probe executed requested mutating command: {invocations}"
+        );
+    }
+
+    #[tokio::test]
+    async fn browser_native_probe_timeout_is_bounded_and_reaps_hanging_child() {
+        let temp = TempDir::new().expect("tempdir");
+        let pid_file = temp.path().join("shim.pid");
+        let shim = write_shim(
+            temp.path(),
+            &format!(
+                r#"#!/bin/sh
+printf '%s\n' "$$" > '{}'
+exec sleep 30
+"#,
+                pid_file.display()
+            ),
+        );
+        let tool = browser_with_agent(shim.display().to_string(), 1);
+
+        let result = tokio::time::timeout(
+            Duration::from_secs(3),
+            tool.execute(json!({
+                "op": "screenshot",
+                "url": "https://example.com"
+            })),
+        )
+        .await
+        .expect("probe should be bounded by BrowserConfig timeout_secs");
+
+        assert!(matches!(result, Err(ToolError::BackendUnavailable { .. })));
+        let pid: u32 = fs::read_to_string(&pid_file)
+            .expect("pid file")
+            .trim()
+            .parse()
+            .expect("pid");
+        let status = std::process::Command::new("kill")
+            .arg("-0")
+            .arg(pid.to_string())
+            .status()
+            .expect("kill -0");
+        assert!(
+            !status.success(),
+            "hanging shim process {pid} is still alive"
+        );
     }
 }
