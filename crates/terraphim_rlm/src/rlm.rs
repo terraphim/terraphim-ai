@@ -376,6 +376,7 @@ impl TerraphimRlm {
         let ctx = ExecutionContext {
             session_id: *session_id,
             timeout_ms: self.config.time_budget_ms,
+            max_output_bytes: self.config.max_inline_output_bytes,
             ..Default::default()
         };
 
@@ -447,6 +448,7 @@ impl TerraphimRlm {
         let ctx = ExecutionContext {
             session_id: *session_id,
             timeout_ms: self.config.time_budget_ms,
+            max_output_bytes: self.config.max_inline_output_bytes,
             ..Default::default()
         };
 
@@ -1151,6 +1153,99 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Default)]
+    struct RecordedContexts {
+        code: std::sync::Arc<std::sync::Mutex<Option<ExecutionContext>>>,
+        command: std::sync::Arc<std::sync::Mutex<Option<ExecutionContext>>>,
+    }
+
+    struct RecordingExecutor {
+        contexts: RecordedContexts,
+        capabilities: Vec<Capability>,
+    }
+
+    impl RecordingExecutor {
+        fn new(contexts: RecordedContexts) -> Self {
+            Self {
+                contexts,
+                capabilities: vec![Capability::PythonExecution, Capability::BashExecution],
+            }
+        }
+    }
+
+    #[async_trait]
+    impl ExecutionEnvironment for RecordingExecutor {
+        type Error = RlmError;
+
+        async fn execute_code(
+            &self,
+            _code: &str,
+            ctx: &ExecutionContext,
+        ) -> Result<ExecutionResult, Self::Error> {
+            *self.contexts.code.lock().unwrap() = Some(ctx.clone());
+            Ok(ExecutionResult::success("recorded code context"))
+        }
+
+        async fn execute_command(
+            &self,
+            _command: &str,
+            ctx: &ExecutionContext,
+        ) -> Result<ExecutionResult, Self::Error> {
+            *self.contexts.command.lock().unwrap() = Some(ctx.clone());
+            Ok(ExecutionResult::success("recorded command context"))
+        }
+
+        async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
+            Ok(ValidationResult::valid(vec![]))
+        }
+
+        async fn create_snapshot(
+            &self,
+            session_id: &SessionId,
+            name: &str,
+        ) -> Result<SnapshotId, Self::Error> {
+            Ok(SnapshotId::new(name, *session_id))
+        }
+
+        async fn restore_snapshot(&self, _snapshot: &SnapshotId) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        async fn list_snapshots(
+            &self,
+            _session_id: &SessionId,
+        ) -> Result<Vec<SnapshotId>, Self::Error> {
+            Ok(vec![])
+        }
+
+        async fn delete_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        async fn delete_session_snapshots(
+            &self,
+            _session_id: &SessionId,
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn capabilities(&self) -> &[Capability] {
+            &self.capabilities
+        }
+
+        fn backend_type(&self) -> BackendType {
+            BackendType::Docker
+        }
+
+        async fn health_check(&self) -> Result<bool, Self::Error> {
+            Ok(true)
+        }
+
+        async fn cleanup(&self) -> Result<(), Self::Error> {
+            Ok(())
+        }
+    }
+
     #[async_trait]
     impl ExecutionEnvironment for MockExecutor {
         type Error = RlmError;
@@ -1306,6 +1401,50 @@ mod tests {
 
         assert!(result.stdout.contains("Ran"));
         assert_eq!(result.exit_code, 0);
+    }
+
+    #[tokio::test]
+    async fn execute_code_passes_configured_max_inline_output_bytes_to_executor_context() {
+        let mut config = RlmConfig::minimal();
+        config.max_inline_output_bytes = 17;
+        let contexts = RecordedContexts::default();
+        let rlm =
+            TerraphimRlm::with_executor(config, RecordingExecutor::new(contexts.clone())).unwrap();
+
+        let session = rlm.create_session().await.unwrap();
+        rlm.execute_code(&session.id, "print('hello')")
+            .await
+            .unwrap();
+
+        let ctx = contexts
+            .code
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("executor should receive code execution context");
+        assert_eq!(ctx.max_output_bytes, 17);
+    }
+
+    #[tokio::test]
+    async fn execute_command_passes_configured_max_inline_output_bytes_to_executor_context() {
+        let mut config = RlmConfig::minimal();
+        config.max_inline_output_bytes = 23;
+        let contexts = RecordedContexts::default();
+        let rlm =
+            TerraphimRlm::with_executor(config, RecordingExecutor::new(contexts.clone())).unwrap();
+
+        let session = rlm.create_session().await.unwrap();
+        rlm.execute_command(&session.id, "echo hello")
+            .await
+            .unwrap();
+
+        let ctx = contexts
+            .command
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("executor should receive command execution context");
+        assert_eq!(ctx.max_output_bytes, 23);
     }
 
     #[tokio::test]

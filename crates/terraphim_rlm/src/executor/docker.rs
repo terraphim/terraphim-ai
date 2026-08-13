@@ -77,6 +77,76 @@ fn unsupported(op: &'static str) -> RlmError {
     }
 }
 
+struct BoundedOutputAccumulator {
+    stdout: String,
+    stderr: String,
+    output_truncated: bool,
+    max_output_bytes: usize,
+}
+
+impl BoundedOutputAccumulator {
+    fn new(max_output_bytes: u64) -> Self {
+        Self {
+            stdout: String::new(),
+            stderr: String::new(),
+            output_truncated: false,
+            max_output_bytes: usize::try_from(max_output_bytes).unwrap_or(usize::MAX),
+        }
+    }
+
+    fn append_stdout(&mut self, bytes: &[u8]) {
+        let text = String::from_utf8_lossy(bytes);
+        self.append_text(OutputChannel::Stdout, &text);
+    }
+
+    fn append_stderr(&mut self, bytes: &[u8]) {
+        let text = String::from_utf8_lossy(bytes);
+        self.append_text(OutputChannel::Stderr, &text);
+    }
+
+    fn append_text(&mut self, channel: OutputChannel, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        if self.output_truncated {
+            return;
+        }
+
+        let mut retained_any = false;
+        for ch in text.chars() {
+            let ch_len = ch.len_utf8();
+            if self.retained_bytes().saturating_add(ch_len) > self.max_output_bytes {
+                self.output_truncated = true;
+                break;
+            }
+
+            match channel {
+                OutputChannel::Stdout => self.stdout.push(ch),
+                OutputChannel::Stderr => self.stderr.push(ch),
+            }
+            retained_any = true;
+        }
+
+        if !retained_any || self.retained_bytes() < text.len() {
+            self.output_truncated = true;
+        }
+    }
+
+    fn retained_bytes(&self) -> usize {
+        self.stdout.len().saturating_add(self.stderr.len())
+    }
+
+    fn finish(self) -> (String, String, bool, Option<String>) {
+        (self.stdout, self.stderr, self.output_truncated, None)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum OutputChannel {
+    Stdout,
+    Stderr,
+}
+
 impl DockerExecutor {
     /// Connect to the local Docker daemon and build a `DockerExecutor` with the
     /// default image and host configuration.
@@ -241,21 +311,20 @@ impl DockerExecutor {
 
         match output {
             Ok(StartExecResults::Attached { mut output, .. }) => {
-                let mut stdout = String::new();
-                let mut stderr = String::new();
+                let mut output_accumulator = BoundedOutputAccumulator::new(ctx.max_output_bytes);
                 let timeout_duration = Duration::from_millis(ctx.timeout_ms);
 
                 let stream_future = async {
                     while let Some(Ok(msg)) = output.next().await {
                         match msg {
                             LogOutput::StdOut { message } => {
-                                stdout.push_str(&String::from_utf8_lossy(&message));
+                                output_accumulator.append_stdout(&message);
                             }
                             LogOutput::StdErr { message } => {
-                                stderr.push_str(&String::from_utf8_lossy(&message));
+                                output_accumulator.append_stderr(&message);
                             }
                             LogOutput::Console { message } => {
-                                stdout.push_str(&String::from_utf8_lossy(&message));
+                                output_accumulator.append_stdout(&message);
                             }
                             LogOutput::StdIn { .. } => {}
                         }
@@ -269,8 +338,13 @@ impl DockerExecutor {
                 let execution_time_ms = start.elapsed().as_millis() as u64;
 
                 if timed_out {
-                    return Ok(ExecutionResult::timeout(stdout, stderr)
-                        .with_execution_time(execution_time_ms));
+                    let (stdout, stderr, output_truncated, output_file_path) =
+                        output_accumulator.finish();
+                    let mut result = ExecutionResult::timeout(stdout, stderr)
+                        .with_execution_time(execution_time_ms);
+                    result.output_truncated = output_truncated;
+                    result.output_file_path = output_file_path;
+                    return Ok(result);
                 }
 
                 let exit_code = self
@@ -282,13 +356,16 @@ impl DockerExecutor {
                     .map(|c| i32::try_from(c).unwrap_or(-1))
                     .unwrap_or(-1);
 
+                let (stdout, stderr, output_truncated, output_file_path) =
+                    output_accumulator.finish();
+
                 Ok(ExecutionResult {
                     stdout,
                     stderr,
                     exit_code,
                     execution_time_ms,
-                    output_truncated: false,
-                    output_file_path: None,
+                    output_truncated,
+                    output_file_path,
                     timed_out: false,
                     metadata: HashMap::new(),
                 })
@@ -562,6 +639,85 @@ mod tests {
         assert_eq!(hc.cap_drop.as_deref(), Some(&["ALL".to_string()][..]));
         assert_eq!(hc.network_mode.as_deref(), Some("bridge"));
         assert_eq!(hc.readonly_rootfs, Some(false));
+    }
+
+    #[test]
+    fn bounded_output_accumulator_retains_combined_output_up_to_max_bytes() {
+        let mut output = BoundedOutputAccumulator::new(5);
+
+        output.append_stdout(b"abc");
+        output.append_stderr(b"de");
+        output.append_stdout(b"fgh");
+
+        let (stdout, stderr, truncated, output_file_path) = output.finish();
+        assert_eq!(stdout, "abc");
+        assert_eq!(stderr, "de");
+        assert_eq!(stdout.len() + stderr.len(), 5);
+        assert!(truncated);
+        assert_eq!(output_file_path, None);
+    }
+
+    #[test]
+    fn bounded_output_accumulator_preserves_channel_separation_after_stderr_reaches_limit() {
+        let mut output = BoundedOutputAccumulator::new(4);
+
+        output.append_stderr(b"err");
+        output.append_stdout(b"!");
+        output.append_stderr(b"discarded");
+
+        let (stdout, stderr, truncated, output_file_path) = output.finish();
+        assert_eq!(stdout, "!");
+        assert_eq!(stderr, "err");
+        assert_eq!(stdout.len() + stderr.len(), 4);
+        assert!(truncated);
+        assert_eq!(output_file_path, None);
+    }
+
+    #[test]
+    fn bounded_output_accumulator_with_zero_max_retains_no_bytes_and_truncates_on_output() {
+        let mut output = BoundedOutputAccumulator::new(0);
+
+        output.append_stdout(b"a");
+        output.append_stderr(b"b");
+
+        let (stdout, stderr, truncated, output_file_path) = output.finish();
+        assert_eq!(stdout, "");
+        assert_eq!(stderr, "");
+        assert!(truncated);
+        assert_eq!(output_file_path, None);
+    }
+
+    #[test]
+    fn bounded_output_accumulator_handles_multibyte_utf8_without_slicing_panic() {
+        let mut output = BoundedOutputAccumulator::new(3);
+
+        output.append_stdout("é".as_bytes());
+        output.append_stderr("€".as_bytes());
+
+        let (stdout, stderr, truncated, output_file_path) = output.finish();
+        assert_eq!(stdout, "é");
+        assert_eq!(stderr, "");
+        assert!(stdout.is_char_boundary(stdout.len()));
+        assert!(stderr.is_char_boundary(stderr.len()));
+        assert!(stdout.len() + stderr.len() <= 3);
+        assert!(truncated);
+        assert_eq!(output_file_path, None);
+    }
+
+    #[test]
+    fn bounded_output_accumulator_discards_all_output_after_first_truncation() {
+        let mut output = BoundedOutputAccumulator::new(3);
+
+        output.append_stdout("é".as_bytes());
+        output.append_stderr("€".as_bytes());
+        output.append_stdout(b"x");
+
+        let (stdout, stderr, truncated, output_file_path) = output.finish();
+        assert_eq!(stdout, "é");
+        assert_eq!(stderr, "");
+        assert!(stdout.len() + stderr.len() <= 3);
+        assert!(truncated);
+        assert_eq!(output_file_path, None);
     }
 
     #[test]
