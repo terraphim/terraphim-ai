@@ -30,13 +30,16 @@ type Shared = Arc<Mutex<Recorded>>;
 
 const LATEST_VERSION: i64 = 5;
 
+/// A task with no `sha`, so no checkout is attempted: these tests cover the
+/// fetch/dispatch gating, and since #3222 a task naming a repository *and* a sha
+/// must check out successfully or fail closed (this fake Gitea has no git side).
 fn echo_task(repo: &str) -> Value {
     let yaml = "name: CI\njobs:\n  build:\n    runs-on: terraphim-native\n    steps:\n      - name: Greet\n        run: echo hello-2185\n";
     let payload = base64::engine::general_purpose::STANDARD.encode(yaml);
     json!({
         "id": 77,
         "workflowPayload": payload,
-        "context": {"github": {"repository": repo, "sha": "cafef00d"}},
+        "context": {"github": {"repository": repo}},
         "secrets": {}, "vars": {}, "needs": {}
     })
 }

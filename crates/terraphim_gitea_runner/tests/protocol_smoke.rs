@@ -47,11 +47,14 @@ async fn fetch_task(State(s): State<Shared>, Json(_body): Json<Value>) -> Json<V
         // but `rch` may be absent on the test host -> we use a plain echo to assert success).
         let yaml = "name: CI\njobs:\n  build:\n    runs-on: terraphim-native\n    steps:\n      - name: Greet\n        run: echo hello-from-native-runner\n";
         let payload = base64::engine::general_purpose::STANDARD.encode(yaml);
+        // No `sha`: this test covers the protocol lifecycle, not checkout. Since
+        // #3222 a task that names a repository *and* a sha must be checked out or
+        // fail closed, and this fake Gitea serves no git endpoints.
         Json(json!({
             "task": {
                 "id": 42,
                 "workflowPayload": payload,
-                "context": {"github": {"repository": "terraphim/proof", "sha": "deadbeef"}},
+                "context": {"github": {"repository": "terraphim/proof"}},
                 "secrets": {}, "vars": {}, "needs": {}
             },
             "tasksVersion": 2

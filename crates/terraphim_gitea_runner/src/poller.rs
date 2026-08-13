@@ -110,6 +110,11 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
             self.config.fcctl_url.clone(),
             self.config.fcctl_vm_type.clone(),
         );
+        // Ownership contract (Refs #3222): `TaskWorker` is the sole finalizer for
+        // a task handed to it -- it has already delivered (or exhausted its
+        // bounded retries on) the terminal `UpdateTask` by the time it returns.
+        // The poller must only log and keep polling; terminalizing here as well
+        // would race a second conclusion onto a task the server already closed.
         match worker.run(state, task).await {
             Ok(ok) => log::info!("task complete: success={ok}"),
             Err(e) => log::error!("task failed: {e}"),
