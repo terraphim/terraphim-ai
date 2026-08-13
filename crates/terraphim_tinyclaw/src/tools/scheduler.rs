@@ -95,6 +95,20 @@ impl OrchestratorScheduleFragment {
         path: &Path,
         project: Option<&str>,
     ) -> Result<(), ToolError> {
+        let marker_count = self
+            .agents
+            .iter()
+            .filter(|agent| agent.name == FRAGMENT_MARKER_AGENT_NAME)
+            .count();
+        if marker_count > 1 {
+            return Err(unowned_fragment_error(
+                path,
+                format!(
+                    "more than one '{FRAGMENT_MARKER_AGENT_NAME}' agent is present ({marker_count}); only one TinyClaw-owned marker is allowed per fragment"
+                ),
+            ));
+        }
+
         let marker_idx = self
             .agents
             .iter()
@@ -298,55 +312,109 @@ impl OrchestratorScheduleStore {
         }
     }
 
-    fn load_fragment(&self) -> Result<OrchestratorScheduleFragment, ToolError> {
-        if !self.path.exists() {
-            return Ok(OrchestratorScheduleFragment::empty_owned(
-                self.project.clone(),
-            ));
+    /// Resolve `self.path` to the single canonical filesystem path used
+    /// by load/save/atomic-write/lock-derivation. Two stores addressing
+    /// the same fragment through different aliases (file-level symlinks,
+    /// parent-directory symlinks, `..`/`.`, redirected parents) collapse
+    /// to the same target, so concurrent creates cannot race past the
+    /// lock or clobber each other on rename.
+    ///
+    /// Strategy:
+    ///   - If the fragment already exists, canonicalize it so a
+    ///     file-level symlink alias resolves to the same inode.
+    ///   - If the fragment does not exist yet, create its parent,
+    ///     canonicalize the parent (which unifies `..`/`.` and
+    ///     resolves parent-directory symlinks), and rejoin the filename.
+    ///     Parent creation errors propagate rather than being silently
+    ///     ignored: an unresolvable parent means we cannot safely
+    ///     serialise writes.
+    ///
+    /// Residual limitation (documented honestly): POSIX `canonicalize`
+    /// does NOT unify hard links. Two stores addressing the same
+    /// fragment through different hard-link paths in different
+    /// directories will acquire INDEPENDENT adjacent locks and can
+    /// race. The lock identity is "adjacent to this canonical entry",
+    /// not "this inode". Inode-level locking of the target would be
+    /// invalidated by atomic replacement (the canonical entry can be
+    /// swapped under us by a concurrent writer), so we do not attempt
+    /// it. Callers that need hard-link protection must ensure only
+    /// one path spelling reaches the scheduler.
+    fn effective_path(&self) -> Result<PathBuf, ToolError> {
+        if let Ok(canonical) = self.path.canonicalize() {
+            return Ok(canonical);
         }
-        let content = std::fs::read_to_string(&self.path)?;
-        let mut fragment: OrchestratorScheduleFragment =
-            toml::from_str(&content).map_err(|e| ToolError::ExecutionFailed {
-            tool: "schedule".to_string(),
-            message: format!(
-                "parse TinyClaw-owned orchestrator schedule fragment {}: {e}; refusing to rewrite because unknown or unowned fields would otherwise be lost",
-                self.path.display()
-            ),
-        })?;
-        fragment.normalize_and_validate_owned(&self.path, self.project.as_deref())?;
-        Ok(fragment)
-    }
 
-    fn save_fragment(&self, fragment: &OrchestratorScheduleFragment) -> Result<(), ToolError> {
-        if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let content = toml::to_string_pretty(fragment).map_err(|e| ToolError::ExecutionFailed {
-            tool: "schedule".to_string(),
-            message: format!("serialise orchestrator schedule fragment: {e}"),
-        })?;
-        atomic_write(&self.path, content.as_bytes())?;
-        Ok(())
-    }
-
-    fn lock_path(&self) -> PathBuf {
-        let mut file_name = self
+        let raw_parent = self
+            .path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."));
+        let canonical_parent = std::fs::create_dir_all(&raw_parent)
+            .and_then(|_| raw_parent.canonicalize())
+            .map_err(|e| ToolError::ExecutionFailed {
+                tool: "schedule".to_string(),
+                message: format!(
+                    "resolve orchestrator schedule fragment parent for {}: {e}",
+                    self.path.display()
+                ),
+            })?;
+        let file_name = self
             .path
             .file_name()
             .map(|name| name.to_os_string())
             .unwrap_or_else(|| "tinyclaw-schedules.toml".into());
+        Ok(canonical_parent.join(file_name))
+    }
+
+    /// Adjacent lock file path for a fragment at `canonical`. The lock
+    /// sits next to the canonical fragment so both alias stores
+    /// observe the same lock file.
+    fn lock_path_for(canonical: &Path) -> PathBuf {
+        let mut file_name = canonical
+            .file_name()
+            .map(|name| name.to_os_string())
+            .unwrap_or_else(|| "tinyclaw-schedules.toml".into());
         file_name.push(".lock");
-        self.path
+        canonical
             .parent()
             .map(|parent| parent.join(&file_name))
             .unwrap_or_else(|| PathBuf::from(file_name))
     }
 
-    fn acquire_fragment_lock(&self) -> Result<FragmentLockGuard, ToolError> {
-        if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent)?;
+    fn load_fragment(&self) -> Result<OrchestratorScheduleFragment, ToolError> {
+        let canonical = self.effective_path()?;
+        if !canonical.exists() {
+            return Ok(OrchestratorScheduleFragment::empty_owned(
+                self.project.clone(),
+            ));
         }
-        let lock_path = self.lock_path();
+        let content = std::fs::read_to_string(&canonical)?;
+        let mut fragment: OrchestratorScheduleFragment =
+            toml::from_str(&content).map_err(|e| ToolError::ExecutionFailed {
+            tool: "schedule".to_string(),
+            message: format!(
+                "parse TinyClaw-owned orchestrator schedule fragment {}: {e}; refusing to rewrite because unknown or unowned fields would otherwise be lost",
+                canonical.display()
+            ),
+        })?;
+        fragment.normalize_and_validate_owned(&canonical, self.project.as_deref())?;
+        Ok(fragment)
+    }
+
+    fn save_fragment(&self, fragment: &OrchestratorScheduleFragment) -> Result<(), ToolError> {
+        let canonical = self.effective_path()?;
+        let content = toml::to_string_pretty(fragment).map_err(|e| ToolError::ExecutionFailed {
+            tool: "schedule".to_string(),
+            message: format!("serialise orchestrator schedule fragment: {e}"),
+        })?;
+        atomic_write(&canonical, content.as_bytes())?;
+        Ok(())
+    }
+
+    fn acquire_fragment_lock(&self) -> Result<FragmentLockGuard, ToolError> {
+        let canonical = self.effective_path()?;
+        let lock_path = Self::lock_path_for(&canonical);
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -364,7 +432,7 @@ impl OrchestratorScheduleStore {
                         file,
                         "pid={} path={}",
                         std::process::id(),
-                        self.path.display()
+                        canonical.display()
                     )?;
                     file.flush()?;
                     return Ok(FragmentLockGuard { file });

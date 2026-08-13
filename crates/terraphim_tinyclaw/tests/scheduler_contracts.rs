@@ -1084,3 +1084,173 @@ async fn orchestrator_schedule_rejects_non_cron_expression() {
         other => panic!("expected InvalidArguments, got {other:?}"),
     }
 }
+
+#[tokio::test]
+async fn orchestrator_schedule_rejects_duplicate_marker_agent_without_rewriting_bytes() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("dup-marker.toml");
+    let original = br#"[[agents]]
+name = "tinyclaw-schedule-fragment-marker"
+layer = "Core"
+cli_tool = "tinyclaw-scheduler-marker"
+task = "TinyClaw scheduler fragment ownership marker"
+schedule = "0 0 1 1 *"
+capabilities = ["tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = false
+
+[[agents]]
+name = "tinyclaw-schedule-fragment-marker"
+layer = "Core"
+cli_tool = "tinyclaw-scheduler-marker"
+task = "rogue duplicate marker"
+schedule = "0 0 1 1 *"
+capabilities = ["tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = true
+
+[[agents]]
+name = "tinyclaw-existing"
+layer = "Core"
+cli_tool = "echo"
+task = "owned task"
+schedule = "0 1 * * *"
+capabilities = ["tinyclaw-schedule", "tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = true
+"#;
+    std::fs::write(&fragment, original).expect("write duplicate-marker fragment");
+
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+        fragment.clone(),
+        "echo",
+    ));
+    let err = tool
+        .execute(json!({
+            "op": "create",
+            "prompt": "must not mutate",
+            "schedule": "0 9 * * *",
+        }))
+        .await
+        .expect_err("duplicate marker agent must be rejected before mutation");
+    match err {
+        ToolError::ExecutionFailed { message, .. } => {
+            assert!(
+                message.contains("marker")
+                    && (message.contains("duplicate") || message.contains("more than one")),
+                "got: {message}"
+            );
+        }
+        other => panic!("expected ExecutionFailed, got {other:?}"),
+    }
+    assert_eq!(
+        std::fs::read(&fragment).expect("read fragment"),
+        original,
+        "duplicate-marker rejection must keep fragment byte-for-byte unchanged"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn orchestrator_schedule_path_alias_concurrent_creates_both_survive() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let real_dir = temp.path().join("real");
+    std::fs::create_dir_all(&real_dir).expect("real dir");
+    let real_fragment = real_dir.join("tinyclaw-schedules.toml");
+    std::fs::write(
+        &real_fragment,
+        r#"[[agents]]
+name = "tinyclaw-schedule-fragment-marker"
+layer = "Core"
+cli_tool = "tinyclaw-scheduler-marker"
+task = "TinyClaw scheduler fragment ownership marker"
+schedule = "0 0 1 1 *"
+capabilities = ["tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = false
+"#,
+    )
+    .expect("write owned fragment");
+
+    // Symlink alias: temp.path()/alias/tinyclaw-schedules.toml -> ../real/tinyclaw-schedules.toml
+    #[cfg(unix)]
+    let alias_fragment = {
+        let alias_dir = temp.path().join("alias");
+        std::fs::create_dir_all(&alias_dir).expect("alias dir");
+        let alias = alias_dir.join("tinyclaw-schedules.toml");
+        std::os::unix::fs::symlink(
+            std::path::Path::new("../real/tinyclaw-schedules.toml"),
+            &alias,
+        )
+        .expect("symlink fragment");
+        alias
+    };
+    #[cfg(not(unix))]
+    let alias_fragment = real_fragment.clone();
+
+    let barrier = Arc::new(Barrier::new(2));
+    let real_a = {
+        let real_fragment = real_fragment.clone();
+        let barrier = Arc::clone(&barrier);
+        tokio::task::spawn_blocking(move || {
+            let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+                real_fragment,
+                "echo",
+            ));
+            barrier.wait();
+            tokio_test::block_on(tool.execute(json!({
+                "op": "create",
+                "prompt": "alias real a",
+                "schedule": "0 9 * * *",
+            })))
+        })
+    };
+    let alias_b = {
+        let alias_fragment = alias_fragment.clone();
+        let barrier = Arc::clone(&barrier);
+        tokio::task::spawn_blocking(move || {
+            let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+                alias_fragment,
+                "echo",
+            ));
+            barrier.wait();
+            tokio_test::block_on(tool.execute(json!({
+                "op": "create",
+                "prompt": "alias alias b",
+                "schedule": "30 9 * * *",
+            })))
+        })
+    };
+
+    real_a
+        .await
+        .expect("real-a thread joins")
+        .expect("real-a creates succeeds");
+    alias_b
+        .await
+        .expect("alias-b thread joins")
+        .expect("alias-b creates succeeds through symlink alias");
+
+    let reader = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+        real_fragment,
+        "echo",
+    ));
+    let listed = reader
+        .execute(json!({"op": "list"}))
+        .await
+        .expect("list after alias concurrent creates");
+    let listed: serde_json::Value = serde_json::from_str(&listed).expect("json output");
+    let prompts = listed["jobs"]
+        .as_array()
+        .expect("jobs array")
+        .iter()
+        .map(|job| job["prompt"].as_str().expect("prompt").to_string())
+        .collect::<Vec<_>>();
+
+    assert_eq!(listed["count"], 2, "jobs listed: {listed}");
+    assert!(
+        prompts.contains(&"alias real a".to_string()),
+        "jobs listed: {listed}"
+    );
+    assert!(
+        prompts.contains(&"alias alias b".to_string()),
+        "jobs listed: {listed}"
+    );
+}
