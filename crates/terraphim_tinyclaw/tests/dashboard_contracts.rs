@@ -16,6 +16,7 @@ use serde_json::{Value, json};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use terraphim_tinyclaw::bus::MessageBus;
 use terraphim_tinyclaw::config::{ChannelsConfig, TeamsConfig, WhatsAppConfig};
@@ -971,6 +972,148 @@ async fn contract_teams_expired_token_rejected_before_dispatch() {
     assert_no_inbound(state.bus).await;
 }
 
+#[tokio::test]
+async fn contract_teams_rotated_jwks_kid_refreshes_once_then_dispatches() {
+    common::scrub_env();
+    let jwks_fetches = Arc::new(AtomicUsize::new(0));
+    let (metadata_url, _jwks_url) = spawn_teams_openid_server_with_jwks_sequence(
+        jwks_fetches.clone(),
+        vec![
+            vec![("old-key", TEAMS_TEST_JWK_N, TEAMS_TEST_JWK_E)],
+            vec![("rotated-key", TEAMS_TEST_JWK_N, TEAMS_TEST_JWK_E)],
+        ],
+    )
+    .await;
+    let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
+        whatsapp: None,
+        teams: Some(teams_config_with_openid_metadata(metadata_url)),
+        ..ChannelsConfig::default()
+    })
+    .await;
+    let body = teams_activity_body();
+    let token = teams_jwt_with_options(
+        "app-123",
+        3600,
+        "rotated-key",
+        "https://api.botframework.com",
+        "https://smba.trafficmanager.net/emea/",
+    );
+
+    let (status, _body) = send_with_header(
+        app,
+        "POST",
+        "/webhooks/teams",
+        body.as_bytes(),
+        Some(("authorization", &format!("Bearer {token}"))),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::ACCEPTED);
+    let msg = recv_inbound(state.bus).await;
+    assert_eq!(msg.content, "hello teams");
+    assert_eq!(jwks_fetches.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn contract_teams_unknown_kid_refreshes_once_then_rejects_before_dispatch() {
+    common::scrub_env();
+    let jwks_fetches = Arc::new(AtomicUsize::new(0));
+    let (metadata_url, _jwks_url) = spawn_teams_openid_server_with_jwks_sequence(
+        jwks_fetches.clone(),
+        vec![
+            vec![("old-key", TEAMS_TEST_JWK_N, TEAMS_TEST_JWK_E)],
+            vec![("rotated-key", TEAMS_TEST_JWK_N, TEAMS_TEST_JWK_E)],
+        ],
+    )
+    .await;
+    let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
+        whatsapp: None,
+        teams: Some(teams_config_with_openid_metadata(metadata_url)),
+        ..ChannelsConfig::default()
+    })
+    .await;
+    let body = teams_activity_body();
+    let token = teams_jwt_with_options(
+        "app-123",
+        3600,
+        "unknown-key",
+        "https://api.botframework.com",
+        "https://smba.trafficmanager.net/emea/",
+    );
+
+    let (status, _body) = send_with_header(
+        app,
+        "POST",
+        "/webhooks/teams",
+        body.as_bytes(),
+        Some(("authorization", &format!("Bearer {token}"))),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(jwks_fetches.load(Ordering::SeqCst), 2);
+    assert_no_inbound(state.bus).await;
+}
+
+#[tokio::test]
+async fn contract_teams_service_url_claim_body_mismatch_rejected_before_dispatch() {
+    common::scrub_env();
+    let (metadata_url, _jwks_url) = spawn_teams_openid_server().await;
+    let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
+        whatsapp: None,
+        teams: Some(teams_config_with_openid_metadata(metadata_url)),
+        ..ChannelsConfig::default()
+    })
+    .await;
+    let body = teams_activity_body();
+    let token = teams_jwt_with_options(
+        "app-123",
+        3600,
+        TEAMS_TEST_KID,
+        "https://api.botframework.com",
+        "https://smba.trafficmanager.net/amer/",
+    );
+
+    let (status, _body) = send_with_header(
+        app,
+        "POST",
+        "/webhooks/teams",
+        body.as_bytes(),
+        Some(("authorization", &format!("Bearer {token}"))),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_no_inbound(state.bus).await;
+}
+
+#[tokio::test]
+async fn contract_teams_openid_metadata_issuer_mismatch_rejected_before_dispatch() {
+    common::scrub_env();
+    let (metadata_url, _jwks_url) =
+        spawn_teams_openid_server_with_issuer("https://issuer.invalid").await;
+    let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
+        whatsapp: None,
+        teams: Some(teams_config_with_openid_metadata(metadata_url)),
+        ..ChannelsConfig::default()
+    })
+    .await;
+    let body = teams_activity_body();
+    let token = teams_jwt("app-123", 3600);
+
+    let (status, _body) = send_with_header(
+        app,
+        "POST",
+        "/webhooks/teams",
+        body.as_bytes(),
+        Some(("authorization", &format!("Bearer {token}"))),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_no_inbound(state.bus).await;
+}
+
 const TEAMS_TEST_KID: &str = "tinyclaw-test-key";
 const TEAMS_TEST_JWK_N: &str = "tYxRuIobku6bWfbLBSklyusK7WAKGPb24YFUpJLnG_sss8QchHEFoIFhKzDAgxSRIAmkeysjznEZv58vL0fQGuAguuYxeNwH6byTVWyFD-4MkAO7dmp9-iIg77PNr83zxJu9aDoQTTnt86eAqKTMb_RMb4BYKodyLk-wOR_SLXLqrtotjeC8WwPzMXgoBSDWJ4EcbbYNnaEzz2vlUaJv73mk6PGybsZdJbMvpNpXsFafVMdUjsys3hJ5CL3LRzzQCKCBe_xjqogu2Qd9kFNNq_25RxXfeO5Tg_M8cHyySyGsDsHrJkAW0SoaA3_Bv-Y9JnbnKkujUC70PVDfSpCrFQ";
 const TEAMS_TEST_JWK_E: &str = "AQAB";
@@ -1005,6 +1148,36 @@ vE0p1iWQBxTvqhzg+H32Up1N
 "#;
 
 async fn spawn_teams_openid_server() -> (String, String) {
+    spawn_teams_openid_server_with_issuer("https://api.botframework.com").await
+}
+
+async fn spawn_teams_openid_server_with_issuer(issuer: &'static str) -> (String, String) {
+    let jwks_fetches = Arc::new(AtomicUsize::new(0));
+    spawn_teams_openid_server_with_issuer_and_jwks_sequence(
+        issuer,
+        jwks_fetches,
+        vec![vec![(TEAMS_TEST_KID, TEAMS_TEST_JWK_N, TEAMS_TEST_JWK_E)]],
+    )
+    .await
+}
+
+async fn spawn_teams_openid_server_with_jwks_sequence(
+    jwks_fetches: Arc<AtomicUsize>,
+    jwks_sequence: Vec<Vec<(&'static str, &'static str, &'static str)>>,
+) -> (String, String) {
+    spawn_teams_openid_server_with_issuer_and_jwks_sequence(
+        "https://api.botframework.com",
+        jwks_fetches,
+        jwks_sequence,
+    )
+    .await
+}
+
+async fn spawn_teams_openid_server_with_issuer_and_jwks_sequence(
+    issuer: &'static str,
+    jwks_fetches: Arc<AtomicUsize>,
+    jwks_sequence: Vec<Vec<(&'static str, &'static str, &'static str)>>,
+) -> (String, String) {
     use axum::routing::get;
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1012,6 +1185,8 @@ async fn spawn_teams_openid_server() -> (String, String) {
     let base = format!("http://{addr}");
     let jwks_url = format!("{base}/keys");
     let metadata_jwks_url = jwks_url.clone();
+    let sequence = Arc::new(jwks_sequence);
+    let keys_sequence = sequence.clone();
     let app = axum::Router::new()
         .route(
             "/metadata",
@@ -1019,7 +1194,7 @@ async fn spawn_teams_openid_server() -> (String, String) {
                 let jwks_uri = metadata_jwks_url.clone();
                 async move {
                     axum::Json(json!({
-                        "issuer": "https://api.botframework.com",
+                        "issuer": issuer,
                         "jwks_uri": jwks_uri,
                         "id_token_signing_alg_values_supported": ["RS256"]
                     }))
@@ -1028,17 +1203,29 @@ async fn spawn_teams_openid_server() -> (String, String) {
         )
         .route(
             "/keys",
-            get(|| async {
-                axum::Json(json!({
-                    "keys": [{
-                        "kty": "RSA",
-                        "kid": TEAMS_TEST_KID,
-                        "use": "sig",
-                        "alg": "RS256",
-                        "n": TEAMS_TEST_JWK_N,
-                        "e": TEAMS_TEST_JWK_E
-                    }]
-                }))
+            get(move || {
+                let jwks_fetches = jwks_fetches.clone();
+                let keys_sequence = keys_sequence.clone();
+                async move {
+                    let fetch_index = jwks_fetches.fetch_add(1, Ordering::SeqCst);
+                    let keys = keys_sequence
+                        .get(fetch_index)
+                        .or_else(|| keys_sequence.last())
+                        .expect("JWKS sequence has at least one response")
+                        .iter()
+                        .map(|(kid, n, e)| {
+                            json!({
+                                "kty": "RSA",
+                                "kid": kid,
+                                "use": "sig",
+                                "alg": "RS256",
+                                "n": n,
+                                "e": e
+                            })
+                        })
+                        .collect::<Vec<_>>();
+                    axum::Json(json!({ "keys": keys }))
+                }
             }),
         );
     tokio::spawn(async move {
@@ -1060,6 +1247,22 @@ fn teams_activity_body() -> String {
 }
 
 fn teams_jwt(audience: &str, expires_in_secs: i64) -> String {
+    teams_jwt_with_options(
+        audience,
+        expires_in_secs,
+        TEAMS_TEST_KID,
+        "https://api.botframework.com",
+        "https://smba.trafficmanager.net/emea/",
+    )
+}
+
+fn teams_jwt_with_options(
+    audience: &str,
+    expires_in_secs: i64,
+    kid: &str,
+    issuer: &str,
+    service_url: &str,
+) -> String {
     use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
     use serde::Serialize;
 
@@ -1075,15 +1278,15 @@ fn teams_jwt(audience: &str, expires_in_secs: i64) -> String {
 
     let now = chrono::Utc::now().timestamp();
     let mut header = Header::new(Algorithm::RS256);
-    header.kid = Some(TEAMS_TEST_KID.to_string());
+    header.kid = Some(kid.to_string());
     encode(
         &header,
         &Claims {
-            iss: "https://api.botframework.com",
+            iss: issuer,
             aud: audience,
             nbf: now - 60,
             exp: now + expires_in_secs,
-            service_url: "https://smba.trafficmanager.net/emea/",
+            service_url,
         },
         &EncodingKey::from_rsa_pem(TEAMS_TEST_PRIVATE_KEY.as_bytes()).unwrap(),
     )

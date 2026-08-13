@@ -29,13 +29,17 @@ async fn forward_to_upstream(state: &ProxyState, path: &str, body: &Value) -> Re
     match req.send().await {
         Ok(resp) => {
             let status = resp.status();
-            let content_type = resp
-                .headers()
-                .get(reqwest::header::CONTENT_TYPE)
-                .cloned();
+            let content_type = resp.headers().get(reqwest::header::CONTENT_TYPE).cloned();
             let bytes = match resp.bytes().await {
                 Ok(b) => b.to_vec(),
                 Err(e) => {
+                    tracing::error!(
+                        target: "terraphim_tinyclaw::proxy",
+                        path,
+                        status = status.as_u16(),
+                        error = %e,
+                        "failed to read upstream chat completion response body"
+                    );
                     return (
                         StatusCode::BAD_GATEWAY,
                         Json(json!({
@@ -60,13 +64,21 @@ async fn forward_to_upstream(state: &ProxyState, path: &str, body: &Value) -> Re
                 .body(axum::body::Body::from(bytes))
                 .unwrap_or_else(|_| StatusCode::BAD_GATEWAY.into_response())
         }
-        Err(e) => (
-            StatusCode::BAD_GATEWAY,
-            Json(json!({
-                "error": { "message": format!("upstream unreachable: {e}"), "type": "upstream_error" }
-            })),
-        )
-            .into_response(),
+        Err(e) => {
+            tracing::warn!(
+                target: "terraphim_tinyclaw::proxy",
+                path,
+                error = %e,
+                "failed to send chat completion request to upstream"
+            );
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({
+                    "error": { "message": format!("upstream unreachable: {e}"), "type": "upstream_error" }
+                })),
+            )
+                .into_response()
+        }
     }
 }
 

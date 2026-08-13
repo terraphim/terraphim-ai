@@ -116,12 +116,7 @@ impl TeamsChannel {
             .kid
             .as_deref()
             .ok_or_else(|| anyhow::anyhow!("Teams webhook JWT missing kid"))?;
-        let jwks = self.jwks().await?;
-        let key = jwks
-            .keys
-            .iter()
-            .find(|key| key.kid.as_deref() == Some(kid))
-            .ok_or_else(|| anyhow::anyhow!("Teams webhook JWT signing key not found"))?;
+        let key = self.webhook_signing_key(kid).await?;
 
         let decoding_key = DecodingKey::from_rsa_components(&key.n, &key.e)?;
         let mut validation = Validation::new(Algorithm::RS256);
@@ -147,9 +142,22 @@ impl TeamsChannel {
         Ok(())
     }
 
-    async fn jwks(&self) -> anyhow::Result<JwksDocument> {
+    async fn webhook_signing_key(&self, kid: &str) -> anyhow::Result<JwkKey> {
+        let jwks = self.jwks(false).await?;
+        if let Some(key) = signing_key_for_kid(&jwks, kid) {
+            return Ok(key.clone());
+        }
+
+        let jwks = self.jwks(true).await?;
+        signing_key_for_kid(&jwks, kid)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Teams webhook JWT signing key not found"))
+    }
+
+    async fn jwks(&self, force_refresh: bool) -> anyhow::Result<JwksDocument> {
         let mut cache = self.jwks_cache.lock().await;
         if let Some(cached) = cache.as_ref()
+            && !force_refresh
             && Instant::now() < cached.expires_at
         {
             return Ok(cached.jwks.clone());
@@ -371,6 +379,10 @@ fn bearer_token(authorization_header: Option<&str>) -> anyhow::Result<&str> {
         anyhow::bail!("Teams webhook authorization bearer token is empty");
     }
     Ok(token)
+}
+
+fn signing_key_for_kid<'a>(jwks: &'a JwksDocument, kid: &str) -> Option<&'a JwkKey> {
+    jwks.keys.iter().find(|key| key.kid.as_deref() == Some(kid))
 }
 
 #[derive(Debug, Deserialize)]
