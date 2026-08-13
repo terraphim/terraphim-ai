@@ -9,6 +9,17 @@
 #     Firecracker mode (firecracker/fc/vm, per VmMode::from_env_str) is rejected
 #   * RUNNER_STATE_FILE is absolute and unique across the pool
 #   * RUNNER_CHECKOUT_DIR is absolute and unique across the pool
+#   * CARGO_TARGET_DIR is absolute and unique across the pool
+#   * CARGO_BUILD_BUILD_DIR is absolute, unique across the pool, and is not the
+#     repo-scoped shared build dir. BOTH are required: the repo's
+#     .cargo/config.toml pins the unstable `build.build-dir` to
+#     {cargo-cache-home}/build/by-project/terraphim-terraphim-ai, and
+#     CARGO_TARGET_DIR does NOT override it -- a compile probe on this host
+#     (cargo 1.93.1) showed the shared by-project dir still created and reported
+#     as `build_directory` with only CARGO_TARGET_DIR set. So without
+#     CARGO_BUILD_BUILD_DIR, concurrent push/PR clippy jobs on different runners
+#     write intermediates into the same tree and trip over kache
+#     hardlink-restored, mode-0444 .rmeta files
 #   * the required `terraphim-native` label is declared
 #   * the journal shows recent runner *activity* -- startup polling, a fetched
 #     task or a completed task -- but not arbitrary unrelated log noise
@@ -126,7 +137,7 @@ healthy_pool() {
     mkdir -p "$root"
     for unit in $SERVICES; do
         write_unit "$root" "$unit" active running "$((4200 + i))" \
-            "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/${i}/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/${i}/checkout RUNNER_LABELS=terraphim-native"
+            "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/${i}/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/${i}/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/${i}/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/${i}/build RUNNER_LABELS=terraphim-native"
         write_journal "$root" "$unit" "$POLL_LINE"
         i=$((i + 1))
     done
@@ -145,6 +156,8 @@ env_file_pool() {
             'RUNNER_VM_MODE=host' \
             "RUNNER_STATE_FILE=/home/alex/gitea-runner/${i}/.runner" \
             "RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/${i}/checkout" \
+            "CARGO_TARGET_DIR=/home/alex/gitea-runner/${i}/target" \
+            "CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/${i}/build" \
             'RUNNER_LABELS=terraphim-native' \
             "${SECRET_KEY}=${SECRET_VALUE}"
         write_unit_ef "$root" "$unit" "$((4200 + i))" "" \
@@ -208,7 +221,7 @@ fi
 CASE="unset-vm-mode-is-host-default"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-3.service active running 4203 \
-    "RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout RUNNER_LABELS=terraphim-native"
+    "RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build RUNNER_LABELS=terraphim-native"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -eq 0 ] || fail "unset RUNNER_VM_MODE must be accepted as host; got $rc; output: $OUT"
 
@@ -217,7 +230,7 @@ for mode in firecracker fc vm FIRECRACKER; do
     CASE="explicit-${mode}-rejected"
     ROOT="$(new_root)"
     write_unit "$ROOT" terraphim-gitea-runner-3.service active running 4203 \
-        "RUNNER_VM_MODE=${mode} RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout RUNNER_LABELS=terraphim-native"
+        "RUNNER_VM_MODE=${mode} RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build RUNNER_LABELS=terraphim-native"
     run_health "$ROOT" && rc=0 || rc=$?
     [ "$rc" -ne 0 ] || fail "RUNNER_VM_MODE=${mode} must fail the host-only contract"
     case "$OUT" in *RUNNER_VM_MODE*) ;; *) fail "output should name RUNNER_VM_MODE; got: $OUT" ;; esac
@@ -227,7 +240,7 @@ done
 CASE="inactive-service-fails"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-2.service failed failed 0 \
-    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout RUNNER_LABELS=terraphim-native"
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build RUNNER_LABELS=terraphim-native"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "inactive service must fail"
 case "$OUT" in *terraphim-gitea-runner-2.service*) ;; *) fail "output should name the failing unit; got: $OUT" ;; esac
@@ -236,7 +249,7 @@ case "$OUT" in *terraphim-gitea-runner-2.service*) ;; *) fail "output should nam
 CASE="dead-mainpid-fails"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-2.service active running 0 \
-    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout RUNNER_LABELS=terraphim-native"
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build RUNNER_LABELS=terraphim-native"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "active unit with MainPID=0 must fail"
 case "$OUT" in *MainPID*) ;; *) fail "output should name MainPID; got: $OUT" ;; esac
@@ -252,7 +265,7 @@ run_health "$ROOT" && rc=0 || rc=$?
 CASE="duplicate-state-file-fails"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
-    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/1/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout RUNNER_LABELS=terraphim-native"
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/1/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build RUNNER_LABELS=terraphim-native"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "shared RUNNER_STATE_FILE must fail"
 case "$OUT" in *RUNNER_STATE_FILE*) ;; *) fail "output should name RUNNER_STATE_FILE; got: $OUT" ;; esac
@@ -261,7 +274,7 @@ case "$OUT" in *RUNNER_STATE_FILE*) ;; *) fail "output should name RUNNER_STATE_
 CASE="duplicate-checkout-dir-fails"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
-    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/1/checkout RUNNER_LABELS=terraphim-native"
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/1/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build RUNNER_LABELS=terraphim-native"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "shared RUNNER_CHECKOUT_DIR must fail"
 case "$OUT" in *RUNNER_CHECKOUT_DIR*) ;; *) fail "output should name RUNNER_CHECKOUT_DIR; got: $OUT" ;; esac
@@ -272,7 +285,7 @@ case "$OUT" in *RUNNER_CHECKOUT_DIR*) ;; *) fail "output should name RUNNER_CHEC
 CASE="relative-paths-fail"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
-    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=.runner RUNNER_CHECKOUT_DIR=. RUNNER_LABELS=terraphim-native"
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=.runner RUNNER_CHECKOUT_DIR=. CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build RUNNER_LABELS=terraphim-native"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "relative RUNNER_STATE_FILE/RUNNER_CHECKOUT_DIR must fail"
 
@@ -280,7 +293,7 @@ run_health "$ROOT" && rc=0 || rc=$?
 CASE="unset-state-and-checkout-fails"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
-    "RUNNER_VM_MODE=host RUNNER_LABELS=terraphim-native"
+    "RUNNER_VM_MODE=host CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build RUNNER_LABELS=terraphim-native"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "unset RUNNER_STATE_FILE/RUNNER_CHECKOUT_DIR must fail"
 
@@ -288,7 +301,7 @@ run_health "$ROOT" && rc=0 || rc=$?
 CASE="missing-required-label-fails"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-3.service active running 4203 \
-    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout RUNNER_LABELS=terraphim-firecracker"
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build RUNNER_LABELS=terraphim-firecracker"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "a pool member without the terraphim-native label must fail"
 case "$OUT" in *terraphim-native*) ;; *) fail "output should name the required label; got: $OUT" ;; esac
@@ -297,7 +310,7 @@ case "$OUT" in *terraphim-native*) ;; *) fail "output should name the required l
 CASE="unset-labels-is-default-terraphim-native"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-3.service active running 4203 \
-    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout"
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -eq 0 ] || fail "unset RUNNER_LABELS defaults to terraphim-native; got $rc; output: $OUT"
 
@@ -305,7 +318,7 @@ run_health "$ROOT" && rc=0 || rc=$?
 CASE="label-list-containing-required-passes"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-3.service active running 4203 \
-    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout RUNNER_LABELS=linux,terraphim-native,x64"
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build RUNNER_LABELS=linux,terraphim-native,x64"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -eq 0 ] || fail "a CSV label list containing terraphim-native must pass; output: $OUT"
 
@@ -313,7 +326,7 @@ run_health "$ROOT" && rc=0 || rc=$?
 CASE="label-substring-does-not-satisfy"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-3.service active running 4203 \
-    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout RUNNER_LABELS=terraphim-native-2"
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build RUNNER_LABELS=terraphim-native-2"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "label 'terraphim-native-2' must not satisfy the terraphim-native requirement"
 
@@ -338,7 +351,7 @@ CASE="reports-all-failures"
 ROOT="$(new_root)"
 write_unit "$ROOT" terraphim-gitea-runner-2.service failed failed 0 "RUNNER_VM_MODE=host"
 write_unit "$ROOT" terraphim-gitea-runner-3.service active running 4203 \
-    "RUNNER_VM_MODE=firecracker RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout"
+    "RUNNER_VM_MODE=firecracker RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "expected failure"
 case "$OUT" in *terraphim-gitea-runner-2.service*) ;; *) fail "runner-2 not reported; got: $OUT" ;; esac
@@ -386,6 +399,8 @@ write_env_file "${ROOT}/env-2" \
     'RUNNER_VM_MODE=host' \
     'RUNNER_STATE_FILE=/home/alex/gitea-runner/1/.runner' \
     'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target' \
+    'CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build' \
     'RUNNER_LABELS=terraphim-native' \
     "${SECRET_KEY}=${SECRET_VALUE}"
 run_health "$ROOT" && rc=0 || rc=$?
@@ -399,6 +414,8 @@ write_env_file "${ROOT}/env-3" \
     'RUNNER_VM_MODE=host' \
     'RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner' \
     'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/1/checkout' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target' \
+    'CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build' \
     'RUNNER_LABELS=terraphim-native'
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "a shared RUNNER_CHECKOUT_DIR from an env file must fail"
@@ -411,6 +428,8 @@ write_env_file "${ROOT}/env-3" \
     'RUNNER_VM_MODE=firecracker' \
     'RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner' \
     'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target' \
+    'CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build' \
     'RUNNER_LABELS=terraphim-native'
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "RUNNER_VM_MODE=firecracker from an env file must fail"
@@ -422,6 +441,8 @@ write_env_file "${ROOT}/env-2" \
     'RUNNER_VM_MODE=host' \
     'RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner' \
     'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target' \
+    'CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build' \
     'RUNNER_LABELS=terraphim-firecracker'
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -ne 0 ] || fail "a env-file label list without terraphim-native must fail"
@@ -433,9 +454,11 @@ write_env_file "${ROOT}/env-3" \
     'RUNNER_VM_MODE=firecracker' \
     'RUNNER_STATE_FILE=/home/alex/gitea-runner/1/.runner' \
     'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/1/checkout' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/1/target' \
+    'CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build' \
     'RUNNER_LABELS=terraphim-native'
 write_unit_ef "$ROOT" terraphim-gitea-runner-3.service 4203 \
-    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout" \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build" \
     "${ROOT}/env-3 (ignore_errors=no)"
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -eq 0 ] || fail "direct Environment= must override EnvironmentFile values; got $rc; output: $OUT"
@@ -446,10 +469,14 @@ ROOT="$(new_env_root)"
 write_env_file "${ROOT}/env-3" \
     'RUNNER_VM_MODE=host' \
     'RUNNER_STATE_FILE=/home/alex/gitea-runner/1/.runner' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/1/target' \
+    'CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/1/build' \
     'RUNNER_LABELS=terraphim-native'
 write_env_file "${ROOT}/env-3-override" \
     'RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner' \
-    'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout'
+    'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target' \
+    'CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build'
 write_unit_ef "$ROOT" terraphim-gitea-runner-3.service 4203 "" \
     "${ROOT}/env-3 (ignore_errors=no)" \
     "${ROOT}/env-3-override (ignore_errors=no)"
@@ -465,6 +492,8 @@ write_env_file "${ROOT}/env-2" \
     'export RUNNER_VM_MODE="host"' \
     "export RUNNER_STATE_FILE='/home/alex/gitea-runner/2/.runner'" \
     'RUNNER_CHECKOUT_DIR="/home/alex/gitea-runner/2/checkout"' \
+    "export CARGO_TARGET_DIR='/home/alex/gitea-runner/2/target'" \
+    'export CARGO_BUILD_BUILD_DIR="/home/alex/gitea-runner/2/build"' \
     'RUNNER_LABELS="terraphim-native"'
 run_health "$ROOT" && rc=0 || rc=$?
 [ "$rc" -eq 0 ] || fail "quoted/exported env-file assignments must parse; got $rc; output: $OUT"
@@ -559,8 +588,277 @@ run_health "$ROOT" >/dev/null 2>&1
 grep -q -- '--since' "${ROOT}/journalctl.argv" 2>/dev/null \
     || fail "the widened activity pattern must still be bounded by --since"
 
+
+# =============================================================================
+# Cargo build-tree isolation (exact-SHA forge canary regression)
+#
+# The repo's .cargo/config.toml pins the *unstable* `build.build-dir`:
+#
+#     [build]
+#     build-dir = "{cargo-cache-home}/build/by-project/terraphim-terraphim-ai"
+#
+# That path is keyed by repo, not by runner. `build-dir` -- not `target-dir` --
+# is where cargo writes intermediates (.rmeta, .d, incremental fragments), and
+# CARGO_TARGET_DIR does NOT override it. A compile probe on this host (cargo
+# 1.93.1) settled it: with only CARGO_TARGET_DIR set, the shared by-project dir
+# was still created and `cargo metadata` reported it as `build_directory` while
+# `target_directory` followed CARGO_TARGET_DIR; adding CARGO_BUILD_BUILD_DIR
+# moved the intermediates and the shared dir was never created.
+#
+# So no runner env isolated the intermediate tree: concurrent push and PR clippy
+# jobs on different pool members wrote it together, and the kache
+# hardlink-restored .rmeta files (mode 0444) were not writeable by the second
+# job -- that is what failed the canaries.
+#
+# The contract: every pool member must resolve BOTH CARGO_TARGET_DIR and
+# CARGO_BUILD_BUILD_DIR -- through an EnvironmentFile or directly in the unit --
+# to absolute paths that no other member uses, and CARGO_BUILD_BUILD_DIR must
+# not be the shared by-project path. Same rules as
+# RUNNER_STATE_FILE/RUNNER_CHECKOUT_DIR, with the same guarantee that env-file
+# secrets never reach the output.
+# =============================================================================
+
+SHARED_BY_PROJECT="/home/alex/.cargo/build/by-project/terraphim-terraphim-ai"
+
+# --- case 36: unset CARGO_TARGET_DIR fails ------------------------------------
+CASE="cargo-target-dir-unset-fails"
+ROOT="$(new_root)"
+write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build RUNNER_LABELS=terraphim-native"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "unset CARGO_TARGET_DIR must fail"
+case "$OUT" in *CARGO_TARGET_DIR*) ;; *) fail "output should name CARGO_TARGET_DIR; got: $OUT" ;; esac
+
+# --- case 37: an empty CARGO_TARGET_DIR is the same as unset ------------------
+CASE="cargo-target-dir-empty-fails"
+ROOT="$(new_root)"
+write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR= CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build RUNNER_LABELS=terraphim-native"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "an empty CARGO_TARGET_DIR must fail like an unset one"
+case "$OUT" in *CARGO_TARGET_DIR*) ;; *) fail "output should name CARGO_TARGET_DIR; got: $OUT" ;; esac
+
+# --- case 38: a relative CARGO_TARGET_DIR cannot be proven unique -------------
+# cargo resolves a relative CARGO_TARGET_DIR against the invocation cwd, i.e.
+# each job's checkout, so two runners can still collide via a shared checkout.
+CASE="cargo-target-dir-relative-fails"
+ROOT="$(new_root)"
+write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build RUNNER_LABELS=terraphim-native"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "a relative CARGO_TARGET_DIR must fail"
+case "$OUT" in *CARGO_TARGET_DIR*) ;; *) fail "output should name CARGO_TARGET_DIR; got: $OUT" ;; esac
+
+# --- case 39: a shared CARGO_TARGET_DIR fails, naming both members ------------
+CASE="cargo-target-dir-duplicate-fails"
+ROOT="$(new_root)"
+write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/1/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build RUNNER_LABELS=terraphim-native"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "a shared CARGO_TARGET_DIR must fail"
+case "$OUT" in *CARGO_TARGET_DIR*) ;; *) fail "output should name CARGO_TARGET_DIR; got: $OUT" ;; esac
+case "$OUT" in *terraphim-gitea-runner.service*) ;; *) fail "output should name the colliding peer unit; got: $OUT" ;; esac
+
+# --- case 40: env-file-configured CARGO_TARGET_DIR is read for uniqueness -----
+CASE="env-file-cargo-target-dir-duplicate-fails"
+ROOT="$(new_env_root)"
+write_env_file "${ROOT}/env-2" \
+    'RUNNER_VM_MODE=host' \
+    'RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner' \
+    'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/1/target' \
+    'CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build' \
+    'RUNNER_LABELS=terraphim-native' \
+    "${SECRET_KEY}=${SECRET_VALUE}"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "a shared CARGO_TARGET_DIR from an env file must fail"
+case "$OUT" in *CARGO_TARGET_DIR*) ;; *) fail "output should name CARGO_TARGET_DIR; got: $OUT" ;; esac
+assert_no_secret_leak
+
+# --- case 41: env-file-configured CARGO_TARGET_DIR must be present ------------
+CASE="env-file-cargo-target-dir-unset-fails"
+ROOT="$(new_env_root)"
+write_env_file "${ROOT}/env-3" \
+    'RUNNER_VM_MODE=host' \
+    'RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner' \
+    'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout' \
+    'CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build' \
+    'RUNNER_LABELS=terraphim-native' \
+    "${SECRET_KEY}=${SECRET_VALUE}"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "an env file without CARGO_TARGET_DIR must fail"
+case "$OUT" in *CARGO_TARGET_DIR*) ;; *) fail "output should name CARGO_TARGET_DIR; got: $OUT" ;; esac
+assert_no_secret_leak
+
+# --- case 42: CARGO_TARGET_DIR must not be the shared by-project dir ----------
+CASE="cargo-target-dir-shared-by-project-fails"
+ROOT="$(new_root)"
+write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=${SHARED_BY_PROJECT} CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/2/build RUNNER_LABELS=terraphim-native"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "CARGO_TARGET_DIR pointed at the shared by-project dir must fail"
+case "$OUT" in *CARGO_TARGET_DIR*) ;; *) fail "output should name CARGO_TARGET_DIR; got: $OUT" ;; esac
+
+# --- case 43: unset CARGO_BUILD_BUILD_DIR fails -------------------------------
+# The regression itself: CARGO_TARGET_DIR alone leaves `build.build-dir` in
+# force, so intermediates still land in the shared by-project tree.
+CASE="cargo-build-build-dir-unset-fails"
+ROOT="$(new_root)"
+write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target RUNNER_LABELS=terraphim-native"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "CARGO_TARGET_DIR alone must not satisfy the contract -- CARGO_BUILD_BUILD_DIR is required"
+case "$OUT" in *CARGO_BUILD_BUILD_DIR*) ;; *) fail "output should name CARGO_BUILD_BUILD_DIR; got: $OUT" ;; esac
+
+# --- case 44: an empty CARGO_BUILD_BUILD_DIR is the same as unset -------------
+CASE="cargo-build-build-dir-empty-fails"
+ROOT="$(new_root)"
+write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target CARGO_BUILD_BUILD_DIR= RUNNER_LABELS=terraphim-native"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "an empty CARGO_BUILD_BUILD_DIR must fail like an unset one"
+case "$OUT" in *CARGO_BUILD_BUILD_DIR*) ;; *) fail "output should name CARGO_BUILD_BUILD_DIR; got: $OUT" ;; esac
+
+# --- case 45: a relative CARGO_BUILD_BUILD_DIR cannot be proven unique --------
+CASE="cargo-build-build-dir-relative-fails"
+ROOT="$(new_root)"
+write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target CARGO_BUILD_BUILD_DIR=build RUNNER_LABELS=terraphim-native"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "a relative CARGO_BUILD_BUILD_DIR must fail"
+case "$OUT" in *CARGO_BUILD_BUILD_DIR*) ;; *) fail "output should name CARGO_BUILD_BUILD_DIR; got: $OUT" ;; esac
+
+# --- case 46: a shared CARGO_BUILD_BUILD_DIR fails, naming both members -------
+# The exact canary shape: two runners, one intermediate tree, 0444 .rmeta.
+CASE="cargo-build-build-dir-duplicate-fails"
+ROOT="$(new_root)"
+write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/1/build RUNNER_LABELS=terraphim-native"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "a shared CARGO_BUILD_BUILD_DIR must fail"
+case "$OUT" in *CARGO_BUILD_BUILD_DIR*) ;; *) fail "output should name CARGO_BUILD_BUILD_DIR; got: $OUT" ;; esac
+case "$OUT" in *terraphim-gitea-runner.service*) ;; *) fail "output should name the colliding peer unit; got: $OUT" ;; esac
+
+# --- case 47: the shared by-project build dir is rejected outright ------------
+# Setting CARGO_BUILD_BUILD_DIR to the value `build.build-dir` already resolves
+# to isolates nothing, and the duplicate check alone would not catch a single
+# member doing it. Reject it explicitly.
+CASE="cargo-build-build-dir-shared-by-project-fails"
+ROOT="$(new_root)"
+write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target CARGO_BUILD_BUILD_DIR=${SHARED_BY_PROJECT} RUNNER_LABELS=terraphim-native"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "the shared by-project build dir must be rejected for CARGO_BUILD_BUILD_DIR"
+case "$OUT" in *CARGO_BUILD_BUILD_DIR*) ;; *) fail "output should name CARGO_BUILD_BUILD_DIR; got: $OUT" ;; esac
+
+# --- case 48: a trailing slash does not evade the shared-dir rejection --------
+CASE="cargo-build-build-dir-shared-by-project-trailing-slash-fails"
+ROOT="$(new_root)"
+write_unit "$ROOT" terraphim-gitea-runner-2.service active running 4202 \
+    "RUNNER_VM_MODE=host RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target CARGO_BUILD_BUILD_DIR=${SHARED_BY_PROJECT}/ RUNNER_LABELS=terraphim-native"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "a trailing slash must not evade the shared by-project rejection"
+case "$OUT" in *CARGO_BUILD_BUILD_DIR*) ;; *) fail "output should name CARGO_BUILD_BUILD_DIR; got: $OUT" ;; esac
+
+# --- case 49: env-file-configured CARGO_BUILD_BUILD_DIR must be present -------
+CASE="env-file-cargo-build-build-dir-unset-fails"
+ROOT="$(new_env_root)"
+write_env_file "${ROOT}/env-3" \
+    'RUNNER_VM_MODE=host' \
+    'RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner' \
+    'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target' \
+    'RUNNER_LABELS=terraphim-native' \
+    "${SECRET_KEY}=${SECRET_VALUE}"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "an env file without CARGO_BUILD_BUILD_DIR must fail"
+case "$OUT" in *CARGO_BUILD_BUILD_DIR*) ;; *) fail "output should name CARGO_BUILD_BUILD_DIR; got: $OUT" ;; esac
+assert_no_secret_leak
+
+# --- case 50: env-file-configured CARGO_BUILD_BUILD_DIR is read for uniqueness -
+CASE="env-file-cargo-build-build-dir-duplicate-fails"
+ROOT="$(new_env_root)"
+write_env_file "${ROOT}/env-2" \
+    'RUNNER_VM_MODE=host' \
+    'RUNNER_STATE_FILE=/home/alex/gitea-runner/2/.runner' \
+    'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/2/checkout' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/2/target' \
+    'CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/1/build' \
+    'RUNNER_LABELS=terraphim-native' \
+    "${SECRET_KEY}=${SECRET_VALUE}"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "a shared CARGO_BUILD_BUILD_DIR from an env file must fail"
+case "$OUT" in *CARGO_BUILD_BUILD_DIR*) ;; *) fail "output should name CARGO_BUILD_BUILD_DIR; got: $OUT" ;; esac
+assert_no_secret_leak
+
+# --- case 51: an env file pinning the shared by-project build dir fails -------
+# The realistic misconfiguration: deploy writes the repo default into the env
+# file, so all three members "have" CARGO_BUILD_BUILD_DIR and none is isolated.
+CASE="env-file-cargo-build-build-dir-shared-by-project-fails"
+ROOT="$(new_env_root)"
+write_env_file "${ROOT}/env-3" \
+    'RUNNER_VM_MODE=host' \
+    'RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner' \
+    'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target' \
+    "CARGO_BUILD_BUILD_DIR=${SHARED_BY_PROJECT}" \
+    'RUNNER_LABELS=terraphim-native' \
+    "${SECRET_KEY}=${SECRET_VALUE}"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || fail "the shared by-project build dir from an env file must fail"
+case "$OUT" in *CARGO_BUILD_BUILD_DIR*) ;; *) fail "output should name CARGO_BUILD_BUILD_DIR; got: $OUT" ;; esac
+assert_no_secret_leak
+
+# --- case 52: direct Environment= overrides an env-file CARGO_BUILD_BUILD_DIR -
+CASE="direct-environment-cargo-build-build-dir-overrides-env-file"
+ROOT="$(new_env_root)"
+write_env_file "${ROOT}/env-3" \
+    'RUNNER_VM_MODE=host' \
+    'RUNNER_STATE_FILE=/home/alex/gitea-runner/3/.runner' \
+    'RUNNER_CHECKOUT_DIR=/home/alex/gitea-runner/3/checkout' \
+    'CARGO_TARGET_DIR=/home/alex/gitea-runner/1/target' \
+    "CARGO_BUILD_BUILD_DIR=${SHARED_BY_PROJECT}" \
+    'RUNNER_LABELS=terraphim-native'
+write_unit_ef "$ROOT" terraphim-gitea-runner-3.service 4203 \
+    "CARGO_TARGET_DIR=/home/alex/gitea-runner/3/target CARGO_BUILD_BUILD_DIR=/home/alex/gitea-runner/3/build" \
+    "${ROOT}/env-3 (ignore_errors=no)"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -eq 0 ] || fail "direct Environment= must override both env-file cargo dirs; got $rc; output: $OUT"
+
+# --- case 53: quoted/exported CARGO_BUILD_BUILD_DIR parses from an env file ---
+CASE="env-file-quoted-cargo-build-build-dir-parses"
+ROOT="$(new_env_root)"
+write_env_file "${ROOT}/env-2" \
+    'RUNNER_VM_MODE=host' \
+    "RUNNER_STATE_FILE='/home/alex/gitea-runner/2/.runner'" \
+    'RUNNER_CHECKOUT_DIR="/home/alex/gitea-runner/2/checkout"' \
+    'export CARGO_TARGET_DIR="/home/alex/gitea-runner/2/target"' \
+    "export CARGO_BUILD_BUILD_DIR='/home/alex/gitea-runner/2/build'" \
+    'RUNNER_LABELS=terraphim-native'
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -eq 0 ] || fail "quoted/exported cargo dir assignments must parse; got $rc; output: $OUT"
+
+# --- case 54: both isolated dirs are reported in the OK output ----------------
+# An operator reading a green run must be able to see which trees are in use; a
+# silent pass would hide a regression back to the shared by-project dir.
+CASE="ok-output-reports-both-isolated-dirs"
+ROOT="$(new_root)"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -eq 0 ] || fail "expected the healthy pool to pass; got $rc; output: $OUT"
+case "$OUT" in *"target dir"*) ;; *) fail "OK output should report the target dir; got: $OUT" ;; esac
+case "$OUT" in *"build dir"*) ;; *) fail "OK output should report the build dir; got: $OUT" ;; esac
+
+# --- case 55: the env-file pool reports them too, still without leaking -------
+CASE="env-file-pool-ok-output-reports-both-dirs"
+ROOT="$(new_env_root)"
+run_health "$ROOT" && rc=0 || rc=$?
+[ "$rc" -eq 0 ] || fail "expected the env-file pool to pass; got $rc; output: $OUT"
+case "$OUT" in *"target dir"*) ;; *) fail "OK output should report the target dir; got: $OUT" ;; esac
+case "$OUT" in *"build dir"*) ;; *) fail "OK output should report the build dir; got: $OUT" ;; esac
+assert_no_secret_leak
+
 if [ "$FAILURES" -eq 0 ]; then
-    echo "PASS: runner pool health contract (35 cases)"
+    echo "PASS: runner pool health contract (55 cases)"
     exit 0
 fi
 echo "FAILURES: $FAILURES" >&2

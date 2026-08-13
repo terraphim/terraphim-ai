@@ -14,8 +14,33 @@
 #   3. RUNNER_STATE_FILE is set, absolute, and unique across the pool
 #   4. RUNNER_CHECKOUT_DIR is set, absolute, and unique across the pool
 #      (shared checkout roots let concurrent jobs corrupt each other)
-#   5. the required `terraphim-native` label is declared
-#   6. the journal shows recent runner *activity* -- the startup declaration,
+#   5. CARGO_TARGET_DIR is set, absolute, and unique across the pool
+#   6. CARGO_BUILD_BUILD_DIR is set, absolute, unique across the pool, and is
+#      NOT the repo-scoped shared cargo build dir.
+#
+#      Both are required, and 6 is the one that actually fixes the canaries.
+#      The repo's .cargo/config.toml sets the *unstable* `build.build-dir`:
+#
+#          [build]
+#          build-dir = "{cargo-cache-home}/build/by-project/terraphim-terraphim-ai"
+#
+#      `build-dir` -- not `target-dir` -- is where cargo writes intermediate
+#      artifacts (.rmeta, .d, incremental fragments); `target-dir` only receives
+#      the final uplifted outputs. CARGO_TARGET_DIR does NOT override
+#      `build.build-dir`, so setting it alone leaves every pool member writing
+#      intermediates into the one shared by-project tree. A compile probe on
+#      this host (cargo 1.96.1) confirms it: with only CARGO_TARGET_DIR set the
+#      shared by-project build dir was still created and `cargo metadata`
+#      reported it as `build_directory`, while `target_directory` followed
+#      CARGO_TARGET_DIR. Setting CARGO_BUILD_BUILD_DIR moved the intermediates
+#      and the shared dir was never created.
+#
+#      That shared intermediate tree is the canary failure: concurrent push/PR
+#      clippy jobs on different pool members write it together, and the second
+#      job hits kache hardlink-restored .rmeta files left at mode 0444 which it
+#      cannot overwrite.
+#   7. the required `terraphim-native` label is declared
+#   8. the journal shows recent runner *activity* -- the startup declaration,
 #      a fetched task or a completed task. `active` alone does not prove the
 #      runner can take work, but a long-lived runner only emits the startup
 #      declaration once, so task activity counts as equal evidence.
@@ -26,8 +51,9 @@
 # optional -- `systemctl show --property=Environment` does NOT expand them, and
 # the live pool keeps all of its runner settings in
 # ~/.config/terraphim-gitea-runner/env[-2|-3]. Env-file *contents* are never
-# echoed: only the four known RUNNER_* settings are ever named in output, so a
-# registration token sitting in the same file cannot leak into CI logs.
+# echoed: only the four known RUNNER_* settings, CARGO_TARGET_DIR and
+# CARGO_BUILD_BUILD_DIR are ever named in output, so a registration token
+# sitting in the same file cannot leak into CI logs.
 #
 # Every failing member is reported; the script does not stop at the first one.
 #
@@ -49,6 +75,9 @@
 #   RUNNER_POOL_MIN   minimum pool size, default 3
 #   REQUIRED_RUNNER_LABEL  default `terraphim-native`
 #   JOURNAL_WINDOW    `journalctl --since` argument, default `10 min ago`
+#   SHARED_CARGO_BUILD_DIR  the repo-scoped cargo build dir that a runner must
+#                     NOT use, default
+#                     `/home/alex/.cargo/build/by-project/terraphim-terraphim-ai`
 #   POLL_EVIDENCE_PATTERN  extended regex of accepted activity evidence,
 #                     default `declared; polling for tasks|fetched task id=|task complete:`
 
@@ -61,6 +90,10 @@ RUNNER_SERVICES="${RUNNER_SERVICES:-terraphim-gitea-runner.service terraphim-git
 RUNNER_POOL_MIN="${RUNNER_POOL_MIN:-3}"
 REQUIRED_RUNNER_LABEL="${REQUIRED_RUNNER_LABEL:-terraphim-native}"
 JOURNAL_WINDOW="${JOURNAL_WINDOW:-10 min ago}"
+# The `build.build-dir` configured in the repo's .cargo/config.toml, with
+# {cargo-cache-home} expanded. It is keyed by repo name, not by runner, so every
+# pool member that leaves CARGO_BUILD_BUILD_DIR unset lands here together.
+SHARED_CARGO_BUILD_DIR="${SHARED_CARGO_BUILD_DIR:-/home/alex/.cargo/build/by-project/terraphim-terraphim-ai}"
 # Extended regex. Each alternative is a distinct proof that the runner is
 # reachable by the Gitea scheduler: it declared its labels and started polling,
 # it accepted a task, or it finished one. Deliberately narrow -- connection,
@@ -74,7 +107,7 @@ while [[ $# -gt 0 ]]; do
         --journal-window) JOURNAL_WINDOW="$2"; shift 2 ;;
         --label)          REQUIRED_RUNNER_LABEL="$2"; shift 2 ;;
         --min)            RUNNER_POOL_MIN="$2"; shift 2 ;;
-        -h|--help)        sed -n '2,53p' "$0"; exit 0 ;;
+        -h|--help)        sed -n '2,82p' "$0"; exit 0 ;;
         *) echo "Unknown argument: $1" >&2; exit 2 ;;
     esac
 done
@@ -181,6 +214,8 @@ fi
 
 STATE_FILES=()
 CHECKOUT_DIRS=()
+TARGET_DIRS=()
+BUILD_DIRS=()
 CHECKED=()
 
 for unit in "${SERVICES[@]}"; do
@@ -286,6 +321,56 @@ for unit in "${SERVICES[@]}"; do
         done
     fi
 
+    # --- isolated cargo output tree ---
+    # CARGO_TARGET_DIR governs the final uplifted artifacts only. It is required
+    # and must be unique, but on its own it does NOT isolate a runner: it leaves
+    # `build.build-dir` in force (see CARGO_BUILD_BUILD_DIR below).
+    target_dir="$(env_value CARGO_TARGET_DIR)"
+    if [[ -z "$target_dir" ]]; then
+        bad "$unit: CARGO_TARGET_DIR unset -- each runner needs its own cargo output tree"
+        unit_failed=1
+    elif [[ "$target_dir" != /* ]]; then
+        bad "$unit: CARGO_TARGET_DIR=${target_dir} is not absolute -- cargo resolves it against each job's cwd, so it cannot be proven unique"
+        unit_failed=1
+    elif [[ "${target_dir%/}" == "${SHARED_CARGO_BUILD_DIR%/}" ]]; then
+        bad "$unit: CARGO_TARGET_DIR=${target_dir} is the repo-scoped shared cargo build dir -- each runner needs its own output tree"
+        unit_failed=1
+    else
+        for i in "${!TARGET_DIRS[@]}"; do
+            if [[ "${TARGET_DIRS[$i]}" == "$target_dir" ]]; then
+                bad "$unit: CARGO_TARGET_DIR=${target_dir} is shared with ${CHECKED[$i]} -- concurrent cargo jobs would fight over one output tree"
+                unit_failed=1
+            fi
+        done
+    fi
+
+    # --- isolated cargo *intermediate* tree (the actual canary fix) ---
+    # The repo pins the unstable `build.build-dir` to a by-project path, and
+    # CARGO_TARGET_DIR does not override it. Unless CARGO_BUILD_BUILD_DIR is set
+    # per runner, every pool member writes .rmeta/incremental fragments into the
+    # one shared tree, where a concurrent job's kache-restored 0444 .rmeta files
+    # are unwriteable.
+    build_dir="$(env_value CARGO_BUILD_BUILD_DIR)"
+    if [[ -z "$build_dir" ]]; then
+        bad "$unit: CARGO_BUILD_BUILD_DIR unset -- CARGO_TARGET_DIR does not override build.build-dir, so cargo still writes intermediates into the shared ${SHARED_CARGO_BUILD_DIR}, where a concurrent job's read-only .rmeta files break the build"
+        unit_failed=1
+    elif [[ "$build_dir" != /* ]]; then
+        bad "$unit: CARGO_BUILD_BUILD_DIR=${build_dir} is not absolute -- cargo resolves it against each job's cwd, so it cannot be proven unique"
+        unit_failed=1
+    elif [[ "${build_dir%/}" == "${SHARED_CARGO_BUILD_DIR%/}" ]]; then
+        bad "$unit: CARGO_BUILD_BUILD_DIR=${build_dir} is the repo-scoped shared cargo build dir -- setting it to the value it already defaults to isolates nothing"
+        unit_failed=1
+    else
+        # build_dir == target_dir for the same runner is fine -- that is cargo's
+        # pre-build-dir layout, and it is still one tree per pool member.
+        for i in "${!BUILD_DIRS[@]}"; do
+            if [[ "${BUILD_DIRS[$i]}" == "$build_dir" ]]; then
+                bad "$unit: CARGO_BUILD_BUILD_DIR=${build_dir} is shared with ${CHECKED[$i]} -- concurrent cargo jobs would fight over one intermediate tree"
+                unit_failed=1
+            fi
+        done
+    fi
+
     # --- required label ---
     labels="$(env_value RUNNER_LABELS)"
     if [[ -n "$labels" ]] && ! csv_contains "$labels" "$REQUIRED_RUNNER_LABEL"; then
@@ -306,9 +391,11 @@ for unit in "${SERVICES[@]}"; do
 
     STATE_FILES+=("$state_file")
     CHECKOUT_DIRS+=("$checkout_dir")
+    TARGET_DIRS+=("$target_dir")
+    BUILD_DIRS+=("$build_dir")
     CHECKED+=("$unit")
 
-    [[ "$unit_failed" -eq 0 ]] && ok "$unit: host mode, pid ${main_pid}, isolated state/checkout, recent task activity"
+    [[ "$unit_failed" -eq 0 ]] && ok "$unit: host mode, pid ${main_pid}, isolated state/checkout, target dir ${target_dir}, build dir ${build_dir}, recent task activity"
 done
 
 if [[ "$FAILURES" -eq 0 ]]; then

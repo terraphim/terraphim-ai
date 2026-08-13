@@ -309,6 +309,19 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             .await
     }
 
+    /// Finalize a claimed task the runner will not execute (Refs #3222).
+    ///
+    /// `FetchTask` claims a task before the poller's coexistence guard can reject
+    /// it, so the claim still has to be concluded. Routing that through the same
+    /// terminal-update path as every other claimed task keeps `TaskWorker` the
+    /// single lifecycle owner: result 4 (`SKIPPED`, terminal and not counted as a
+    /// run) with `stoppedAt`, delivered under the same bounded retry budget. The
+    /// caller only logs the outcome.
+    pub async fn finalize_skipped(&self, state: &RunnerState, task_id: i64) -> Result<()> {
+        self.send_terminal_update(state, task_id, result::SKIPPED)
+            .await
+    }
+
     /// Deliver a terminal `UpdateTask` with a bounded retry budget. Gitea holds
     /// the job open until it sees this, so a transient 5xx/network blip must not
     /// abandon the task; a persistent outage returns the last error to the caller.

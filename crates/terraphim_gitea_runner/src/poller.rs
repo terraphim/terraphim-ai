@@ -58,10 +58,60 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
         }
     }
 
+    /// `FetchTask` under `config.poll_timeout`.
+    ///
+    /// This is the only part of an iteration it is safe to cancel: nothing has
+    /// been claimed yet, so abandoning the call loses nothing. Cancelling is a
+    /// backstop for a hang below reqwest's own `http_request_timeout`.
+    async fn fetch_bounded(
+        &self,
+        state: &RunnerState,
+        tasks_version: i64,
+    ) -> Result<crate::types::FetchTaskResponse> {
+        match tokio::time::timeout(
+            self.config.poll_timeout,
+            self.client.fetch_task(state, tasks_version),
+        )
+        .await
+        {
+            Ok(resp) => resp,
+            Err(_elapsed) => Err(crate::RunnerError::Protocol(format!(
+                "FetchTask timed out after {:?}; verify Gitea is reachable at {}",
+                self.config.poll_timeout, self.config.instance_url,
+            ))),
+        }
+    }
+
+    /// Build the worker that owns a claimed task's lifecycle.
+    fn build_worker(&self) -> TaskWorker<C, P> {
+        let mut worker = TaskWorker::new(
+            self.client.clone(),
+            self.planner.clone(),
+            self.config.instance_url.clone(),
+            self.checkout_dir.clone(),
+        );
+        if let Some((writer, context)) = &self.legacy {
+            worker = worker.with_legacy_mirror(writer.clone(), context.clone());
+        }
+        if let Some(writer) = &self.status_fallback {
+            worker = worker.with_status_fallback(writer.clone());
+        }
+        worker.with_vm_config(
+            self.config.vm_mode,
+            self.config.fcctl_url.clone(),
+            self.config.fcctl_vm_type.clone(),
+        )
+    }
+
     /// Run one fetch/dispatch iteration. Returns the updated `tasks_version`.
     /// Exposed for tests; the daemon calls this in a loop.
+    ///
+    /// Only the `FetchTask` call is time-bounded (by `config.poll_timeout`).
+    /// Everything after it operates on a task Gitea has already *claimed*, and a
+    /// claimed task must not be cancelled before its owner terminalizes it --
+    /// see [`Poller::run_forever`].
     pub async fn poll_once(&self, state: &RunnerState, tasks_version: i64) -> Result<i64> {
-        let resp = self.client.fetch_task(state, tasks_version).await?;
+        let resp = self.fetch_bounded(state, tasks_version).await?;
         let Some(task) = resp.task else {
             return Ok(resp.tasks_version);
         };
@@ -77,39 +127,22 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
                 // #2185: FetchTask already CLAIMED this task (StatusRunning,
                 // assigned to this runner). Report it skipped (terminal) so
                 // Gitea marks it done instead of orphaning it until the zombie
-                // timeout. Best-effort: a release failure must not crash the loop.
+                // timeout. #3222: the claim is concluded through `TaskWorker`, the
+                // single lifecycle owner, so it carries `stoppedAt` and the same
+                // bounded retry as any other terminal result; the poller only
+                // logs (a release failure must not crash the loop).
                 log::info!(
                     "releasing task id={} for repo `{name}` (not in active_repos)",
                     task.id
                 );
-                if let Err(e) = self
-                    .client
-                    .update_task(state, skip_task_state(task.id))
-                    .await
-                {
+                if let Err(e) = self.build_worker().finalize_skipped(state, task.id).await {
                     log::warn!("failed to release skipped task id={}: {e}", task.id);
                 }
                 return Ok(resp.tasks_version);
             }
         }
 
-        let mut worker = TaskWorker::new(
-            self.client.clone(),
-            self.planner.clone(),
-            self.config.instance_url.clone(),
-            self.checkout_dir.clone(),
-        );
-        if let Some((writer, context)) = &self.legacy {
-            worker = worker.with_legacy_mirror(writer.clone(), context.clone());
-        }
-        if let Some(writer) = &self.status_fallback {
-            worker = worker.with_status_fallback(writer.clone());
-        }
-        worker = worker.with_vm_config(
-            self.config.vm_mode,
-            self.config.fcctl_url.clone(),
-            self.config.fcctl_vm_type.clone(),
-        );
+        let worker = self.build_worker();
         // Ownership contract (Refs #3222): `TaskWorker` is the sole finalizer for
         // a task handed to it -- it has already delivered (or exhausted its
         // bounded retries on) the terminal `UpdateTask` by the time it returns.
@@ -132,8 +165,15 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
     /// until an unrelated bump or a runner restart -- the stuck-run race. Sending
     /// 0 forces a pick each poll; the extra `PickTask` query is negligible.
     ///
-    /// Each `poll_once` call is wrapped in `config.poll_timeout`. If it does not
-    /// return within that window the stall is logged and the loop continues.
+    /// `config.poll_timeout` bounds the `FetchTask` call *only* (see
+    /// [`Poller::fetch_bounded`]). It deliberately does not wrap the whole
+    /// iteration: `poll_once` awaits `TaskWorker::run` for a task Gitea has
+    /// already claimed, and builds legitimately run far longer than a poll
+    /// timeout (1800s per step / 7200s total, against a 60s default). Cancelling
+    /// that future dropped the worker before it could post its terminal
+    /// `UpdateTask`, stranding the claimed job until the server-side zombie
+    /// timeout -- exactly the failure #3222 exists to remove. Responsiveness is
+    /// unaffected: with no task to run, an iteration is just the bounded fetch.
     /// `config.http_request_timeout` (set on the reqwest client) is the primary
     /// guard; `poll_timeout` is belt-and-suspenders for kernel-level hangs.
     ///
@@ -143,44 +183,18 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
     pub async fn run_forever(&self, state: &RunnerState) -> Result<()> {
         let mut consecutive_errors = 0u32;
         loop {
-            match tokio::time::timeout(self.config.poll_timeout, self.poll_once(state, 0)).await {
-                Ok(Ok(_tasks_version)) => {
+            match self.poll_once(state, 0).await {
+                Ok(_tasks_version) => {
                     consecutive_errors = 0;
                     // Heartbeat: no-op when $NOTIFY_SOCKET is unset.
                     let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog]);
                 }
-                Ok(Err(e)) => {
+                Err(e) => {
                     consecutive_errors += 1;
                     log::error!("poll error (streak={consecutive_errors}): {e}");
-                }
-                Err(_elapsed) => {
-                    consecutive_errors += 1;
-                    log::error!(
-                        "poll timed out after {:?} (streak={consecutive_errors}); \
-                         verify Gitea is reachable at {}",
-                        self.config.poll_timeout,
-                        self.config.instance_url,
-                    );
                 }
             }
             tokio::time::sleep(self.config.poll_interval).await;
         }
-    }
-}
-
-/// #2185: minimal `UpdateTask` payload marking a task SKIPPED. Result code 4
-/// maps to Gitea `StatusSkipped`, which is terminal (`Status::IsDone`) and not
-/// counted as a run (`HasRun` is false) -- it releases a claimed-but-unservable
-/// task without recording a misleading failure.
-fn skip_task_state(task_id: i64) -> crate::types::UpdateTaskRequest {
-    crate::types::UpdateTaskRequest {
-        state: crate::types::TaskState {
-            id: task_id,
-            result: 4,
-            started_at: None,
-            stopped_at: None,
-            steps: Vec::new(),
-        },
-        outputs: std::collections::BTreeMap::new(),
     }
 }
