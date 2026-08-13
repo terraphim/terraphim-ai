@@ -794,15 +794,8 @@ async fn run_skill_command(
     command: SkillCommands,
     scheduler_cfg: &terraphim_tinyclaw::config::SchedulerConfig,
 ) -> anyhow::Result<()> {
-    let mut executor = SkillExecutor::with_default_storage()
+    let executor = SkillExecutor::with_default_storage()
         .map_err(|e| anyhow::anyhow!("Failed to initialize skill executor: {}", e))?;
-    if scheduler_cfg.enabled {
-        let scheduler =
-            terraphim_tinyclaw::tools::scheduler::ScheduleTool::from_config(scheduler_cfg)
-                .await
-                .map_err(|e| anyhow::anyhow!("{e}"))?;
-        executor = executor.with_scheduler_tool(std::sync::Arc::new(scheduler));
-    }
 
     match command {
         SkillCommands::Save { path } => {
@@ -893,6 +886,21 @@ async fn run_skill_command(
             let skill = executor
                 .load_skill(&name)
                 .map_err(|e| anyhow::anyhow!("Failed to load skill: {}", e))?;
+            let executor = if skill_uses_schedule(&skill) && scheduler_cfg.enabled {
+                match terraphim_tinyclaw::tools::scheduler::ScheduleTool::from_config(scheduler_cfg)
+                    .await
+                {
+                    Ok(scheduler) => executor.with_scheduler_tool(std::sync::Arc::new(scheduler)),
+                    Err(err) => {
+                        log::warn!(
+                            "scheduler is enabled but unavailable for scheduled skill steps: {err}"
+                        );
+                        executor
+                    }
+                }
+            } else {
+                executor
+            };
 
             // Parse inputs
             let mut input_map = HashMap::new();
@@ -934,6 +942,10 @@ async fn run_skill_command(
                         log.output.chars().take(50).collect::<String>()
                     );
                 }
+            }
+
+            if let terraphim_tinyclaw::skills::SkillStatus::Failed { step, error } = result.status {
+                anyhow::bail!("skill failed at step {}: {}", step + 1, error);
             }
         }
 
@@ -1032,6 +1044,13 @@ async fn run_skill_command(
     }
 
     Ok(())
+}
+
+fn skill_uses_schedule(skill: &Skill) -> bool {
+    skill
+        .steps
+        .iter()
+        .any(|step| matches!(step, terraphim_tinyclaw::skills::SkillStep::Schedule { .. }))
 }
 
 /// Execute a schedule subcommand (Hermes parity cron surface, #3147).
@@ -1153,5 +1172,105 @@ mod backend_gate_tests {
         config.memory.backend = "sqlite".to_string();
         config.memory.allow_sqlite_backend = true;
         assert_eq!(choose_session_backend(&config), SessionBackendChoice::Jsonl);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, MutexGuard};
+    use terraphim_tinyclaw::config::SchedulerConfig;
+    use terraphim_tinyclaw::skills::{Skill, SkillInput, SkillStep};
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    struct EnvGuard {
+        _lock: MutexGuard<'static, ()>,
+        previous_xdg_config_home: Option<String>,
+    }
+
+    impl EnvGuard {
+        fn set_xdg_config_home(path: &std::path::Path) -> Self {
+            let lock = ENV_LOCK
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let previous_xdg_config_home = std::env::var("XDG_CONFIG_HOME").ok();
+            unsafe {
+                std::env::set_var("XDG_CONFIG_HOME", path);
+            }
+            Self {
+                _lock: lock,
+                previous_xdg_config_home,
+            }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            unsafe {
+                if let Some(previous) = &self.previous_xdg_config_home {
+                    std::env::set_var("XDG_CONFIG_HOME", previous);
+                } else {
+                    std::env::remove_var("XDG_CONFIG_HOME");
+                }
+            }
+        }
+    }
+
+    fn enabled_scheduler_without_backend() -> SchedulerConfig {
+        SchedulerConfig {
+            enabled: true,
+            cli_tool: "echo".to_string(),
+            ..SchedulerConfig::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn skill_list_does_not_construct_unavailable_scheduler() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let _env = EnvGuard::set_xdg_config_home(temp.path());
+
+        run_skill_command(SkillCommands::List, &enabled_scheduler_without_backend())
+            .await
+            .expect("skill list must not require scheduler backend");
+    }
+
+    #[tokio::test]
+    async fn skill_run_schedule_step_fails_when_scheduler_step_runs() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let _env = EnvGuard::set_xdg_config_home(temp.path());
+        let executor = SkillExecutor::with_default_storage().expect("skill executor");
+        executor
+            .save_skill(&Skill {
+                name: "scheduled-skill".to_string(),
+                version: "1.0.0".to_string(),
+                description: "Contains a schedule step".to_string(),
+                author: None,
+                steps: vec![SkillStep::Schedule {
+                    cron: "0 9 * * *".to_string(),
+                    skill: "daily-report".to_string(),
+                    inputs: serde_json::json!({}),
+                }],
+                inputs: vec![SkillInput {
+                    name: "message".to_string(),
+                    description: "unused".to_string(),
+                    required: false,
+                    default: Some("hello".to_string()),
+                }],
+            })
+            .expect("save skill");
+
+        let err = run_skill_command(
+            SkillCommands::Run {
+                name: "scheduled-skill".to_string(),
+                inputs: Vec::new(),
+            },
+            &enabled_scheduler_without_backend(),
+        )
+        .await
+        .expect_err("schedule step should fail clearly when scheduler is unavailable");
+        let msg = err.to_string();
+        assert!(msg.contains("skill failed at step 1"), "got: {msg}");
+        assert!(msg.contains("scheduler not configured"), "got: {msg}");
     }
 }

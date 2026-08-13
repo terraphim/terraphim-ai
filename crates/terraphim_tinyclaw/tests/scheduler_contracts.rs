@@ -557,6 +557,184 @@ working_dir = "{}"
 }
 
 #[tokio::test]
+async fn orchestrator_schedule_upgrades_legacy_owned_fragment_marker_to_project() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let base_config = temp.path().join("orchestrator.toml");
+    let fragment = temp.path().join("tinyclaw-schedules.toml");
+    std::fs::write(
+        &base_config,
+        format!(
+            r#"
+working_dir = "{}"
+include = ["tinyclaw-schedules.toml"]
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.10
+moderate_threshold = 0.20
+severe_threshold = 0.40
+critical_threshold = 0.70
+
+[compound_review]
+schedule = "0 2 * * *"
+max_duration_secs = 1800
+repo_path = "{}"
+create_prs = false
+
+[[projects]]
+id = "tinyclaw"
+working_dir = "{}"
+"#,
+            temp.path().display(),
+            temp.path().display(),
+            temp.path().display()
+        ),
+    )
+    .expect("write base config");
+    std::fs::write(
+        &fragment,
+        r#"[[agents]]
+name = "tinyclaw-schedule-fragment-marker"
+layer = "Core"
+cli_tool = "tinyclaw-scheduler-marker"
+task = "TinyClaw scheduler fragment ownership marker"
+schedule = "0 0 1 1 *"
+capabilities = ["tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = false
+
+[[agents]]
+name = "tinyclaw-existing"
+layer = "Core"
+cli_tool = "echo"
+task = "legacy owned task"
+schedule = "0 1 * * *"
+capabilities = ["tinyclaw-schedule", "tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = true
+"#,
+    )
+    .expect("write legacy owned fragment");
+
+    let store = OrchestratorScheduleStore::with_cli_tool_and_project(
+        fragment.clone(),
+        "echo",
+        Some("tinyclaw".to_string()),
+    );
+    let tool = ScheduleTool::new_orchestrator(store);
+    tool.execute(json!({
+        "op": "create",
+        "prompt": "new multi-project report",
+        "schedule": "0 9 * * *",
+    }))
+    .await
+    .expect("legacy owned marker is upgraded before mutation");
+
+    let content = std::fs::read_to_string(&fragment).expect("read fragment");
+    assert!(
+        content.contains("project = \"tinyclaw\""),
+        "marker and agents should carry project after upgrade: {content}"
+    );
+    let config = terraphim_orchestrator::OrchestratorConfig::from_file(&base_config)
+        .expect("orchestrator reloads generated schedule fragment");
+    config
+        .validate()
+        .expect("upgraded fragment validates in multi-project mode");
+}
+
+#[tokio::test]
+async fn orchestrator_schedule_adds_missing_marker_for_owned_project_fragment() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("missing-marker.toml");
+    std::fs::write(
+        &fragment,
+        r#"[[agents]]
+name = "tinyclaw-existing"
+layer = "Core"
+cli_tool = "echo"
+task = "owned task without marker"
+schedule = "0 1 * * *"
+capabilities = ["tinyclaw-schedule", "tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = true
+"#,
+    )
+    .expect("write owned fragment without marker");
+
+    let store = OrchestratorScheduleStore::with_cli_tool_and_project(
+        fragment.clone(),
+        "echo",
+        Some("tinyclaw".to_string()),
+    );
+    let tool = ScheduleTool::new_orchestrator(store);
+    tool.execute(json!({
+        "op": "create",
+        "prompt": "new report",
+        "schedule": "0 9 * * *",
+    }))
+    .await
+    .expect("missing marker is added for otherwise owned fragment");
+
+    let content = std::fs::read_to_string(&fragment).expect("read fragment");
+    assert!(content.contains("name = \"tinyclaw-schedule-fragment-marker\""));
+    assert!(content.contains("project = \"tinyclaw\""));
+}
+
+#[tokio::test]
+async fn orchestrator_schedule_rejects_marker_for_different_project_without_rewriting_bytes() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("wrong-project.toml");
+    let original = br#"[[agents]]
+name = "tinyclaw-schedule-fragment-marker"
+layer = "Core"
+cli_tool = "tinyclaw-scheduler-marker"
+task = "TinyClaw scheduler fragment ownership marker"
+schedule = "0 0 1 1 *"
+project = "other"
+capabilities = ["tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = false
+
+[[agents]]
+name = "tinyclaw-existing"
+layer = "Core"
+cli_tool = "echo"
+task = "other project task"
+schedule = "0 1 * * *"
+project = "other"
+capabilities = ["tinyclaw-schedule", "tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = true
+"#;
+    std::fs::write(&fragment, original).expect("write other-project fragment");
+
+    let store = OrchestratorScheduleStore::with_cli_tool_and_project(
+        fragment.clone(),
+        "echo",
+        Some("tinyclaw".to_string()),
+    );
+    let tool = ScheduleTool::new_orchestrator(store);
+    let err = tool
+        .execute(json!({
+            "op": "create",
+            "prompt": "must not mutate",
+            "schedule": "0 9 * * *",
+        }))
+        .await
+        .expect_err("different project marker must be rejected");
+    match err {
+        ToolError::ExecutionFailed { message, .. } => {
+            assert!(message.contains("project"), "got: {message}");
+            assert!(message.contains("other"), "got: {message}");
+        }
+        other => panic!("expected ExecutionFailed, got {other:?}"),
+    }
+    assert_eq!(
+        std::fs::read(&fragment).expect("read fragment"),
+        original,
+        "rejected project mismatch must remain byte-for-byte unchanged"
+    );
+}
+
+#[tokio::test]
 async fn orchestrator_schedule_unknown_project_fails_validation_clearly() {
     common::scrub_env();
     let temp = tempfile::tempdir().expect("tempdir");

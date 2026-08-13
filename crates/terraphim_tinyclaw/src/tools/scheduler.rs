@@ -84,17 +84,22 @@ impl OrchestratorScheduleFragment {
         }
     }
 
-    fn validate_owned(&self, path: &Path) -> Result<(), ToolError> {
-        let marker = self
+    fn normalize_and_validate_owned(
+        &mut self,
+        path: &Path,
+        project: Option<&str>,
+    ) -> Result<(), ToolError> {
+        let marker_idx = self
             .agents
             .iter()
-            .find(|agent| agent.name == FRAGMENT_MARKER_AGENT_NAME)
-            .ok_or_else(|| {
-                unowned_fragment_error(path, "missing TinyClaw ownership marker agent")
-            })?;
-        validate_marker_agent(path, marker)?;
+            .position(|agent| agent.name == FRAGMENT_MARKER_AGENT_NAME);
 
-        for agent in &self.agents {
+        if let Some(idx) = marker_idx {
+            validate_marker_agent(path, &self.agents[idx])?;
+            normalize_agent_project(path, &mut self.agents[idx], project)?;
+        }
+
+        for agent in &mut self.agents {
             if is_marker_agent(agent) {
                 continue;
             }
@@ -129,6 +134,12 @@ impl OrchestratorScheduleFragment {
                     ),
                 ));
             }
+            normalize_agent_project(path, agent, project)?;
+        }
+
+        if marker_idx.is_none() {
+            self.agents
+                .insert(0, marker_agent(project.map(ToOwned::to_owned)));
         }
         Ok(())
     }
@@ -180,6 +191,34 @@ fn validate_marker_agent(path: &Path, marker: &OrchestratorScheduleAgent) -> Res
         ));
     }
     Ok(())
+}
+
+fn normalize_agent_project(
+    path: &Path,
+    agent: &mut OrchestratorScheduleAgent,
+    project: Option<&str>,
+) -> Result<(), ToolError> {
+    match (project, agent.project.as_deref()) {
+        (Some(expected), Some(actual)) if actual != expected => Err(unowned_fragment_error(
+            path,
+            format!(
+                "agent '{}' belongs to project '{}' but scheduler.project is '{}'",
+                agent.name, actual, expected
+            ),
+        )),
+        (Some(expected), None) => {
+            agent.project = Some(expected.to_string());
+            Ok(())
+        }
+        (Some(_), Some(_)) | (None, None) => Ok(()),
+        (None, Some(actual)) => Err(unowned_fragment_error(
+            path,
+            format!(
+                "agent '{}' belongs to project '{}' but scheduler.project is not configured",
+                agent.name, actual
+            ),
+        )),
+    }
 }
 
 fn is_marker_agent(agent: &OrchestratorScheduleAgent) -> bool {
@@ -249,7 +288,7 @@ impl OrchestratorScheduleStore {
             ));
         }
         let content = std::fs::read_to_string(&self.path)?;
-        let fragment: OrchestratorScheduleFragment =
+        let mut fragment: OrchestratorScheduleFragment =
             toml::from_str(&content).map_err(|e| ToolError::ExecutionFailed {
             tool: "schedule".to_string(),
             message: format!(
@@ -257,7 +296,7 @@ impl OrchestratorScheduleStore {
                 self.path.display()
             ),
         })?;
-        fragment.validate_owned(&self.path)?;
+        fragment.normalize_and_validate_owned(&self.path, self.project.as_deref())?;
         Ok(fragment)
     }
 

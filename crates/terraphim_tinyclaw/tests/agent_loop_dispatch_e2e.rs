@@ -347,6 +347,7 @@ async fn fresh_session_memory_capture_retrieve_apply_response_flow_uat() {
         role: None,
         timeout_secs: 5,
         max_context_chars: 4000,
+        ..MemoryConfig::default()
     };
     let (_handle, system_seen) =
         make_memory_loop(bus.clone(), tmp.path().join("fresh-session"), memory).await;
