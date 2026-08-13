@@ -8,7 +8,8 @@ use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use tokio::sync::Mutex;
 
 pub const CHANNEL_NAME: &str = "teams";
 const MAX_TEXT_CHARS: usize = 28_000;
@@ -19,6 +20,13 @@ pub struct TeamsChannel {
     config: TeamsConfig,
     client: reqwest::Client,
     running: Arc<AtomicBool>,
+    token_cache: Arc<Mutex<Option<CachedToken>>>,
+}
+
+#[derive(Debug, Clone)]
+struct CachedToken {
+    access_token: String,
+    expires_at: Instant,
 }
 
 impl TeamsChannel {
@@ -27,6 +35,7 @@ impl TeamsChannel {
             config,
             client: reqwest::Client::new(),
             running: Arc::new(AtomicBool::new(false)),
+            token_cache: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -94,10 +103,11 @@ impl TeamsChannel {
             && authorization_header["Bearer ".len()..].trim().len() > 20
     }
 
-    async fn acquire_access_token(&self) -> anyhow::Result<String> {
+    async fn acquire_access_token_uncached(&self) -> anyhow::Result<CachedToken> {
         #[derive(Deserialize)]
         struct TokenResponse {
             access_token: String,
+            expires_in: Option<u64>,
         }
 
         let params = [
@@ -122,7 +132,26 @@ impl TeamsChannel {
         if token.access_token.trim().is_empty() {
             anyhow::bail!("Teams token response did not include access_token");
         }
-        Ok(token.access_token)
+        let lifetime = Duration::from_secs(token.expires_in.unwrap_or(3600));
+        let skew = Duration::from_secs(60).min(lifetime / 2);
+        Ok(CachedToken {
+            access_token: token.access_token,
+            expires_at: Instant::now() + lifetime.saturating_sub(skew),
+        })
+    }
+
+    async fn access_token(&self) -> anyhow::Result<String> {
+        let mut cache = self.token_cache.lock().await;
+        if let Some(cached) = cache.as_ref()
+            && Instant::now() < cached.expires_at
+        {
+            return Ok(cached.access_token.clone());
+        }
+
+        let token = self.acquire_access_token_uncached().await?;
+        let access_token = token.access_token.clone();
+        *cache = Some(token);
+        Ok(access_token)
     }
 
     async fn send_chunk(
@@ -130,8 +159,8 @@ impl TeamsChannel {
         service_url: &str,
         conversation_id: &str,
         chunk: &str,
+        token: &str,
     ) -> anyhow::Result<()> {
-        let token = self.acquire_access_token().await?;
         let url = format!(
             "{}/v3/conversations/{}/activities",
             service_url.trim_end_matches('/'),
@@ -146,7 +175,7 @@ impl TeamsChannel {
             let response = self
                 .client
                 .post(&url)
-                .bearer_auth(&token)
+                .bearer_auth(token)
                 .json(&body)
                 .send()
                 .await;
@@ -191,8 +220,9 @@ impl Channel for TeamsChannel {
 
     async fn send(&self, msg: OutboundMessage) -> anyhow::Result<()> {
         let (service_url, conversation_id) = parse_chat_id(&msg.chat_id)?;
+        let token = self.access_token().await?;
         for chunk in crate::format::chunk_message_with_hard_limit(&msg.content, MAX_TEXT_CHARS) {
-            self.send_chunk(service_url, conversation_id, &chunk)
+            self.send_chunk(service_url, conversation_id, &chunk, &token)
                 .await?;
         }
         Ok(())
@@ -473,6 +503,81 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn multi_chunk_send_reuses_one_oauth_token() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let base = spawn_capture_server(tx).await;
+        let ch = TeamsChannel::new(test_config(&format!("{base}/token")));
+        let content = "x".repeat(MAX_TEXT_CHARS + 17);
+
+        ch.send(OutboundMessage::new(
+            "teams",
+            format!("{base}|conv-1"),
+            content,
+        ))
+        .await
+        .unwrap();
+
+        let mut token_requests = 0;
+        let mut send_requests = 0;
+        while let Some(request) = rx.recv().await {
+            match request.path.as_str() {
+                "/token" => token_requests += 1,
+                "/v3/conversations/conv-1/activities" => send_requests += 1,
+                _ => {}
+            }
+            if send_requests == 2 {
+                break;
+            }
+        }
+
+        assert_eq!(token_requests, 1);
+        assert_eq!(send_requests, 2);
+    }
+
+    #[tokio::test]
+    async fn expired_oauth_token_is_refreshed() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let base = spawn_capture_server(tx).await;
+        let ch = TeamsChannel::new(test_config(&format!("{base}/token")));
+
+        ch.send(OutboundMessage::new(
+            "teams",
+            format!("{base}|conv-1"),
+            "one",
+        ))
+        .await
+        .unwrap();
+        {
+            let mut cache = ch.token_cache.lock().await;
+            let cached = cache.as_mut().expect("first send cached a token");
+            cached.expires_at = Instant::now() - Duration::from_secs(1);
+        }
+        ch.send(OutboundMessage::new(
+            "teams",
+            format!("{base}|conv-1"),
+            "two",
+        ))
+        .await
+        .unwrap();
+
+        let mut token_requests = 0;
+        let mut send_requests = 0;
+        while let Some(request) = rx.recv().await {
+            match request.path.as_str() {
+                "/token" => token_requests += 1,
+                "/v3/conversations/conv-1/activities" => send_requests += 1,
+                _ => {}
+            }
+            if send_requests == 2 {
+                break;
+            }
+        }
+
+        assert_eq!(token_requests, 2);
+        assert_eq!(send_requests, 2);
+    }
+
+    #[tokio::test]
     #[ignore]
     async fn live_teams_send_text() {
         if std::env::var("TERRAPHIM_TEST_LIVE").ok().as_deref() != Some("1") {
@@ -536,7 +641,10 @@ mod tests {
             .await
             .unwrap();
             if uri.path() == "/token" {
-                (StatusCode::OK, r#"{"access_token":"fixture-token"}"#)
+                (
+                    StatusCode::OK,
+                    r#"{"access_token":"fixture-token","expires_in":3600}"#,
+                )
             } else {
                 (StatusCode::CREATED, r#"{"id":"activity-reply"}"#)
             }

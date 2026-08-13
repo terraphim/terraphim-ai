@@ -13,9 +13,11 @@
 //! Run with `terraphim_tinyclaw serve-dashboard` or programmatically via
 //! `dashboard::serve()`.
 
+pub mod auth;
 pub mod cron;
 pub mod dispatch;
 pub mod health;
+pub mod ingress;
 pub mod sessions;
 pub mod status;
 
@@ -27,6 +29,7 @@ use terraphim_persistence::DeviceStorage;
 use tokio::sync::Mutex;
 
 use crate::bus::MessageBus;
+use crate::config::ChannelsConfig;
 use crate::cron::CronStore;
 use crate::session::SessionManager;
 
@@ -42,6 +45,8 @@ pub struct DashboardState {
     /// the endpoint is unauthenticated (dev/test only — production must set
     /// this from `TINYCLAW_FIRE_TOKEN` env var).
     pub fire_token: Option<String>,
+    /// Channel configs used by production webhook ingress routes.
+    pub inbound_channels: ChannelsConfig,
 }
 
 impl DashboardState {
@@ -58,7 +63,32 @@ impl DashboardState {
             cron_store,
             auth_required: false,
             fire_token: None,
+            inbound_channels: ChannelsConfig::default(),
         }
+    }
+
+    /// Attach configured channel ingress handlers to dashboard state.
+    pub fn with_inbound_channels(mut self, inbound_channels: ChannelsConfig) -> Self {
+        self.inbound_channels = inbound_channels;
+        self
+    }
+
+    /// Attach the live gateway runtime so dashboard and webhook ingress
+    /// dispatch into the same AgentLoop and expose the same sessions.
+    pub fn with_runtime(
+        mut self,
+        bus: Arc<MessageBus>,
+        sessions: Arc<Mutex<SessionManager>>,
+    ) -> Self {
+        self.bus = bus;
+        self.sessions = sessions;
+        self
+    }
+
+    /// Configure the bearer token protecting side-effecting dashboard routes.
+    pub fn with_fire_token(mut self, fire_token: Option<String>) -> Self {
+        self.fire_token = fire_token;
+        self
     }
 }
 
@@ -68,6 +98,11 @@ pub fn router(state: DashboardState) -> Router {
         .route("/api/health", get(health::get_health))
         .route("/api/status", get(status::get_status))
         .route("/api/agent/messages", post(dispatch::post_message))
+        .route(
+            "/webhooks/whatsapp",
+            get(ingress::whatsapp_verify).post(ingress::whatsapp_webhook),
+        )
+        .route("/webhooks/teams", post(ingress::teams_webhook))
         .route("/api/cron/fire", post(cron::fire_webhook))
         .route(
             "/api/cron/jobs",

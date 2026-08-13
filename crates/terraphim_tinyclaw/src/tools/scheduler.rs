@@ -623,7 +623,13 @@ impl ScheduleTool {
                 Ok(job_id)
             }
             ScheduleBackend::Orchestrator(store) => {
-                store.create_job(prompt, schedule_expr, skills, deliver, model)
+                let store = store.clone();
+                let schedule_expr = schedule_expr.to_string();
+                tokio::task::spawn_blocking(move || {
+                    store.create_job(prompt, &schedule_expr, skills, deliver, model)
+                })
+                .await
+                .map_err(join_schedule_error)?
             }
         }
     }
@@ -645,7 +651,12 @@ impl ScheduleTool {
                     .map(ScheduledJob::from_cron_job)
                     .collect())
             }
-            ScheduleBackend::Orchestrator(store) => store.list_jobs(),
+            ScheduleBackend::Orchestrator(store) => {
+                let store = store.clone();
+                tokio::task::spawn_blocking(move || store.list_jobs())
+                    .await
+                    .map_err(join_schedule_error)?
+            }
         }
     }
 
@@ -674,8 +685,21 @@ impl ScheduleTool {
                 }
                 Ok(removed)
             }
-            ScheduleBackend::Orchestrator(store) => store.delete_job(id),
+            ScheduleBackend::Orchestrator(store) => {
+                let store = store.clone();
+                let id = id.to_string();
+                tokio::task::spawn_blocking(move || store.delete_job(&id))
+                    .await
+                    .map_err(join_schedule_error)?
+            }
         }
+    }
+}
+
+fn join_schedule_error(err: tokio::task::JoinError) -> ToolError {
+    ToolError::ExecutionFailed {
+        tool: "schedule".to_string(),
+        message: format!("orchestrator schedule worker failed: {err}"),
     }
 }
 

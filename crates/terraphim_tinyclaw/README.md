@@ -362,7 +362,9 @@ max_bytes = 524288
 
 [scheduler]
 enabled = true
-store_key = "tinyclaw/schedules"
+orchestrator_schedule_file = "tinyclaw-schedules.toml"
+cli_tool = "codex"
+project = "tinyclaw"
 ```
 
 Example chat requests:
@@ -382,6 +384,15 @@ operations only. Real browser-engine operations (`click`, `type`, and
 web_operations` or another real browser backend is wired; do not use README
 examples as evidence that #3148 is closed.
 
+Gateway mode can expose the dashboard/webhook HTTP router by setting
+`TINYCLAW_DASHBOARD_ADDR` (for example `127.0.0.1:3457`) before starting
+`terraphim-tinyclaw gateway`. The router includes production-wired
+`/webhooks/whatsapp` and `/webhooks/teams` ingress. WhatsApp GET
+verification uses the configured verify token and POST dispatch requires
+`X-Hub-Signature-256` HMAC verification before parsing. Teams ingress
+requires an `Authorization: Bearer <token>` header before parsing/dispatch, but
+does not yet perform cryptographic Bot Framework JWT validation.
+
 CLI surfaces:
 
 ```bash
@@ -394,10 +405,13 @@ terraphim-tinyclaw schedule create "daily-report" "0 9 * * *" --skill daily-repo
 terraphim-tinyclaw mcp --serve
 ```
 
-Current parity blockers: #3147 remains blocked because there is no
-`terraphim_orchestrator`-backed scheduler in this workspace; #3148 remains
-blocked for `terraphim-agent web_operations` browser automation; #3165 remains
-blocked for WhatsApp/Teams live-tier scope.
+Current parity blockers: #3148 remains blocked for `terraphim-agent
+web_operations` browser automation; #3165 remains blocked for
+WhatsApp/Teams live-tier scope. #3147 is implemented end-to-end
+(orchestrator-backed scheduler with fragment-ownership validation) and
+the production CLI / dashboard surfaces both wire it; the remaining
+work for #3147 is operational (pointing a real orchestrator at the
+generated `tinyclaw-schedules.toml` include fragment) rather than code.
 
 Live-tier interoperability tests are opt-in and ignored by default. Set the
 documented `LIVE_TINYCLAW_*` env flags in the relevant tests for MCP, GitHub,

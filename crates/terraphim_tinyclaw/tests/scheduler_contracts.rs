@@ -403,6 +403,107 @@ enabled = false
     assert!(content.contains("tinyclaw-schedule-fragment-schema:1"));
 }
 
+// --- spawn_blocking regressions (P2 from review #3221) ------------------
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn orchestrator_schedule_does_not_block_tokio_worker_for_other_tasks() {
+    // The orchestrator schedule backend used to run synchronous
+    // filesystem + fs2 lock-retry + thread::sleep from inside an
+    // async Tool::execute. On a contended lock that could block a
+    // Tokio worker for up to 10 s, starving other concurrent tasks.
+    // After the fix, schedule operations must release the worker
+    // promptly even while the lock is contended.
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("tinyclaw-schedules.toml");
+    std::fs::write(
+        &fragment,
+        r#"[[agents]]
+name = "tinyclaw-schedule-fragment-marker"
+layer = "Core"
+cli_tool = "tinyclaw-scheduler-marker"
+task = "TinyClaw scheduler fragment ownership marker"
+schedule = "0 0 1 1 *"
+capabilities = ["tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = false
+"#,
+    )
+    .expect("write owned fragment");
+
+    // Pre-acquire the adjacent lock file from outside the orchestrator
+    // path so the schedule call MUST enter the fs2 retry loop. Without
+    // the spawn_blocking fix, the contended schedule call holds a
+    // tokio worker for the full FRAGMENT_LOCK_TIMEOUT (10 s).
+    let lock_path = fragment.with_extension("toml.lock");
+    let holder = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&lock_path)
+        .expect("open lock");
+    fs2::FileExt::lock_exclusive(&holder).expect("holder locks fragment");
+
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+        fragment.clone(),
+        "echo",
+    ));
+
+    let counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let counter_clone = Arc::clone(&counter);
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let stop_clone = Arc::clone(&stop);
+    let tick_handle = tokio::spawn(async move {
+        while !stop_clone.load(std::sync::atomic::Ordering::Relaxed) {
+            counter_clone.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    });
+
+    // Issue ONE contended schedule call. With the spawn_blocking fix
+    // it must time out and return an error (10 s of offloaded blocking
+    // work) WITHOUT starving the worker of ticks. Without the fix, the
+    // worker is pinned for 10 s.
+    let start = std::time::Instant::now();
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(12),
+        tool.execute(json!({
+            "op": "create",
+            "prompt": "contended probe",
+            "schedule": "0 9 * * *",
+        })),
+    )
+    .await;
+    let elapsed = start.elapsed();
+
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    let _ = tick_handle.await;
+    let ticks = counter.load(std::sync::atomic::Ordering::Relaxed);
+
+    // Contended call must either fail (lock timeout) or succeed after
+    // we release — but it must NOT take longer than FRAGMENT_LOCK_TIMEOUT
+    // (10 s) + small grace.
+    assert!(
+        result.is_ok(),
+        "schedule call deadlocked past the 12 s outer guard"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_secs(11),
+        "schedule call ran for {elapsed:?}; lock contention is not bounded"
+    );
+    // Crucially: the tick task must have run frequently despite the
+    // contended lock. Each 50 ms tick = +1 count. 10 s of wall-clock
+    // implies ~200 ticks. Without the spawn_blocking fix, the worker
+    // hosting the timeout is starved.
+    let expected_min_ticks = (elapsed.as_millis() / 100) as u64;
+    assert!(
+        ticks >= expected_min_ticks,
+        "scheduler blocked the tokio worker; ticks={ticks} expected>= {expected_min_ticks} after {elapsed:?}"
+    );
+
+    drop(holder);
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn orchestrator_schedule_concurrent_independent_creates_both_survive() {
     common::scrub_env();

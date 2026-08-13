@@ -312,7 +312,9 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
 
     // Create session manager (wrapped in Arc<Mutex> for sharing)
     let sessions_dir = config.agent.workspace.join("sessions");
-    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(
+        sessions_dir.clone(),
+    )));
 
     // Create tool registry with session manager + Hermes-parity tools
     // (sandbox / subagent / browser / scheduler, each gated by config).
@@ -382,7 +384,9 @@ async fn spawn_agent_loop(
     system_prompt: String,
 ) -> anyhow::Result<tokio::task::JoinHandle<()>> {
     let sessions_dir = config.agent.workspace.join("sessions");
-    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(
+        sessions_dir.clone(),
+    )));
     let web_tools_config = config.tools.web.as_ref();
     let memory_config = if config.memory.enabled {
         Some(&config.memory)
@@ -536,7 +540,9 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
 
     // Create session manager (wrapped in Arc<Mutex> for sharing)
     let sessions_dir = config.agent.workspace.join("sessions");
-    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(
+        sessions_dir.clone(),
+    )));
 
     // Create tool registry with session manager
     let web_tools_config = config.tools.web.as_ref();
@@ -574,6 +580,7 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     // (P1#4 fix) shares the same in-memory sessions Arc between the
     // agent loop and the MCP server.
     let sessions_for_mcp = sessions.clone();
+    let sessions_for_dashboard = sessions.clone();
 
     // Create agent loop
     let backend = select_session_backend(&config, sessions).await;
@@ -652,6 +659,20 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
             }
         }
     });
+
+    if let Ok(addr) = std::env::var("TINYCLAW_DASHBOARD_ADDR")
+        && !addr.trim().is_empty()
+    {
+        let addr: SocketAddr = addr.parse()?;
+        let dashboard_state =
+            terraphim_tinyclaw::dashboard::DashboardState::new_in_memory(sessions_dir)
+                .await
+                .with_runtime(bus.clone(), sessions_for_dashboard)
+                .with_inbound_channels(config.channels.clone())
+                .with_fire_token(std::env::var("TINYCLAW_FIRE_TOKEN").ok());
+        let bound = terraphim_tinyclaw::dashboard::serve(dashboard_state, addr).await?;
+        log::info!("Dashboard and webhook ingress listening on http://{bound}");
+    }
 
     // Wait for shutdown signal
     match tokio::signal::ctrl_c().await {

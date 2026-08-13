@@ -89,6 +89,13 @@ terraphim_mcp_search = { version = "0.1.3", registry = "terraphim" }
 rmcp = { version = "0.9.1", features = ["server", "transport-io", "client", "transport-child-process", "macros"] }
 schemars = "1"
 
+# `futures::StreamExt` is used by `BrowserTool` to stream-bounded HTTP
+# response bodies; the alternative (`resp.bytes()`) trusts Content-Length
+# and can buffer gigabytes. Already in the transitive tree via `axum`,
+# pinned here so the browser tool's body cap doesn't depend on a future
+# axum version bump.
+futures-util = { version = "0.3", default-features = false, features = ["io"] }
+
 # Wave 3 of Hermes parity arc: cron scheduler with persistence.
 # Uses `cron = "0.13"` for cron expression parsing (instead of a hand-rolled
 # parser) and `terraphim_persistence` for job storage.

@@ -18,6 +18,7 @@
 
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
+use futures_util::StreamExt;
 use serde_json::{Value, json};
 use std::process::Stdio;
 use std::time::Duration;
@@ -294,6 +295,45 @@ struct FetchedPage {
     body: String,
 }
 
+/// Streaming body read bounded to `max_bytes + 1` bytes.
+///
+/// We never trust Content-Length: servers can lie, omit it, or use
+/// chunked transfer encoding without any advertised size. We pull
+/// chunks from `resp.bytes_stream()` and stop as soon as the running
+/// total exceeds `max_bytes`. The single over-budget byte is what
+/// distinguishes "exactly at the cap" from "over the cap".
+///
+/// On overflow the caller must NOT use the partial buffer — the
+/// returned `Err` short-circuits before any payload reaches
+/// downstream code.
+async fn read_capped_body(
+    resp: reqwest::Response,
+    max_bytes: usize,
+    tool: &str,
+) -> Result<Vec<u8>, ToolError> {
+    let mut stream = resp.bytes_stream();
+    let mut buf = Vec::with_capacity(max_bytes.saturating_add(1).min(64 * 1024));
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| ToolError::ExecutionFailed {
+            tool: tool.to_string(),
+            message: format!("read body failed: {e}"),
+        })?;
+        if buf.len().saturating_add(chunk.len()) > max_bytes {
+            // Stop draining — connection will be dropped when `resp` is
+            // consumed at end of scope.
+            return Err(ToolError::ExecutionFailed {
+                tool: tool.to_string(),
+                message: format!(
+                    "response too large (> {} bytes); refusing to buffer unbounded body",
+                    max_bytes
+                ),
+            });
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    Ok(buf)
+}
+
 impl BrowserTool {
     async fn fetch_page(&self, url: &str) -> Result<FetchedPage, ToolError> {
         validate_http_url(url)?;
@@ -313,30 +353,13 @@ impl BrowserTool {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_string();
-        if let Some(len) = resp
-            .headers()
-            .get(reqwest::header::CONTENT_LENGTH)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<usize>().ok())
-            && len > self.config.max_bytes
-        {
-            return Err(ToolError::ExecutionFailed {
-                tool: "browser".to_string(),
-                message: format!(
-                    "response too large ({len} bytes > {})",
-                    self.config.max_bytes
-                ),
-            });
-        }
-        let bytes = resp.bytes().await.map_err(|e| ToolError::ExecutionFailed {
-            tool: "browser".to_string(),
-            message: format!("read body failed: {e}"),
-        })?;
+        let bytes = read_capped_body(resp, self.config.max_bytes, "browser").await?;
+        let bytes_len = bytes.len();
         let text = String::from_utf8_lossy(&bytes).to_string();
         Ok(FetchedPage {
             status,
             content_type,
-            bytes_len: bytes.len(),
+            bytes_len,
             body: self.bound(&text),
         })
     }
@@ -547,30 +570,27 @@ impl Tool for BrowserTool {
                     message: format!("{method} {url} failed: {e}"),
                 })?;
                 let status = resp.status().as_u16();
-                if let Some(len) = resp
+                let advertised_len = resp
                     .headers()
                     .get(reqwest::header::CONTENT_LENGTH)
                     .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<usize>().ok())
-                    && len > self.config.max_bytes
-                {
-                    return Ok(json!({
-                        "op": "api",
-                        "method": method,
-                        "url": url,
-                        "status": status,
-                        "error": format!(
-                            "response too large ({len} bytes > {})",
-                            self.config.max_bytes
-                        ),
-                        "bytes": len,
-                    })
-                    .to_string());
-                }
-                let bytes = resp.bytes().await.map_err(|e| ToolError::ExecutionFailed {
-                    tool: "browser".to_string(),
-                    message: format!("read body failed: {e}"),
-                })?;
+                    .and_then(|v| v.parse::<usize>().ok());
+                let bytes = match read_capped_body(resp, self.config.max_bytes, "browser").await {
+                    Ok(bytes) => bytes,
+                    Err(ToolError::ExecutionFailed { message, .. }) => {
+                        let bytes = advertised_len.unwrap_or(0);
+                        return Ok(json!({
+                            "op": "api",
+                            "method": method,
+                            "url": url,
+                            "status": status,
+                            "error": message,
+                            "bytes": bytes,
+                        })
+                        .to_string());
+                    }
+                    Err(other) => return Err(other),
+                };
                 let text = String::from_utf8_lossy(&bytes).to_string();
                 Ok(json!({
                     "op": "api",

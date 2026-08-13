@@ -102,8 +102,7 @@ pub async fn chat_completions(State(state): State<ProxyState>, body: Json<Value>
 
     if let Some(bus) = &state.bus
         && !last_user.is_empty()
-    {
-        let _ = crate::agent::entry::dispatch_to_agent_loop(
+        && let Err(err) = crate::agent::entry::dispatch_to_agent_loop(
             bus,
             crate::bus::InboundMessage::new(
                 "proxy",
@@ -112,7 +111,11 @@ pub async fn chat_completions(State(state): State<ProxyState>, body: Json<Value>
                 last_user,
             ),
         )
-        .await;
+        .await
+    {
+        log::warn!(
+            "proxy chat completion dispatch failed channel=proxy sender_id=openai-client chat_id=chat-completions error={err}"
+        );
     }
 
     let now = Utc::now().timestamp();

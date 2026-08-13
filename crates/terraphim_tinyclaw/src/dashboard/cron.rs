@@ -31,7 +31,7 @@ pub struct FireRequest {
 /// `POST /api/cron/fire`
 ///
 /// Hermes contract:
-/// - Missing/invalid auth → 401 `{"error": "invalid fire token"}`
+/// - Missing/invalid auth → 401 `{"error": "invalid auth token"}`
 /// - Missing `job_id` → 400 `{"error": "missing job_id"}`
 /// - Job not found → 200 `{"status": "gone", "job_id": "..."}`
 /// - Valid → 202 `{"status": "accepted", "job_id": "..."}`
@@ -47,17 +47,8 @@ pub async fn fire_webhook(
     Json(body): Json<FireRequest>,
 ) -> impl IntoResponse {
     // Auth gate — per Hermes contract, refuse without a matching Bearer token.
-    if let Some(expected) = state.fire_token.as_deref() {
-        let provided = headers
-            .get(axum::http::header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.strip_prefix("Bearer "));
-        if provided != Some(expected) {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(json!({ "error": "invalid fire token" })),
-            );
-        }
+    if let Some(response) = super::auth::require_fire_token(&state.fire_token, &headers) {
+        return response;
     }
 
     let job_id = body.job_id;
@@ -65,7 +56,8 @@ pub async fn fire_webhook(
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": "missing job_id" })),
-        );
+        )
+            .into_response();
     }
 
     // Look up the job across all cron stores (in our case, just one).
@@ -73,15 +65,18 @@ pub async fn fire_webhook(
         Ok(Some(_job)) => (
             StatusCode::ACCEPTED,
             Json(json!({ "status": "accepted", "job_id": job_id })),
-        ),
+        )
+            .into_response(),
         Ok(None) => (
             StatusCode::OK,
             Json(json!({ "status": "gone", "job_id": job_id })),
-        ),
+        )
+            .into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
-        ),
+        )
+            .into_response(),
     }
 }
 
