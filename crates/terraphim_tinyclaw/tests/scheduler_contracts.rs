@@ -203,6 +203,207 @@ async fn orchestrator_schedule_rejects_omitted_cli_tool_before_persistence() {
 }
 
 #[tokio::test]
+async fn orchestrator_schedule_rejects_unowned_fragment_without_rewriting_bytes() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("operator-owned.toml");
+    let original = br#"# operator-managed include
+[[agents]]
+name = "nightly-maintenance"
+layer = "Core"
+cli_tool = "echo"
+task = "do not touch"
+schedule = "0 1 * * *"
+"#;
+    std::fs::write(&fragment, original).expect("write unowned fragment");
+
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+        fragment.clone(),
+        "echo",
+    ));
+    let err = tool
+        .execute(json!({
+            "op": "create",
+            "prompt": "run daily report",
+            "schedule": "0 9 * * *",
+        }))
+        .await
+        .expect_err("unowned fragment must be rejected");
+    match err {
+        ToolError::ExecutionFailed { message, .. } => {
+            assert!(
+                message.contains("refusing") || message.contains("unknown or unowned"),
+                "got: {message}"
+            );
+        }
+        other => panic!("expected ExecutionFailed, got {other:?}"),
+    }
+    assert_eq!(
+        std::fs::read(&fragment).expect("read fragment"),
+        original,
+        "rejected unowned TOML must remain byte-for-byte unchanged"
+    );
+}
+
+#[tokio::test]
+async fn orchestrator_schedule_rejects_mixed_owned_fragment_without_rewriting_bytes() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("mixed.toml");
+    let original = br#"[[agents]]
+name = "tinyclaw-schedule-fragment-marker"
+layer = "Core"
+cli_tool = "tinyclaw-scheduler-marker"
+task = "TinyClaw scheduler fragment ownership marker"
+schedule = "0 0 1 1 *"
+capabilities = ["tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = false
+
+[[agents]]
+name = "operator-agent"
+layer = "Core"
+cli_tool = "echo"
+task = "operator-owned task"
+schedule = "0 1 * * *"
+capabilities = ["not-tinyclaw"]
+"#;
+    std::fs::write(&fragment, original).expect("write mixed fragment");
+
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+        fragment.clone(),
+        "echo",
+    ));
+    let err = tool
+        .execute(json!({
+            "op": "delete",
+            "id": "unknown",
+        }))
+        .await
+        .expect_err("mixed fragment must be rejected before mutation");
+    match err {
+        ToolError::ExecutionFailed { message, .. } => {
+            assert!(message.contains("not a TinyClaw-owned"), "got: {message}");
+        }
+        other => panic!("expected ExecutionFailed, got {other:?}"),
+    }
+    assert_eq!(
+        std::fs::read(&fragment).expect("read fragment"),
+        original,
+        "rejected mixed TOML must remain byte-for-byte unchanged"
+    );
+}
+
+#[tokio::test]
+async fn orchestrator_schedule_rejects_unknown_future_fields_without_rewriting_bytes() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("future-owned.toml");
+    let original = br#"[[agents]]
+name = "tinyclaw-schedule-fragment-marker"
+layer = "Core"
+cli_tool = "tinyclaw-scheduler-marker"
+task = "TinyClaw scheduler fragment ownership marker"
+schedule = "0 0 1 1 *"
+capabilities = ["tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = false
+
+[[agents]]
+name = "tinyclaw-existing"
+layer = "Core"
+cli_tool = "echo"
+task = "future compatible task"
+schedule = "0 1 * * *"
+capabilities = ["tinyclaw-schedule", "tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+future_field = "must not be discarded"
+"#;
+    std::fs::write(&fragment, original).expect("write future fragment");
+
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+        fragment.clone(),
+        "echo",
+    ));
+    let err = tool
+        .execute(json!({
+            "op": "create",
+            "prompt": "run daily report",
+            "schedule": "0 9 * * *",
+        }))
+        .await
+        .expect_err("unknown fields must not be silently discarded");
+    match err {
+        ToolError::ExecutionFailed { message, .. } => {
+            assert!(
+                message.contains("unknown") || message.contains("refusing to rewrite"),
+                "got: {message}"
+            );
+        }
+        other => panic!("expected ExecutionFailed, got {other:?}"),
+    }
+    assert_eq!(
+        std::fs::read(&fragment).expect("read fragment"),
+        original,
+        "rejected future TOML must remain byte-for-byte unchanged"
+    );
+}
+
+#[tokio::test]
+async fn orchestrator_schedule_owned_fragment_create_list_delete_round_trips() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("tinyclaw-schedules.toml");
+    std::fs::write(
+        &fragment,
+        r#"[[agents]]
+name = "tinyclaw-schedule-fragment-marker"
+layer = "Core"
+cli_tool = "tinyclaw-scheduler-marker"
+task = "TinyClaw scheduler fragment ownership marker"
+schedule = "0 0 1 1 *"
+capabilities = ["tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = false
+"#,
+    )
+    .expect("write owned fragment");
+
+    let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+        fragment.clone(),
+        "echo",
+    ));
+    let out = tool
+        .execute(json!({
+            "op": "create",
+            "prompt": "owned round trip",
+            "schedule": "0 9 * * *",
+        }))
+        .await
+        .expect("create in owned fragment");
+    let v: serde_json::Value = serde_json::from_str(&out).expect("json output");
+    let id = v["id"].as_str().expect("id present").to_string();
+
+    let listed = tool
+        .execute(json!({"op": "list"}))
+        .await
+        .expect("list owned fragment");
+    let listed: serde_json::Value = serde_json::from_str(&listed).expect("json output");
+    assert_eq!(listed["count"], 1);
+    assert_eq!(listed["jobs"][0]["id"], id);
+
+    tool.execute(json!({"op": "delete", "id": id}))
+        .await
+        .expect("delete owned schedule");
+    let listed = tool
+        .execute(json!({"op": "list"}))
+        .await
+        .expect("list after delete");
+    let listed: serde_json::Value = serde_json::from_str(&listed).expect("json output");
+    assert_eq!(listed["count"], 0);
+
+    let content = std::fs::read_to_string(&fragment).expect("read fragment");
+    assert!(content.contains("name = \"tinyclaw-schedule-fragment-marker\""));
+    assert!(content.contains("tinyclaw-schedule-fragment-schema:1"));
+}
+
+#[tokio::test]
 async fn schedule_persists_as_orchestrator_agent_across_restart() {
     common::scrub_env();
     let temp = tempfile::tempdir().expect("tempdir");
@@ -280,8 +481,11 @@ create_prs = false
     let config = terraphim_orchestrator::OrchestratorConfig::from_file(&base_config)
         .expect("orchestrator reloads after delete");
     assert!(
-        config.agents.is_empty(),
-        "delete removes orchestrator agent"
+        config
+            .agents
+            .iter()
+            .all(|agent| agent.name != format!("tinyclaw-{id}")),
+        "delete removes scheduled orchestrator agent"
     );
 }
 

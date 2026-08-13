@@ -28,6 +28,13 @@ use crate::cron::{CronJob, CronStore, Schedule};
 /// Default bound on jobs listed per `list` call.
 const LIST_LIMIT: usize = 100;
 const AGENT_NAME_PREFIX: &str = "tinyclaw-";
+const FRAGMENT_OWNER: &str = "terraphim_tinyclaw.scheduler";
+const FRAGMENT_SCHEMA_VERSION: u16 = 1;
+const FRAGMENT_MARKER_AGENT_NAME: &str = "tinyclaw-schedule-fragment-marker";
+const FRAGMENT_OWNER_CAPABILITY: &str =
+    "tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler";
+const FRAGMENT_SCHEMA_CAPABILITY: &str = "tinyclaw-schedule-fragment-schema:1";
+const SCHEDULE_CAPABILITY: &str = "tinyclaw-schedule";
 
 /// The scheduler tool.
 pub struct ScheduleTool {
@@ -40,12 +47,14 @@ enum ScheduleBackend {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct OrchestratorScheduleFragment {
     #[serde(default)]
     agents: Vec<OrchestratorScheduleAgent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct OrchestratorScheduleAgent {
     name: String,
     layer: String,
@@ -66,6 +75,126 @@ struct OrchestratorScheduleAgent {
 
 fn default_enabled() -> bool {
     true
+}
+
+impl OrchestratorScheduleFragment {
+    fn empty_owned(project: Option<String>) -> Self {
+        Self {
+            agents: vec![marker_agent(project)],
+        }
+    }
+
+    fn validate_owned(&self, path: &Path) -> Result<(), ToolError> {
+        let marker = self
+            .agents
+            .iter()
+            .find(|agent| agent.name == FRAGMENT_MARKER_AGENT_NAME)
+            .ok_or_else(|| {
+                unowned_fragment_error(path, "missing TinyClaw ownership marker agent")
+            })?;
+        validate_marker_agent(path, marker)?;
+
+        for agent in &self.agents {
+            if is_marker_agent(agent) {
+                continue;
+            }
+            if !agent.name.starts_with(AGENT_NAME_PREFIX)
+                || !agent
+                    .capabilities
+                    .iter()
+                    .any(|capability| capability == SCHEDULE_CAPABILITY)
+            {
+                return Err(unowned_fragment_error(
+                    path,
+                    format!(
+                        "agent '{}' is not a TinyClaw-owned schedule agent",
+                        agent.name
+                    ),
+                ));
+            }
+            if !agent
+                .capabilities
+                .iter()
+                .any(|capability| capability == FRAGMENT_OWNER_CAPABILITY)
+                || !agent
+                    .capabilities
+                    .iter()
+                    .any(|capability| capability == FRAGMENT_SCHEMA_CAPABILITY)
+            {
+                return Err(unowned_fragment_error(
+                    path,
+                    format!(
+                        "agent '{}' is missing TinyClaw ownership/schema capabilities",
+                        agent.name
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn marker_agent(project: Option<String>) -> OrchestratorScheduleAgent {
+    OrchestratorScheduleAgent {
+        name: FRAGMENT_MARKER_AGENT_NAME.to_string(),
+        layer: "Core".to_string(),
+        cli_tool: "tinyclaw-scheduler-marker".to_string(),
+        task: "TinyClaw scheduler fragment ownership marker".to_string(),
+        schedule: "0 0 1 1 *".to_string(),
+        project,
+        model: None,
+        skill_chain: Vec::new(),
+        capabilities: vec![
+            FRAGMENT_OWNER_CAPABILITY.to_string(),
+            FRAGMENT_SCHEMA_CAPABILITY.to_string(),
+        ],
+        enabled: false,
+    }
+}
+
+fn validate_marker_agent(path: &Path, marker: &OrchestratorScheduleAgent) -> Result<(), ToolError> {
+    if marker.enabled {
+        return Err(unowned_fragment_error(
+            path,
+            "TinyClaw ownership marker agent must be disabled",
+        ));
+    }
+    if !marker
+        .capabilities
+        .iter()
+        .any(|capability| capability == FRAGMENT_OWNER_CAPABILITY)
+    {
+        return Err(unowned_fragment_error(
+            path,
+            format!("owner marker capability must identify '{FRAGMENT_OWNER}'"),
+        ));
+    }
+    if !marker
+        .capabilities
+        .iter()
+        .any(|capability| capability == FRAGMENT_SCHEMA_CAPABILITY)
+    {
+        return Err(unowned_fragment_error(
+            path,
+            format!("schema marker capability must be version {FRAGMENT_SCHEMA_VERSION}"),
+        ));
+    }
+    Ok(())
+}
+
+fn is_marker_agent(agent: &OrchestratorScheduleAgent) -> bool {
+    agent.name == FRAGMENT_MARKER_AGENT_NAME
+}
+
+fn unowned_fragment_error(path: &Path, reason: impl Into<String>) -> ToolError {
+    ToolError::ExecutionFailed {
+        tool: "schedule".to_string(),
+        message: format!(
+            "refusing to mutate orchestrator schedule fragment {}: {}; configure a dedicated TinyClaw-owned fragment with a disabled '{FRAGMENT_MARKER_AGENT_NAME}' marker agent carrying capabilities '{FRAGMENT_OWNER_CAPABILITY}' and '{FRAGMENT_SCHEMA_CAPABILITY}'",
+            path.display(),
+            reason.into()
+        ),
+    }
 }
 
 /// Durable orchestrator schedule fragment store.
@@ -115,16 +244,21 @@ impl OrchestratorScheduleStore {
 
     fn load_fragment(&self) -> Result<OrchestratorScheduleFragment, ToolError> {
         if !self.path.exists() {
-            return Ok(OrchestratorScheduleFragment { agents: Vec::new() });
+            return Ok(OrchestratorScheduleFragment::empty_owned(
+                self.project.clone(),
+            ));
         }
         let content = std::fs::read_to_string(&self.path)?;
-        toml::from_str(&content).map_err(|e| ToolError::ExecutionFailed {
+        let fragment: OrchestratorScheduleFragment =
+            toml::from_str(&content).map_err(|e| ToolError::ExecutionFailed {
             tool: "schedule".to_string(),
             message: format!(
-                "parse orchestrator schedule fragment {}: {e}",
+                "parse TinyClaw-owned orchestrator schedule fragment {}: {e}; refusing to rewrite because unknown or unowned fields would otherwise be lost",
                 self.path.display()
             ),
-        })
+        })?;
+        fragment.validate_owned(&self.path)?;
+        Ok(fragment)
     }
 
     fn save_fragment(&self, fragment: &OrchestratorScheduleFragment) -> Result<(), ToolError> {
@@ -183,7 +317,11 @@ impl OrchestratorScheduleStore {
             project: self.project.clone(),
             model,
             skill_chain: skills,
-            capabilities: vec!["tinyclaw-schedule".to_string()],
+            capabilities: vec![
+                SCHEDULE_CAPABILITY.to_string(),
+                FRAGMENT_OWNER_CAPABILITY.to_string(),
+                FRAGMENT_SCHEMA_CAPABILITY.to_string(),
+            ],
             enabled: true,
         };
         let mut fragment = self.load_fragment()?;
@@ -374,6 +512,9 @@ impl ScheduledJob {
     }
 
     fn from_orchestrator_agent(agent: OrchestratorScheduleAgent) -> Option<Self> {
+        if is_marker_agent(&agent) {
+            return None;
+        }
         let id = agent.name.strip_prefix(AGENT_NAME_PREFIX)?.to_string();
         Some(Self {
             id,

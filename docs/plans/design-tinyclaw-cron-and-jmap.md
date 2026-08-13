@@ -95,7 +95,26 @@ agents and let the orchestrator load it on startup/restart.
      `{op, id, schedule, status: "created"}`.
    - `list` → read the include fragment → `{op, count, jobs:[…]}`.
    - `delete {id}` → remove by id → `{op, id, status: "deleted"}`.
-   - Production config requires
+   - Production config requires a dedicated TinyClaw-owned include fragment
+     whose durable marker is an orchestrator-compatible disabled agent:
+     ```toml
+     [[agents]]
+     name = "tinyclaw-schedule-fragment-marker"
+     layer = "Core"
+     cli_tool = "tinyclaw-scheduler-marker"
+     task = "TinyClaw scheduler fragment ownership marker"
+     schedule = "0 0 1 1 *"
+     capabilities = [
+       "tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler",
+       "tinyclaw-schedule-fragment-schema:1",
+     ]
+     enabled = false
+     ```
+     Existing unmarked fragments, fragments containing non-TinyClaw agents,
+     and owned fragments containing unknown future fields are rejected before
+     mutation so TinyClaw never rewrites operator-managed TOML through its
+     reduced scheduler schema.
+   - Production config also requires
      `scheduler.orchestrator_schedule_file = ".../tinyclaw-schedules.toml"`
      and an explicit `scheduler.cli_tool` that accepts the task as a
      positional prompt;

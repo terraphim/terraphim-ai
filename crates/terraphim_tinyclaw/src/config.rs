@@ -1327,11 +1327,15 @@ pub struct SchedulerConfig {
     #[serde(default = "default_scheduler_store_key")]
     pub store_key: String,
 
-    /// Orchestrator include fragment written by TinyClaw schedule commands.
+    /// Dedicated orchestrator include fragment written by TinyClaw schedule
+    /// commands.
     ///
-    /// The operator must include this file from the base orchestrator config,
-    /// e.g. `include = ["tinyclaw-schedules.toml"]`, so the orchestrator
-    /// reloads schedules after process restart.
+    /// The file must be TinyClaw-owned: existing files need a disabled
+    /// `tinyclaw-schedule-fragment-marker` marker agent with owner/schema
+    /// capabilities. TinyClaw rejects unowned, mixed, or unknown-schema
+    /// fragments before mutation. The operator must include this file from the
+    /// base orchestrator config, e.g. `include = ["tinyclaw-schedules.toml"]`,
+    /// so the orchestrator reloads schedules after process restart.
     #[serde(default)]
     pub orchestrator_schedule_file: Option<PathBuf>,
 

@@ -82,7 +82,18 @@ blocked_commands = ["rm -rf /", "mkfs", "dd if=/dev/zero"]
 # Scheduler Configuration
 # =============================================================================
 
-# Enable only when the orchestrator includes this fragment from its base config.
+# Enable only with a dedicated TinyClaw-owned orchestrator include fragment.
+# The fragment must contain a disabled marker agent:
+#   [[agents]]
+#   name = "tinyclaw-schedule-fragment-marker"
+#   layer = "Core"
+#   cli_tool = "tinyclaw-scheduler-marker"
+#   task = "TinyClaw scheduler fragment ownership marker"
+#   schedule = "0 0 1 1 *"
+#   capabilities = ["tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+#   enabled = false
+# TinyClaw refuses to mutate unowned or mixed fragments so operator-managed
+# orchestrator TOML is never rewritten through the scheduler's reduced schema.
 # cli_tool is required and must name a runner that accepts the scheduled task as
 # a positional prompt. Do not point this at terraphim-tinyclaw, which expects
 # subcommands.
