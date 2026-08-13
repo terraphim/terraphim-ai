@@ -129,6 +129,7 @@ haystack_jmap = { version = "1.20.2", registry = "terraphim" }
 # Wave 4 (Phase B) GitHub channel — HMAC-SHA256 webhook verification.
 hmac = "0.12"
 sha2 = "0.10"
+jsonwebtoken = "9"
 
 # Wave 5 (Phase E) Hermes parity tools — sandbox, subagents, browser.
 # terraphim_rlm: sandboxed execution (Local/Docker backends). Not a
@@ -163,6 +164,7 @@ tokio-test = "0.4"
 tower = { version = "0.5", features = ["util"] }
 reqwest = { workspace = true }
 tempfile = { workspace = true }
+rsa = { version = "0.9", features = ["pem"] }
 
 criterion = { version = "0.8", features = ["async_tokio"] }
 

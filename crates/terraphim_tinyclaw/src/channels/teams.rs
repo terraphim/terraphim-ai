@@ -4,6 +4,7 @@ use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::channel::Channel;
 use crate::config::TeamsConfig;
 use async_trait::async_trait;
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
@@ -21,11 +22,18 @@ pub struct TeamsChannel {
     client: reqwest::Client,
     running: Arc<AtomicBool>,
     token_cache: Arc<Mutex<Option<CachedToken>>>,
+    jwks_cache: Arc<Mutex<Option<CachedJwks>>>,
 }
 
 #[derive(Debug, Clone)]
 struct CachedToken {
     access_token: String,
+    expires_at: Instant,
+}
+
+#[derive(Debug, Clone)]
+struct CachedJwks {
+    jwks: JwksDocument,
     expires_at: Instant,
 }
 
@@ -36,6 +44,7 @@ impl TeamsChannel {
             client: reqwest::Client::new(),
             running: Arc::new(AtomicBool::new(false)),
             token_cache: Arc::new(Mutex::new(None)),
+            jwks_cache: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -92,15 +101,107 @@ impl TeamsChannel {
         Ok(Some(inbound))
     }
 
-    /// Minimal production guard for Bot Framework webhook handlers.
-    ///
-    /// A deployable HTTP route must reject missing/non-bearer headers before
-    /// parsing activities, then validate the JWT with Microsoft OpenID
-    /// metadata at the route boundary. This helper enforces the non-optional
-    /// bearer shape without logging or returning token material.
-    pub fn has_bearer_authorization(&self, authorization_header: &str) -> bool {
-        authorization_header.starts_with("Bearer ")
-            && authorization_header["Bearer ".len()..].trim().len() > 20
+    /// Validate a Bot Framework webhook JWT before activity parse/dispatch.
+    pub async fn validate_webhook_authorization(
+        &self,
+        authorization_header: Option<&str>,
+        body: &[u8],
+    ) -> anyhow::Result<()> {
+        let token = bearer_token(authorization_header)?;
+        let header = decode_header(token)?;
+        if header.alg != Algorithm::RS256 {
+            anyhow::bail!("Teams webhook JWT must use RS256");
+        }
+        let kid = header
+            .kid
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("Teams webhook JWT missing kid"))?;
+        let jwks = self.jwks().await?;
+        let key = jwks
+            .keys
+            .iter()
+            .find(|key| key.kid.as_deref() == Some(kid))
+            .ok_or_else(|| anyhow::anyhow!("Teams webhook JWT signing key not found"))?;
+
+        let decoding_key = DecodingKey::from_rsa_components(&key.n, &key.e)?;
+        let mut validation = Validation::new(Algorithm::RS256);
+        validation.set_audience(std::slice::from_ref(&self.config.app_id));
+        validation.set_issuer(std::slice::from_ref(&self.config.jwt_issuer));
+        validation.validate_exp = true;
+        validation.validate_nbf = true;
+        validation.leeway = 300;
+
+        let token_data = decode::<TeamsWebhookClaims>(token, &decoding_key, &validation)?;
+        if token_data.claims.aud != self.config.app_id {
+            anyhow::bail!("Teams webhook JWT audience mismatch");
+        }
+        let activity = serde_json::from_slice::<TeamsActivityServiceUrl>(body)?;
+        let body_service_url = activity
+            .service_url
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("Teams activity missing serviceUrl"))?;
+        if token_data.claims.service_url != body_service_url {
+            anyhow::bail!("Teams webhook JWT serviceUrl mismatch");
+        }
+
+        Ok(())
+    }
+
+    async fn jwks(&self) -> anyhow::Result<JwksDocument> {
+        let mut cache = self.jwks_cache.lock().await;
+        if let Some(cached) = cache.as_ref()
+            && Instant::now() < cached.expires_at
+        {
+            return Ok(cached.jwks.clone());
+        }
+
+        let metadata = self.fetch_openid_metadata().await?;
+        if metadata.issuer != self.config.jwt_issuer {
+            anyhow::bail!("Teams OpenID metadata issuer mismatch");
+        }
+        if !metadata
+            .id_token_signing_alg_values_supported
+            .iter()
+            .any(|alg| alg == "RS256")
+        {
+            anyhow::bail!("Teams OpenID metadata does not advertise RS256");
+        }
+        let jwks_url = self
+            .config
+            .openid_jwks_url
+            .as_deref()
+            .unwrap_or(metadata.jwks_uri.as_str());
+        let jwks = self.fetch_jwks(jwks_url).await?;
+        if jwks.keys.is_empty() {
+            anyhow::bail!("Teams JWKS is empty");
+        }
+        *cache = Some(CachedJwks {
+            jwks: jwks.clone(),
+            expires_at: Instant::now() + Duration::from_secs(24 * 60 * 60),
+        });
+        Ok(jwks)
+    }
+
+    async fn fetch_openid_metadata(&self) -> anyhow::Result<OpenIdMetadata> {
+        let response = self
+            .client
+            .get(&self.config.openid_metadata_url)
+            .send()
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            anyhow::bail!("Teams OpenID metadata request failed with status {status}");
+        }
+        Ok(response.json::<OpenIdMetadata>().await?)
+    }
+
+    async fn fetch_jwks(&self, jwks_url: &str) -> anyhow::Result<JwksDocument> {
+        let response = self.client.get(jwks_url).send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            anyhow::bail!("Teams JWKS request failed with status {status}");
+        }
+        Ok(response.json::<JwksDocument>().await?)
     }
 
     async fn acquire_access_token_uncached(&self) -> anyhow::Result<CachedToken> {
@@ -259,6 +360,52 @@ fn backoff(attempt: usize) -> Duration {
     Duration::from_millis(50 * 2_u64.pow(attempt as u32))
 }
 
+fn bearer_token(authorization_header: Option<&str>) -> anyhow::Result<&str> {
+    let header = authorization_header
+        .ok_or_else(|| anyhow::anyhow!("Teams webhook missing authorization header"))?;
+    let Some(token) = header.strip_prefix("Bearer ") else {
+        anyhow::bail!("Teams webhook authorization must use Bearer scheme");
+    };
+    let token = token.trim();
+    if token.is_empty() {
+        anyhow::bail!("Teams webhook authorization bearer token is empty");
+    }
+    Ok(token)
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenIdMetadata {
+    issuer: String,
+    jwks_uri: String,
+    #[serde(default)]
+    id_token_signing_alg_values_supported: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct JwksDocument {
+    keys: Vec<JwkKey>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct JwkKey {
+    kid: Option<String>,
+    n: String,
+    e: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct TeamsWebhookClaims {
+    aud: String,
+    #[serde(rename = "serviceUrl")]
+    service_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct TeamsActivityServiceUrl {
+    #[serde(rename = "serviceUrl")]
+    service_url: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct TeamsActivity {
     #[serde(rename = "type")]
@@ -395,11 +542,14 @@ mod tests {
     }
 
     #[test]
-    fn requires_bearer_authorization_shape() {
-        let ch = TeamsChannel::new(test_config("http://127.0.0.1/token"));
-        assert!(ch.has_bearer_authorization("Bearer abcdefghijklmnopqrstuvwxyz"));
-        assert!(!ch.has_bearer_authorization("Bearer short"));
-        assert!(!ch.has_bearer_authorization("Basic abcdefghijklmnopqrstuvwxyz"));
+    fn extracts_bearer_token_without_shape_only_acceptance() {
+        assert_eq!(
+            bearer_token(Some("Bearer abcdefghijklmnopqrstuvwxyz")).unwrap(),
+            "abcdefghijklmnopqrstuvwxyz"
+        );
+        assert!(bearer_token(None).is_err());
+        assert!(bearer_token(Some("Bearer ")).is_err());
+        assert!(bearer_token(Some("Basic abcdefghijklmnopqrstuvwxyz")).is_err());
     }
 
     #[tokio::test]
@@ -590,6 +740,10 @@ mod tests {
             token_url: "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token"
                 .into(),
             scope: "https://api.botframework.com/.default".into(),
+            openid_metadata_url:
+                "https://login.botframework.com/v1/.well-known/openidconfiguration".into(),
+            openid_jwks_url: None,
+            jwt_issuer: "https://api.botframework.com".into(),
             allow_from: vec!["*".into()],
         };
         let service_url = std::env::var("TEAMS_TEST_SERVICE_URL").unwrap();
@@ -610,6 +764,10 @@ mod tests {
             app_password: "secret-456".into(),
             token_url: token_url.into(),
             scope: "https://api.botframework.com/.default".into(),
+            openid_metadata_url:
+                "https://login.botframework.com/v1/.well-known/openidconfiguration".into(),
+            openid_jwks_url: None,
+            jwt_issuer: "https://api.botframework.com".into(),
             allow_from: vec!["29:user".into()],
         }
     }

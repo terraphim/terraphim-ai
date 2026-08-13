@@ -453,6 +453,17 @@ pub struct TeamsConfig {
     /// OAuth scope for Bot Framework API.
     #[serde(default = "default_teams_scope")]
     pub scope: String,
+    /// OpenID metadata endpoint for validating Bot Connector webhook JWTs.
+    #[serde(default = "default_teams_openid_metadata_url")]
+    pub openid_metadata_url: String,
+    /// Optional JWKS endpoint override for deterministic tests or private
+    /// Bot Connector-compatible deployments. Production should normally use
+    /// the `jwks_uri` discovered from `openid_metadata_url`.
+    #[serde(default)]
+    pub openid_jwks_url: Option<String>,
+    /// Expected issuer for Bot Connector webhook JWTs.
+    #[serde(default = "default_teams_jwt_issuer")]
+    pub jwt_issuer: String,
     /// List of allowed Teams user IDs. Must be non-empty.
     pub allow_from: Vec<String>,
 }
@@ -464,6 +475,9 @@ impl std::fmt::Debug for TeamsConfig {
             .field("app_password", &"***REDACTED***")
             .field("token_url", &self.token_url)
             .field("scope", &self.scope)
+            .field("openid_metadata_url", &self.openid_metadata_url)
+            .field("openid_jwks_url", &self.openid_jwks_url)
+            .field("jwt_issuer", &self.jwt_issuer)
             .field("allow_from", &self.allow_from)
             .finish()
     }
@@ -483,6 +497,19 @@ impl TeamsConfig {
         if self.scope.trim().is_empty() {
             anyhow::bail!("teams.scope cannot be empty");
         }
+        if self.openid_metadata_url.trim().is_empty() {
+            anyhow::bail!("teams.openid_metadata_url cannot be empty");
+        }
+        if self
+            .openid_jwks_url
+            .as_deref()
+            .is_some_and(|url| url.trim().is_empty())
+        {
+            anyhow::bail!("teams.openid_jwks_url cannot be empty when configured");
+        }
+        if self.jwt_issuer.trim().is_empty() {
+            anyhow::bail!("teams.jwt_issuer cannot be empty");
+        }
         if self.allow_from.is_empty() {
             anyhow::bail!("teams.allow_from cannot be empty");
         }
@@ -500,6 +527,14 @@ fn default_teams_token_url() -> String {
 
 fn default_teams_scope() -> String {
     "https://api.botframework.com/.default".to_string()
+}
+
+fn default_teams_openid_metadata_url() -> String {
+    "https://login.botframework.com/v1/.well-known/openidconfiguration".to_string()
+}
+
+fn default_teams_jwt_issuer() -> String {
+    "https://api.botframework.com".to_string()
 }
 
 /// Telegram channel configuration.
@@ -834,6 +869,10 @@ mod tests {
             app_password: "teams-password-secret".into(),
             token_url: "https://login.microsoftonline.com/token".into(),
             scope: "https://api.botframework.com/.default".into(),
+            openid_metadata_url:
+                "https://login.botframework.com/v1/.well-known/openidconfiguration".into(),
+            openid_jwks_url: None,
+            jwt_issuer: "https://api.botframework.com".into(),
             allow_from: vec!["29:user".into()],
         };
         let out = format!("{cfg:?}");
@@ -869,6 +908,12 @@ allow_from = ["29:user"]
             "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token"
         );
         assert_eq!(teams.scope, "https://api.botframework.com/.default");
+        assert_eq!(
+            teams.openid_metadata_url,
+            "https://login.botframework.com/v1/.well-known/openidconfiguration"
+        );
+        assert_eq!(teams.openid_jwks_url, None);
+        assert_eq!(teams.jwt_issuer, "https://api.botframework.com");
         assert!(teams.validate().is_ok());
     }
 
@@ -890,6 +935,10 @@ allow_from = ["29:user"]
             app_password: "password".into(),
             token_url: "https://login.microsoftonline.com/token".into(),
             scope: "https://api.botframework.com/.default".into(),
+            openid_metadata_url:
+                "https://login.botframework.com/v1/.well-known/openidconfiguration".into(),
+            openid_jwks_url: None,
+            jwt_issuer: "https://api.botframework.com".into(),
             allow_from: vec![],
         };
         assert!(teams.validate().is_err());

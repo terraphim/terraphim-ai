@@ -45,6 +45,13 @@ async fn forward_to_upstream(state: &ProxyState, path: &str, body: &Value) -> Re
                         .into_response();
                 }
             };
+            tracing::debug!(
+                target: "terraphim_tinyclaw::proxy",
+                path,
+                status = status.as_u16(),
+                response_bytes = bytes.len(),
+                "forwarded chat completion response from upstream"
+            );
             let mut builder = axum::http::Response::builder().status(status);
             if let Some(ct) = content_type {
                 builder = builder.header("content-type", ct);
@@ -120,6 +127,12 @@ pub async fn chat_completions(State(state): State<ProxyState>, body: Json<Value>
 
     let now = Utc::now().timestamp();
     let id = format!("chatcmpl-{:x}", now);
+    tracing::debug!(
+        target: "terraphim_tinyclaw::proxy",
+        model,
+        dispatched_to_bus = state.bus.is_some() && !last_user.is_empty(),
+        "served local echo chat completion"
+    );
     let response = json!({
         "id": id,
         "object": "chat.completion",

@@ -390,8 +390,9 @@ Gateway mode can expose the dashboard/webhook HTTP router by setting
 `/webhooks/whatsapp` and `/webhooks/teams` ingress. WhatsApp GET
 verification uses the configured verify token and POST dispatch requires
 `X-Hub-Signature-256` HMAC verification before parsing. Teams ingress
-requires an `Authorization: Bearer <token>` header before parsing/dispatch, but
-does not yet perform cryptographic Bot Framework JWT validation.
+cryptographically validates the Bot Framework RS256 JWT against Microsoft
+OpenID/JWKS metadata, including issuer, bot-app audience, validity window, and
+the activity `serviceUrl`, before parsing or dispatching the activity.
 
 CLI surfaces:
 

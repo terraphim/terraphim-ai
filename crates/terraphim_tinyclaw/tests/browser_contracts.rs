@@ -433,3 +433,24 @@ async fn browser_navigate_accepts_body_exactly_at_max_bytes() {
     assert_eq!(v["status"], 200);
     assert_eq!(v["bytes"], 16 * 1024);
 }
+
+#[tokio::test]
+async fn browser_navigate_rejects_body_one_byte_over_max_bytes() {
+    let tool = make_browser_with_max_bytes(16 * 1024);
+    let base = spawn_chunked_large_body((16 * 1024) + 1).await;
+
+    let err = tool
+        .execute(json!({"op": "navigate", "url": format!("{base}/big")}))
+        .await
+        .expect_err("body one byte over max_bytes must fail");
+
+    match err {
+        ToolError::ExecutionFailed { message, .. } => {
+            assert!(
+                message.contains("response too large"),
+                "message should report too-large body, got: {message}"
+            );
+        }
+        other => panic!("expected ExecutionFailed, got {other:?}"),
+    }
+}

@@ -16,6 +16,6 @@ pub async fn get_health(state: axum::extract::State<DashboardState>) -> Json<Val
     Json(json!({
         "ok": true,
         "version": VERSION,
-        "auth_required": state.auth_required,
+        "auth_required": state.fire_token.is_some(),
     }))
 }

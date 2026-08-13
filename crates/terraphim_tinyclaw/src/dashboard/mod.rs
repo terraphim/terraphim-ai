@@ -39,8 +39,6 @@ pub struct DashboardState {
     pub sessions: Arc<Mutex<SessionManager>>,
     pub bus: Arc<MessageBus>,
     pub cron_store: CronStore,
-    /// Whether the dashboard requires auth (cookie/JWT gate).
-    pub auth_required: bool,
     /// Bearer token required for `POST /api/cron/fire`. When `None`,
     /// the endpoint is unauthenticated (dev/test only — production must set
     /// this from `TINYCLAW_FIRE_TOKEN` env var).
@@ -61,7 +59,6 @@ impl DashboardState {
             sessions: Arc::new(Mutex::new(SessionManager::new(sessions_dir))),
             bus: Arc::new(MessageBus::new()),
             cron_store,
-            auth_required: false,
             fire_token: None,
             inbound_channels: ChannelsConfig::default(),
         }

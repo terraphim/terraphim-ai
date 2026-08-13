@@ -100,9 +100,14 @@ pub struct CreateJobRequest {
 /// `POST /api/cron/jobs`
 pub async fn create_job(
     State(state): State<DashboardState>,
+    headers: axum::http::HeaderMap,
     Json(body): Json<CreateJobRequest>,
 ) -> impl IntoResponse {
     use crate::cron::{CronJob, Schedule};
+
+    if let Some(response) = super::auth::require_fire_token(&state.fire_token, &headers) {
+        return response;
+    }
 
     let schedule = match body.schedule {
         Some(s) => match Schedule::parse(&s) {
@@ -167,8 +172,13 @@ pub async fn get_job(
 /// `DELETE /api/cron/jobs/{id}`
 pub async fn delete_job(
     State(state): State<DashboardState>,
+    headers: axum::http::HeaderMap,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    if let Some(response) = super::auth::require_fire_token(&state.fire_token, &headers) {
+        return response;
+    }
+
     match state.cron_store.remove_job(&id).await {
         Ok(true) => (
             StatusCode::OK,

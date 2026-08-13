@@ -40,7 +40,6 @@ async fn make_app() -> (DashboardState, axum::Router) {
         sessions: Arc::new(Mutex::new(SessionManager::new(PathBuf::from("/tmp")))),
         bus: Arc::new(MessageBus::new()),
         cron_store,
-        auth_required: false,
         fire_token: None,
         inbound_channels: ChannelsConfig::default(),
     };
@@ -101,6 +100,22 @@ async fn contract_health_includes_auth_required_flag() {
     let (status, body) = send_json(app, "GET", "/api/health", None).await;
     assert_eq!(status, StatusCode::OK);
     assert!(body["auth_required"].is_boolean());
+}
+
+#[tokio::test]
+async fn contract_health_reports_auth_not_required_without_fire_token() {
+    let (_state, app) = make_app().await;
+    let (status, body) = send_json(app, "GET", "/api/health", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["auth_required"], false);
+}
+
+#[tokio::test]
+async fn contract_health_reports_auth_required_with_fire_token() {
+    let (_state, app) = make_app_with_fire_token("super-secret-token").await;
+    let (status, body) = send_json(app, "GET", "/api/health", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["auth_required"], true);
 }
 
 // --- /api/status -----------------------------------------------------------
@@ -264,6 +279,72 @@ async fn contract_cron_create_job_requires_schedule() {
 }
 
 #[tokio::test]
+async fn contract_cron_create_job_rejects_missing_auth_without_mutation_when_token_configured() {
+    let (_state, app) = make_app_with_fire_token("super-secret-token").await;
+
+    let (status, body) = send_with_auth(
+        app.clone(),
+        "POST",
+        "/api/cron/jobs",
+        Some(json!({
+            "prompt": "must not persist",
+            "schedule": "1h"
+        })),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["error"], "invalid auth token");
+
+    let (_status, list) = send_json(app, "GET", "/api/cron/jobs", None).await;
+    assert_eq!(list["count"], 0);
+}
+
+#[tokio::test]
+async fn contract_cron_create_job_rejects_wrong_bearer_without_mutation_when_token_configured() {
+    let (_state, app) = make_app_with_fire_token("super-secret-token").await;
+
+    let (status, body) = send_with_auth(
+        app.clone(),
+        "POST",
+        "/api/cron/jobs",
+        Some(json!({
+            "prompt": "must not persist",
+            "schedule": "1h"
+        })),
+        Some("wrong-token"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["error"], "invalid auth token");
+
+    let (_status, list) = send_json(app, "GET", "/api/cron/jobs", None).await;
+    assert_eq!(list["count"], 0);
+}
+
+#[tokio::test]
+async fn contract_cron_create_job_accepts_correct_bearer_when_token_configured() {
+    let (_state, app) = make_app_with_fire_token("super-secret-token").await;
+
+    let (status, body) = send_with_auth(
+        app.clone(),
+        "POST",
+        "/api/cron/jobs",
+        Some(json!({
+            "prompt": "persist me",
+            "schedule": "1h"
+        })),
+        Some("super-secret-token"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(body["status"], "created");
+
+    let (_status, list) = send_json(app, "GET", "/api/cron/jobs", None).await;
+    assert_eq!(list["count"], 1);
+}
+
+#[tokio::test]
 async fn contract_cron_get_job_404_when_missing() {
     let (_state, app) = make_app().await;
     let (status, body) = send_json(app, "GET", "/api/cron/jobs/ghost", None).await;
@@ -324,6 +405,99 @@ async fn contract_cron_delete_job_404_when_missing() {
     let (status, body) = send_json(app, "DELETE", "/api/cron/jobs/ghost", None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert!(body["error"].as_str().unwrap().contains("not found"));
+}
+
+#[tokio::test]
+async fn contract_cron_delete_job_rejects_missing_auth_without_mutation_when_token_configured() {
+    let (_state, app) = make_app_with_fire_token("super-secret-token").await;
+    let (_create_status, created) = send_with_auth(
+        app.clone(),
+        "POST",
+        "/api/cron/jobs",
+        Some(json!({
+            "prompt": "keep me",
+            "schedule": "1h"
+        })),
+        Some("super-secret-token"),
+    )
+    .await;
+    let id = created["id"].as_str().unwrap().to_string();
+
+    let (status, body) = send_with_auth(
+        app.clone(),
+        "DELETE",
+        &format!("/api/cron/jobs/{id}"),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["error"], "invalid auth token");
+
+    let (status, body) = send_json(app, "GET", &format!("/api/cron/jobs/{id}"), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["id"], id);
+}
+
+#[tokio::test]
+async fn contract_cron_delete_job_rejects_wrong_bearer_without_mutation_when_token_configured() {
+    let (_state, app) = make_app_with_fire_token("super-secret-token").await;
+    let (_create_status, created) = send_with_auth(
+        app.clone(),
+        "POST",
+        "/api/cron/jobs",
+        Some(json!({
+            "prompt": "keep me",
+            "schedule": "1h"
+        })),
+        Some("super-secret-token"),
+    )
+    .await;
+    let id = created["id"].as_str().unwrap().to_string();
+
+    let (status, body) = send_with_auth(
+        app.clone(),
+        "DELETE",
+        &format!("/api/cron/jobs/{id}"),
+        None,
+        Some("wrong-token"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["error"], "invalid auth token");
+
+    let (status, body) = send_json(app, "GET", &format!("/api/cron/jobs/{id}"), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["id"], id);
+}
+
+#[tokio::test]
+async fn contract_cron_delete_job_accepts_correct_bearer_when_token_configured() {
+    let (_state, app) = make_app_with_fire_token("super-secret-token").await;
+    let (_create_status, created) = send_with_auth(
+        app.clone(),
+        "POST",
+        "/api/cron/jobs",
+        Some(json!({
+            "prompt": "delete me",
+            "schedule": "1h"
+        })),
+        Some("super-secret-token"),
+    )
+    .await;
+    let id = created["id"].as_str().unwrap().to_string();
+
+    let (status, body) = send_with_auth(
+        app,
+        "DELETE",
+        &format!("/api/cron/jobs/{id}"),
+        None,
+        Some("super-secret-token"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["status"], "deleted");
+    assert_eq!(body["id"], id);
 }
 
 // --- /api/sessions ---------------------------------------------------------
@@ -400,6 +574,10 @@ fn teams_config() -> TeamsConfig {
         app_password: "secret-456".into(),
         token_url: "http://127.0.0.1/token".into(),
         scope: "https://api.botframework.com/.default".into(),
+        openid_metadata_url: "https://login.botframework.com/v1/.well-known/openidconfiguration"
+            .into(),
+        openid_jwks_url: None,
+        jwt_issuer: "https://api.botframework.com".into(),
         allow_from: vec!["29:user".into()],
     }
 }
@@ -414,6 +592,13 @@ async fn make_app_with_inbound_channels(
     };
     let app = router(state.clone());
     (state, app)
+}
+
+fn teams_config_with_openid_metadata(openid_metadata_url: String) -> TeamsConfig {
+    TeamsConfig {
+        openid_metadata_url,
+        ..teams_config()
+    }
 }
 
 #[tokio::test]
@@ -649,9 +834,10 @@ async fn contract_whatsapp_valid_signature_dispatches_allowed_message() {
 #[tokio::test]
 async fn contract_teams_rejects_missing_bearer_before_parse_dispatch() {
     common::scrub_env();
+    let (metadata_url, _jwks_url) = spawn_teams_openid_server().await;
     let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
         whatsapp: None,
-        teams: Some(teams_config()),
+        teams: Some(teams_config_with_openid_metadata(metadata_url)),
         ..ChannelsConfig::default()
     })
     .await;
@@ -670,11 +856,12 @@ async fn contract_teams_rejects_missing_bearer_before_parse_dispatch() {
 }
 
 #[tokio::test]
-async fn contract_teams_valid_bearer_shape_dispatches_allowed_message() {
+async fn contract_teams_valid_signed_jwt_dispatches_allowed_message() {
     common::scrub_env();
+    let (metadata_url, _jwks_url) = spawn_teams_openid_server().await;
     let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
         whatsapp: None,
-        teams: Some(teams_config()),
+        teams: Some(teams_config_with_openid_metadata(metadata_url)),
         ..ChannelsConfig::default()
     })
     .await;
@@ -686,13 +873,14 @@ async fn contract_teams_valid_bearer_shape_dispatches_allowed_message() {
       "conversation": {"id": "conv-1"},
       "text": "hello teams"
     }"#;
+    let token = teams_jwt("app-123", 3600);
 
     let (status, _body) = send_with_header(
         app,
         "POST",
         "/webhooks/teams",
         body,
-        Some(("authorization", "Bearer abcdefghijklmnopqrstuvwxyz")),
+        Some(("authorization", &format!("Bearer {token}"))),
     )
     .await;
 
@@ -702,6 +890,204 @@ async fn contract_teams_valid_bearer_shape_dispatches_allowed_message() {
     assert_eq!(msg.sender_id, "29:user");
     assert_eq!(msg.chat_id, "https://smba.trafficmanager.net/emea/|conv-1");
     assert_eq!(msg.content, "hello teams");
+}
+
+#[tokio::test]
+async fn contract_teams_forged_signature_rejected_before_dispatch() {
+    common::scrub_env();
+    let (metadata_url, _jwks_url) = spawn_teams_openid_server().await;
+    let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
+        whatsapp: None,
+        teams: Some(teams_config_with_openid_metadata(metadata_url)),
+        ..ChannelsConfig::default()
+    })
+    .await;
+    let body = teams_activity_body();
+    let mut token = teams_jwt("app-123", 3600);
+    token.push('x');
+
+    let (status, _body) = send_with_header(
+        app,
+        "POST",
+        "/webhooks/teams",
+        body.as_bytes(),
+        Some(("authorization", &format!("Bearer {token}"))),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_no_inbound(state.bus).await;
+}
+
+#[tokio::test]
+async fn contract_teams_wrong_audience_rejected_before_dispatch() {
+    common::scrub_env();
+    let (metadata_url, _jwks_url) = spawn_teams_openid_server().await;
+    let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
+        whatsapp: None,
+        teams: Some(teams_config_with_openid_metadata(metadata_url)),
+        ..ChannelsConfig::default()
+    })
+    .await;
+    let body = teams_activity_body();
+    let token = teams_jwt("other-app", 3600);
+
+    let (status, _body) = send_with_header(
+        app,
+        "POST",
+        "/webhooks/teams",
+        body.as_bytes(),
+        Some(("authorization", &format!("Bearer {token}"))),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_no_inbound(state.bus).await;
+}
+
+#[tokio::test]
+async fn contract_teams_expired_token_rejected_before_dispatch() {
+    common::scrub_env();
+    let (metadata_url, _jwks_url) = spawn_teams_openid_server().await;
+    let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
+        whatsapp: None,
+        teams: Some(teams_config_with_openid_metadata(metadata_url)),
+        ..ChannelsConfig::default()
+    })
+    .await;
+    let body = teams_activity_body();
+    let token = teams_jwt("app-123", -3600);
+
+    let (status, _body) = send_with_header(
+        app,
+        "POST",
+        "/webhooks/teams",
+        body.as_bytes(),
+        Some(("authorization", &format!("Bearer {token}"))),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_no_inbound(state.bus).await;
+}
+
+const TEAMS_TEST_KID: &str = "tinyclaw-test-key";
+const TEAMS_TEST_JWK_N: &str = "tYxRuIobku6bWfbLBSklyusK7WAKGPb24YFUpJLnG_sss8QchHEFoIFhKzDAgxSRIAmkeysjznEZv58vL0fQGuAguuYxeNwH6byTVWyFD-4MkAO7dmp9-iIg77PNr83zxJu9aDoQTTnt86eAqKTMb_RMb4BYKodyLk-wOR_SLXLqrtotjeC8WwPzMXgoBSDWJ4EcbbYNnaEzz2vlUaJv73mk6PGybsZdJbMvpNpXsFafVMdUjsys3hJ5CL3LRzzQCKCBe_xjqogu2Qd9kFNNq_25RxXfeO5Tg_M8cHyySyGsDsHrJkAW0SoaA3_Bv-Y9JnbnKkujUC70PVDfSpCrFQ";
+const TEAMS_TEST_JWK_E: &str = "AQAB";
+const TEAMS_TEST_PRIVATE_KEY: &str = r#"-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC1jFG4ihuS7ptZ
+9ssFKSXK6wrtYAoY9vbhgVSkkucb+yyzxByEcQWggWErMMCDFJEgCaR7KyPOcRm/
+ny8vR9Aa4CC65jF43AfpvJNVbIUP7gyQA7t2an36IiDvs82vzfPEm71oOhBNOe3z
+p4CopMxv9ExvgFgqh3IuT7A5H9Itcuqu2i2N4LxbA/MxeCgFINYngRxttg2doTPP
+a+VRom/veaTo8bJuxl0lsy+k2lewVp9Ux1SOzKzeEnkIvctHPNAIoIF7/GOqiC7Z
+B32QU02r/blHFd947lOD8zxwfLJLIawOwesmQBbRKhoDf8G/5j0mducqS6NQLvQ9
+UN9KkKsVAgMBAAECggEAB8MSE2PEPgn5lmUY1QWnWf+mnfOHOv4EHCwdZFPrkaSx
+ipYN6hOy++PMNb6F3JTah5Yh9CoqA7+OLEUwDUNywFNo0tTYtKQjqnini/Vx0vaI
+jve54hw3eqRO6DC10JhrnbJS7Mveuo6Jf+tfctZo7zhwtCu2mUrlNNmvXSHhKJQ4
+oQ+HUcmFpn/2CtVDyMBtoOojk39qEFdPO6LcE9xoTTVHn1cvk71HcR/qnBVg0VBF
+XerChWKhYhi0cspmktIL5WzZIWE6ErjmBLJ+4995q/djvYnk3GNBvjqG51KCiQBC
+ZMki4K/R+usg/bH6PsQ6LvkUSl2hM9i9mgMwGMQNmQKBgQD1l9/laDMmD1KkAKJb
+9jMAJI2SWabazrcdLxTDTP0HLmBuWIM5mYE49aUSIken2SCj5KUJ/YLehWZ/ucxU
+Bu24T67El3nKrKMJYy1hU756qSfZsO2f4bpWaBBSYTrHdWG/pnK8m+OOu3FOeKyg
+XEs1dBVa9zvRDZTr2roV5uU46wKBgQC9PbOIKfyTjYJ7VopGTQlkmSyBVzZXjwRw
+n8ih3Gbm3uvSMMqqRHjtg/w7eisuaDJD9pvyeuP1BJwG4FDoP1azovL3WCS54yDU
+jKVXCnsZ9cPPa/sUE3JJWlqt9NDSk7Z6G5to2K/6Ce0QLBV3M97q5ij4PdmXSYzt
+RdQsP6ir/wKBgQC0zuhmY41sktFbrp/Zpmsryr1zpo9B/fgwAy59Dlwmgk06T+3k
+ZRAO2EJ8FEK+3wq5vqaGsV485udsV2SH5EX1cKyRTZe7z9eEHMEXK2lLsueEzE5V
+bAEchiamD7EPkWqyhx9nnjktJvCnPg6RTQGNy/XA783Y/e/KqFBhuYi+mwKBgQC7
+/lyoixVYO78A6eKpngQTxLrarpnUd8YwX/s/GKW8+n2IrGHYrfb39SMQrvfQvUAa
+FhWr1/s3P+IETrjxT2LBR8JYh17Mr17A6AukoUvTaTuhhiLCOeNSDYmBwG/mkUk4
+ms5TZNfE7DFt3G1iosvzzLusiDzttupiF/mED6VvXwKBgFSKRofIyXHQc18DedPd
+hk2ltMOg3XqpkyifgW42gTcQYZiH+3OGsw7Z6mpAxVWsnbKalwiIpfMdz77Bi26g
+7UfGWW2nzox55bdkY99ZfW2lnbuJfKz3j4f5H4ifvrKFX6oHxP03JrbC4I6/G2+f
+vE0p1iWQBxTvqhzg+H32Up1N
+-----END PRIVATE KEY-----
+"#;
+
+async fn spawn_teams_openid_server() -> (String, String) {
+    use axum::routing::get;
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let base = format!("http://{addr}");
+    let jwks_url = format!("{base}/keys");
+    let metadata_jwks_url = jwks_url.clone();
+    let app = axum::Router::new()
+        .route(
+            "/metadata",
+            get(move || {
+                let jwks_uri = metadata_jwks_url.clone();
+                async move {
+                    axum::Json(json!({
+                        "issuer": "https://api.botframework.com",
+                        "jwks_uri": jwks_uri,
+                        "id_token_signing_alg_values_supported": ["RS256"]
+                    }))
+                }
+            }),
+        )
+        .route(
+            "/keys",
+            get(|| async {
+                axum::Json(json!({
+                    "keys": [{
+                        "kty": "RSA",
+                        "kid": TEAMS_TEST_KID,
+                        "use": "sig",
+                        "alg": "RS256",
+                        "n": TEAMS_TEST_JWK_N,
+                        "e": TEAMS_TEST_JWK_E
+                    }]
+                }))
+            }),
+        );
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+    (format!("{base}/metadata"), jwks_url)
+}
+
+fn teams_activity_body() -> String {
+    r#"{
+      "type": "message",
+      "id": "activity-1",
+      "serviceUrl": "https://smba.trafficmanager.net/emea/",
+      "from": {"id": "29:user"},
+      "conversation": {"id": "conv-1"},
+      "text": "hello teams"
+    }"#
+    .to_string()
+}
+
+fn teams_jwt(audience: &str, expires_in_secs: i64) -> String {
+    use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    struct Claims<'a> {
+        iss: &'a str,
+        aud: &'a str,
+        nbf: i64,
+        exp: i64,
+        #[serde(rename = "serviceUrl")]
+        service_url: &'a str,
+    }
+
+    let now = chrono::Utc::now().timestamp();
+    let mut header = Header::new(Algorithm::RS256);
+    header.kid = Some(TEAMS_TEST_KID.to_string());
+    encode(
+        &header,
+        &Claims {
+            iss: "https://api.botframework.com",
+            aud: audience,
+            nbf: now - 60,
+            exp: now + expires_in_secs,
+            service_url: "https://smba.trafficmanager.net/emea/",
+        },
+        &EncodingKey::from_rsa_pem(TEAMS_TEST_PRIVATE_KEY.as_bytes()).unwrap(),
+    )
+    .unwrap()
 }
 
 async fn send_with_header(

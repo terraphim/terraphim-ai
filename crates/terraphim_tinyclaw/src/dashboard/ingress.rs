@@ -82,13 +82,14 @@ pub async fn teams_webhook(
     let channel = TeamsChannel::new(config);
     let authorization = headers
         .get(axum::http::header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default();
-    if !channel.has_bearer_authorization(authorization) {
+        .and_then(|v| v.to_str().ok());
+    if let Err(err) = channel
+        .validate_webhook_authorization(authorization, &body)
+        .await
+    {
+        log::warn!("Teams webhook authentication failed: {err}");
         return StatusCode::UNAUTHORIZED.into_response();
     }
-    // This route enforces Bot Framework bearer-header shape before
-    // parse/dispatch. It does not perform cryptographic JWT validation.
     let Some(message) = (match channel.parse_activity(&body) {
         Ok(message) => message,
         Err(err) => {
