@@ -51,7 +51,9 @@ jobs:
           cargo build --release
 
       - name: Install Pagefind CLI
-        run: npm install --global pagefind
+        run: |
+          npm install --prefix /tmp/pagefind-cli pagefind
+          echo "/tmp/pagefind-cli/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Build documentation with md-book
         working-directory: docs
