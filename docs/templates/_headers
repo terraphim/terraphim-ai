@@ -1,15 +1,19 @@
-# Cloudflare Pages custom headers for correct MIME types
+# Cloudflare Pages headers for generated assets with stable filenames.
 /css/*
   Content-Type: text/css
+  Cache-Control: public, max-age=0, must-revalidate
 
 /js/*
   Content-Type: application/javascript
+  Cache-Control: public, max-age=0, must-revalidate
 
 /components/*
   Content-Type: application/javascript
+  Cache-Control: public, max-age=0, must-revalidate
 
 /*.js
   Content-Type: application/javascript
 
 /pagefind/*
   Content-Type: application/javascript
+  Cache-Control: public, max-age=0, must-revalidate

@@ -67,6 +67,7 @@ jobs:
           echo "DEBUG: Building with md-book fork..."
           rm -rf book/
           /tmp/md-book/target/release/md-book -i . -o book
+          cp templates/_headers book/_headers
           echo "DEBUG: Build completed with exit code: $?"
 
       - name: Upload build artifact
