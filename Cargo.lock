@@ -8936,6 +8936,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_llm_runner"
+version = "1.21.0"
+dependencies = [
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "terraphim_lsp"
 version = "1.21.0"
 dependencies = [
