@@ -50,6 +50,9 @@ jobs:
           cd /tmp/md-book
           cargo build --release
 
+      - name: Install Pagefind CLI
+        run: npm install --global pagefind
+
       - name: Build documentation with md-book
         working-directory: docs
         run: |
@@ -61,7 +64,7 @@ jobs:
           ls -la /tmp/md-book/target/release/ || echo "md-book binary not found"
           echo "DEBUG: Building with md-book fork..."
           rm -rf book/
-          /tmp/md-book/target/release/md-book -i . -o book || true
+          /tmp/md-book/target/release/md-book -i . -o book
           echo "DEBUG: Build completed with exit code: $?"
 
       - name: Upload build artifact
