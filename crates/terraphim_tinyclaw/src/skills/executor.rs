@@ -986,7 +986,11 @@ create_prs = false
         );
 
         let config = terraphim_orchestrator::OrchestratorConfig::from_file(&base_config).unwrap();
-        let agent = config.agents.first().expect("generated agent");
+        let agent = config
+            .agents
+            .iter()
+            .find(|agent| agent.name.starts_with("tinyclaw-") && agent.task.contains("ops"))
+            .expect("generated schedule agent");
         assert_eq!(agent.schedule.as_deref(), Some("0 9 * * *"));
         assert_eq!(agent.skill_chain, vec!["daily-report".to_string()]);
         assert!(agent.task.contains("\"topic\":\"ops\""));

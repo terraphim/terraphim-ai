@@ -57,6 +57,7 @@ regex = "1"
 
 # Concurrency
 parking_lot = "0.12"
+fs2 = "0.4"
 
 # CLI
 clap = { version = "4", features = ["derive"] }

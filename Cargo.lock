@@ -9655,6 +9655,7 @@ dependencies = [
  "dirs 5.0.1",
  "env_home",
  "env_logger",
+ "fs2",
  "haystack_jmap",
  "hmac 0.12.1",
  "hound",

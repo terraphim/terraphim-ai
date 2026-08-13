@@ -6,7 +6,7 @@
 mod common;
 
 use serde_json::json;
-use std::sync::Arc;
+use std::sync::{Arc, Barrier};
 use terraphim_persistence::DeviceStorage;
 use terraphim_tinyclaw::cron::CronStore;
 use terraphim_tinyclaw::tools::scheduler::{OrchestratorScheduleStore, ScheduleTool};
@@ -401,6 +401,170 @@ enabled = false
     let content = std::fs::read_to_string(&fragment).expect("read fragment");
     assert!(content.contains("name = \"tinyclaw-schedule-fragment-marker\""));
     assert!(content.contains("tinyclaw-schedule-fragment-schema:1"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn orchestrator_schedule_concurrent_independent_creates_both_survive() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("tinyclaw-schedules.toml");
+    std::fs::write(
+        &fragment,
+        r#"[[agents]]
+name = "tinyclaw-schedule-fragment-marker"
+layer = "Core"
+cli_tool = "tinyclaw-scheduler-marker"
+task = "TinyClaw scheduler fragment ownership marker"
+schedule = "0 0 1 1 *"
+capabilities = ["tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler", "tinyclaw-schedule-fragment-schema:1"]
+enabled = false
+"#,
+    )
+    .expect("write owned fragment");
+
+    let barrier = Arc::new(Barrier::new(2));
+    let create_a = {
+        let fragment = fragment.clone();
+        let barrier = Arc::clone(&barrier);
+        tokio::task::spawn_blocking(move || {
+            let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+                fragment, "echo",
+            ));
+            barrier.wait();
+            tokio_test::block_on(tool.execute(json!({
+                "op": "create",
+                "prompt": "concurrent report a",
+                "schedule": "0 9 * * *",
+            })))
+        })
+    };
+    let create_b = {
+        let fragment = fragment.clone();
+        let barrier = Arc::clone(&barrier);
+        tokio::task::spawn_blocking(move || {
+            let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+                fragment, "echo",
+            ));
+            barrier.wait();
+            tokio_test::block_on(tool.execute(json!({
+                "op": "create",
+                "prompt": "concurrent report b",
+                "schedule": "30 9 * * *",
+            })))
+        })
+    };
+
+    create_a
+        .await
+        .expect("create a thread joins")
+        .expect("create a succeeds");
+    create_b
+        .await
+        .expect("create b thread joins")
+        .expect("create b succeeds");
+
+    let reader =
+        ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(fragment, "echo"));
+    let listed = reader
+        .execute(json!({"op": "list"}))
+        .await
+        .expect("list after concurrent creates");
+    let listed: serde_json::Value = serde_json::from_str(&listed).expect("json output");
+    let prompts = listed["jobs"]
+        .as_array()
+        .expect("jobs array")
+        .iter()
+        .map(|job| job["prompt"].as_str().expect("prompt").to_string())
+        .collect::<Vec<_>>();
+
+    assert_eq!(listed["count"], 2, "jobs listed: {listed}");
+    assert!(
+        prompts.contains(&"concurrent report a".to_string()),
+        "jobs listed: {listed}"
+    );
+    assert!(
+        prompts.contains(&"concurrent report b".to_string()),
+        "jobs listed: {listed}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn orchestrator_schedule_concurrent_create_delete_preserves_both_mutations() {
+    common::scrub_env();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fragment = temp.path().join("tinyclaw-schedules.toml");
+    let seed_tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+        fragment.clone(),
+        "echo",
+    ));
+    let seeded = seed_tool
+        .execute(json!({
+            "op": "create",
+            "prompt": "seed report",
+            "schedule": "0 8 * * *",
+        }))
+        .await
+        .expect("seed create succeeds");
+    let seeded: serde_json::Value = serde_json::from_str(&seeded).expect("json output");
+    let seeded_id = seeded["id"].as_str().expect("seed id").to_string();
+
+    let barrier = Arc::new(Barrier::new(2));
+    let delete_seed = {
+        let fragment = fragment.clone();
+        let barrier = Arc::clone(&barrier);
+        let seeded_id = seeded_id.clone();
+        tokio::task::spawn_blocking(move || {
+            let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+                fragment, "echo",
+            ));
+            barrier.wait();
+            tokio_test::block_on(tool.execute(json!({
+                "op": "delete",
+                "id": seeded_id,
+            })))
+        })
+    };
+    let create_new = {
+        let fragment = fragment.clone();
+        let barrier = Arc::clone(&barrier);
+        tokio::task::spawn_blocking(move || {
+            let tool = ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(
+                fragment, "echo",
+            ));
+            barrier.wait();
+            tokio_test::block_on(tool.execute(json!({
+                "op": "create",
+                "prompt": "replacement report",
+                "schedule": "30 8 * * *",
+            })))
+        })
+    };
+
+    delete_seed
+        .await
+        .expect("delete thread joins")
+        .expect("delete succeeds");
+    create_new
+        .await
+        .expect("create thread joins")
+        .expect("create succeeds");
+
+    let reader =
+        ScheduleTool::new_orchestrator(OrchestratorScheduleStore::with_cli_tool(fragment, "echo"));
+    let listed = reader
+        .execute(json!({"op": "list"}))
+        .await
+        .expect("list after concurrent create/delete");
+    let listed: serde_json::Value = serde_json::from_str(&listed).expect("json output");
+    let prompts = listed["jobs"]
+        .as_array()
+        .expect("jobs array")
+        .iter()
+        .map(|job| job["prompt"].as_str().expect("prompt").to_string())
+        .collect::<Vec<_>>();
+
+    assert_eq!(listed["count"], 1, "jobs listed: {listed}");
+    assert_eq!(prompts, vec!["replacement report".to_string()]);
 }
 
 #[tokio::test]

@@ -19,9 +19,13 @@
 
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::fs::{File, OpenOptions};
+use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use crate::cron::{CronJob, CronStore, Schedule};
 
@@ -35,6 +39,8 @@ const FRAGMENT_OWNER_CAPABILITY: &str =
     "tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler";
 const FRAGMENT_SCHEMA_CAPABILITY: &str = "tinyclaw-schedule-fragment-schema:1";
 const SCHEDULE_CAPABILITY: &str = "tinyclaw-schedule";
+const FRAGMENT_LOCK_TIMEOUT: Duration = Duration::from_secs(10);
+const FRAGMENT_LOCK_RETRY_INTERVAL: Duration = Duration::from_millis(10);
 
 /// The scheduler tool.
 pub struct ScheduleTool {
@@ -244,6 +250,17 @@ pub struct OrchestratorScheduleStore {
     project: Option<String>,
 }
 
+#[derive(Debug)]
+struct FragmentLockGuard {
+    file: File,
+}
+
+impl Drop for FragmentLockGuard {
+    fn drop(&mut self) {
+        let _ = FileExt::unlock(&self.file);
+    }
+}
+
 impl OrchestratorScheduleStore {
     /// Create a store writing generated schedule agents to `path`.
     ///
@@ -312,6 +329,77 @@ impl OrchestratorScheduleStore {
         Ok(())
     }
 
+    fn lock_path(&self) -> PathBuf {
+        let mut file_name = self
+            .path
+            .file_name()
+            .map(|name| name.to_os_string())
+            .unwrap_or_else(|| "tinyclaw-schedules.toml".into());
+        file_name.push(".lock");
+        self.path
+            .parent()
+            .map(|parent| parent.join(&file_name))
+            .unwrap_or_else(|| PathBuf::from(file_name))
+    }
+
+    fn acquire_fragment_lock(&self) -> Result<FragmentLockGuard, ToolError> {
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let lock_path = self.lock_path();
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)?;
+        let started = Instant::now();
+
+        loop {
+            match FileExt::try_lock_exclusive(&file) {
+                Ok(()) => {
+                    file.set_len(0)?;
+                    file.seek(SeekFrom::Start(0))?;
+                    writeln!(
+                        file,
+                        "pid={} path={}",
+                        std::process::id(),
+                        self.path.display()
+                    )?;
+                    file.flush()?;
+                    return Ok(FragmentLockGuard { file });
+                }
+                Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                    if started.elapsed() >= FRAGMENT_LOCK_TIMEOUT {
+                        return Err(ToolError::ExecutionFailed {
+                            tool: "schedule".to_string(),
+                            message: format!(
+                                "timed out acquiring orchestrator schedule fragment lock {} after {:?}",
+                                lock_path.display(),
+                                FRAGMENT_LOCK_TIMEOUT
+                            ),
+                        });
+                    }
+                    std::thread::sleep(FRAGMENT_LOCK_RETRY_INTERVAL);
+                }
+                Err(err) => return Err(err.into()),
+            }
+        }
+    }
+
+    fn mutate_fragment<T>(
+        &self,
+        mutate: impl FnOnce(&mut OrchestratorScheduleFragment) -> Result<(T, bool), ToolError>,
+    ) -> Result<T, ToolError> {
+        let _lock = self.acquire_fragment_lock()?;
+        let mut fragment = self.load_fragment()?;
+        let (result, should_save) = mutate(&mut fragment)?;
+        if should_save {
+            self.save_fragment(&fragment)?;
+        }
+        Ok(result)
+    }
+
     fn create_job(
         &self,
         prompt: String,
@@ -363,10 +451,10 @@ impl OrchestratorScheduleStore {
             ],
             enabled: true,
         };
-        let mut fragment = self.load_fragment()?;
-        fragment.agents.push(agent);
-        self.save_fragment(&fragment)?;
-        Ok(id)
+        self.mutate_fragment(|fragment| {
+            fragment.agents.push(agent);
+            Ok((id, true))
+        })
     }
 
     fn list_jobs(&self) -> Result<Vec<ScheduledJob>, ToolError> {
@@ -380,15 +468,13 @@ impl OrchestratorScheduleStore {
     }
 
     fn delete_job(&self, id: &str) -> Result<bool, ToolError> {
-        let mut fragment = self.load_fragment()?;
-        let before = fragment.agents.len();
         let expected_name = format!("{AGENT_NAME_PREFIX}{id}");
-        fragment.agents.retain(|agent| agent.name != expected_name);
-        let removed = fragment.agents.len() != before;
-        if removed {
-            self.save_fragment(&fragment)?;
-        }
-        Ok(removed)
+        self.mutate_fragment(|fragment| {
+            let before = fragment.agents.len();
+            fragment.agents.retain(|agent| agent.name != expected_name);
+            let removed = fragment.agents.len() != before;
+            Ok((removed, removed))
+        })
     }
 }
 
