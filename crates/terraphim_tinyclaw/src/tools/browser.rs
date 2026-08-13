@@ -167,20 +167,10 @@ async fn run_agent(
         Err(_) => {
             let _ = child.kill().await;
             let _ = child.wait().await;
-            let stdout = stdout_task
-                .await
-                .ok()
-                .and_then(Result::ok)
-                .unwrap_or_default();
-            let stderr = stderr_task
-                .await
-                .ok()
-                .and_then(Result::ok)
-                .unwrap_or_default();
+            stdout_task.abort();
+            stderr_task.abort();
             return Err(format!(
-                "probe timed out after {timeout_secs}s; killed terraphim-agent subprocess; stdout='{}' stderr='{}'",
-                preview_output(&stdout),
-                preview_output(&stderr)
+                "probe timed out after {timeout_secs}s; killed terraphim-agent subprocess; stdout/stderr readers aborted"
             ));
         }
     };
@@ -696,6 +686,68 @@ exec sleep 30
         assert!(
             !status.success(),
             "hanging shim process {pid} is still alive"
+        );
+    }
+
+    #[tokio::test]
+    async fn browser_native_probe_timeout_is_bounded_when_descendant_inherits_pipes() {
+        let temp = TempDir::new().expect("tempdir");
+        let direct_pid_file = temp.path().join("direct.pid");
+        let descendant_pid_file = temp.path().join("descendant.pid");
+        let shim = write_shim(
+            temp.path(),
+            &format!(
+                r#"#!/bin/sh
+printf '%s\n' "$$" > '{}'
+sleep 30 &
+printf '%s\n' "$!" > '{}'
+exec sleep 30
+"#,
+                direct_pid_file.display(),
+                descendant_pid_file.display()
+            ),
+        );
+        let tool = browser_with_agent(shim.display().to_string(), 1);
+
+        let started = std::time::Instant::now();
+        let result = tokio::time::timeout(
+            Duration::from_secs(3),
+            tool.execute(json!({
+                "op": "screenshot",
+                "url": "https://example.com"
+            })),
+        )
+        .await;
+
+        if let Ok(pid_text) = fs::read_to_string(&descendant_pid_file)
+            && let Ok(pid) = pid_text.trim().parse::<u32>()
+        {
+            let _ = std::process::Command::new("kill")
+                .arg("-TERM")
+                .arg(pid.to_string())
+                .status();
+        }
+
+        let result = result.expect("probe should not wait indefinitely for inherited pipes");
+        assert!(matches!(result, Err(ToolError::BackendUnavailable { .. })));
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "probe exceeded independent timeout guard"
+        );
+
+        let direct_pid: u32 = fs::read_to_string(&direct_pid_file)
+            .expect("direct pid file")
+            .trim()
+            .parse()
+            .expect("direct pid");
+        let status = std::process::Command::new("kill")
+            .arg("-0")
+            .arg(direct_pid.to_string())
+            .status()
+            .expect("kill -0 direct child");
+        assert!(
+            !status.success(),
+            "direct shim process {direct_pid} is still alive"
         );
     }
 }
