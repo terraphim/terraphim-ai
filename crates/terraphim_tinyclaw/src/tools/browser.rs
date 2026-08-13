@@ -24,6 +24,7 @@ use std::time::Duration;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 use tokio::sync::Mutex;
+use tokio::time::Instant;
 
 /// Configuration for the browser tool.
 #[derive(Debug, Clone)]
@@ -156,8 +157,11 @@ async fn run_agent(
         let mut buf = Vec::new();
         stderr.read_to_end(&mut buf).await.map(|_| buf)
     });
+    let mut stdout_task = stdout_task;
+    let mut stderr_task = stderr_task;
 
-    let status = match tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait()).await {
+    let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+    let status = match tokio::time::timeout_at(deadline, child.wait()).await {
         Ok(Ok(status)) => status,
         Ok(Err(e)) => {
             stdout_task.abort();
@@ -175,14 +179,42 @@ async fn run_agent(
         }
     };
 
-    let stdout = stdout_task
-        .await
-        .map_err(|e| format!("failed to join stdout reader for {binary}: {e}"))?
-        .map_err(|e| format!("failed to read stdout from {binary}: {e}"))?;
-    let stderr = stderr_task
-        .await
-        .map_err(|e| format!("failed to join stderr reader for {binary}: {e}"))?
-        .map_err(|e| format!("failed to read stderr from {binary}: {e}"))?;
+    let stdout = tokio::select! {
+        result = &mut stdout_task => {
+            result
+                .map_err(|e| format!("failed to join stdout reader for {binary}: {e}"))?
+                .map_err(|e| format!("failed to read stdout from {binary}: {e}"))?
+        }
+        _ = tokio::time::sleep_until(deadline) => {
+            stdout_task.abort();
+            stderr_task.abort();
+            if matches!(child.try_wait(), Ok(None)) {
+                let _ = child.kill().await;
+                let _ = child.wait().await;
+            }
+            return Err(format!(
+                "probe timed out after {timeout_secs}s; killed terraphim-agent subprocess if still running; stdout/stderr readers aborted"
+            ));
+        }
+    };
+    let stderr = tokio::select! {
+        result = &mut stderr_task => {
+            result
+                .map_err(|e| format!("failed to join stderr reader for {binary}: {e}"))?
+                .map_err(|e| format!("failed to read stderr from {binary}: {e}"))?
+        }
+        _ = tokio::time::sleep_until(deadline) => {
+            stdout_task.abort();
+            stderr_task.abort();
+            if matches!(child.try_wait(), Ok(None)) {
+                let _ = child.kill().await;
+                let _ = child.wait().await;
+            }
+            return Err(format!(
+                "probe timed out after {timeout_secs}s; killed terraphim-agent subprocess if still running; stdout/stderr readers aborted"
+            ));
+        }
+    };
 
     Ok(std::process::Output {
         status,
@@ -748,6 +780,50 @@ exec sleep 30
         assert!(
             !status.success(),
             "direct shim process {direct_pid} is still alive"
+        );
+    }
+
+    #[tokio::test]
+    async fn browser_native_probe_timeout_after_child_exit_with_inherited_pipes() {
+        let temp = TempDir::new().expect("tempdir");
+        let descendant_pid_file = temp.path().join("descendant.pid");
+        let shim = write_shim(
+            temp.path(),
+            &format!(
+                r#"#!/bin/sh
+sleep 30 &
+printf '%s\n' "$!" > '{}'
+exit 0
+"#,
+                descendant_pid_file.display()
+            ),
+        );
+        let tool = browser_with_agent(shim.display().to_string(), 1);
+
+        let started = std::time::Instant::now();
+        let result = tokio::time::timeout(
+            Duration::from_secs(3),
+            tool.execute(json!({
+                "op": "screenshot",
+                "url": "https://example.com"
+            })),
+        )
+        .await;
+
+        if let Ok(pid_text) = fs::read_to_string(&descendant_pid_file)
+            && let Ok(pid) = pid_text.trim().parse::<u32>()
+        {
+            let _ = std::process::Command::new("kill")
+                .arg("-TERM")
+                .arg(pid.to_string())
+                .status();
+        }
+
+        let result = result.expect("probe should not wait indefinitely after direct child exits 0");
+        assert!(matches!(result, Err(ToolError::BackendUnavailable { .. })));
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "probe exceeded independent timeout guard"
         );
     }
 }
