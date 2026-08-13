@@ -9,6 +9,9 @@
 
 use sha2::{Digest, Sha256};
 use std::fmt;
+use std::path::Path;
+use terraphim_rlm::executor::strict_docker_diagnostics_sandbox as rlm_strict_docker_diagnostics_sandbox;
+pub use terraphim_rlm::executor::{StrictDockerDiagnosticsSandbox, StrictDockerSandboxError};
 
 /// Native CI verdicts accepted at the evidence boundary.
 #[derive(Clone, Eq, PartialEq)]
@@ -32,6 +35,22 @@ impl fmt::Debug for NativeVerdict {
             Self::Other(_) => formatter.debug_tuple("Other").field(&"<redacted>").finish(),
         }
     }
+}
+
+/// Construct the strict Docker-only diagnostics sandbox.
+///
+/// This companion factory delegates to RLM's opaque strict Docker constructor.
+/// It does not expose the strict Docker profile, raw `HostConfig`, or inner
+/// Docker executor.
+///
+/// # Errors
+///
+/// Returns an error when the checkout profile is invalid, Docker construction
+/// fails, or the constructed backend is not Docker.
+pub async fn strict_docker_diagnostics_sandbox(
+    checkout_path: impl AsRef<Path>,
+) -> Result<StrictDockerDiagnosticsSandbox, StrictDockerSandboxError> {
+    rlm_strict_docker_diagnostics_sandbox(checkout_path).await
 }
 
 /// Candidate evidence supplied to [`NativeFailureEvidence::validate`].
@@ -324,4 +343,26 @@ fn push_field(canonical: &mut Vec<u8>, name: &str, value: &[u8]) {
     canonical.push(0);
     canonical.extend_from_slice(value);
     canonical.push(0xff);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::error::Error;
+
+    #[test]
+    fn strict_sandbox_error_formatting_has_no_backend_source_chain() {
+        let sensitive = "/checkout/path unix:///var/run/docker.sock token=secret";
+
+        for error in [
+            StrictDockerSandboxError::InvalidCheckout,
+            StrictDockerSandboxError::BackendInit,
+            StrictDockerSandboxError::DockerUnhealthy,
+            StrictDockerSandboxError::NonDockerBackend,
+        ] {
+            assert!(!format!("{error:?}").contains(sensitive));
+            assert!(!error.to_string().contains(sensitive));
+            assert!(error.source().is_none());
+        }
+    }
 }

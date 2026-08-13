@@ -1,0 +1,5 @@
+error[E0599]: no method named `with_host_config` found for struct `StrictDockerDiagnosticsSandbox` in the current scope
+  --> $DIR/strict_sandbox_no_host_config.rs:10:21
+   |
+10 |     let _ = sandbox.with_host_config(Default::default());
+   |                     ^^^^^^^^^^^^^^^^ method not found in `StrictDockerDiagnosticsSandbox`
