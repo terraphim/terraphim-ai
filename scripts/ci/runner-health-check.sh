@@ -4,8 +4,33 @@
 # Exits 0 if runner is active and not stale, non-zero otherwise.
 # Also repairs rustup toolchain bin/* missing +x (Refs #2463).
 # Designed for systemd timer or cron execution.
+#
+# Gates on the source-controlled host-only pool contract first (Refs #3222):
+# scripts/check-runner-health.sh must pass before any Gitea query, so a
+# Firecracker-mode or checkout-colliding pool member fails fast and locally,
+# without credentials. Injectable for tests / off-host invocations:
+#   RUNNER_POOL_HEALTH_SCRIPT  path to the pool contract checker
+#   SKIP_POOL_CHECK=1          bypass the gate when not running on a runner host
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUNNER_POOL_HEALTH_SCRIPT="${RUNNER_POOL_HEALTH_SCRIPT:-${SCRIPT_DIR}/../check-runner-health.sh}"
+
+check_host_pool() {
+    if [[ "${SKIP_POOL_CHECK:-0}" == "1" ]]; then
+        echo "WARN: SKIP_POOL_CHECK=1, host pool contract not verified" >&2
+        return 0
+    fi
+    if [[ ! -f "$RUNNER_POOL_HEALTH_SCRIPT" ]]; then
+        echo "ERROR: pool health script missing: $RUNNER_POOL_HEALTH_SCRIPT" >&2
+        return 1
+    fi
+    bash "$RUNNER_POOL_HEALTH_SCRIPT" || {
+        echo "ERROR: host runner pool violates the native CI contract" >&2
+        return 1
+    }
+}
 
 check_rust_toolchain_perms() {
     local rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
@@ -56,6 +81,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+check_host_pool
+
 if [[ -z "$GITEA_TOKEN" ]]; then
     if [[ -f ~/.profile ]]; then
         source ~/.profile
@@ -81,7 +108,8 @@ RUNNERS_JSON=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
     fi
 }
 
-TOTAL=$(echo "$RUNNERS_JSON" | jq '.length // 0')
+# `.length` indexes an object; the admin API returns an array, so use `length`.
+TOTAL=$(echo "$RUNNERS_JSON" | jq 'length')
 ONLINE=$(echo "$RUNNERS_JSON" | jq '[.[] | select(.status == "online")] | length')
 OFFLINE=$(echo "$RUNNERS_JSON" | jq '[.[] | select(.status != "online")] | length')
 

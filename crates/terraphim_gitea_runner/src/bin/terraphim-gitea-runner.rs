@@ -18,9 +18,9 @@
 //! - `GITEA_TOKEN`          fallback for `RUNNER_STATUS_TOKEN` when unset
 //! - `RUNNER_CHECKOUT_DIR`  checkout root; per-repo trees at `<root>/<owner>/<repo>` (default `.`)
 //! - `RUNNER_HTTP_TIMEOUT`  per-request HTTP timeout in seconds (default 30)
-//! - `RUNNER_POLL_TIMEOUT`  belt-and-suspenders timeout wrapping a single
-//!   fetch/execute iteration in seconds (default 7200). Must exceed the longest
-//!   expected workflow step; the workflow executor has its own per-step timeout.
+//! - `RUNNER_POLL_TIMEOUT`  belt-and-suspenders timeout wrapping only the
+//!   pre-claim `FetchTask` request (default `2 x RUNNER_HTTP_TIMEOUT`). It never
+//!   bounds an already-claimed workflow; TaskWorker owns that lifecycle.
 //! - `RUNNER_TAXONOMY_DIR`  directory containing `command_policy.md` for the
 //!   command allowlist; if unset, the embedded default policy is used
 
@@ -75,15 +75,15 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or(30);
     let http_request_timeout = Duration::from_secs(http_timeout_secs);
 
-    // #2185 / #2971: the poll timeout wraps the entire FetchTask + workflow
-    // execution iteration. The previous default (http_timeout * 2 = 60s) was
-    // shorter than terraphim-ai build/test steps, causing the runner to abort
-    // long-running but healthy jobs. Default to 2h to match the workflow
-    // executor's max_execution_time; operators can tune via env.
+    // #2185 / #3222: this belt-and-suspenders timeout wraps only the pre-claim
+    // FetchTask request. Claimed workflow execution is never cancelled by the
+    // poll timeout; TaskWorker owns it through terminal publication. Keep this
+    // longer than reqwest's request timeout so the client timeout normally fires
+    // first. Operators can tune it via env.
     let poll_timeout_secs: u64 = std::env::var("RUNNER_POLL_TIMEOUT")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(7200);
+        .unwrap_or(http_timeout_secs.saturating_mul(2));
     let poll_timeout = Duration::from_secs(poll_timeout_secs);
 
     let status_token = std::env::var("RUNNER_STATUS_TOKEN")

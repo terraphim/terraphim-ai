@@ -63,6 +63,13 @@ pub enum RunnerError {
     /// Execution via the reused github_runner stack failed.
     #[error("execution error: {0}")]
     Execution(String),
+    /// The target repository could not be materialised at the task's commit.
+    ///
+    /// This is fail-closed: a build must never run against a working tree that
+    /// is not the commit under test, so a checkout failure terminalizes the task
+    /// rather than degrading to the bare checkout root (Refs #3222).
+    #[error("checkout failed: {0}")]
+    Checkout(String),
 }
 
 /// Convenience result alias.
