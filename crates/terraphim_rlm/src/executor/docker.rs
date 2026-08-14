@@ -30,8 +30,10 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, oneshot};
+use tokio::time::Instant as TokioInstant;
 
 use super::{
     Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId,
@@ -39,9 +41,12 @@ use super::{
 };
 use crate::config::{BackendType, RlmConfig};
 use crate::error::{RlmError, RlmResult};
+use crate::native_diagnostics::{Probe, ProbeResult, ValidatedNativeFailureEvidence};
 use crate::types::SessionId;
 
 const DEFAULT_IMAGE: &str = "python:3.11-slim";
+/// Fixed diagnostics image for strict Rust/Cargo/Git probes.
+pub const STRICT_DIAGNOSTICS_IMAGE: &str = "rust:1.96-bookworm";
 const BACKEND_NAME: &str = "docker";
 
 /// Default container memory limit in bytes (512 MiB).
@@ -53,16 +58,82 @@ const DEFAULT_PIDS_LIMIT: i64 = 256;
 const STRICT_DIAGNOSTICS_MEMORY_BYTES: i64 = 256 * 1024 * 1024;
 /// Strict diagnostics PIDs limit.
 const STRICT_DIAGNOSTICS_PIDS_LIMIT: i64 = 64;
+/// Strict diagnostics CPU quota in Docker NanoCPUs (0.5 CPU).
+const STRICT_DIAGNOSTICS_NANO_CPUS: i64 = 500_000_000;
 /// Strict diagnostics tmpfs scratch size in bytes (64 MiB).
 const STRICT_DIAGNOSTICS_TMPFS_BYTES: i64 = 64 * 1024 * 1024;
+/// Bounded cleanup deadline used after the main strict lifecycle deadline fires.
+const STRICT_DIAGNOSTICS_CLEANUP_TIMEOUT: Duration = Duration::from_secs(5);
+/// Absolute preflight deadline for strict Docker diagnostics construction.
+const STRICT_DIAGNOSTICS_PREFLIGHT_TIMEOUT: Duration = Duration::from_secs(30);
 
 const STRICT_CHECKOUT_TARGET: &str = "/workspace";
 const STRICT_TMP_TARGET: &str = "/tmp";
 
+fn strict_container_name(session_id: &SessionId) -> String {
+    format!("terraphim-rlm-{}", session_id)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct StrictRecoveryRecord {
+    locator: String,
+    locator_kind: StrictRecoveryLocatorKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum StrictRecoveryLocatorKind {
+    NameCreateInFlight,
+    ContainerId,
+}
+
+impl StrictRecoveryRecord {
+    fn create_in_flight(name: String) -> Self {
+        Self {
+            locator: name,
+            locator_kind: StrictRecoveryLocatorKind::NameCreateInFlight,
+        }
+    }
+
+    fn container_id(id: String) -> Self {
+        Self {
+            locator: id,
+            locator_kind: StrictRecoveryLocatorKind::ContainerId,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct StrictWorkerState {
+    completed: AtomicBool,
+    completed_notify: tokio::sync::Notify,
+}
+
+impl StrictWorkerState {
+    fn new() -> Self {
+        Self {
+            completed: AtomicBool::new(false),
+            completed_notify: tokio::sync::Notify::new(),
+        }
+    }
+
+    fn mark_completed(&self) {
+        self.completed.store(true, Ordering::Release);
+        self.completed_notify.notify_waiters();
+    }
+
+    fn is_completed(&self) -> bool {
+        self.completed.load(Ordering::Acquire)
+    }
+}
+
 /// Executes code in Docker containers, providing namespace-level isolation.
 pub struct DockerExecutor {
     docker: Docker,
-    session_to_container: DashMap<SessionId, Arc<Mutex<Option<String>>>>,
+    session_to_container: Arc<DashMap<SessionId, Arc<Mutex<Option<String>>>>>,
+    strict_recovery: Arc<DashMap<SessionId, StrictRecoveryRecord>>,
+    strict_workers: Arc<DashMap<SessionId, Arc<StrictWorkerState>>>,
+    strict_shutting_down: Arc<AtomicBool>,
+    strict_spawn_lock: Arc<Mutex<()>>,
     image: String,
     host_config: HostConfig,
     capabilities: Vec<Capability>,
@@ -144,6 +215,12 @@ pub enum StrictDockerSandboxError {
     /// health check.
     #[error("strict Docker backend health check failed")]
     DockerUnhealthy,
+    /// Fixed diagnostics image was not present locally.
+    #[error("strict Docker diagnostics image unavailable")]
+    DiagnosticsImageUnavailable,
+    /// Required fixed diagnostics tools failed preflight.
+    #[error("strict Docker diagnostics tools unavailable")]
+    DiagnosticsToolsUnavailable,
     /// Constructor did not produce the expected Docker backend.
     #[error("strict sandbox constructor did not produce Docker backend")]
     NonDockerBackend,
@@ -151,16 +228,140 @@ pub enum StrictDockerSandboxError {
 
 /// Opaque strict Docker-only diagnostics sandbox.
 ///
-/// The inner Docker executor is intentionally private. Callers can use the
-/// [`ExecutionEnvironment`] contract but cannot mutate Docker host
-/// configuration or extract the raw executor.
+/// The inner Docker executor is intentionally private. Callers can use only the
+/// fixed diagnostic methods and cannot mutate Docker host configuration,
+/// execute raw commands, or extract the raw executor.
 pub struct StrictDockerDiagnosticsSandbox {
     inner: DockerExecutor,
+}
+
+/// Validated limits for strict diagnostic probes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProbeExecutionLimits {
+    timeout_ms: u64,
+    max_output_bytes: u64,
+}
+
+impl ProbeExecutionLimits {
+    /// Maximum accepted strict probe timeout.
+    pub const MAX_TIMEOUT_MS: u64 = 600_000;
+    /// Maximum accepted inline probe output.
+    pub const MAX_OUTPUT_BYTES: u64 = 1024 * 1024;
+
+    /// Validate strict diagnostic execution limits.
+    ///
+    /// This timeout is the operation deadline for strict probe phases after a
+    /// Docker create request has begun. For lifecycle safety, an in-flight
+    /// create request is not cancelled on deadline; the worker waits until
+    /// Docker returns a definitive container ID or error. If Docker returns an
+    /// ID after the deadline, the worker deletes that ID under the separate
+    /// strict cleanup timeout before reporting the operation timeout. This can
+    /// make the call exceed `timeout_ms`, but prevents accepting a name-based
+    /// `NotFound` race as cleanup proof.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a limit is zero or exceeds the strict maximum.
+    pub fn new(timeout_ms: u64, max_output_bytes: u64) -> Result<Self, ProbeExecutionLimitsError> {
+        if timeout_ms == 0 || timeout_ms > Self::MAX_TIMEOUT_MS {
+            return Err(ProbeExecutionLimitsError::InvalidTimeout);
+        }
+        if max_output_bytes == 0 || max_output_bytes > Self::MAX_OUTPUT_BYTES {
+            return Err(ProbeExecutionLimitsError::InvalidMaxOutput);
+        }
+        Ok(Self {
+            timeout_ms,
+            max_output_bytes,
+        })
+    }
+
+    /// Strict timeout in milliseconds.
+    pub fn timeout_ms(&self) -> u64 {
+        self.timeout_ms
+    }
+
+    /// Strict maximum captured output bytes.
+    pub fn max_output_bytes(&self) -> u64 {
+        self.max_output_bytes
+    }
+}
+
+impl Default for ProbeExecutionLimits {
+    fn default() -> Self {
+        Self {
+            timeout_ms: 30_000,
+            max_output_bytes: crate::DEFAULT_MAX_INLINE_OUTPUT_BYTES.min(Self::MAX_OUTPUT_BYTES),
+        }
+    }
+}
+
+/// Safe validation error for strict diagnostic probe limits.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum ProbeExecutionLimitsError {
+    /// Timeout was zero or above the strict maximum.
+    #[error("probe timeout must be positive and within the strict maximum")]
+    InvalidTimeout,
+    /// Output limit was zero or above the strict maximum.
+    #[error("probe output limit must be positive and within the strict maximum")]
+    InvalidMaxOutput,
+}
+
+impl StrictDockerDiagnosticsSandbox {
+    /// Execute one closed, read-only diagnostic probe in `/workspace`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an RLM execution error if Docker exec fails or if fail-closed
+    /// cleanup cannot be proven.
+    pub(crate) async fn execute_probe(
+        &self,
+        _evidence: &ValidatedNativeFailureEvidence,
+        probe: Probe,
+        limits: ProbeExecutionLimits,
+    ) -> RlmResult<ProbeResult> {
+        let command = StrictDiagnosticCommand::for_probe(probe);
+        let execution = self
+            .inner
+            .execute_strict_diagnostic_session(command.argv, limits)
+            .await?;
+        Ok(ProbeResult::from_execution(probe, execution))
+    }
 }
 
 impl fmt::Debug for StrictDockerDiagnosticsSandbox {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("StrictDockerDiagnosticsSandbox { backend: Docker }")
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct StrictDiagnosticCommand {
+    argv: Vec<&'static str>,
+}
+
+impl StrictDiagnosticCommand {
+    fn for_probe(probe: Probe) -> Self {
+        match probe {
+            Probe::CargoMetadataNoDeps => Self::cargo_metadata_no_deps(),
+            Probe::GitDiffCheck => Self::git_diff_check(),
+        }
+    }
+
+    fn cargo_metadata_no_deps() -> Self {
+        Self {
+            argv: vec!["cargo", "metadata", "--no-deps", "--format-version", "1"],
+        }
+    }
+
+    fn git_diff_check() -> Self {
+        Self {
+            argv: vec!["git", "diff", "--check"],
+        }
+    }
+
+    #[cfg(test)]
+    fn create_exec_options_for_test(&self) -> CreateExecOptions<&str> {
+        strict_diagnostic_create_exec_options(self.argv.clone())
     }
 }
 
@@ -181,21 +382,129 @@ pub async fn strict_docker_diagnostics_sandbox(
         .map_err(|_| StrictDockerSandboxError::InvalidCheckout)?;
     let executor = DockerExecutor::new_strict_diagnostics(profile, None)
         .map_err(|_| StrictDockerSandboxError::BackendInit)?;
-    ensure_strict_docker_healthy(&executor).await?;
-    if executor.backend_type() != BackendType::Docker {
-        return Err(StrictDockerSandboxError::NonDockerBackend);
-    }
+    ensure_strict_diagnostics_preflight(&executor).await?;
     Ok(StrictDockerDiagnosticsSandbox { inner: executor })
 }
 
-async fn ensure_strict_docker_healthy<E>(executor: &E) -> Result<(), StrictDockerSandboxError>
+async fn ensure_strict_diagnostics_preflight<P>(
+    preflight: &P,
+) -> Result<(), StrictDockerSandboxError>
 where
-    E: ExecutionEnvironment<Error = RlmError>,
+    P: StrictDiagnosticsPreflight + Sync,
 {
-    match executor.health_check().await {
-        Ok(true) => Ok(()),
-        Ok(false) | Err(_) => Err(StrictDockerSandboxError::DockerUnhealthy),
+    let deadline = TokioInstant::now() + STRICT_DIAGNOSTICS_PREFLIGHT_TIMEOUT;
+    ensure_strict_diagnostics_preflight_with_deadline(preflight, deadline).await
+}
+
+async fn ensure_strict_diagnostics_preflight_with_deadline<P>(
+    preflight: &P,
+    deadline: TokioInstant,
+) -> Result<(), StrictDockerSandboxError>
+where
+    P: StrictDiagnosticsPreflight + Sync,
+{
+    if preflight.backend_type() != BackendType::Docker {
+        return Err(StrictDockerSandboxError::NonDockerBackend);
     }
+    if !strict_preflight_phase(
+        deadline,
+        preflight.docker_healthy(),
+        StrictDockerSandboxError::DockerUnhealthy,
+    )
+    .await?
+    {
+        return Err(StrictDockerSandboxError::DockerUnhealthy);
+    }
+    if !strict_preflight_phase(
+        deadline,
+        preflight.diagnostics_image_available(),
+        StrictDockerSandboxError::DiagnosticsImageUnavailable,
+    )
+    .await?
+    {
+        return Err(StrictDockerSandboxError::DiagnosticsImageUnavailable);
+    }
+    if !strict_preflight_phase(
+        deadline,
+        preflight.diagnostics_tools_available(deadline),
+        StrictDockerSandboxError::DiagnosticsToolsUnavailable,
+    )
+    .await?
+    {
+        return Err(StrictDockerSandboxError::DiagnosticsToolsUnavailable);
+    }
+    Ok(())
+}
+
+async fn strict_preflight_phase<F>(
+    deadline: TokioInstant,
+    future: F,
+    timeout_error: StrictDockerSandboxError,
+) -> Result<bool, StrictDockerSandboxError>
+where
+    F: std::future::Future<Output = bool>,
+{
+    let Some(remaining) = deadline.checked_duration_since(TokioInstant::now()) else {
+        return Err(timeout_error);
+    };
+    tokio::time::timeout(remaining, future)
+        .await
+        .map_err(|_| timeout_error)
+}
+
+#[async_trait]
+trait StrictDiagnosticsPreflight {
+    fn backend_type(&self) -> BackendType;
+    async fn docker_healthy(&self) -> bool;
+    async fn diagnostics_image_available(&self) -> bool;
+    async fn diagnostics_tools_available(&self, deadline: TokioInstant) -> bool;
+}
+
+#[async_trait]
+impl StrictDiagnosticsPreflight for DockerExecutor {
+    fn backend_type(&self) -> BackendType {
+        BackendType::Docker
+    }
+
+    async fn docker_healthy(&self) -> bool {
+        matches!(self.health_check().await, Ok(true))
+    }
+
+    async fn diagnostics_image_available(&self) -> bool {
+        self.docker
+            .inspect_image(STRICT_DIAGNOSTICS_IMAGE)
+            .await
+            .is_ok()
+    }
+
+    async fn diagnostics_tools_available(&self, deadline: TokioInstant) -> bool {
+        ensure_strict_diagnostics_tools_available(self, deadline).await
+    }
+}
+
+async fn ensure_strict_diagnostics_tools_available(
+    executor: &DockerExecutor,
+    deadline: TokioInstant,
+) -> bool {
+    for argv in [vec!["cargo", "--version"], vec!["git", "--version"]] {
+        let Some(remaining) = deadline.checked_duration_since(TokioInstant::now()) else {
+            return false;
+        };
+        let timeout_ms = u64::try_from(remaining.as_millis())
+            .unwrap_or(u64::MAX)
+            .clamp(1, ProbeExecutionLimits::MAX_TIMEOUT_MS);
+        let limits = ProbeExecutionLimits::new(timeout_ms, 16 * 1024).unwrap_or_default();
+        let Ok(result) = executor
+            .execute_strict_diagnostic_session(argv, limits)
+            .await
+        else {
+            return false;
+        };
+        if result.exit_code != 0 || result.timed_out {
+            return false;
+        }
+    }
+    true
 }
 
 /// Build the default `HostConfig` applied to every session container.
@@ -221,6 +530,7 @@ fn strict_diagnostics_host_config(checkout_path: &Path) -> HostConfig {
     HostConfig {
         memory: Some(STRICT_DIAGNOSTICS_MEMORY_BYTES),
         pids_limit: Some(STRICT_DIAGNOSTICS_PIDS_LIMIT),
+        nano_cpus: Some(STRICT_DIAGNOSTICS_NANO_CPUS),
         cap_drop: Some(vec!["ALL".to_string()]),
         cap_add: None,
         network_mode: Some("none".to_string()),
@@ -372,7 +682,11 @@ impl DockerExecutor {
 
         Ok(Self {
             docker,
-            session_to_container: DashMap::new(),
+            session_to_container: Arc::new(DashMap::new()),
+            strict_recovery: Arc::new(DashMap::new()),
+            strict_workers: Arc::new(DashMap::new()),
+            strict_shutting_down: Arc::new(AtomicBool::new(false)),
+            strict_spawn_lock: Arc::new(Mutex::new(())),
             image: DEFAULT_IMAGE.to_string(),
             host_config: default_host_config(),
             capabilities,
@@ -402,6 +716,7 @@ impl DockerExecutor {
         validator: Option<Arc<crate::validator::KnowledgeGraphValidator>>,
     ) -> Result<Self, RlmError> {
         let mut executor = Self::new(RlmConfig::minimal(), validator)?;
+        executor.image = STRICT_DIAGNOSTICS_IMAGE.to_string();
         executor.host_config = profile.host_config();
         Ok(executor)
     }
@@ -444,7 +759,7 @@ impl DockerExecutor {
     }
 
     async fn create_container(&self, session_id: &SessionId) -> RlmResult<String> {
-        let container_name = format!("terraphim-rlm-{}", session_id);
+        let container_name = strict_container_name(session_id);
 
         let config = self.container_create_body();
 
@@ -499,8 +814,12 @@ impl DockerExecutor {
         Self {
             docker: Docker::connect_with_local_defaults()
                 .expect("constructing Docker client handle should not contact daemon"),
-            session_to_container: DashMap::new(),
-            image: DEFAULT_IMAGE.to_string(),
+            session_to_container: Arc::new(DashMap::new()),
+            strict_recovery: Arc::new(DashMap::new()),
+            strict_workers: Arc::new(DashMap::new()),
+            strict_shutting_down: Arc::new(AtomicBool::new(false)),
+            strict_spawn_lock: Arc::new(Mutex::new(())),
+            image: STRICT_DIAGNOSTICS_IMAGE.to_string(),
             host_config: profile.host_config(),
             capabilities: Vec::new(),
             validator: None,
@@ -514,13 +833,129 @@ impl DockerExecutor {
         cmd: Vec<&str>,
         ctx: &ExecutionContext,
     ) -> RlmResult<ExecutionResult> {
+        self.exec_in_container_with_workdir(container_id, cmd, None, ctx)
+            .await
+    }
+
+    async fn execute_strict_diagnostic_session(
+        &self,
+        cmd: Vec<&str>,
+        limits: ProbeExecutionLimits,
+    ) -> RlmResult<ExecutionResult> {
+        let _spawn_guard = self.strict_spawn_lock.lock().await;
+        if self.strict_shutting_down.load(Ordering::Acquire) {
+            return Err(strict_cleanup_failed());
+        }
+        if !self.strict_workers.is_empty() {
+            return Err(strict_cleanup_failed());
+        }
+        self.retry_strict_recovery_records().await?;
+        if !self.strict_recovery.is_empty() || !self.strict_workers.is_empty() {
+            return Err(strict_cleanup_failed());
+        }
+
+        let session_id = SessionId::new();
+        let deadline = TokioInstant::now() + Duration::from_millis(limits.timeout_ms());
+        let (tx, rx) = oneshot::channel();
+        let command = cmd.into_iter().map(str::to_string).collect();
+        let worker_state = Arc::new(StrictWorkerState::new());
+        self.strict_workers.insert(session_id, worker_state.clone());
+        let worker = StrictDiagnosticLifecycleWorker {
+            backend: DockerStrictLifecycleBackend {
+                docker: self.docker.clone(),
+                host_config: self.host_config.clone(),
+            },
+            recovery: self.strict_recovery.clone(),
+            workers: self.strict_workers.clone(),
+            worker_state,
+            session_id,
+            container_name: strict_container_name(&session_id),
+            command,
+            limits,
+            deadline,
+            result_tx: tx,
+        };
+        tokio::spawn(worker.run());
+        drop(_spawn_guard);
+
+        rx.await.map_err(|_| strict_cleanup_failed())?
+    }
+
+    async fn retry_strict_recovery_records(&self) -> RlmResult<()> {
+        let backend = DockerStrictLifecycleBackend {
+            docker: self.docker.clone(),
+            host_config: self.host_config.clone(),
+        };
+        retry_strict_recovery_records_with_backend(
+            &backend,
+            &self.strict_recovery,
+            &self.strict_workers,
+        )
+        .await
+    }
+
+    async fn strict_shutdown(&self, wait: Duration) -> RlmResult<()> {
+        self.strict_shutting_down.store(true, Ordering::Release);
+        let deadline = TokioInstant::now() + wait;
+        let workers: Vec<_> = self
+            .strict_workers
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect();
+
+        for worker in workers {
+            loop {
+                let completed = worker.completed_notify.notified();
+                if worker.is_completed() {
+                    break;
+                }
+                let Some(remaining) = deadline.checked_duration_since(TokioInstant::now()) else {
+                    return Err(strict_cleanup_failed());
+                };
+                tokio::time::timeout(remaining, completed)
+                    .await
+                    .map_err(|_| strict_cleanup_failed())?;
+            }
+        }
+
+        self.retry_strict_recovery_records().await
+    }
+
+    async fn strict_shutdown_for_cleanup(&self) -> RlmResult<()> {
+        self.strict_shutdown(STRICT_DIAGNOSTICS_CLEANUP_TIMEOUT)
+            .await
+    }
+
+    #[cfg(test)]
+    async fn strict_shutdown_for_test(&self, wait: Duration) -> RlmResult<()> {
+        self.strict_shutdown(wait).await
+    }
+
+    async fn exec_in_container_with_workdir(
+        &self,
+        container_id: &str,
+        cmd: Vec<&str>,
+        working_dir: Option<&str>,
+        ctx: &ExecutionContext,
+    ) -> RlmResult<ExecutionResult> {
         let exec_config = CreateExecOptions {
             attach_stdout: Some(true),
             attach_stderr: Some(true),
             cmd: Some(cmd),
+            working_dir,
             ..Default::default()
         };
 
+        self.exec_in_container_with_config(container_id, exec_config, ctx)
+            .await
+    }
+
+    async fn exec_in_container_with_config(
+        &self,
+        container_id: &str,
+        exec_config: CreateExecOptions<&str>,
+        ctx: &ExecutionContext,
+    ) -> RlmResult<ExecutionResult> {
         let exec = self
             .docker
             .create_exec(container_id, exec_config)
@@ -655,6 +1090,375 @@ impl DockerExecutor {
     }
 }
 
+struct StrictDiagnosticLifecycleWorker<B>
+where
+    B: StrictDiagnosticLifecycleBackend,
+{
+    backend: B,
+    recovery: Arc<DashMap<SessionId, StrictRecoveryRecord>>,
+    workers: Arc<DashMap<SessionId, Arc<StrictWorkerState>>>,
+    worker_state: Arc<StrictWorkerState>,
+    session_id: SessionId,
+    container_name: String,
+    command: Vec<String>,
+    limits: ProbeExecutionLimits,
+    deadline: TokioInstant,
+    result_tx: oneshot::Sender<RlmResult<ExecutionResult>>,
+}
+
+impl<B> StrictDiagnosticLifecycleWorker<B>
+where
+    B: StrictDiagnosticLifecycleBackend,
+{
+    async fn run(self) {
+        let result = self.run_inner().await;
+        self.worker_state.mark_completed();
+        self.workers.remove(&self.session_id);
+        let _ = self.result_tx.send(result);
+    }
+
+    async fn run_inner(&self) -> RlmResult<ExecutionResult> {
+        self.recovery.insert(
+            self.session_id,
+            StrictRecoveryRecord::create_in_flight(self.container_name.clone()),
+        );
+
+        let result = async {
+            let container_id = self.create_phase().await?;
+            self.phase(self.backend.start_strict_container(&container_id))
+                .await?;
+            let exec_config = strict_diagnostic_create_exec_options_owned(self.command.clone());
+            let result = self
+                .phase(
+                    self.backend
+                        .exec_strict_container(&container_id, exec_config, self.limits),
+                )
+                .await?;
+            Ok(result)
+        }
+        .await;
+
+        if self.recovery.get(&self.session_id).is_none() {
+            return result;
+        }
+
+        let cleanup_result = self.cleanup().await;
+        strict_probe_cleanup_outcome(result, cleanup_result)
+    }
+
+    async fn create_phase(&self) -> RlmResult<String> {
+        let create_result = self
+            .backend
+            .create_strict_container(&self.container_name)
+            .await;
+        let deadline_elapsed = self
+            .deadline
+            .checked_duration_since(TokioInstant::now())
+            .is_none();
+
+        match create_result {
+            Ok(container_id) => {
+                self.recovery.insert(
+                    self.session_id,
+                    StrictRecoveryRecord::container_id(container_id.clone()),
+                );
+                if deadline_elapsed {
+                    let cleanup_result = self.cleanup().await;
+                    return strict_probe_cleanup_outcome(
+                        Err(strict_probe_timed_out()),
+                        cleanup_result,
+                    )
+                    .map(|_| container_id);
+                }
+                Ok(container_id)
+            }
+            Err(error) => {
+                self.recovery.remove(&self.session_id);
+                if deadline_elapsed {
+                    Err(strict_probe_timed_out())
+                } else {
+                    Err(error)
+                }
+            }
+        }
+    }
+
+    async fn phase<F, T>(&self, future: F) -> RlmResult<T>
+    where
+        F: std::future::Future<Output = RlmResult<T>>,
+    {
+        let Some(remaining) = self.deadline.checked_duration_since(TokioInstant::now()) else {
+            return Err(strict_probe_timed_out());
+        };
+        tokio::time::timeout(remaining, future)
+            .await
+            .map_err(|_| strict_probe_timed_out())?
+    }
+
+    async fn cleanup(&self) -> RlmResult<()> {
+        let Some(record) = self
+            .recovery
+            .get(&self.session_id)
+            .map(|entry| entry.clone())
+        else {
+            return Err(strict_cleanup_failed());
+        };
+        let cleanup = tokio::time::timeout(
+            STRICT_DIAGNOSTICS_CLEANUP_TIMEOUT,
+            self.backend.strict_delete_container(&record),
+        )
+        .await
+        .map_err(|_| strict_cleanup_failed())?;
+        cleanup?;
+        self.recovery.remove(&self.session_id);
+        Ok(())
+    }
+}
+
+#[async_trait]
+trait StrictDiagnosticLifecycleBackend: Clone + Send + Sync + 'static {
+    async fn create_strict_container(&self, container_name: &str) -> RlmResult<String>;
+    async fn start_strict_container(&self, container_id: &str) -> RlmResult<()>;
+    async fn exec_strict_container(
+        &self,
+        container_id: &str,
+        exec_config: CreateExecOptions<String>,
+        limits: ProbeExecutionLimits,
+    ) -> RlmResult<ExecutionResult>;
+    async fn strict_delete_container(&self, record: &StrictRecoveryRecord) -> RlmResult<()>;
+}
+
+async fn retry_strict_recovery_records_with_backend<B>(
+    backend: &B,
+    recovery: &DashMap<SessionId, StrictRecoveryRecord>,
+    workers: &DashMap<SessionId, Arc<StrictWorkerState>>,
+) -> RlmResult<()>
+where
+    B: StrictDiagnosticLifecycleBackend,
+{
+    if !workers.is_empty() {
+        return Err(strict_cleanup_failed());
+    }
+    let records: Vec<_> = recovery
+        .iter()
+        .map(|entry| (*entry.key(), entry.value().clone()))
+        .collect();
+
+    for (session_id, record) in records {
+        if record.locator_kind != StrictRecoveryLocatorKind::ContainerId {
+            return Err(strict_cleanup_failed());
+        }
+        let cleanup = tokio::time::timeout(
+            STRICT_DIAGNOSTICS_CLEANUP_TIMEOUT,
+            backend.strict_delete_container(&record),
+        )
+        .await
+        .map_err(|_| strict_cleanup_failed())?;
+        cleanup?;
+        recovery.remove(&session_id);
+    }
+    Ok(())
+}
+
+#[derive(Clone)]
+struct DockerStrictLifecycleBackend {
+    docker: Docker,
+    host_config: HostConfig,
+}
+
+#[async_trait]
+impl StrictDiagnosticLifecycleBackend for DockerStrictLifecycleBackend {
+    async fn create_strict_container(&self, container_name: &str) -> RlmResult<String> {
+        let config = ContainerCreateBody {
+            image: Some(STRICT_DIAGNOSTICS_IMAGE.to_string()),
+            cmd: Some(vec!["sleep".to_string(), "infinity".to_string()]),
+            host_config: Some(self.host_config.clone()),
+            ..Default::default()
+        };
+        let options = CreateContainerOptionsBuilder::new()
+            .name(container_name)
+            .build();
+        let create_response = self
+            .docker
+            .create_container(Some(options), config)
+            .await
+            .map_err(|_| strict_backend_init_failed("create"))?;
+        Ok(create_response.id)
+    }
+
+    async fn start_strict_container(&self, container_id: &str) -> RlmResult<()> {
+        self.docker
+            .start_container(container_id, None)
+            .await
+            .map_err(|_| strict_backend_init_failed("start"))
+    }
+
+    async fn exec_strict_container(
+        &self,
+        container_id: &str,
+        exec_config: CreateExecOptions<String>,
+        limits: ProbeExecutionLimits,
+    ) -> RlmResult<ExecutionResult> {
+        exec_in_container_with_config_for_docker(&self.docker, container_id, exec_config, limits)
+            .await
+    }
+
+    async fn strict_delete_container(&self, record: &StrictRecoveryRecord) -> RlmResult<()> {
+        strict_delete_container_with_docker(&self.docker, record).await
+    }
+}
+
+async fn strict_delete_container_with_docker(
+    docker: &Docker,
+    record: &StrictRecoveryRecord,
+) -> RlmResult<()> {
+    let options = RemoveContainerOptionsBuilder::new().force(true).build();
+    match docker
+        .remove_container(&record.locator, Some(options))
+        .await
+    {
+        Ok(()) => Ok(()),
+        Err(_) => {
+            log::warn!("strict diagnostic cleanup failed");
+            Err(strict_cleanup_failed())
+        }
+    }
+}
+
+fn strict_probe_cleanup_outcome(
+    result: RlmResult<ExecutionResult>,
+    cleanup_result: RlmResult<()>,
+) -> RlmResult<ExecutionResult> {
+    match (result, cleanup_result) {
+        (Ok(result), Ok(())) => Ok(result),
+        (Err(error), Ok(())) => Err(error),
+        (Ok(_), Err(_)) | (Err(_), Err(_)) => Err(strict_cleanup_failed()),
+    }
+}
+
+fn strict_cleanup_failed() -> RlmError {
+    RlmError::Internal {
+        message: "strict diagnostic cleanup failed".to_string(),
+    }
+}
+
+fn strict_probe_timed_out() -> RlmError {
+    RlmError::ExecutionFailed {
+        message: "strict diagnostic execution timed out".to_string(),
+        exit_code: None,
+        stdout: None,
+        stderr: None,
+    }
+}
+
+fn strict_backend_init_failed(action: &str) -> RlmError {
+    RlmError::BackendInitFailed {
+        backend: BACKEND_NAME.to_string(),
+        message: format!("strict diagnostic container {action} failed"),
+    }
+}
+
+#[cfg(test)]
+fn strict_diagnostic_create_exec_options(cmd: Vec<&str>) -> CreateExecOptions<&str> {
+    CreateExecOptions {
+        attach_stdout: Some(true),
+        attach_stderr: Some(true),
+        cmd: Some(cmd),
+        working_dir: Some(STRICT_CHECKOUT_TARGET),
+        ..Default::default()
+    }
+}
+
+fn strict_diagnostic_create_exec_options_owned(cmd: Vec<String>) -> CreateExecOptions<String> {
+    CreateExecOptions {
+        attach_stdout: Some(true),
+        attach_stderr: Some(true),
+        cmd: Some(cmd),
+        working_dir: Some(STRICT_CHECKOUT_TARGET.to_string()),
+        ..Default::default()
+    }
+}
+
+async fn exec_in_container_with_config_for_docker(
+    docker: &Docker,
+    container_id: &str,
+    exec_config: CreateExecOptions<String>,
+    limits: ProbeExecutionLimits,
+) -> RlmResult<ExecutionResult> {
+    let exec = docker
+        .create_exec(container_id, exec_config)
+        .await
+        .map_err(|_| RlmError::ExecutionFailed {
+            message: "strict diagnostic exec setup failed".to_string(),
+            exit_code: None,
+            stdout: None,
+            stderr: None,
+        })?;
+
+    let start = Instant::now();
+    let output = docker
+        .start_exec(&exec.id, Some(StartExecOptions::default()))
+        .await;
+
+    match output {
+        Ok(StartExecResults::Attached { mut output, .. }) => {
+            let mut output_accumulator = BoundedOutputAccumulator::new(limits.max_output_bytes());
+
+            while let Some(Ok(msg)) = output.next().await {
+                match msg {
+                    LogOutput::StdOut { message } => {
+                        output_accumulator.append_stdout(&message);
+                    }
+                    LogOutput::StdErr { message } => {
+                        output_accumulator.append_stderr(&message);
+                    }
+                    LogOutput::Console { message } => {
+                        output_accumulator.append_stdout(&message);
+                    }
+                    LogOutput::StdIn { .. } => {}
+                }
+            }
+
+            let exit_code = docker
+                .inspect_exec(&exec.id)
+                .await
+                .map_err(|_| RlmError::ExecutionFailed {
+                    message: "strict diagnostic exec inspect failed".to_string(),
+                    exit_code: None,
+                    stdout: None,
+                    stderr: None,
+                })?
+                .exit_code
+                .map(|c| i32::try_from(c).unwrap_or(-1))
+                .unwrap_or(-1);
+
+            let (stdout, stderr, output_truncated, output_file_path) = output_accumulator.finish();
+            Ok(ExecutionResult {
+                stdout,
+                stderr,
+                exit_code,
+                execution_time_ms: start.elapsed().as_millis() as u64,
+                output_truncated,
+                output_file_path,
+                timed_out: false,
+                metadata: HashMap::new(),
+            })
+        }
+        Ok(StartExecResults::Detached) => Err(RlmError::ExecutionFailed {
+            message: "strict diagnostic exec detached".to_string(),
+            exit_code: None,
+            stdout: None,
+            stderr: None,
+        }),
+        Err(_) => Err(RlmError::ExecutionFailed {
+            message: "strict diagnostic exec start failed".to_string(),
+            exit_code: None,
+            stdout: None,
+            stderr: None,
+        }),
+    }
+}
+
 #[async_trait]
 impl super::ExecutionEnvironment for DockerExecutor {
     type Error = RlmError;
@@ -743,7 +1547,9 @@ impl super::ExecutionEnvironment for DockerExecutor {
                 log::warn!("Failed to cleanup container {}: {}", ids[i], e);
             }
         }
-        Ok(())
+        self.strict_shutdown_for_cleanup()
+            .await
+            .map_err(|_| strict_cleanup_failed())
     }
 
     async fn end_session(&self, session_id: &SessionId) -> Result<(), Self::Error> {
@@ -754,6 +1560,11 @@ impl super::ExecutionEnvironment for DockerExecutor {
 
 impl Drop for DockerExecutor {
     fn drop(&mut self) {
+        // Drop can only attempt best-effort cleanup for legacy session
+        // containers. Strict diagnostics lifecycle state is intentionally left
+        // untouched here: a synchronous destructor cannot await in-flight
+        // Docker create settlement or prove cleanup before Tokio runtime or
+        // process shutdown.
         // Snapshot the entry pointers so we can drain in the spawned task
         // without holding the DashMap reference here.
         let entries: Vec<_> = self
@@ -800,75 +1611,6 @@ impl Drop for DockerExecutor {
     }
 }
 
-#[async_trait]
-impl ExecutionEnvironment for StrictDockerDiagnosticsSandbox {
-    type Error = RlmError;
-
-    async fn execute_code(
-        &self,
-        code: &str,
-        ctx: &ExecutionContext,
-    ) -> Result<ExecutionResult, Self::Error> {
-        self.inner.execute_code(code, ctx).await
-    }
-
-    async fn execute_command(
-        &self,
-        cmd: &str,
-        ctx: &ExecutionContext,
-    ) -> Result<ExecutionResult, Self::Error> {
-        self.inner.execute_command(cmd, ctx).await
-    }
-
-    async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
-        self.inner.validate(input).await
-    }
-
-    async fn create_snapshot(
-        &self,
-        session_id: &SessionId,
-        name: &str,
-    ) -> Result<SnapshotId, Self::Error> {
-        self.inner.create_snapshot(session_id, name).await
-    }
-
-    async fn restore_snapshot(&self, id: &SnapshotId) -> Result<(), Self::Error> {
-        self.inner.restore_snapshot(id).await
-    }
-
-    async fn list_snapshots(&self, session_id: &SessionId) -> Result<Vec<SnapshotId>, Self::Error> {
-        self.inner.list_snapshots(session_id).await
-    }
-
-    async fn delete_snapshot(&self, id: &SnapshotId) -> Result<(), Self::Error> {
-        self.inner.delete_snapshot(id).await
-    }
-
-    async fn delete_session_snapshots(&self, session_id: &SessionId) -> Result<(), Self::Error> {
-        self.inner.delete_session_snapshots(session_id).await
-    }
-
-    fn capabilities(&self) -> &[Capability] {
-        self.inner.capabilities()
-    }
-
-    fn backend_type(&self) -> BackendType {
-        self.inner.backend_type()
-    }
-
-    async fn health_check(&self) -> Result<bool, Self::Error> {
-        self.inner.health_check().await
-    }
-
-    async fn cleanup(&self) -> Result<(), Self::Error> {
-        self.inner.cleanup().await
-    }
-
-    async fn end_session(&self, session_id: &SessionId) -> Result<(), Self::Error> {
-        self.inner.end_session(session_id).await
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -876,6 +1618,8 @@ mod tests {
     use bollard::models::{MountBindOptionsPropagationEnum, MountType};
     use std::error::Error;
     use std::fs;
+    use std::sync::Mutex as StdMutex;
+    use tokio::sync::Notify;
 
     fn is_docker_available() -> bool {
         std::process::Command::new("docker")
@@ -942,137 +1686,6 @@ mod tests {
         assert_eq!(hc.cap_drop.as_deref(), Some(&["ALL".to_string()][..]));
         assert_eq!(hc.network_mode.as_deref(), Some("bridge"));
         assert_eq!(hc.readonly_rootfs, Some(false));
-    }
-
-    struct FakeHealthExecutor {
-        result: Result<bool, RlmError>,
-    }
-
-    #[async_trait]
-    impl ExecutionEnvironment for FakeHealthExecutor {
-        type Error = RlmError;
-
-        async fn execute_code(
-            &self,
-            _code: &str,
-            _ctx: &ExecutionContext,
-        ) -> Result<ExecutionResult, Self::Error> {
-            Ok(ExecutionResult::success(""))
-        }
-
-        async fn execute_command(
-            &self,
-            _cmd: &str,
-            _ctx: &ExecutionContext,
-        ) -> Result<ExecutionResult, Self::Error> {
-            Ok(ExecutionResult::success(""))
-        }
-
-        async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
-            Ok(ValidationResult::valid(Vec::new()))
-        }
-
-        async fn create_snapshot(
-            &self,
-            session_id: &SessionId,
-            name: &str,
-        ) -> Result<SnapshotId, Self::Error> {
-            Ok(SnapshotId::new(name, *session_id))
-        }
-
-        async fn restore_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
-            Ok(())
-        }
-
-        async fn list_snapshots(
-            &self,
-            _session_id: &SessionId,
-        ) -> Result<Vec<SnapshotId>, Self::Error> {
-            Ok(Vec::new())
-        }
-
-        async fn delete_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
-            Ok(())
-        }
-
-        async fn delete_session_snapshots(
-            &self,
-            _session_id: &SessionId,
-        ) -> Result<(), Self::Error> {
-            Ok(())
-        }
-
-        fn capabilities(&self) -> &[Capability] {
-            &[]
-        }
-
-        fn backend_type(&self) -> BackendType {
-            BackendType::Docker
-        }
-
-        async fn health_check(&self) -> Result<bool, Self::Error> {
-            match &self.result {
-                Ok(healthy) => Ok(*healthy),
-                Err(error) => Err(clone_backend_init_error(error)),
-            }
-        }
-
-        async fn cleanup(&self) -> Result<(), Self::Error> {
-            Ok(())
-        }
-    }
-
-    fn clone_backend_init_error(error: &RlmError) -> RlmError {
-        match error {
-            RlmError::BackendInitFailed { backend, message } => RlmError::BackendInitFailed {
-                backend: backend.clone(),
-                message: message.clone(),
-            },
-            _ => RlmError::BackendInitFailed {
-                backend: "docker".to_string(),
-                message: "test health failure".to_string(),
-            },
-        }
-    }
-
-    #[tokio::test]
-    async fn strict_health_gate_passes_only_true_health() {
-        let executor = FakeHealthExecutor { result: Ok(true) };
-
-        ensure_strict_docker_healthy(&executor)
-            .await
-            .expect("healthy docker accepted");
-    }
-
-    #[tokio::test]
-    async fn strict_health_gate_fails_closed_on_false_health() {
-        let executor = FakeHealthExecutor { result: Ok(false) };
-
-        let error = ensure_strict_docker_healthy(&executor)
-            .await
-            .expect_err("unhealthy docker rejected");
-
-        assert!(matches!(error, StrictDockerSandboxError::DockerUnhealthy));
-    }
-
-    #[tokio::test]
-    async fn strict_health_gate_fails_closed_on_health_error_without_source_leak() {
-        let sensitive = "unix:///var/run/docker.sock?token=secret-token";
-        let executor = FakeHealthExecutor {
-            result: Err(RlmError::BackendInitFailed {
-                backend: "docker".to_string(),
-                message: sensitive.to_string(),
-            }),
-        };
-
-        let error = ensure_strict_docker_healthy(&executor)
-            .await
-            .expect_err("health error rejected");
-
-        assert!(matches!(error, StrictDockerSandboxError::DockerUnhealthy));
-        assert!(!format!("{error:?}").contains(sensitive));
-        assert!(!error.to_string().contains(sensitive));
-        assert!(error.source().is_none());
     }
 
     #[test]
@@ -1198,6 +1811,174 @@ mod tests {
         assert!(!debug.contains(&canonical_checkout));
     }
 
+    struct FakeStrictPreflight {
+        backend_type: BackendType,
+        healthy: bool,
+        image_available: bool,
+        tools_available: bool,
+        block_health: bool,
+        block_image: bool,
+        block_tools: bool,
+    }
+
+    #[async_trait]
+    impl StrictDiagnosticsPreflight for FakeStrictPreflight {
+        fn backend_type(&self) -> BackendType {
+            self.backend_type
+        }
+
+        async fn docker_healthy(&self) -> bool {
+            if self.block_health {
+                std::future::pending::<()>().await;
+            }
+            self.healthy
+        }
+
+        async fn diagnostics_image_available(&self) -> bool {
+            if self.block_image {
+                std::future::pending::<()>().await;
+            }
+            self.image_available
+        }
+
+        async fn diagnostics_tools_available(&self, _deadline: TokioInstant) -> bool {
+            if self.block_tools {
+                std::future::pending::<()>().await;
+            }
+            self.tools_available
+        }
+    }
+
+    #[tokio::test]
+    async fn strict_preflight_accepts_docker_with_fixed_image_and_tools() {
+        let preflight = FakeStrictPreflight {
+            backend_type: BackendType::Docker,
+            healthy: true,
+            image_available: true,
+            tools_available: true,
+            block_health: false,
+            block_image: false,
+            block_tools: false,
+        };
+
+        ensure_strict_diagnostics_preflight(&preflight)
+            .await
+            .expect("preflight passes");
+    }
+
+    #[tokio::test]
+    async fn strict_preflight_fails_closed_for_backend_health_image_and_tools() {
+        for (preflight, expected) in [
+            (
+                FakeStrictPreflight {
+                    backend_type: BackendType::Local,
+                    healthy: true,
+                    image_available: true,
+                    tools_available: true,
+                    block_health: false,
+                    block_image: false,
+                    block_tools: false,
+                },
+                StrictDockerSandboxError::NonDockerBackend,
+            ),
+            (
+                FakeStrictPreflight {
+                    backend_type: BackendType::Docker,
+                    healthy: false,
+                    image_available: true,
+                    tools_available: true,
+                    block_health: false,
+                    block_image: false,
+                    block_tools: false,
+                },
+                StrictDockerSandboxError::DockerUnhealthy,
+            ),
+            (
+                FakeStrictPreflight {
+                    backend_type: BackendType::Docker,
+                    healthy: true,
+                    image_available: false,
+                    tools_available: true,
+                    block_health: false,
+                    block_image: false,
+                    block_tools: false,
+                },
+                StrictDockerSandboxError::DiagnosticsImageUnavailable,
+            ),
+            (
+                FakeStrictPreflight {
+                    backend_type: BackendType::Docker,
+                    healthy: true,
+                    image_available: true,
+                    tools_available: false,
+                    block_health: false,
+                    block_image: false,
+                    block_tools: false,
+                },
+                StrictDockerSandboxError::DiagnosticsToolsUnavailable,
+            ),
+        ] {
+            let error = ensure_strict_diagnostics_preflight(&preflight)
+                .await
+                .expect_err("preflight rejects");
+
+            assert_eq!(error, expected);
+            assert!(error.source().is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn strict_preflight_deadline_wraps_blocked_health_image_and_tools() {
+        for (preflight, expected) in [
+            (
+                FakeStrictPreflight {
+                    backend_type: BackendType::Docker,
+                    healthy: true,
+                    image_available: true,
+                    tools_available: true,
+                    block_health: true,
+                    block_image: false,
+                    block_tools: false,
+                },
+                StrictDockerSandboxError::DockerUnhealthy,
+            ),
+            (
+                FakeStrictPreflight {
+                    backend_type: BackendType::Docker,
+                    healthy: true,
+                    image_available: true,
+                    tools_available: true,
+                    block_health: false,
+                    block_image: true,
+                    block_tools: false,
+                },
+                StrictDockerSandboxError::DiagnosticsImageUnavailable,
+            ),
+            (
+                FakeStrictPreflight {
+                    backend_type: BackendType::Docker,
+                    healthy: true,
+                    image_available: true,
+                    tools_available: true,
+                    block_health: false,
+                    block_image: false,
+                    block_tools: true,
+                },
+                StrictDockerSandboxError::DiagnosticsToolsUnavailable,
+            ),
+        ] {
+            let error = ensure_strict_diagnostics_preflight_with_deadline(
+                &preflight,
+                TokioInstant::now() + Duration::from_millis(10),
+            )
+            .await
+            .expect_err("blocked preflight phase times out");
+
+            assert_eq!(error, expected);
+            assert!(error.source().is_none());
+        }
+    }
+
     #[test]
     fn strict_container_create_body_uses_profile_host_config_and_no_env() {
         let checkout = tempfile::tempdir().expect("checkout tempdir");
@@ -1207,7 +1988,637 @@ mod tests {
 
         assert_eq!(body.host_config, Some(profile.host_config()));
         assert_eq!(body.env, None);
-        assert_eq!(body.image.as_deref(), Some(DEFAULT_IMAGE));
+        assert_eq!(body.image.as_deref(), Some(STRICT_DIAGNOSTICS_IMAGE));
+    }
+
+    #[test]
+    fn strict_diagnostic_command_compiler_emits_fixed_argv_templates() {
+        assert_eq!(
+            StrictDiagnosticCommand::cargo_metadata_no_deps().argv,
+            vec!["cargo", "metadata", "--no-deps", "--format-version", "1"]
+        );
+        assert_eq!(
+            StrictDiagnosticCommand::git_diff_check().argv,
+            vec!["git", "diff", "--check"]
+        );
+    }
+
+    #[test]
+    fn strict_probe_limits_preserve_validated_values() {
+        let limits = ProbeExecutionLimits::new(12_345, 65_536).expect("valid limits");
+
+        assert_eq!(limits.timeout_ms(), 12_345);
+        assert_eq!(limits.max_output_bytes(), 65_536);
+    }
+
+    #[test]
+    fn strict_probe_limits_reject_zero_and_oversized_values() {
+        assert_eq!(
+            ProbeExecutionLimits::new(0, 1024).expect_err("zero timeout"),
+            ProbeExecutionLimitsError::InvalidTimeout
+        );
+        assert_eq!(
+            ProbeExecutionLimits::new(ProbeExecutionLimits::MAX_TIMEOUT_MS + 1, 1024)
+                .expect_err("oversized timeout"),
+            ProbeExecutionLimitsError::InvalidTimeout
+        );
+        assert_eq!(
+            ProbeExecutionLimits::new(1000, 0).expect_err("zero output"),
+            ProbeExecutionLimitsError::InvalidMaxOutput
+        );
+        assert_eq!(
+            ProbeExecutionLimits::new(1000, ProbeExecutionLimits::MAX_OUTPUT_BYTES + 1)
+                .expect_err("oversized output"),
+            ProbeExecutionLimitsError::InvalidMaxOutput
+        );
+    }
+
+    #[test]
+    fn strict_diagnostic_create_exec_options_use_argv_workspace_and_no_env() {
+        let command = StrictDiagnosticCommand::cargo_metadata_no_deps();
+        let options = command.create_exec_options_for_test();
+        let value = serde_json::to_value(&options).expect("options serialize");
+
+        assert_eq!(
+            value.get("Cmd").expect("cmd"),
+            &serde_json::json!(["cargo", "metadata", "--no-deps", "--format-version", "1"])
+        );
+        assert_eq!(
+            value.get("WorkingDir").and_then(|value| value.as_str()),
+            Some(STRICT_CHECKOUT_TARGET)
+        );
+        assert!(value.get("Env").is_none_or(serde_json::Value::is_null));
+        assert!(value.get("Cmd").is_some());
+        assert_ne!(value.get("Cmd"), Some(&serde_json::json!("cargo test")));
+        assert!(
+            !value
+                .get("Cmd")
+                .and_then(|value| value.as_array())
+                .is_some_and(|cmd| cmd.iter().any(|part| part == "sh" || part == "-c"))
+        );
+    }
+
+    fn strict_test_execution_result(exit_code: i32, timed_out: bool) -> ExecutionResult {
+        ExecutionResult {
+            stdout: String::new(),
+            stderr: String::new(),
+            exit_code,
+            execution_time_ms: 1,
+            output_truncated: false,
+            output_file_path: None,
+            timed_out,
+            metadata: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn strict_probe_cleanup_returns_success_nonzero_and_timeout_when_cleaned() {
+        let success =
+            strict_probe_cleanup_outcome(Ok(strict_test_execution_result(0, false)), Ok(()))
+                .expect("success result");
+        assert_eq!(success.exit_code, 0);
+
+        let nonzero =
+            strict_probe_cleanup_outcome(Ok(strict_test_execution_result(101, false)), Ok(()))
+                .expect("nonzero still returns execution result");
+        assert_eq!(nonzero.exit_code, 101);
+
+        let timeout =
+            strict_probe_cleanup_outcome(Ok(strict_test_execution_result(-1, true)), Ok(()))
+                .expect("timeout still returns execution result");
+        assert!(timeout.timed_out);
+    }
+
+    #[test]
+    fn strict_probe_cleanup_preserves_exec_error_when_cleaned() {
+        let error = strict_probe_cleanup_outcome(
+            Err(RlmError::ExecutionFailed {
+                message: "exec failed".to_string(),
+                exit_code: None,
+                stdout: None,
+                stderr: None,
+            }),
+            Ok(()),
+        )
+        .expect_err("exec error returned after cleanup");
+
+        assert!(matches!(error, RlmError::ExecutionFailed { .. }));
+    }
+
+    #[test]
+    fn strict_probe_cleanup_fails_closed_when_cleanup_is_not_proven() {
+        for result in [
+            Ok(strict_test_execution_result(0, false)),
+            Ok(strict_test_execution_result(101, false)),
+            Err(RlmError::ExecutionFailed {
+                message: "exec failed".to_string(),
+                exit_code: None,
+                stdout: None,
+                stderr: None,
+            }),
+        ] {
+            let error = strict_probe_cleanup_outcome(result, Err(strict_cleanup_failed()))
+                .expect_err("cleanup failure wins");
+            assert!(matches!(error, RlmError::Internal { .. }));
+            assert!(!format!("{error:?}").contains("exec failed"));
+        }
+    }
+
+    #[derive(Clone, Default)]
+    struct FakeStrictLifecycleBackend {
+        created_id: Arc<String>,
+        events: Arc<StdMutex<Vec<String>>>,
+        create_entered: Arc<Notify>,
+        create_release: Arc<Notify>,
+        pause_create: bool,
+        fail_create: bool,
+        block_start: bool,
+        fail_delete: bool,
+        block_delete: bool,
+    }
+
+    impl FakeStrictLifecycleBackend {
+        fn new(created_id: &str) -> Self {
+            Self {
+                created_id: Arc::new(created_id.to_string()),
+                events: Arc::new(StdMutex::new(Vec::new())),
+                create_entered: Arc::new(Notify::new()),
+                create_release: Arc::new(Notify::new()),
+                pause_create: false,
+                fail_create: false,
+                block_start: false,
+                fail_delete: false,
+                block_delete: false,
+            }
+        }
+
+        fn pause_create(mut self) -> Self {
+            self.pause_create = true;
+            self
+        }
+
+        fn block_start(mut self) -> Self {
+            self.block_start = true;
+            self
+        }
+
+        fn fail_create(mut self) -> Self {
+            self.fail_create = true;
+            self
+        }
+
+        fn fail_delete(mut self) -> Self {
+            self.fail_delete = true;
+            self
+        }
+
+        fn block_delete(mut self) -> Self {
+            self.block_delete = true;
+            self
+        }
+
+        fn events(&self) -> Vec<String> {
+            self.events.lock().expect("events lock").clone()
+        }
+    }
+
+    #[async_trait]
+    impl StrictDiagnosticLifecycleBackend for FakeStrictLifecycleBackend {
+        async fn create_strict_container(&self, container_name: &str) -> RlmResult<String> {
+            self.events
+                .lock()
+                .expect("events lock")
+                .push(format!("create:{container_name}"));
+            self.create_entered.notify_waiters();
+            if self.pause_create {
+                self.create_release.notified().await;
+            }
+            if self.fail_create {
+                return Err(strict_backend_init_failed("create"));
+            }
+            Ok((*self.created_id).clone())
+        }
+
+        async fn start_strict_container(&self, container_id: &str) -> RlmResult<()> {
+            self.events
+                .lock()
+                .expect("events lock")
+                .push(format!("start:{container_id}"));
+            if self.block_start {
+                std::future::pending::<()>().await;
+            }
+            Ok(())
+        }
+
+        async fn exec_strict_container(
+            &self,
+            container_id: &str,
+            _exec_config: CreateExecOptions<String>,
+            _limits: ProbeExecutionLimits,
+        ) -> RlmResult<ExecutionResult> {
+            self.events
+                .lock()
+                .expect("events lock")
+                .push(format!("exec:{container_id}"));
+            Ok(strict_test_execution_result(0, false))
+        }
+
+        async fn strict_delete_container(&self, record: &StrictRecoveryRecord) -> RlmResult<()> {
+            self.events.lock().expect("events lock").push(format!(
+                "delete:{}:{:?}",
+                record.locator, record.locator_kind
+            ));
+            if self.block_delete {
+                std::future::pending::<()>().await;
+            }
+            if self.fail_delete {
+                return Err(strict_cleanup_failed());
+            }
+            Ok(())
+        }
+    }
+
+    fn fake_worker(
+        backend: FakeStrictLifecycleBackend,
+        recovery: Arc<DashMap<SessionId, StrictRecoveryRecord>>,
+        workers: Arc<DashMap<SessionId, Arc<StrictWorkerState>>>,
+        deadline: TokioInstant,
+    ) -> (
+        StrictDiagnosticLifecycleWorker<FakeStrictLifecycleBackend>,
+        oneshot::Receiver<RlmResult<ExecutionResult>>,
+        SessionId,
+    ) {
+        let session_id = SessionId::new();
+        let (tx, rx) = oneshot::channel();
+        let worker_state = Arc::new(StrictWorkerState::new());
+        workers.insert(session_id, worker_state.clone());
+        let worker = StrictDiagnosticLifecycleWorker {
+            backend,
+            recovery,
+            workers,
+            worker_state,
+            session_id,
+            container_name: strict_container_name(&session_id),
+            command: vec!["cargo".to_string(), "--version".to_string()],
+            limits: ProbeExecutionLimits::new(100, 1024).expect("valid limits"),
+            deadline,
+            result_tx: tx,
+        };
+        (worker, rx, session_id)
+    }
+
+    #[tokio::test]
+    async fn strict_worker_caller_cancellation_during_create_still_deletes_created_id_once() {
+        let backend = FakeStrictLifecycleBackend::new("created-after-cancel").pause_create();
+        let recovery = Arc::new(DashMap::new());
+        let workers = Arc::new(DashMap::new());
+        let (worker, rx, session_id) = fake_worker(
+            backend.clone(),
+            recovery.clone(),
+            workers.clone(),
+            TokioInstant::now() + Duration::from_secs(1),
+        );
+        let handle = tokio::spawn(worker.run());
+
+        backend.create_entered.notified().await;
+        drop(rx);
+        backend.create_release.notify_waiters();
+        handle.await.expect("worker finishes");
+
+        assert_eq!(
+            backend.events(),
+            vec![
+                format!("create:{}", strict_container_name(&session_id)),
+                "start:created-after-cancel".to_string(),
+                "exec:created-after-cancel".to_string(),
+                "delete:created-after-cancel:ContainerId".to_string(),
+            ]
+        );
+        assert!(recovery.is_empty());
+        assert!(workers.is_empty());
+    }
+
+    #[tokio::test]
+    async fn strict_worker_timeout_during_start_deletes_bound_id_and_reports_timeout() {
+        let backend = FakeStrictLifecycleBackend::new("created-before-timeout").block_start();
+        let recovery = Arc::new(DashMap::new());
+        let workers = Arc::new(DashMap::new());
+        let (worker, rx, _session_id) = fake_worker(
+            backend.clone(),
+            recovery.clone(),
+            workers.clone(),
+            TokioInstant::now() + Duration::from_millis(10),
+        );
+        tokio::spawn(worker.run());
+
+        let error = rx
+            .await
+            .expect("worker sends result")
+            .expect_err("start timeout fails");
+
+        assert_eq!(
+            error.to_string(),
+            "Code execution failed: strict diagnostic execution timed out"
+        );
+        let events = backend.events();
+        assert!(events[0].starts_with("create:terraphim-rlm-"));
+        assert!(
+            events
+                .iter()
+                .any(|event| event == "delete:created-before-timeout:ContainerId")
+        );
+        assert!(recovery.is_empty());
+        assert!(workers.is_empty());
+    }
+
+    #[tokio::test]
+    async fn strict_worker_create_id_after_deadline_deletes_id_once_without_starting() {
+        let backend = FakeStrictLifecycleBackend::new("created-too-late").pause_create();
+        let recovery = Arc::new(DashMap::new());
+        let workers = Arc::new(DashMap::new());
+        let (worker, rx, session_id) = fake_worker(
+            backend.clone(),
+            recovery.clone(),
+            workers.clone(),
+            TokioInstant::now() + Duration::from_millis(10),
+        );
+        tokio::spawn(worker.run());
+
+        backend.create_entered.notified().await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        backend.create_release.notify_waiters();
+
+        let error = rx
+            .await
+            .expect("worker sends result")
+            .expect_err("late create reports timeout after cleanup");
+
+        assert_eq!(
+            error.to_string(),
+            "Code execution failed: strict diagnostic execution timed out"
+        );
+        let events = backend.events();
+        assert_eq!(
+            events,
+            vec![
+                format!("create:{}", strict_container_name(&session_id)),
+                "delete:created-too-late:ContainerId".to_string(),
+            ]
+        );
+        assert!(recovery.is_empty());
+        assert!(workers.is_empty());
+    }
+
+    #[tokio::test]
+    async fn strict_worker_create_error_after_deadline_clears_name_without_delete() {
+        let backend = FakeStrictLifecycleBackend::new("not-created")
+            .pause_create()
+            .fail_create();
+        let recovery = Arc::new(DashMap::new());
+        let workers = Arc::new(DashMap::new());
+        let (worker, rx, session_id) = fake_worker(
+            backend.clone(),
+            recovery.clone(),
+            workers.clone(),
+            TokioInstant::now() + Duration::from_millis(10),
+        );
+        tokio::spawn(worker.run());
+
+        backend.create_entered.notified().await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        backend.create_release.notify_waiters();
+
+        let error = rx
+            .await
+            .expect("worker sends result")
+            .expect_err("late create error reports timeout");
+
+        assert_eq!(
+            error.to_string(),
+            "Code execution failed: strict diagnostic execution timed out"
+        );
+        assert!(!recovery.contains_key(&session_id));
+        assert!(
+            !backend
+                .events()
+                .iter()
+                .any(|event| event.starts_with("delete:"))
+        );
+        assert!(workers.is_empty());
+    }
+
+    #[tokio::test]
+    async fn strict_worker_delete_failure_leaves_recovery_record() {
+        let backend = FakeStrictLifecycleBackend::new("cleanup-fails").fail_delete();
+        let recovery = Arc::new(DashMap::new());
+        let workers = Arc::new(DashMap::new());
+        let (worker, rx, session_id) = fake_worker(
+            backend.clone(),
+            recovery.clone(),
+            workers.clone(),
+            TokioInstant::now() + Duration::from_secs(1),
+        );
+        tokio::spawn(worker.run());
+
+        let error = rx
+            .await
+            .expect("worker sends result")
+            .expect_err("cleanup failure wins");
+
+        assert_eq!(
+            error.to_string(),
+            "Internal error: strict diagnostic cleanup failed"
+        );
+        assert_eq!(
+            recovery.get(&session_id).map(|entry| entry.clone()),
+            Some(StrictRecoveryRecord::container_id(
+                "cleanup-fails".to_string()
+            ))
+        );
+        assert!(workers.is_empty());
+    }
+
+    #[tokio::test]
+    async fn strict_worker_cleanup_timeout_leaves_recovery_record() {
+        let backend = FakeStrictLifecycleBackend::new("cleanup-timeout").block_delete();
+        let recovery = Arc::new(DashMap::new());
+        let workers = Arc::new(DashMap::new());
+        let (worker, rx, session_id) = fake_worker(
+            backend.clone(),
+            recovery.clone(),
+            workers.clone(),
+            TokioInstant::now() + Duration::from_secs(1),
+        );
+        tokio::spawn(worker.run());
+
+        let error = rx
+            .await
+            .expect("worker sends result")
+            .expect_err("cleanup timeout wins");
+
+        assert_eq!(
+            error.to_string(),
+            "Internal error: strict diagnostic cleanup failed"
+        );
+        assert_eq!(
+            recovery.get(&session_id).map(|entry| entry.clone()),
+            Some(StrictRecoveryRecord::container_id(
+                "cleanup-timeout".to_string()
+            ))
+        );
+        assert!(workers.is_empty());
+    }
+
+    #[tokio::test]
+    async fn strict_worker_success_deletes_once_and_removes_recovery_record() {
+        let backend = FakeStrictLifecycleBackend::new("cleanup-once");
+        let recovery = Arc::new(DashMap::new());
+        let workers = Arc::new(DashMap::new());
+        let (worker, rx, session_id) = fake_worker(
+            backend.clone(),
+            recovery.clone(),
+            workers.clone(),
+            TokioInstant::now() + Duration::from_secs(1),
+        );
+        tokio::spawn(worker.run());
+
+        let result = rx
+            .await
+            .expect("worker sends result")
+            .expect("worker succeeds");
+
+        assert_eq!(result.exit_code, 0);
+        assert_eq!(
+            backend
+                .events()
+                .iter()
+                .filter(|event| event.starts_with("delete:"))
+                .count(),
+            1
+        );
+        assert!(!recovery.contains_key(&session_id));
+        assert!(workers.is_empty());
+    }
+
+    #[tokio::test]
+    async fn strict_recovery_retry_refuses_active_worker_without_deleting_name() {
+        let backend = FakeStrictLifecycleBackend::new("active-worker");
+        let recovery = DashMap::new();
+        let workers = DashMap::new();
+        let session_id = SessionId::new();
+        recovery.insert(
+            session_id,
+            StrictRecoveryRecord::create_in_flight(strict_container_name(&session_id)),
+        );
+        workers.insert(session_id, Arc::new(StrictWorkerState::new()));
+
+        let error = retry_strict_recovery_records_with_backend(&backend, &recovery, &workers)
+            .await
+            .expect_err("active worker blocks recovery retry");
+
+        assert!(matches!(error, RlmError::Internal { .. }));
+        assert!(recovery.contains_key(&session_id));
+        assert!(backend.events().is_empty());
+    }
+
+    #[tokio::test]
+    async fn strict_recovery_retry_refuses_stale_name_record_and_retains_it() {
+        let backend = FakeStrictLifecycleBackend::new("stale-name");
+        let recovery = DashMap::new();
+        let workers = DashMap::new();
+        let session_id = SessionId::new();
+        recovery.insert(
+            session_id,
+            StrictRecoveryRecord::create_in_flight(strict_container_name(&session_id)),
+        );
+
+        let error = retry_strict_recovery_records_with_backend(&backend, &recovery, &workers)
+            .await
+            .expect_err("stale name fails closed");
+
+        assert!(matches!(error, RlmError::Internal { .. }));
+        assert!(recovery.contains_key(&session_id));
+        assert!(backend.events().is_empty());
+    }
+
+    #[tokio::test]
+    async fn strict_recovery_retry_deletes_confirmed_id_once_and_clears_record() {
+        let backend = FakeStrictLifecycleBackend::new("unused");
+        let recovery = DashMap::new();
+        let workers = DashMap::new();
+        let session_id = SessionId::new();
+        recovery.insert(
+            session_id,
+            StrictRecoveryRecord::container_id("confirmed-id".to_string()),
+        );
+
+        retry_strict_recovery_records_with_backend(&backend, &recovery, &workers)
+            .await
+            .expect("confirmed ID recovery succeeds");
+        retry_strict_recovery_records_with_backend(&backend, &recovery, &workers)
+            .await
+            .expect("second retry has no work");
+
+        assert!(!recovery.contains_key(&session_id));
+        assert_eq!(
+            backend.events(),
+            vec!["delete:confirmed-id:ContainerId".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn strict_executor_refuses_new_probe_when_worker_is_active() {
+        let exec = DockerExecutor::new(RlmConfig::minimal(), None).expect("docker client handle");
+        exec.strict_workers
+            .insert(SessionId::new(), Arc::new(StrictWorkerState::new()));
+
+        let error = exec
+            .execute_strict_diagnostic_session(
+                vec!["cargo", "--version"],
+                ProbeExecutionLimits::default(),
+            )
+            .await
+            .expect_err("active worker cap fails closed");
+
+        assert!(matches!(error, RlmError::Internal { .. }));
+    }
+
+    #[tokio::test]
+    async fn strict_shutdown_reports_unresolved_name_and_retains_record() {
+        let exec = DockerExecutor::new(RlmConfig::minimal(), None).expect("docker client handle");
+        let session_id = SessionId::new();
+        exec.strict_recovery.insert(
+            session_id,
+            StrictRecoveryRecord::create_in_flight(strict_container_name(&session_id)),
+        );
+
+        let error = exec
+            .strict_shutdown_for_test(Duration::from_millis(10))
+            .await
+            .expect_err("unresolved name cannot be proven clean");
+
+        assert!(matches!(error, RlmError::Internal { .. }));
+        assert!(exec.strict_recovery.contains_key(&session_id));
+    }
+
+    #[test]
+    fn docker_executor_drop_leaves_strict_recovery_records_untouched() {
+        let exec = DockerExecutor::new(RlmConfig::minimal(), None).expect("docker client handle");
+        let recovery = exec.strict_recovery.clone();
+        let session_id = SessionId::new();
+        recovery.insert(
+            session_id,
+            StrictRecoveryRecord::container_id("recoverable-id".to_string()),
+        );
+
+        drop(exec);
+
+        assert_eq!(
+            recovery.get(&session_id).map(|entry| entry.clone()),
+            Some(StrictRecoveryRecord::container_id(
+                "recoverable-id".to_string()
+            ))
+        );
     }
 
     #[test]
@@ -1221,7 +2632,7 @@ mod tests {
 
         assert_eq!(
             value.get("Image").and_then(|v| v.as_str()),
-            Some(DEFAULT_IMAGE)
+            Some(STRICT_DIAGNOSTICS_IMAGE)
         );
         assert!(value.get("Env").is_none_or(serde_json::Value::is_null));
 

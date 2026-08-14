@@ -1,5 +1,6 @@
 use terraphim_llm_runner::{
-    NativeFailureEvidence, NativeFailureEvidenceError, NativeFailureEvidenceInput, NativeVerdict,
+    MAX_NATIVE_FAILURE_EVIDENCE_BYTES, NativeFailureEvidence, NativeFailureEvidenceError,
+    NativeFailureEvidenceInput, NativeVerdict,
 };
 
 fn valid_input() -> NativeFailureEvidenceInput {
@@ -193,6 +194,98 @@ fn rejects_oversized_log_tail_without_truncating() {
 }
 
 #[test]
+fn rejects_zero_and_oversized_requested_evidence_limits() {
+    for limit in [0, MAX_NATIVE_FAILURE_EVIDENCE_BYTES + 1, usize::MAX] {
+        let mut input = valid_input();
+        input.max_evidence_bytes = limit;
+
+        let error = NativeFailureEvidence::validate(input).expect_err("invalid limit rejected");
+
+        assert_eq!(error, NativeFailureEvidenceError::InvalidEvidenceLimit);
+    }
+}
+
+#[test]
+fn rejects_logs_above_hard_evidence_ceiling() {
+    let mut input = valid_input();
+    input.max_evidence_bytes = MAX_NATIVE_FAILURE_EVIDENCE_BYTES;
+    input.redacted_log_tail = "x".repeat(MAX_NATIVE_FAILURE_EVIDENCE_BYTES + 1);
+
+    let error = NativeFailureEvidence::validate(input).expect_err("hard ceiling enforced");
+
+    assert_eq!(error, NativeFailureEvidenceError::EvidenceTooLarge);
+}
+
+#[test]
+fn accepts_exact_aggregate_evidence_boundary() {
+    let mut input = valid_input();
+    input.owner = "owner".to_string();
+    input.repo = "repo".to_string();
+    input.failing_step = None;
+    input.max_evidence_bytes = MAX_NATIVE_FAILURE_EVIDENCE_BYTES;
+    let fixed_bytes = input.owner.len() + input.repo.len() + input.commit_sha.len() + 8 + 8 + 1 + 1;
+    input.redacted_log_tail = "x".repeat(MAX_NATIVE_FAILURE_EVIDENCE_BYTES - fixed_bytes);
+
+    let evidence = NativeFailureEvidence::validate(input).expect("exact aggregate limit accepted");
+
+    assert_eq!(
+        evidence.redacted_log_tail().len() + fixed_bytes,
+        MAX_NATIVE_FAILURE_EVIDENCE_BYTES
+    );
+}
+
+#[test]
+fn rejects_one_byte_over_aggregate_evidence_boundary() {
+    let mut input = valid_input();
+    input.owner = "owner".to_string();
+    input.repo = "repo".to_string();
+    input.failing_step = None;
+    input.max_evidence_bytes = MAX_NATIVE_FAILURE_EVIDENCE_BYTES;
+    let fixed_bytes = input.owner.len() + input.repo.len() + input.commit_sha.len() + 8 + 8 + 1 + 1;
+    input.redacted_log_tail = "x".repeat(MAX_NATIVE_FAILURE_EVIDENCE_BYTES - fixed_bytes + 1);
+
+    let error = NativeFailureEvidence::validate(input).expect_err("aggregate limit rejected");
+
+    assert_eq!(error, NativeFailureEvidenceError::EvidenceTooLarge);
+}
+
+#[test]
+fn rejects_huge_identity_and_combined_fields_without_leaking_contents() {
+    for (field, value) in [
+        ("owner", "o".repeat(MAX_NATIVE_FAILURE_EVIDENCE_BYTES + 1)),
+        ("repo", "r".repeat(MAX_NATIVE_FAILURE_EVIDENCE_BYTES + 1)),
+    ] {
+        let mut input = valid_input();
+        input.max_evidence_bytes = MAX_NATIVE_FAILURE_EVIDENCE_BYTES;
+        match field {
+            "owner" => input.owner = value.clone(),
+            "repo" => input.repo = value.clone(),
+            _ => unreachable!("known field"),
+        }
+
+        let error = NativeFailureEvidence::validate(input).expect_err("huge identity rejected");
+
+        assert!(matches!(
+            error,
+            NativeFailureEvidenceError::InvalidOwner
+                | NativeFailureEvidenceError::InvalidRepo
+                | NativeFailureEvidenceError::EvidenceTooLarge
+        ));
+        assert!(!format!("{error}").contains(&value));
+        assert!(!format!("{error:?}").contains(&value));
+    }
+
+    let mut input = valid_input();
+    input.max_evidence_bytes = MAX_NATIVE_FAILURE_EVIDENCE_BYTES;
+    input.failing_step = Some("x".repeat(80));
+    input.redacted_log_tail = "y".repeat(MAX_NATIVE_FAILURE_EVIDENCE_BYTES);
+
+    let error = NativeFailureEvidence::validate(input).expect_err("combined fields rejected");
+
+    assert_eq!(error, NativeFailureEvidenceError::EvidenceTooLarge);
+}
+
+#[test]
 fn rejects_common_unredacted_secret_patterns() {
     for log in [
         "Authorization: Bearer sk-live-secret",
@@ -211,6 +304,33 @@ fn rejects_common_unredacted_secret_patterns() {
         assert_eq!(error, NativeFailureEvidenceError::UnredactedSecret);
         assert!(!format!("{error}").contains(log));
         assert!(!format!("{error:?}").contains(log));
+    }
+}
+
+#[test]
+fn rejects_invalid_failing_step_values_without_leaking_them() {
+    let oversized = "x".repeat(81);
+    for step in [
+        "",
+        " ",
+        "cargo\ntest",
+        "cargo\ttest",
+        "Authorization: Bearer secret",
+        "GITEA_TOKEN=secret-value",
+        "openai_api_key=sk-secret",
+        "op://Vault/Item/password",
+        oversized.as_str(),
+    ] {
+        let mut input = valid_input();
+        input.failing_step = Some(step.to_string());
+
+        let error = NativeFailureEvidence::validate(input).expect_err("invalid step rejected");
+
+        assert_eq!(error, NativeFailureEvidenceError::InvalidFailingStep);
+        for sensitive in ["secret", "sk-secret", "Vault/Item", &oversized] {
+            assert!(!format!("{error}").contains(sensitive));
+            assert!(!format!("{error:?}").contains(sensitive));
+        }
     }
 }
 
@@ -234,6 +354,8 @@ fn input_debug_redacts_secret_bearing_contract_fields() {
 
     assert!(debug.contains("owner: \"terraphim\""));
     assert!(debug.contains("redacted_log_tail: \"<redacted>\""));
+    assert!(debug.contains("failing_step: Some(\"<redacted>\")"));
+    assert!(!debug.contains("cargo test"));
     assert!(debug.contains("Other(\"<redacted>\")"));
     assert!(!debug.contains("debug-input-sentinel-secret-log"));
     assert!(!debug.contains("debug-input-sentinel-verdict"));
@@ -249,6 +371,8 @@ fn evidence_debug_redacts_secret_bearing_contract_fields() {
 
     assert!(debug.contains("owner: \"terraphim\""));
     assert!(debug.contains("redacted_log_tail: \"<redacted>\""));
+    assert!(debug.contains("failing_step: Some(\"<redacted>\")"));
+    assert!(!debug.contains("cargo test"));
     assert!(!debug.contains("debug-evidence-sentinel-secret-log"));
 }
 
@@ -294,10 +418,6 @@ fn evidence_digest_changes_when_semantic_fields_change() {
     cases.push(input);
 
     let mut input = valid_input();
-    input.failing_step = Some(String::new());
-    cases.push(input);
-
-    let mut input = valid_input();
     input.redacted_log_tail = "different failure output".to_string();
     cases.push(input);
 
@@ -316,12 +436,5 @@ fn evidence_digest_changes_when_semantic_fields_change() {
         .evidence_digest()
         .to_string();
 
-    let mut empty_step = valid_input();
-    empty_step.failing_step = Some(String::new());
-    let empty_digest = NativeFailureEvidence::validate(empty_step)
-        .expect("empty step evidence")
-        .evidence_digest()
-        .to_string();
-
-    assert_ne!(none_digest, empty_digest);
+    assert_ne!(none_digest, baseline);
 }

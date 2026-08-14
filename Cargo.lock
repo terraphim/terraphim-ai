@@ -5738,7 +5738,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
@@ -8954,7 +8954,8 @@ dependencies = [
 name = "terraphim_llm_runner"
 version = "1.21.0"
 dependencies = [
- "sha2 0.10.9",
+ "serde",
+ "serde_json",
  "tempfile",
  "terraphim_rlm",
  "thiserror 1.0.69",
@@ -9236,6 +9237,7 @@ dependencies = [
  "rmcp",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "terraphim-firecracker",
  "terraphim_agent_supervisor",

@@ -52,6 +52,7 @@
 // Core modules
 pub mod config;
 pub mod error;
+pub mod native_diagnostics;
 pub mod types;
 
 // Execution environment abstraction
@@ -105,6 +106,11 @@ pub use logger::{TrajectoryEvent, TrajectoryLogger, TrajectoryLoggerConfig, read
 pub use mcp_tools::{
     RlmBashResponse, RlmCodeResponse, RlmContextResponse, RlmMcpService, RlmQueryResponse,
     RlmSnapshotResponse,
+};
+pub use native_diagnostics::{
+    Diagnosis, DiagnosisKind, MAX_NATIVE_FAILURE_EVIDENCE_BYTES, NativeFailureEvidence,
+    NativeFailureEvidenceError, NativeFailureEvidenceInput, NativeVerdict, Probe, ProbeResult,
+    RemediationSuggestion, StepName, StepNameError, ValidatedNativeFailureEvidence,
 };
 pub use parser::CommandParser;
 pub use query_loop::{QueryLoop, QueryLoopConfig, QueryLoopResult, TerminationReason};

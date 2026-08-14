@@ -1,10 +1,7 @@
+use std::error::Error;
 use std::fs;
 
-use std::error::Error;
-
 use terraphim_llm_runner::{StrictDockerSandboxError, strict_docker_diagnostics_sandbox};
-use terraphim_rlm::config::BackendType;
-use terraphim_rlm::executor::ExecutionEnvironment;
 
 #[test]
 fn strict_docker_sandbox_rejects_invalid_checkout_without_leaking_source_chain() {
@@ -42,13 +39,11 @@ fn strict_docker_sandbox_public_api_is_opaque() {
 }
 
 #[tokio::test]
-#[ignore = "requires a reachable Docker daemon"]
-async fn strict_docker_sandbox_constructs_docker_executor_only() {
+#[ignore = "requires a reachable Docker daemon and locally pre-provisioned rust:1.96-bookworm"]
+async fn strict_docker_sandbox_constructs_with_preprovisioned_diagnostics_image() {
     let checkout = tempfile::tempdir().expect("checkout tempdir");
 
-    let executor = strict_docker_diagnostics_sandbox(checkout.path())
+    strict_docker_diagnostics_sandbox(checkout.path())
         .await
         .expect("strict docker executor");
-
-    assert_eq!(executor.backend_type(), BackendType::Docker);
 }

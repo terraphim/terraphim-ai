@@ -32,8 +32,8 @@ mod r#trait;
 pub use context::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
 #[cfg(feature = "docker-backend")]
 pub use docker::{
-    DockerExecutor, StrictDockerDiagnosticsSandbox, StrictDockerSandboxError,
-    strict_docker_diagnostics_sandbox,
+    DockerExecutor, ProbeExecutionLimits, ProbeExecutionLimitsError,
+    StrictDockerDiagnosticsSandbox, StrictDockerSandboxError, strict_docker_diagnostics_sandbox,
 };
 #[cfg(feature = "firecracker")]
 pub use firecracker::FirecrackerExecutor;
