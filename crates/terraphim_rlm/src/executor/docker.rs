@@ -536,6 +536,7 @@ fn strict_diagnostics_host_config(checkout_path: &Path) -> HostConfig {
         network_mode: Some("none".to_string()),
         readonly_rootfs: Some(true),
         privileged: Some(false),
+        security_opt: Some(vec!["no-new-privileges".to_string()]),
         devices: None,
         device_cgroup_rules: None,
         device_requests: None,
@@ -807,26 +808,6 @@ impl DockerExecutor {
         }
     }
 
-    #[cfg(test)]
-    fn strict_container_create_body_for_test(
-        profile: &StrictDockerDiagnosticsProfile,
-    ) -> ContainerCreateBody {
-        Self {
-            docker: Docker::connect_with_local_defaults()
-                .expect("constructing Docker client handle should not contact daemon"),
-            session_to_container: Arc::new(DashMap::new()),
-            strict_recovery: Arc::new(DashMap::new()),
-            strict_workers: Arc::new(DashMap::new()),
-            strict_shutting_down: Arc::new(AtomicBool::new(false)),
-            strict_spawn_lock: Arc::new(Mutex::new(())),
-            image: STRICT_DIAGNOSTICS_IMAGE.to_string(),
-            host_config: profile.host_config(),
-            capabilities: Vec::new(),
-            validator: None,
-        }
-        .container_create_body()
-    }
-
     async fn exec_in_container(
         &self,
         container_id: &str,
@@ -844,14 +825,14 @@ impl DockerExecutor {
     ) -> RlmResult<ExecutionResult> {
         let _spawn_guard = self.strict_spawn_lock.lock().await;
         if self.strict_shutting_down.load(Ordering::Acquire) {
-            return Err(strict_cleanup_failed());
+            return Err(strict_diagnostics_shutting_down());
         }
         if !self.strict_workers.is_empty() {
-            return Err(strict_cleanup_failed());
+            return Err(strict_diagnostics_busy());
         }
         self.retry_strict_recovery_records().await?;
         if !self.strict_recovery.is_empty() || !self.strict_workers.is_empty() {
-            return Err(strict_cleanup_failed());
+            return Err(strict_diagnostics_busy());
         }
 
         let session_id = SessionId::new();
@@ -1129,10 +1110,11 @@ where
                 .await?;
             let exec_config = strict_diagnostic_create_exec_options_owned(self.command.clone());
             let result = self
-                .phase(
-                    self.backend
-                        .exec_strict_container(&container_id, exec_config, self.limits),
-                )
+                .exec_phase(self.backend.exec_strict_container(
+                    &container_id,
+                    exec_config,
+                    self.limits,
+                ))
                 .await?;
             Ok(result)
         }
@@ -1195,6 +1177,18 @@ where
             .map_err(|_| strict_probe_timed_out())?
     }
 
+    async fn exec_phase<F>(&self, future: F) -> RlmResult<ExecutionResult>
+    where
+        F: std::future::Future<Output = RlmResult<ExecutionResult>>,
+    {
+        let Some(remaining) = self.deadline.checked_duration_since(TokioInstant::now()) else {
+            return Ok(strict_probe_timeout_result());
+        };
+        tokio::time::timeout(remaining, future)
+            .await
+            .unwrap_or_else(|_| Ok(strict_probe_timeout_result()))
+    }
+
     async fn cleanup(&self) -> RlmResult<()> {
         let Some(record) = self
             .recovery
@@ -1237,7 +1231,7 @@ where
     B: StrictDiagnosticLifecycleBackend,
 {
     if !workers.is_empty() {
-        return Err(strict_cleanup_failed());
+        return Err(strict_diagnostics_busy());
     }
     let records: Vec<_> = recovery
         .iter()
@@ -1269,12 +1263,7 @@ struct DockerStrictLifecycleBackend {
 #[async_trait]
 impl StrictDiagnosticLifecycleBackend for DockerStrictLifecycleBackend {
     async fn create_strict_container(&self, container_name: &str) -> RlmResult<String> {
-        let config = ContainerCreateBody {
-            image: Some(STRICT_DIAGNOSTICS_IMAGE.to_string()),
-            cmd: Some(vec!["sleep".to_string(), "infinity".to_string()]),
-            host_config: Some(self.host_config.clone()),
-            ..Default::default()
-        };
+        let config = strict_diagnostic_container_create_body(self.host_config.clone());
         let options = CreateContainerOptionsBuilder::new()
             .name(container_name)
             .build();
@@ -1340,6 +1329,27 @@ fn strict_cleanup_failed() -> RlmError {
     RlmError::Internal {
         message: "strict diagnostic cleanup failed".to_string(),
     }
+}
+
+fn strict_diagnostics_busy() -> RlmError {
+    RlmError::StrictDiagnosticsBusy
+}
+
+fn strict_diagnostics_shutting_down() -> RlmError {
+    RlmError::StrictDiagnosticsShuttingDown
+}
+
+fn strict_diagnostic_container_create_body(host_config: HostConfig) -> ContainerCreateBody {
+    ContainerCreateBody {
+        image: Some(STRICT_DIAGNOSTICS_IMAGE.to_string()),
+        cmd: Some(vec!["sleep".to_string(), "infinity".to_string()]),
+        host_config: Some(host_config),
+        ..Default::default()
+    }
+}
+
+fn strict_probe_timeout_result() -> ExecutionResult {
+    ExecutionResult::timeout(String::new(), String::new())
 }
 
 fn strict_probe_timed_out() -> RlmError {
@@ -1716,6 +1726,10 @@ mod tests {
         );
         assert_eq!(host_config.cap_add, None);
         assert_eq!(host_config.privileged, Some(false));
+        assert_eq!(
+            host_config.security_opt.as_deref(),
+            Some(&["no-new-privileges".to_string()][..])
+        );
         assert_eq!(host_config.devices, None);
         assert_eq!(host_config.device_cgroup_rules, None);
         assert_eq!(host_config.device_requests, None);
@@ -1984,7 +1998,7 @@ mod tests {
         let checkout = tempfile::tempdir().expect("checkout tempdir");
         let profile = StrictDockerDiagnosticsProfile::new(checkout.path()).expect("strict profile");
 
-        let body = DockerExecutor::strict_container_create_body_for_test(&profile);
+        let body = strict_diagnostic_container_create_body(profile.host_config());
 
         assert_eq!(body.host_config, Some(profile.host_config()));
         assert_eq!(body.env, None);
@@ -2133,6 +2147,7 @@ mod tests {
         pause_create: bool,
         fail_create: bool,
         block_start: bool,
+        block_exec: bool,
         fail_delete: bool,
         block_delete: bool,
     }
@@ -2147,6 +2162,7 @@ mod tests {
                 pause_create: false,
                 fail_create: false,
                 block_start: false,
+                block_exec: false,
                 fail_delete: false,
                 block_delete: false,
             }
@@ -2159,6 +2175,11 @@ mod tests {
 
         fn block_start(mut self) -> Self {
             self.block_start = true;
+            self
+        }
+
+        fn block_exec(mut self) -> Self {
+            self.block_exec = true;
             self
         }
 
@@ -2220,6 +2241,9 @@ mod tests {
                 .lock()
                 .expect("events lock")
                 .push(format!("exec:{container_id}"));
+            if self.block_exec {
+                std::future::pending::<()>().await;
+            }
             Ok(strict_test_execution_result(0, false))
         }
 
@@ -2326,6 +2350,60 @@ mod tests {
             events
                 .iter()
                 .any(|event| event == "delete:created-before-timeout:ContainerId")
+        );
+        assert!(recovery.is_empty());
+        assert!(workers.is_empty());
+    }
+
+    #[tokio::test]
+    async fn strict_worker_timeout_during_exec_deletes_bound_id_and_returns_typed_timeout_result() {
+        let backend = FakeStrictLifecycleBackend::new("created-before-exec-timeout").block_exec();
+        let recovery = Arc::new(DashMap::new());
+        let workers = Arc::new(DashMap::new());
+        let (worker, rx, _session_id) = fake_worker(
+            backend.clone(),
+            recovery.clone(),
+            workers.clone(),
+            TokioInstant::now() + Duration::from_millis(10),
+        );
+        tokio::spawn(worker.run());
+
+        let result = rx
+            .await
+            .expect("worker sends result")
+            .expect("exec timeout returns typed execution result after cleanup");
+
+        assert!(result.timed_out);
+        assert_eq!(result.exit_code, -1);
+        let evidence = crate::native_diagnostics::ValidatedNativeFailureEvidence::validate(
+            crate::native_diagnostics::NativeFailureEvidenceInput {
+                owner: "terraphim".to_string(),
+                repo: "terraphim-ai".to_string(),
+                commit_sha: "0123456789abcdef0123456789abcdef01234567".to_string(),
+                run_id: 1,
+                job_id: 2,
+                failing_step: Some("native diagnostics".to_string()),
+                verdict: crate::native_diagnostics::NativeVerdict::Failure,
+                redacted_log_tail: "probe timed out".to_string(),
+                max_evidence_bytes: 4096,
+            },
+        )
+        .expect("valid evidence");
+        let probe_result = ProbeResult::from_execution(Probe::CargoMetadataNoDeps, result);
+        let diagnosis = crate::native_diagnostics::Diagnosis::from_evidence_and_probes(
+            &evidence,
+            &[probe_result],
+        );
+        assert_eq!(
+            diagnosis.kind(),
+            &crate::native_diagnostics::DiagnosisKind::Timeout
+        );
+        let events = backend.events();
+        assert!(events[0].starts_with("create:terraphim-rlm-"));
+        assert!(
+            events
+                .iter()
+                .any(|event| event == "delete:created-before-exec-timeout:ContainerId")
         );
         assert!(recovery.is_empty());
         assert!(workers.is_empty());
@@ -2516,7 +2594,7 @@ mod tests {
             .await
             .expect_err("active worker blocks recovery retry");
 
-        assert!(matches!(error, RlmError::Internal { .. }));
+        assert!(matches!(error, RlmError::StrictDiagnosticsBusy));
         assert!(recovery.contains_key(&session_id));
         assert!(backend.events().is_empty());
     }
@@ -2580,7 +2658,7 @@ mod tests {
             .await
             .expect_err("active worker cap fails closed");
 
-        assert!(matches!(error, RlmError::Internal { .. }));
+        assert!(matches!(error, RlmError::StrictDiagnosticsBusy));
     }
 
     #[tokio::test]
@@ -2627,7 +2705,7 @@ mod tests {
         let canonical_checkout = checkout.path().canonicalize().expect("canonical checkout");
         let profile = StrictDockerDiagnosticsProfile::new(checkout.path()).expect("strict profile");
 
-        let body = DockerExecutor::strict_container_create_body_for_test(&profile);
+        let body = strict_diagnostic_container_create_body(profile.host_config());
         let value = serde_json::to_value(&body).expect("strict container request serializes");
 
         assert_eq!(
@@ -2655,6 +2733,10 @@ mod tests {
         assert_eq!(
             host_config.get("CapDrop").and_then(|v| v.as_array()),
             Some(&vec![serde_json::Value::String("ALL".to_string())])
+        );
+        assert_eq!(
+            host_config.get("SecurityOpt"),
+            Some(&serde_json::json!(["no-new-privileges"]))
         );
         assert!(
             host_config

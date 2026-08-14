@@ -185,6 +185,9 @@ impl Diagnosis {
         evidence: &ValidatedNativeFailureEvidence,
         probes: &[ProbeResult],
     ) -> Self {
+        // Validated evidence gates deterministic diagnostics. Correlating the
+        // mounted checkout to owner/repo/SHA is the caller or event adapter's
+        // responsibility unless a reliable local correlation signal is added.
         let kind = diagnose_kind(evidence, probes);
         let summary = bounded_summary(evidence.redacted_log_tail(), MAX_DIAGNOSIS_SUMMARY_BYTES);
         let remediations = remediations_for(&kind, evidence.failing_step());
