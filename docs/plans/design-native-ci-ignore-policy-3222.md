@@ -362,6 +362,7 @@ not implementation-scope expansion:
 |---|---|---|---|
 | D001 | `--include-ignored` can execute ignored tests but was absent from the forbidden-token list. | Phase 2.5 security/operations boundary | Reject `--include-ignored` alongside `--ignored`; prove the negative path with a temporary workflow mutation. |
 | D002 | Exact-count assertions did not reject an extra direct Cargo-test step or enforce the approved baseline → runner → companion order. | Phase 2 test strategy | Collect every directly invoked Cargo-test line after env stripping and assert that the ordered list equals exactly the three approved commands. |
+| D003 | Trybuild copies private-registry workspace entries into a scratch manifest outside the repository, so nested Cargo cannot discover `.cargo/config.toml` on a clean/native target. | Phase 1 environment assumption / Phase 2 command contract | Prefix only the LLM package-default step with the non-secret `CARGO_REGISTRIES_TERRAPHIM_INDEX` value; retain the same normalized direct Cargo command, token policy, target set, and ignored-test behavior. Prove clean-target RED without the prefix and GREEN with it. |
 
 Interpreter-wrapped Cargo commands and outright deletion of the baseline
 executor remain the documented review/branch-protection boundaries. No new

@@ -8,7 +8,7 @@
 
 - Combined design/specification: `docs/plans/design-native-ci-ignore-policy-3222.md`
 - Approval SHA-256: `ce6417e176bbf59480e5341d4488b8281e6dbf8b98916dfeaf700e2e2ea1d419`
-- Current post-review SHA-256: `2f40a11b3236c13769bd07976e9e06e07e52b3513fde0fa4039118ea6dcce143`
+- Current post-review SHA-256: `06bcab07f16825c336b33383e02aeaef446b3b7f9617dffc1c8b399aef2bcac8`
 - Frozen Phase 2 body SHA-256: `632acff377eff7053a397b11ce589c03b43b9241ab7880c10f374ab8dfbb83ca`
 
 ## Quality gate
@@ -36,3 +36,9 @@ enforce the exact ordered direct-Cargo-test set. D001/D002 in the specification
 appendix clarify those existing invariants without expanding the two-file
 implementation scope. Mutation-first evidence and final gate results are
 retained in `docs/plans/verification-native-ci-ignore-policy-3222.md`.
+
+Native validation then identified D003: trybuild scratch manifests do not inherit
+the repository-local private-registry index. The specification loop-back permits
+only a non-secret registry-index prefix on the existing LLM command; normalized
+command order, target selection, token handling, and the two-file implementation
+scope remain unchanged.

@@ -42,4 +42,4 @@ jobs:
       # Broad workspace `--all-targets` remains excluded from this merge gate (Refs #3222).
       - run: cargo test --workspace --lib --no-fail-fast
       - run: cargo test -p terraphim_gitea_runner --no-fail-fast
-      - run: cargo test -p terraphim_llm_runner --no-fail-fast
+      - run: CARGO_REGISTRIES_TERRAPHIM_INDEX=sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/ cargo test -p terraphim_llm_runner --no-fail-fast
