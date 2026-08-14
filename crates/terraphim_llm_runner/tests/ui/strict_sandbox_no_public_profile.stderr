@@ -1,0 +1,23 @@
+error[E0432]: unresolved import `terraphim_llm_runner::strict_docker_diagnostics_profile`
+ --> tests/ui/strict_sandbox_no_public_profile.rs:1:5
+  |
+1 | use terraphim_llm_runner::strict_docker_diagnostics_profile;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `strict_docker_diagnostics_profile` in the root
+  |
+help: a similar name exists in the module
+  |
+1 - use terraphim_llm_runner::strict_docker_diagnostics_profile;
+1 + use terraphim_llm_runner::strict_docker_diagnostics_sandbox;
+  |
+
+error[E0432]: unresolved import `terraphim_rlm::executor::StrictDockerDiagnosticsProfile`
+ --> tests/ui/strict_sandbox_no_public_profile.rs:2:5
+  |
+2 | use terraphim_rlm::executor::StrictDockerDiagnosticsProfile;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `StrictDockerDiagnosticsProfile` in `executor`
+  |
+help: a similar name exists in the module
+  |
+2 - use terraphim_rlm::executor::StrictDockerDiagnosticsProfile;
+2 + use terraphim_rlm::executor::StrictDockerDiagnosticsSandbox;
+  |

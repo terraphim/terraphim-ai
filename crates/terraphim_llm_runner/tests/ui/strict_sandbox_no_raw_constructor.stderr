@@ -1,0 +1,5 @@
+error[E0432]: unresolved import `terraphim_rlm::executor::new_strict_diagnostics`
+ --> tests/ui/strict_sandbox_no_raw_constructor.rs:1:5
+  |
+1 | use terraphim_rlm::executor::new_strict_diagnostics;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `new_strict_diagnostics` in `executor`
