@@ -37,7 +37,9 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo build --workspace
-      # Deliberate scope: `--lib` only. Widening to `--all-targets` changes both
-      # the runtime budget and the failure semantics of the merge gate, and is
-      # tracked separately rather than folded into this recovery (Refs #3222).
+      # Deliberate scope: the workspace `--lib` command remains the stable baseline.
+      # Targeted package-default runner/companion commands close known deterministic contract gaps.
+      # Broad workspace `--all-targets` remains excluded from this merge gate (Refs #3222).
       - run: cargo test --workspace --lib --no-fail-fast
+      - run: cargo test -p terraphim_gitea_runner --no-fail-fast
+      - run: cargo test -p terraphim_llm_runner --no-fail-fast
