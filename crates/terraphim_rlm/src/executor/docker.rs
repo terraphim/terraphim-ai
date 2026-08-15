@@ -551,11 +551,13 @@ fn strict_diagnostics_host_config(checkout_path: &Path) -> HostConfig {
                 tmpfs_options: Some(MountTmpfsOptions {
                     size_bytes: Some(STRICT_DIAGNOSTICS_TMPFS_BYTES),
                     mode: None,
-                    options: Some(vec![
-                        vec!["noexec".to_string()],
-                        vec!["nosuid".to_string()],
-                        vec!["nodev".to_string()],
-                    ]),
+                    // Docker 28.3+ rejects `nosuid`/`nodev` tmpfs options at
+                    // container create ("invalid mount config for type tmpfs"),
+                    // which previously made the strict profile unstartable.
+                    // `noexec` + 64 MiB cap are retained; `nosuid`/`nodev` add
+                    // nothing here because all capabilities are dropped (no
+                    // CAP_MKNOD) and the rootfs is read-only.
+                    options: Some(vec![vec!["noexec".to_string()]]),
                 }),
                 ..Default::default()
             },
@@ -1752,11 +1754,7 @@ mod tests {
         assert_eq!(tmpfs.size_bytes, Some(STRICT_DIAGNOSTICS_TMPFS_BYTES));
         assert_eq!(
             tmpfs.options.as_ref().expect("tmpfs flags"),
-            &vec![
-                vec!["noexec".to_string()],
-                vec!["nosuid".to_string()],
-                vec!["nodev".to_string()]
-            ]
+            &vec![vec!["noexec".to_string()]]
         );
 
         let checkout_mount = mounts
@@ -2801,10 +2799,7 @@ mod tests {
             tmpfs.get("SizeBytes").and_then(|v| v.as_i64()),
             Some(STRICT_DIAGNOSTICS_TMPFS_BYTES)
         );
-        assert_eq!(
-            tmpfs.get("Options"),
-            Some(&serde_json::json!([["noexec"], ["nosuid"], ["nodev"]]))
-        );
+        assert_eq!(tmpfs.get("Options"), Some(&serde_json::json!([["noexec"]])));
 
         let checkout_mount = mounts
             .iter()
