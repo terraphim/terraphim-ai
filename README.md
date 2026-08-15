@@ -614,6 +614,11 @@ docker run ghcr.io/terraphim/terraphim-server:latest
 #### Direct Download
 Download pre-built binaries from [GitHub Releases](https://github.com/terraphim/terraphim-ai/releases).
 
+> **Note for fleet-internal agents:** GitHub Releases and crates.io are **not** the fleet-canonical
+> channel for `terraphim_grep` and `terraphim_agent` — they track behind the private Gitea cargo
+> registry. See [Release Channels](docs/src/release-channels.md) before reporting a version mismatch
+> as a release failure.
+
 ### Development Setup
 
 For development, see our comprehensive [Development Setup Guide](docs/src/development-setup.md) which covers:
