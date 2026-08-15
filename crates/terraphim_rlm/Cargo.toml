@@ -81,12 +81,15 @@ required-features = ["cli"]
 
 [features]
 default = ["full"]
-full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "mcp", "cli"]
+full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "apple-container-backend", "e2b-backend", "mcp", "cli"]
 llm = ["dep:terraphim_service", "dep:terraphim_config"]
 kg-validation = ["dep:terraphim_automata", "dep:terraphim_types", "dep:terraphim_rolegraph"]
 supervision = ["dep:terraphim_agent_supervisor"]
 llm-bridge = ["dep:hyper", "dep:hyper-util"]
 docker-backend = ["dep:bollard"]
+# Apple `container` CLI backend (macOS 26 / Apple silicon at runtime).
+# Pure CLI adapter: compiles everywhere, no extra third-party dependency.
+apple-container-backend = []
 firecracker = ["dep:terraphim-firecracker"]
 e2b-backend = ["dep:reqwest"]
 mcp = ["dep:rmcp", "dep:terraphim_mcp_search", "dep:terraphim_types"]
