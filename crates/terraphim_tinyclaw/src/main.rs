@@ -238,7 +238,9 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
                 scheduler: Some(&config.scheduler),
                 homeassistant: Some(&config.homeassistant),
                 vision: Some(&config.vision),
-                ..Default::default()
+                image_gen: Some(&config.image_gen),
+                tts: Some(&config.tts),
+                moa: Some(&config.moa),
             },
         )
         .await,
@@ -313,7 +315,9 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
                 scheduler: Some(&config.scheduler),
                 homeassistant: Some(&config.homeassistant),
                 vision: Some(&config.vision),
-                ..Default::default()
+                image_gen: Some(&config.image_gen),
+                tts: Some(&config.tts),
+                moa: Some(&config.moa),
             },
         )
         .await,

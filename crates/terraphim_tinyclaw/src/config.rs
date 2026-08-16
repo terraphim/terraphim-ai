@@ -1389,7 +1389,7 @@ pub struct ImageGenConfig {
 }
 
 fn default_image_model() -> String {
-    "fal-ai/flux-pro/v1.1-ultra".to_string()
+    "fal-ai/flux-2-pro".to_string()
 }
 
 fn default_image_base_url() -> String {

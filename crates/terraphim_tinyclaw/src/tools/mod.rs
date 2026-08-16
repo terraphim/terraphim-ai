@@ -10,6 +10,7 @@ pub mod edit;
 pub mod filesystem;
 pub mod fuzzy_match;
 pub mod homeassistant;
+pub mod image_generation;
 pub mod interrupt;
 pub mod patch_parser;
 pub mod process_registry;
@@ -305,6 +306,13 @@ pub async fn create_default_registry_with_parity(
         && cfg.available()
     {
         registry.register(Box::new(crate::tools::vision::VisionTool::from_config(cfg)));
+    }
+    if let Some(cfg) = parity.image_gen
+        && cfg.available()
+    {
+        registry.register(Box::new(
+            crate::tools::image_generation::ImageGenerateTool::from_config(cfg),
+        ));
     }
 
     registry
