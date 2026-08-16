@@ -1,14 +1,29 @@
 //! Tool registry and implementations for TinyClaw agent.
 
 pub mod agent_memory;
+pub mod approval;
 pub mod browser;
+pub mod clarify;
+pub mod clipboard;
+pub mod debug_helpers;
 pub mod edit;
 pub mod filesystem;
+pub mod fuzzy_match;
+pub mod homeassistant;
+pub mod image_generation;
+pub mod interrupt;
+pub mod moa;
+pub mod patch_parser;
+pub mod process_registry;
+pub mod rl_training;
 pub mod sandbox;
 pub mod scheduler;
 pub mod session_tools;
 pub mod shell;
 pub mod subagent;
+pub mod todo;
+pub mod tts;
+pub mod vision;
 pub mod voice_transcribe;
 pub mod web;
 
@@ -186,32 +201,47 @@ pub async fn create_default_registry(
         sessions,
         web_tools_config,
         memory_config,
-        None,
-        None,
-        None,
-        None,
+        ParityConfig::default(),
     )
     .await
 }
 
+/// Bundled Hermes-parity tool configuration.
+#[derive(Default)]
+pub struct ParityConfig<'a> {
+    pub sandbox: Option<&'a crate::config::SandboxConfig>,
+    pub subagent: Option<&'a crate::config::SubagentConfig>,
+    pub browser: Option<&'a crate::config::BrowserConfig>,
+    pub scheduler: Option<&'a crate::config::SchedulerConfig>,
+    pub homeassistant: Option<&'a crate::config::HomeAssistantConfig>,
+    pub vision: Option<&'a crate::config::VisionConfig>,
+    pub image_gen: Option<&'a crate::config::ImageGenConfig>,
+    pub tts: Option<&'a crate::config::TtsConfig>,
+    pub moa: Option<&'a crate::config::MoaConfig>,
+    pub rl: Option<&'a crate::config::RlConfig>,
+}
+
 /// Create a standard tool registry including the Hermes-parity tools
-/// (sandbox / subagent / browser) when their configs are enabled.
+/// (sandbox / subagent / browser / scheduler / homeassistant / vision /
+/// image_gen / tts / moa) when their configs are enabled.
 pub async fn create_default_registry_with_parity(
     sessions: Option<std::sync::Arc<tokio::sync::Mutex<crate::session::SessionManager>>>,
     web_tools_config: Option<&crate::config::WebToolsConfig>,
     memory_config: Option<&crate::config::MemoryConfig>,
-    sandbox_config: Option<&crate::config::SandboxConfig>,
-    subagent_config: Option<&crate::config::SubagentConfig>,
-    browser_config: Option<&crate::config::BrowserConfig>,
-    scheduler_config: Option<&crate::config::SchedulerConfig>,
+    parity: ParityConfig<'_>,
 ) -> ToolRegistry {
     use crate::tools::agent_memory::{
         AgentMemoryConfig, LearnCaptureTool, MemoryApplyTool, MemoryCaptureTool, MemoryRetrieveTool,
     };
+    use crate::tools::clarify::ClarifyTool;
+    use crate::tools::clipboard::ClipboardTool;
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
+    use crate::tools::patch_parser::PatchParseTool;
+    use crate::tools::process_registry::{ProcessRegistry, ProcessTool};
     use crate::tools::session_tools::{SessionHistoryTool, SessionListTool, SessionSendTool};
     use crate::tools::shell::ShellTool;
+    use crate::tools::todo::{TodoStore, TodoTool};
     use crate::tools::voice_transcribe::VoiceTranscribeTool;
     use crate::tools::web::{WebFetchTool, WebSearchTool};
 
@@ -222,6 +252,15 @@ pub async fn create_default_registry_with_parity(
     registry.register(Box::new(WebSearchTool::from_config(web_tools_config)));
     registry.register(Box::new(WebFetchTool::from_config(web_tools_config)));
     registry.register(Box::new(VoiceTranscribeTool::new()));
+    registry.register(Box::new(TodoTool::new(std::sync::Arc::new(
+        TodoStore::new(),
+    ))));
+    registry.register(Box::new(PatchParseTool::new()));
+    registry.register(Box::new(ClarifyTool::new()));
+    registry.register(Box::new(ClipboardTool::new()));
+    registry.register(Box::new(ProcessTool::new(std::sync::Arc::new(
+        ProcessRegistry::new(),
+    ))));
 
     // Register session tools if SessionManager is provided
     if let Some(sessions) = sessions {
@@ -241,9 +280,10 @@ pub async fn create_default_registry_with_parity(
         registry.register(Box::new(LearnCaptureTool::new(agent_mem_cfg)));
     }
 
-    // Register Hermes-parity tools (sandbox / subagent / browser).
-    // Each is off by default; enabled via tinyclaw.toml sections.
-    if let Some(cfg) = sandbox_config
+    // Register Hermes-parity tools (sandbox / subagent / browser / scheduler /
+    // homeassistant / vision / image_gen / tts / moa). Each is off by default;
+    // enabled via tinyclaw.toml sections.
+    if let Some(cfg) = parity.sandbox
         && cfg.enabled
     {
         match crate::tools::sandbox::SandboxTool::from_config(cfg).await {
@@ -251,14 +291,14 @@ pub async fn create_default_registry_with_parity(
             Err(e) => log::warn!("sandbox tool disabled: {}", e),
         }
     }
-    if let Some(cfg) = subagent_config
+    if let Some(cfg) = parity.subagent
         && cfg.enabled
     {
         registry.register(Box::new(crate::tools::subagent::SubagentTool::from_config(
             cfg,
         )));
     }
-    if let Some(cfg) = browser_config
+    if let Some(cfg) = parity.browser
         && cfg.enabled
     {
         match crate::tools::browser::BrowserTool::from_config(cfg) {
@@ -266,13 +306,53 @@ pub async fn create_default_registry_with_parity(
             Err(e) => log::warn!("browser tool disabled: {}", e),
         }
     }
-    if let Some(cfg) = scheduler_config
+    if let Some(cfg) = parity.scheduler
         && cfg.enabled
     {
         match crate::tools::scheduler::ScheduleTool::from_config(cfg).await {
             Ok(tool) => registry.register(Box::new(tool)),
             Err(e) => log::warn!("schedule tool disabled: {}", e),
         }
+    }
+    if let Some(cfg) = parity.homeassistant
+        && cfg.available()
+    {
+        for tool in crate::tools::homeassistant::build_tools(cfg) {
+            registry.register(tool);
+        }
+    }
+    if let Some(cfg) = parity.vision
+        && cfg.available()
+    {
+        registry.register(Box::new(crate::tools::vision::VisionTool::from_config(cfg)));
+    }
+    if let Some(cfg) = parity.image_gen
+        && cfg.available()
+    {
+        registry.register(Box::new(
+            crate::tools::image_generation::ImageGenerateTool::from_config(cfg),
+        ));
+    }
+    if let Some(cfg) = parity.tts
+        && cfg.available()
+    {
+        registry.register(Box::new(crate::tools::tts::TextToSpeechTool::from_config(
+            cfg,
+        )));
+    }
+    if let Some(cfg) = parity.moa
+        && cfg.available()
+    {
+        registry.register(Box::new(
+            crate::tools::moa::MixtureOfAgentsTool::from_config(cfg),
+        ));
+    }
+    if let Some(cfg) = parity.rl
+        && cfg.available()
+    {
+        registry.register(Box::new(
+            crate::tools::rl_training::RlCheckStatusTool::from_config(cfg),
+        ));
     }
 
     registry

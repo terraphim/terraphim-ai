@@ -4,8 +4,12 @@
 
 mod common;
 
-use terraphim_tinyclaw::config::{Config, ToolsConfig, WebToolsConfig};
-use terraphim_tinyclaw::tools::create_default_registry;
+use terraphim_tinyclaw::config::{
+    Config, HomeAssistantConfig, ToolsConfig, VisionConfig, WebToolsConfig,
+};
+use terraphim_tinyclaw::tools::{
+    ParityConfig, create_default_registry, create_default_registry_with_parity,
+};
 
 /// Test that web tools configuration is wired through to the registry.
 #[tokio::test]
@@ -74,6 +78,11 @@ async fn test_all_expected_tools_registered() {
         "web_search",
         "web_fetch",
         "voice_transcribe",
+        "todo",
+        "patch_parse",
+        "clarify",
+        "process",
+        "clipboard",
     ];
 
     for tool_name in &expected_tools {
@@ -83,4 +92,88 @@ async fn test_all_expected_tools_registered() {
             tool_name
         );
     }
+}
+
+/// Test that Home Assistant tools are gated by `enabled` + token.
+#[tokio::test]
+async fn test_homeassistant_tools_gated_by_config() {
+    common::scrub_env();
+
+    // Disabled by default: no HA tools.
+    let registry = create_default_registry(None, None, None).await;
+    assert!(registry.get("ha_list_entities").is_none());
+
+    // Enabled + token: HA tools registered.
+    let cfg = HomeAssistantConfig {
+        enabled: true,
+        url: "http://ha.local:8123".into(),
+        token: "secret".into(),
+    };
+    let registry = create_default_registry_with_parity(
+        None,
+        None,
+        None,
+        ParityConfig {
+            homeassistant: Some(&cfg),
+            ..Default::default()
+        },
+    )
+    .await;
+    for name in [
+        "ha_list_entities",
+        "ha_get_state",
+        "ha_list_services",
+        "ha_call_service",
+    ] {
+        assert!(
+            registry.get(name).is_some(),
+            "HA tool '{}' should be registered",
+            name
+        );
+    }
+
+    // Enabled but no token: no HA tools.
+    let cfg_no_token = HomeAssistantConfig {
+        enabled: true,
+        ..Default::default()
+    };
+    let registry = create_default_registry_with_parity(
+        None,
+        None,
+        None,
+        ParityConfig {
+            homeassistant: Some(&cfg_no_token),
+            ..Default::default()
+        },
+    )
+    .await;
+    assert!(registry.get("ha_list_entities").is_none());
+}
+
+/// Test that the vision tool is gated by `enabled` + api_key.
+#[tokio::test]
+async fn test_vision_tool_gated_by_config() {
+    common::scrub_env();
+
+    // Disabled by default: no vision tool.
+    let registry = create_default_registry(None, None, None).await;
+    assert!(registry.get("vision_analyze").is_none());
+
+    // Enabled + key: vision tool registered.
+    let cfg = VisionConfig {
+        enabled: true,
+        api_key: "k".into(),
+        ..Default::default()
+    };
+    let registry = create_default_registry_with_parity(
+        None,
+        None,
+        None,
+        ParityConfig {
+            vision: Some(&cfg),
+            ..Default::default()
+        },
+    )
+    .await;
+    assert!(registry.get("vision_analyze").is_some());
 }
