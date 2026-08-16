@@ -10,6 +10,7 @@ pub mod filesystem;
 pub mod fuzzy_match;
 pub mod interrupt;
 pub mod patch_parser;
+pub mod process_registry;
 pub mod sandbox;
 pub mod scheduler;
 pub mod session_tools;
@@ -204,6 +205,7 @@ pub async fn create_default_registry_with_parity(
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
     use crate::tools::patch_parser::PatchParseTool;
+    use crate::tools::process_registry::{ProcessRegistry, ProcessTool};
     use crate::tools::session_tools::{SessionHistoryTool, SessionListTool, SessionSendTool};
     use crate::tools::shell::ShellTool;
     use crate::tools::todo::{TodoStore, TodoTool};
@@ -222,6 +224,9 @@ pub async fn create_default_registry_with_parity(
     ))));
     registry.register(Box::new(PatchParseTool::new()));
     registry.register(Box::new(ClarifyTool::new()));
+    registry.register(Box::new(ProcessTool::new(std::sync::Arc::new(
+        ProcessRegistry::new(),
+    ))));
 
     // Register session tools if SessionManager is provided
     if let Some(sessions) = sessions {

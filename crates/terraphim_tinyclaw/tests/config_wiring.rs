@@ -76,6 +76,8 @@ async fn test_all_expected_tools_registered() {
         "voice_transcribe",
         "todo",
         "patch_parse",
+        "clarify",
+        "process",
     ];
 
     for tool_name in &expected_tools {
