@@ -12,6 +12,7 @@ pub mod fuzzy_match;
 pub mod homeassistant;
 pub mod image_generation;
 pub mod interrupt;
+pub mod moa;
 pub mod patch_parser;
 pub mod process_registry;
 pub mod sandbox;
@@ -321,6 +322,13 @@ pub async fn create_default_registry_with_parity(
         registry.register(Box::new(crate::tools::tts::TextToSpeechTool::from_config(
             cfg,
         )));
+    }
+    if let Some(cfg) = parity.moa
+        && cfg.available()
+    {
+        registry.register(Box::new(
+            crate::tools::moa::MixtureOfAgentsTool::from_config(cfg),
+        ));
     }
 
     registry
