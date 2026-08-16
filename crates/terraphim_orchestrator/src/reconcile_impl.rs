@@ -222,7 +222,7 @@ impl AgentOrchestrator {
         self.tick_count = self.tick_count.wrapping_add(1);
 
         // 15. Periodic telemetry persistence (every 60 ticks = ~5 min at 5s interval)
-        if self.tick_count % 60 == 0 {
+        if self.tick_count.is_multiple_of(60) {
             self.persist_telemetry();
         }
 
@@ -237,7 +237,10 @@ impl AgentOrchestrator {
         }
 
         // Archive stale learnings periodically
-        if self.tick_count % self.learning_config.consolidation_ticks == 0 {
+        if self
+            .tick_count
+            .is_multiple_of(self.learning_config.consolidation_ticks)
+        {
             if let Some(ref store) = self.learning_store {
                 match tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current()
@@ -319,7 +322,10 @@ impl AgentOrchestrator {
         // branch protection, classify each open PR head, and take action
         // (enqueue missing agents, open remediation issues, or clear for
         // auto-merge). Runs every N ticks to avoid excessive API load.
-        if self.tick_count % self.config.gate_reconcile_interval_ticks as u64 == 0 {
+        if self
+            .tick_count
+            .is_multiple_of(self.config.gate_reconcile_interval_ticks as u64)
+        {
             if let Err(e) = self.reconcile_pr_gates().await {
                 warn!(error = %e, "reconcile_pr_gates failed");
             }

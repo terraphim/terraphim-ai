@@ -318,7 +318,7 @@ fn resolve_agent<'a>(
             request
                 .project
                 .as_deref()
-                .map_or(true, |project| agent.project.as_deref() == Some(project))
+                .is_none_or(|project| agent.project.as_deref() == Some(project))
         })
         .collect::<Vec<_>>();
 
