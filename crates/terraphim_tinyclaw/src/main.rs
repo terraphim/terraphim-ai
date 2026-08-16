@@ -891,7 +891,10 @@ mod backend_gate_tests {
         config.memory.enabled = true;
         config.memory.backend = "sqlite".to_string();
         config.memory.allow_sqlite_backend = true;
-        assert_eq!(choose_session_backend(&config), SessionBackendChoice::Sqlite);
+        assert_eq!(
+            choose_session_backend(&config),
+            SessionBackendChoice::Sqlite
+        );
     }
 
     /// Memory disabled: sqlite is never selected regardless of flags.
