@@ -4,6 +4,11 @@
 # Conforms to private/cto-executive-system 2026-08-14-adf-agent-fleet-enablement.md:
 #   - no `schedule = "on_demand"` (Growth/Safety agents OMIT schedule entirely)
 #   - cli_tool is never plain `pi` (pi-rust symlink for coding agents)
+#   - cli_tool paths use ${HOME}/.local/bin/pi-rust — the standard per-user
+#     install location, env-expanded at config load so the cli_tool probe sees
+#     a literal absolute path (bare `~` is NOT expanded by the probe). On hosts
+#     that install pi-rust at /usr/local/bin/pi-rust instead, override via the
+#     AGENT_CLI_OVERRIDE mechanism or update these paths.
 #   - models: kimi-for-coding/k3, minimax-coding-plan/MiniMax-M3,
 #     zai-coding-plan/glm-5.2 only (k2p5 and M2.5 are sunset)
 #   - relative paths only (working dirs relative to repo root)
@@ -77,10 +82,10 @@ repo = "terraphim-ai"
 [[agents]]
 name = "developer"
 layer = "Core"
-cli_tool = "/usr/local/bin/pi-rust"
+cli_tool = "${HOME}/.local/bin/pi-rust"
 model = "kimi-for-coding/k3"
 fallback_model = "zai-coding-plan/glm-5.2"
-fallback_provider = "/usr/local/bin/pi-rust"
+fallback_provider = "${HOME}/.local/bin/pi-rust"
 persona = "ferrox"
 terraphim_role = "Terraphim AI Developer"
 skill_chain = ["disciplined-research", "disciplined-design", "disciplined-implementation", "testing"]
@@ -160,10 +165,10 @@ source ~/.profile
 [[agents]]
 name = "reviewer-2"
 layer = "Core"
-cli_tool = "/usr/local/bin/pi-rust"
+cli_tool = "${HOME}/.local/bin/pi-rust"
 model = "minimax-coding-plan/MiniMax-M3"
 fallback_model = "kimi-for-coding/k3"
-fallback_provider = "/usr/local/bin/pi-rust"
+fallback_provider = "${HOME}/.local/bin/pi-rust"
 persona = "conduit"
 terraphim_role = "Terraphim AI Reviewer"
 skill_chain = ["disciplined-research", "code-review"]
@@ -242,10 +247,10 @@ statuses.
 [[agents]]
 name = "merge-coordinator"
 layer = "Growth"
-cli_tool = "/usr/local/bin/pi-rust"
+cli_tool = "${HOME}/.local/bin/pi-rust"
 model = "kimi-for-coding/k3"
 fallback_model = "zai-coding-plan/glm-5.2"
-fallback_provider = "/usr/local/bin/pi-rust"
+fallback_provider = "${HOME}/.local/bin/pi-rust"
 persona = "conduit"
 terraphim_role = "Terraphim AI Merge Coordinator"
 skill_chain = ["disciplined-research", "disciplined-verification"]

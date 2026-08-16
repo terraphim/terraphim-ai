@@ -20,7 +20,7 @@ timeout_secs = 3600
 [[steps]]
 name = "implement"
 kind = "agent"
-cli_tool = "/usr/local/bin/pi-rust"
+cli_tool = "${HOME}/.local/bin/pi-rust"
 model = "kimi-for-coding/k3"
 persona = "ferrox"
 task = '''
@@ -71,7 +71,7 @@ on_fail = "abort"
 [[steps]]
 name = "merge"
 kind = "agent"
-cli_tool = "/usr/local/bin/pi-rust"
+cli_tool = "${HOME}/.local/bin/pi-rust"
 model = "kimi-for-coding/k3"
 persona = "conduit"
 task = '''
