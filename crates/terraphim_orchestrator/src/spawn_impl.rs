@@ -520,6 +520,23 @@ impl AgentOrchestrator {
         // Pre-create temp log path so the spawner can write stderr directly
         // to disk, giving us a durable fallback if the broadcast drain lags.
         let _ = std::fs::create_dir_all(&self.agent_log_dir);
+
+        // Ensure the agent's working directory exists before spawning. The
+        // spawner's AgentValidator rejects a missing working_dir, and we must
+        // NOT rely on agent_log_dir's create_dir_all as a side-effect: on
+        // production hosts agent_log_dir points at /opt/ai-dark-factory/logs/agents
+        // (a sibling of, not a child of, the config working_dir), which would
+        // leave a synthetic test working_dir (e.g. /tmp/test-orchestrator)
+        // uncreated and abort the spawn on the CI runner.
+        if let Err(e) = std::fs::create_dir_all(&agent_working_dir) {
+            warn!(
+                agent = %def.name,
+                dir = %agent_working_dir.display(),
+                error = %e,
+                "failed to create agent working dir"
+            );
+        }
+
         let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
         let stderr_tmp_name = format!(".tmp-{}-{}.stderr.log", def.name, ts);
         let stderr_tmp_path = self.agent_log_dir.join(&stderr_tmp_name);

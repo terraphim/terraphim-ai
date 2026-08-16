@@ -842,9 +842,23 @@ impl AgentSpawner {
         if effective_stdin {
             if let Some(mut stdin) = child.stdin.take() {
                 use tokio::io::AsyncWriteExt;
-                stdin.write_all(task.as_bytes()).await.map_err(|e| {
-                    SpawnerError::SpawnError(format!("failed to write prompt to stdin: {}", e))
-                })?;
+                if let Err(e) = stdin.write_all(task.as_bytes()).await {
+                    // BrokenPipe means the child exited before consuming stdin
+                    // (e.g. a short-lived CLI tool). The process itself spawned
+                    // successfully; treat early exit as non-fatal here and let
+                    // early-exit/health detection handle it, instead of failing
+                    // the whole spawn.
+                    if e.kind() != std::io::ErrorKind::BrokenPipe {
+                        return Err(SpawnerError::SpawnError(format!(
+                            "failed to write prompt to stdin: {}",
+                            e
+                        )));
+                    }
+                    tracing::debug!(
+                        agent = %config.agent_id,
+                        "child exited before consuming stdin; ignoring BrokenPipe"
+                    );
+                }
                 // Drop stdin to close the pipe (signals EOF to the child)
             }
         }

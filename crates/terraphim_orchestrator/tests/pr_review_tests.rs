@@ -123,7 +123,10 @@ fn evaluate_rejects_human_author() {
     let v = parse_verdict(&load("go_5_5_clean.md"), 101).unwrap();
     let mut pr = agent_pr(120);
     pr.author_login = "alex".to_string();
-    assert!(!author_is_agent(&pr.author_login));
+    assert!(!author_is_agent(
+        &pr.author_login,
+        &std::collections::BTreeSet::new()
+    ));
 
     match evaluate(&v, &pr, &AutoMergeCriteria::default()) {
         AutoMergeDecision::HumanReviewNeeded(reason) => {
