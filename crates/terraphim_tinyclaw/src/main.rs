@@ -241,6 +241,7 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
                 image_gen: Some(&config.image_gen),
                 tts: Some(&config.tts),
                 moa: Some(&config.moa),
+                rl: Some(&config.rl),
             },
         )
         .await,
@@ -318,6 +319,7 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
                 image_gen: Some(&config.image_gen),
                 tts: Some(&config.tts),
                 moa: Some(&config.moa),
+                rl: Some(&config.rl),
             },
         )
         .await,

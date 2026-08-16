@@ -84,6 +84,12 @@ pub struct Config {
     /// When `moa.enabled = true`, the `mixture_of_agents` tool registers.
     #[serde(default)]
     pub moa: MoaConfig,
+
+    /// RL training configuration. **Default: disabled.**
+    /// When `rl.enabled = true`, the `rl_check_status` tool registers to poll
+    /// a rollout server's status endpoint.
+    #[serde(default)]
+    pub rl: RlConfig,
 }
 
 impl Config {
@@ -1521,6 +1527,40 @@ impl Default for MoaConfig {
 impl MoaConfig {
     pub fn available(&self) -> bool {
         self.enabled && !self.api_key.is_empty() && !self.reference_models.is_empty()
+    }
+}
+
+/// RL training configuration (Hermes parity, partial).
+///
+/// **Default behaviour: disabled.** The full veRL training orchestration from
+/// Hermes `rl_training_tool.py` is a deliberate non-goal (deeply coupled to
+/// Python/ray/wandb). This config exposes a monitorable `rl_check_status` tool
+/// that polls a rollout server's status endpoint.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RlConfig {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default = "default_rl_server_url")]
+    pub rollout_server_url: String,
+}
+
+fn default_rl_server_url() -> String {
+    "http://localhost:8000".to_string()
+}
+
+impl Default for RlConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            rollout_server_url: default_rl_server_url(),
+        }
+    }
+}
+
+impl RlConfig {
+    pub fn available(&self) -> bool {
+        self.enabled
     }
 }
 

@@ -15,6 +15,7 @@ pub mod interrupt;
 pub mod moa;
 pub mod patch_parser;
 pub mod process_registry;
+pub mod rl_training;
 pub mod sandbox;
 pub mod scheduler;
 pub mod session_tools;
@@ -202,6 +203,7 @@ pub struct ParityConfig<'a> {
     pub image_gen: Option<&'a crate::config::ImageGenConfig>,
     pub tts: Option<&'a crate::config::TtsConfig>,
     pub moa: Option<&'a crate::config::MoaConfig>,
+    pub rl: Option<&'a crate::config::RlConfig>,
 }
 
 /// Create a standard tool registry including the Hermes-parity tools
@@ -328,6 +330,13 @@ pub async fn create_default_registry_with_parity(
     {
         registry.register(Box::new(
             crate::tools::moa::MixtureOfAgentsTool::from_config(cfg),
+        ));
+    }
+    if let Some(cfg) = parity.rl
+        && cfg.available()
+    {
+        registry.register(Box::new(
+            crate::tools::rl_training::RlCheckStatusTool::from_config(cfg),
         ));
     }
 
