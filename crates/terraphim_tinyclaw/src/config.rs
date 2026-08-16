@@ -1074,6 +1074,20 @@ pub struct MemoryConfig {
     /// to `"jsonl"`.
     #[serde(default = "default_memory_backend")]
     pub backend: String,
+
+    /// Explicit opt-in for the `"sqlite"` session backend. **Default:
+    /// `false`.**
+    ///
+    /// The sqlite path currently persists session state through
+    /// `DeviceStorage` while session *tools* (session_history,
+    /// session_send, …) still read the jsonl `SessionManager` — a known
+    /// split-brain session state (#3227 review P1). When this flag is
+    /// `false`, a requested `backend = "sqlite"` is rejected with a
+    /// warning and the loop falls back to jsonl, so the split-brain can
+    /// only occur when a user deliberately opts in. Set to `true` only
+    /// if you accept that caveat.
+    #[serde(default)]
+    pub allow_sqlite_backend: bool,
 }
 
 fn default_agent_binary() -> String {
@@ -1101,6 +1115,7 @@ impl Default for MemoryConfig {
             timeout_secs: default_memory_timeout(),
             max_context_chars: default_max_context_chars(),
             backend: default_memory_backend(),
+            allow_sqlite_backend: false,
         }
     }
 }
@@ -1397,6 +1412,31 @@ enabled = true
         assert!(cfg.role.is_none());
         assert_eq!(cfg.binary, "terraphim-agent");
         assert_eq!(cfg.timeout_secs, 10);
+    }
+
+    #[test]
+    fn memory_config_sqlite_gate_defaults_closed() {
+        // #3227 review P1: the sqlite backend must be opt-in so the
+        // split-brain session state can never be entered silently.
+        let cfg = MemoryConfig::default();
+        assert!(!cfg.allow_sqlite_backend);
+        assert_eq!(cfg.backend, "jsonl");
+
+        // Omitted from TOML → still false (serde default).
+        let cfg: MemoryConfig = toml::from_str("enabled = true\n").expect("parse");
+        assert!(!cfg.allow_sqlite_backend);
+    }
+
+    #[test]
+    fn memory_config_sqlite_gate_parses_explicit_opt_in() {
+        let toml = r#"
+enabled = true
+backend = "sqlite"
+allow_sqlite_backend = true
+"#;
+        let cfg: MemoryConfig = toml::from_str(toml).expect("parse");
+        assert_eq!(cfg.backend, "sqlite");
+        assert!(cfg.allow_sqlite_backend);
     }
 }
 
