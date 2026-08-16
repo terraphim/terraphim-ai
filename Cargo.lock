@@ -8405,7 +8405,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-firecracker"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8683,7 +8683,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_ai_nodejs"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "ahash",
  "anyhow",
@@ -8848,7 +8848,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_dsm"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -8864,7 +8864,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_eval_check"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "clap",
  "serde",
@@ -8952,7 +8952,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_llm_runner"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -8965,7 +8965,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_lsp"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "env_logger",
  "log",
@@ -9003,7 +9003,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_merge_coordinator"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "chrono",
  "fs2",
@@ -9260,7 +9260,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_rlm"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9383,7 +9383,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_server"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9415,7 +9415,7 @@ dependencies = [
  "terraphim_service",
  "terraphim_settings 1.20.4",
  "terraphim_types 1.20.4",
- "terraphim_update 1.21.0",
+ "terraphim_update 1.21.3",
  "tokio",
  "tower-http 0.6.11",
  "ulid",
@@ -9482,7 +9482,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_sessions"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9579,7 +9579,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_tinyclaw"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9733,7 +9733,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_update"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "anyhow",
  "base64",
@@ -9786,7 +9786,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_validation"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9851,7 +9851,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_workspace"
-version = "1.21.0"
+version = "1.21.3"
 dependencies = [
  "jiff",
  "serde",
