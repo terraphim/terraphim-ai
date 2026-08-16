@@ -69,9 +69,25 @@ pub(crate) async fn run_agent(
     args: &[&str],
     stdin_data: Option<&str>,
 ) -> Result<String, ToolError> {
+    run_agent_in_dir(config, args, stdin_data, None).await
+}
+
+/// Execute `terraphim-agent` with an explicit working directory.
+///
+/// `terraphim-agent learn capture` resolves its project learnings store
+/// from the process working directory (`<cwd>/.terraphim/learnings`), so
+/// the agent loop pins `work_dir` to the configured agent workspace to
+/// keep captured learnings project-local (#3225). `None` inherits the
+/// current process directory (existing behaviour for all other calls).
+pub(crate) async fn run_agent_in_dir(
+    config: &AgentMemoryConfig,
+    args: &[&str],
+    stdin_data: Option<&str>,
+    work_dir: Option<&std::path::Path>,
+) -> Result<String, ToolError> {
     let result = timeout(
         Duration::from_secs(config.timeout_secs),
-        run_agent_inner(config, args, stdin_data),
+        run_agent_inner(config, args, stdin_data, work_dir),
     )
     .await;
 
@@ -88,14 +104,20 @@ async fn run_agent_inner(
     config: &AgentMemoryConfig,
     args: &[&str],
     stdin_data: Option<&str>,
+    work_dir: Option<&std::path::Path>,
 ) -> Result<String, ToolError> {
     let output = if let Some(data) = stdin_data {
         // Spawn, pipe stdin, then collect output.
-        let mut child = Command::new(&config.binary)
+        let mut command = Command::new(&config.binary);
+        command
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+        if let Some(dir) = work_dir {
+            command.current_dir(dir);
+        }
+        let mut child = command
             .spawn()
             .map_err(|e| map_io_error(&config.binary, e))?;
 
@@ -118,10 +140,15 @@ async fn run_agent_inner(
                 message: format!("Failed to wait for process: {}", e),
             })?
     } else {
-        Command::new(&config.binary)
+        let mut command = Command::new(&config.binary);
+        command
             .args(args)
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+        if let Some(dir) = work_dir {
+            command.current_dir(dir);
+        }
+        command
             .output()
             .await
             .map_err(|e| map_io_error(&config.binary, e))?
@@ -172,6 +199,90 @@ fn map_io_error(binary: &std::path::Path, e: std::io::Error) -> ToolError {
             message: format!("Failed to execute terraphim-agent: {}", e),
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Invariant failure capture (#3225)
+// ---------------------------------------------------------------------------
+
+/// Glob patterns for commands that must never be auto-captured as
+/// learnings. Test runners fail routinely (that is their job), so
+/// capturing them would flood the learning store with noise. Mirrors
+/// `LearningCaptureConfig::default().ignore_patterns` in
+/// `terraphim-agent`; the CLI applies the same list server-side, this
+/// client-side check avoids spawning a subprocess at all.
+pub(crate) const CAPTURE_IGNORE_PATTERNS: &[&str] =
+    &["cargo test*", "npm test*", "pytest*", "yarn test*"];
+
+/// Minimal glob matcher supporting the `*` wildcard (any run of
+/// characters, including empty). Sufficient for the ignore list above
+/// and avoids a new dependency for four patterns.
+pub(crate) fn glob_matches(pattern: &str, text: &str) -> bool {
+    let segments: Vec<&str> = pattern.split('*').collect();
+    if segments.len() == 1 {
+        return pattern == text;
+    }
+
+    let mut rest = text;
+    // The first segment anchors at the start of the text.
+    let first = segments[0];
+    if !rest.starts_with(first) {
+        return false;
+    }
+    rest = &rest[first.len()..];
+
+    // Middle segments must appear in order.
+    for segment in &segments[1..segments.len() - 1] {
+        match rest.find(segment) {
+            Some(idx) => rest = &rest[idx + segment.len()..],
+            None => return false,
+        }
+    }
+
+    // The last segment anchors at the end (empty when the pattern ends
+    // with '*', which matches any suffix).
+    let last = segments[segments.len() - 1];
+    last.is_empty() || rest.ends_with(last)
+}
+
+/// Check whether a command matches the capture ignore list.
+pub(crate) fn should_ignore_command(command: &str) -> bool {
+    let trimmed = command.trim_start();
+    CAPTURE_IGNORE_PATTERNS
+        .iter()
+        .any(|pattern| glob_matches(pattern, trimmed))
+}
+
+/// Invoke `terraphim-agent learn capture` for a failed command.
+///
+/// Shared by [`LearnCaptureTool`] (model-elected capture) and the agent
+/// loop's invariant capture path (#3225). Secret redaction is delegated
+/// to `terraphim-agent`, which redacts before persisting. The error
+/// output is truncated to [`MAX_OUTPUT_BYTES`] before being passed to
+/// the subprocess. Respects the configured subprocess timeout via
+/// [`run_agent`].
+///
+/// `work_dir` pins the learnings store location (see
+/// [`run_agent_in_dir`]); `None` inherits the process directory.
+pub(crate) async fn capture_failed_command(
+    config: &AgentMemoryConfig,
+    command: &str,
+    error: &str,
+    exit_code: i64,
+    work_dir: Option<&std::path::Path>,
+) -> Result<String, ToolError> {
+    let error_truncated = truncate_chars(error, MAX_OUTPUT_BYTES);
+    let exit_code_str = exit_code.to_string();
+    let cli_args = vec![
+        "learn",
+        "capture",
+        command,
+        "--error",
+        error_truncated,
+        "--exit-code",
+        &exit_code_str,
+    ];
+    run_agent_in_dir(config, &cli_args, None, work_dir).await
 }
 
 // ---------------------------------------------------------------------------
@@ -746,18 +857,7 @@ impl Tool for LearnCaptureTool {
 
         let exit_code = args["exit_code"].as_i64().unwrap_or(1);
 
-        let exit_code_str = exit_code.to_string();
-        let cli_args = vec![
-            "learn",
-            "capture",
-            command,
-            "--error",
-            error,
-            "--exit-code",
-            &exit_code_str,
-        ];
-
-        run_agent(&self.config, &cli_args, None).await
+        capture_failed_command(&self.config, command, error, exit_code, None).await
     }
 }
 
@@ -768,6 +868,34 @@ impl Tool for LearnCaptureTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_glob_matches() {
+        assert!(glob_matches("cargo test*", "cargo test"));
+        assert!(glob_matches("cargo test*", "cargo test --lib"));
+        assert!(glob_matches("pytest*", "pytest tests/"));
+        assert!(!glob_matches("cargo test*", "cargo build"));
+        // Glob prefix semantics: matches, same as glob::Pattern in terraphim-agent.
+        assert!(glob_matches("cargo test*", "cargo testing"));
+        assert!(glob_matches("exact", "exact"));
+        assert!(!glob_matches("exact", "exactly"));
+        assert!(glob_matches("*test*", "my test run"));
+        assert!(!glob_matches("*test*", "my run"));
+        assert!(glob_matches("a*b*c", "aXbYc"));
+        assert!(!glob_matches("a*b*c", "aXbY"));
+    }
+
+    #[test]
+    fn test_should_ignore_command() {
+        assert!(should_ignore_command("cargo test --lib"));
+        assert!(should_ignore_command("  cargo test"));
+        assert!(should_ignore_command("npm test"));
+        assert!(should_ignore_command("pytest tests/"));
+        assert!(should_ignore_command("yarn test --watch"));
+        assert!(!should_ignore_command("ls /nonexistent"));
+        assert!(!should_ignore_command("cargo build"));
+        assert!(!should_ignore_command("git push"));
+    }
 
     fn test_config() -> Arc<AgentMemoryConfig> {
         Arc::new(AgentMemoryConfig {

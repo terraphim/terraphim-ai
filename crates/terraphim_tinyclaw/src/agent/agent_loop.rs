@@ -10,7 +10,9 @@ use crate::config::{AgentConfig, DirectLlmConfig};
 use crate::credentials::{CredentialPool, CredentialSource, EnvVarSource, ProviderId};
 use crate::memory::{SharedBackend, jsonl::JsonlBackend};
 use crate::session::{ChatMessage, MessageRole, SessionManager};
-use crate::tools::agent_memory::{AgentMemoryConfig, run_agent};
+use crate::tools::agent_memory::{
+    AgentMemoryConfig, capture_failed_command, run_agent, should_ignore_command,
+};
 use crate::tools::{ToolError, ToolRegistry};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -443,6 +445,10 @@ pub struct ToolCallingLoop {
     memory_enabled: bool,
     /// Shared config for the agent-memory subprocess bridge.
     memory_config: Option<Arc<AgentMemoryConfig>>,
+    /// Agent workspace directory. Failed-command learnings are captured
+    /// with this as the subprocess working directory so the learning
+    /// lands in `<workspace>/.terraphim/learnings` (#3225).
+    workspace: std::path::PathBuf,
     /// Last time `memory apply` ran (cooldown guard — avoids a subprocess
     /// spawn on every single turn).
     memory_last_apply: Arc<Mutex<std::time::Instant>>,
@@ -555,6 +561,7 @@ impl ToolCallingLoop {
             shutdown: CancellationToken::new(),
             memory_enabled,
             memory_config: mem_cfg_arc,
+            workspace: agent_config.workspace.clone(),
             memory_last_apply: Arc::new(Mutex::new(std::time::Instant::now())),
         }
     }
@@ -829,6 +836,79 @@ impl ToolCallingLoop {
         }
     }
 
+    /// Invariant failure capture (#3225): when an exec-class tool call
+    /// fails, capture the failed command as a learning via
+    /// `terraphim-agent learn capture` — no model involvement required.
+    ///
+    /// Semantics mirror terraphim-agent's PostToolUse hook:
+    /// - gated on `memory.enabled` (the memory bridge master switch);
+    /// - fail-open: a capture failure is a `warn` log, never an error
+    ///   surfaced to the turn;
+    /// - test-runner commands matching the ignore globs
+    ///   (`cargo test*`, `npm test*`, `pytest*`, `yarn test*`) are
+    ///   skipped client-side;
+    /// - secret redaction is delegated to `terraphim-agent`, which
+    ///   redacts before persisting;
+    /// - the subprocess timeout and 1 MiB output guard are enforced by
+    ///   the shared bridge in `tools::agent_memory`.
+    ///
+    /// `Blocked` errors are not captured: the command never ran, so
+    /// there is no failure to learn from.
+    async fn capture_tool_failure(&self, tool_call: &crate::tools::ToolCall, error: &ToolError) {
+        if !self.memory_enabled {
+            return;
+        }
+        let Some(ref mem_config) = self.memory_config else {
+            return;
+        };
+
+        // Exec-class tools only: a failed shell command is the learning
+        // signal. Other tools (web, filesystem, …) are out of scope.
+        if !matches!(
+            tool_call.name.as_str(),
+            "shell" | "exec" | "bash" | "sandbox"
+        ) {
+            return;
+        }
+
+        // A blocked command never executed; guard rejections are policy,
+        // not command failures.
+        if matches!(error, ToolError::Blocked { .. }) {
+            return;
+        }
+
+        let Some(command) = tool_call.arguments["command"].as_str() else {
+            return;
+        };
+
+        if should_ignore_command(command) {
+            log::debug!("Skipping learning capture for ignored command: {command}");
+            return;
+        }
+
+        let (exit_code, error_output) = match error {
+            ToolError::NonZeroExit {
+                exit_code, stderr, ..
+            } => (i64::from(*exit_code), stderr.clone()),
+            // Conventional timeout exit code (cf. GNU timeout(1)).
+            ToolError::Timeout { .. } => (124, error.to_string()),
+            other => (1, other.to_string()),
+        };
+
+        match capture_failed_command(
+            mem_config,
+            command,
+            &error_output,
+            exit_code,
+            Some(&self.workspace),
+        )
+        .await
+        {
+            Ok(_) => log::info!("Captured failed command as learning: {command}"),
+            Err(e) => log::warn!("Learning capture failed (non-fatal): {e}"),
+        }
+    }
+
     /// Run the iterative tool-calling loop with explicit system prompt.
     async fn run_tool_loop_with_prompt(
         &self,
@@ -881,6 +961,8 @@ impl ToolCallingLoop {
                             format!("Tool blocked: {}", reason)
                         }
                         Err(e) => {
+                            // #3225: failure capture is a loop invariant.
+                            self.capture_tool_failure(tool_call, &e).await;
                             format!("Tool execution error: {}", e)
                         }
                     },
@@ -895,7 +977,11 @@ impl ToolCallingLoop {
                         );
                         match self.tools.execute(tool_call).await {
                             Ok(result) => result,
-                            Err(e) => format!("Tool execution error: {}", e),
+                            Err(e) => {
+                                // #3225: failure capture is a loop invariant.
+                                self.capture_tool_failure(tool_call, &e).await;
+                                format!("Tool execution error: {}", e)
+                            }
                         }
                     }
                 };
