@@ -18,24 +18,33 @@ pub struct HomeAssistantClient {
 }
 
 impl HomeAssistantClient {
-    pub fn new(url: impl Into<String>, token: impl Into<String>) -> Self {
+    pub fn new(url: impl Into<String>, token: impl Into<String>) -> Result<Self, String> {
+        let token = token.into();
+        // Validate the token up front so a malformed value surfaces as a clear
+        // config error rather than a silently unauthenticated request (401).
+        reqwest::header::HeaderValue::from_str(&token)
+            .map_err(|e| format!("invalid Home Assistant token: {}", e))?;
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(15))
             .build()
             .unwrap_or_default();
-        Self {
+        Ok(Self {
             http: client,
             url: url.into().trim_end_matches('/').to_string(),
-            token: token.into(),
-        }
+            token,
+        })
     }
 
     fn headers(&self) -> reqwest::header::HeaderMap {
         let mut h = reqwest::header::HeaderMap::new();
         let bearer = format!("Bearer {}", self.token);
-        if let Ok(v) = reqwest::header::HeaderValue::from_str(&bearer) {
-            h.insert(reqwest::header::AUTHORIZATION, v);
-        }
+        // Token was validated in `new`; the "Bearer " prefix is static ASCII,
+        // so this construction cannot fail for valid tokens.
+        h.insert(
+            reqwest::header::AUTHORIZATION,
+            reqwest::header::HeaderValue::from_str(&bearer)
+                .expect("token pre-validated in HomeAssistantClient::new"),
+        );
         h.insert(
             reqwest::header::CONTENT_TYPE,
             reqwest::header::HeaderValue::from_static("application/json"),
@@ -232,10 +241,10 @@ pub struct HaCallServiceTool {
 }
 
 /// Build the four HA tools from config.
-pub fn build_tools(config: &HomeAssistantConfig) -> Vec<Box<dyn Tool>> {
-    let client = Arc::new(HomeAssistantClient::new(&config.url, &config.token));
+pub fn build_tools(config: &HomeAssistantConfig) -> Result<Vec<Box<dyn Tool>>, String> {
+    let client = Arc::new(HomeAssistantClient::new(&config.url, &config.token)?);
     let inner = Arc::new(HaTools { client });
-    vec![
+    Ok(vec![
         Box::new(HaListEntitiesTool {
             inner: inner.clone(),
         }),
@@ -246,7 +255,7 @@ pub fn build_tools(config: &HomeAssistantConfig) -> Vec<Box<dyn Tool>> {
             inner: inner.clone(),
         }),
         Box::new(HaCallServiceTool { inner }),
-    ]
+    ])
 }
 
 #[async_trait]
@@ -421,8 +430,18 @@ mod tests {
             url: "http://ha".into(),
             token: "tok".into(),
         };
-        let tools = build_tools(&cfg);
+        let tools = build_tools(&cfg).unwrap();
         assert_eq!(tools.len(), 4);
+    }
+
+    #[test]
+    fn build_tools_rejects_invalid_token() {
+        let cfg = HomeAssistantConfig {
+            enabled: true,
+            url: "http://ha".into(),
+            token: "bad\ntoken".into(),
+        };
+        assert!(build_tools(&cfg).is_err());
     }
 
     #[test]
@@ -432,7 +451,7 @@ mod tests {
             url: "http://ha".into(),
             token: "tok".into(),
         };
-        let tools = build_tools(&cfg);
+        let tools = build_tools(&cfg).unwrap();
         let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
         let mut dedup = names.clone();
         dedup.sort();

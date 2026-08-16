@@ -30,6 +30,7 @@ pub struct ImageGenerateClient {
     model: String,
     base_url: String,
     api_key: String,
+    safety_checker: bool,
 }
 
 impl ImageGenerateClient {
@@ -43,6 +44,7 @@ impl ImageGenerateClient {
             model: cfg.model.clone(),
             base_url: cfg.base_url.trim_end_matches('/').to_string(),
             api_key: cfg.api_key.clone(),
+            safety_checker: cfg.safety_checker,
         }
     }
 
@@ -53,16 +55,20 @@ impl ImageGenerateClient {
             return Err("prompt is required and must be a non-empty string".to_string());
         }
 
-        let body = serde_json::json!({
+        let mut body = serde_json::json!({
             "prompt": prompt,
             "image_size": aspect_ratio_to_image_size(aspect_ratio),
             "num_inference_steps": 50,
             "guidance_scale": 4.5,
             "num_images": 1,
             "output_format": "png",
-            "enable_safety_checker": false,
-            "safety_tolerance": "5"
+            "enable_safety_checker": self.safety_checker,
         });
+        // Only emit the (most-permissive) safety tolerance when the checker is
+        // deliberately disabled; otherwise leave it to the provider default.
+        if !self.safety_checker {
+            body["safety_tolerance"] = serde_json::json!("5");
+        }
 
         let url = format!("{}/{}", self.base_url, self.model);
         let resp = self
@@ -180,5 +186,10 @@ mod tests {
             ..Default::default()
         };
         assert!(!cfg2.available());
+    }
+
+    #[test]
+    fn safety_checker_defaults_on() {
+        assert!(ImageGenConfig::default().safety_checker);
     }
 }

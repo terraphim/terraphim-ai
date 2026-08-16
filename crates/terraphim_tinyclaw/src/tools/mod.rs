@@ -317,8 +317,13 @@ pub async fn create_default_registry_with_parity(
     if let Some(cfg) = parity.homeassistant
         && cfg.available()
     {
-        for tool in crate::tools::homeassistant::build_tools(cfg) {
-            registry.register(tool);
+        match crate::tools::homeassistant::build_tools(cfg) {
+            Ok(tools) => {
+                for tool in tools {
+                    registry.register(tool);
+                }
+            }
+            Err(e) => log::warn!("homeassistant tools disabled: {}", e),
         }
     }
     if let Some(cfg) = parity.vision

@@ -14,12 +14,12 @@
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use terraphim_types::score::OkapiBM25Scorer;
-use terraphim_types::{Document, DocumentType};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
+use terraphim_types::score::OkapiBM25Scorer;
+use terraphim_types::{Document, DocumentType};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::time::timeout;
@@ -599,13 +599,7 @@ impl MemoryRetrieveTool {
     async fn retrieve_upstream(&self, query: &str, limit: usize) -> Option<Vec<MemoryItem>> {
         let limit_str = limit.to_string();
         let mut cli_args = vec![
-            "memory",
-            "retrieve",
-            query,
-            "--limit",
-            &limit_str,
-            "--format",
-            "json",
+            "memory", "retrieve", query, "--limit", &limit_str, "--format", "json",
         ];
 
         // Pass the configured role through to retrieval, not only
@@ -691,11 +685,10 @@ impl Tool for MemoryRetrieveTool {
         // `--format json` on `memory retrieve` (companion change filed as
         // a follow-up to #3226).
         if let Some(items) = self.retrieve_upstream(query, limit).await {
-            let json =
-                serde_json::to_string(&items).map_err(|e| ToolError::ExecutionFailed {
-                    tool: "memory_retrieve".to_string(),
-                    message: format!("Failed to serialise results: {}", e),
-                })?;
+            let json = serde_json::to_string(&items).map_err(|e| ToolError::ExecutionFailed {
+                tool: "memory_retrieve".to_string(),
+                message: format!("Failed to serialise results: {}", e),
+            })?;
             return Ok(json);
         }
 
@@ -1059,7 +1052,10 @@ mod tests {
 
     #[test]
     fn test_normalise_tokens_strips_punctuation_and_case() {
-        assert_eq!(normalise_tokens("Rust, cargo!  NEXTEST."), "rust cargo nextest");
+        assert_eq!(
+            normalise_tokens("Rust, cargo!  NEXTEST."),
+            "rust cargo nextest"
+        );
         assert_eq!(normalise_tokens(""), "");
         assert_eq!(normalise_tokens("---"), "");
     }
@@ -1125,8 +1121,16 @@ mod tests {
     #[test]
     fn test_rank_items_role_scoping() {
         let items = vec![
-            fixture_item("dev", "testing strategy for the backend", vec!["role:developer"]),
-            fixture_item("rev", "testing checklist for reviewers", vec!["role:reviewer"]),
+            fixture_item(
+                "dev",
+                "testing strategy for the backend",
+                vec!["role:developer"],
+            ),
+            fixture_item(
+                "rev",
+                "testing checklist for reviewers",
+                vec!["role:reviewer"],
+            ),
             fixture_item("shared", "testing is everyone's job", vec![]),
         ];
 
