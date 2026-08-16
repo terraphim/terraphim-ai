@@ -176,3 +176,35 @@ pub struct TodoTool { store: Arc<TodoStore> }
 - [x] Research complete
 - [x] Wave 1 design complete
 - [ ] Human approval received
+
+## Implementation Status (2026-08-16)
+
+All 15 capabilities implemented, tested, and committed to branch
+`task/tinyclaw-auxiliary-tools` (off `origin/main`). Full tinyclaw suite green
+(366 lib tests + all integration/doc tests; `cargo clippy -D warnings` clean).
+
+| # | Tool | Module | Wave | Notes |
+|---|------|--------|------|-------|
+| 1 | interrupt | `tools/interrupt.rs` | 1 | shared `AtomicBool` |
+| 2 | todo | `tools/todo.rs` | 1 | `TodoStore` + `TodoTool` |
+| 3 | debug_helpers | `tools/debug_helpers.rs` | 1 | env-gated JSON log |
+| 4 | fuzzy_match | `tools/fuzzy_match.rs` | 1 | Levenshtein ratio |
+| 5 | patch_parser | `tools/patch_parser.rs` | 1 | `parse_v4a_patch` |
+| 6 | clarify | `tools/clarify.rs` | 1.5 | callback-wirable |
+| 7 | approval | `tools/approval.rs` | 1.5 | 25 danger patterns |
+| 8 | process_registry | `tools/process_registry.rs` | 1.5 | spawn/poll/kill |
+| 9 | clipboard | `tools/clipboard.rs` | 2 | osascript / wl-paste / xclip |
+| 10 | homeassistant | `tools/homeassistant.rs` | 2 | 4 HA REST tools |
+| 11 | vision | `tools/vision.rs` | 2 | OpenAI-compatible multimodal |
+| 12 | image_generation | `tools/image_generation.rs` | 2 | FAL.ai FLUX |
+| 13 | tts | `tools/tts.rs` | 2 | edge / openai / elevenlabs |
+| 14 | mixture_of_agents | `tools/moa.rs` | 3 | parallel ensemble |
+| 15 | rl_training | `tools/rl_training.rs` | 3 | **partial**: `rl_check_status` only |
+
+### Deviation from plan
+- `create_default_registry_with_parity` refactored from a growing list of
+  positional config args to a bundled `ParityConfig<'a>` struct (fixes clippy
+  `too_many_arguments`).
+- `rl_training`: full veRL/ray/wandb orchestration is a **deliberate non-goal**
+  (1380 lines of Python-infra-coupled code). Ported the portable piece
+  (`rl_check_status` polling a rollout server).
