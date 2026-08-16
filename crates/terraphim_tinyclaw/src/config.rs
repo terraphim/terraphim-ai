@@ -61,6 +61,29 @@ pub struct Config {
     /// are registered over the HA REST API.
     #[serde(default)]
     pub homeassistant: HomeAssistantConfig,
+
+    /// Vision configuration. **Default: disabled.**
+    /// When `vision.enabled = true`, the `vision_analyze` tool registers and
+    /// sends multimodal chat-completion requests to an OpenAI-compatible
+    /// vision model endpoint.
+    #[serde(default)]
+    pub vision: VisionConfig,
+
+    /// Image generation configuration. **Default: disabled.**
+    /// When `image_gen.enabled = true`, the `image_generate` tool registers
+    /// against an OpenAI-compatible image endpoint (DALL-E style).
+    #[serde(default)]
+    pub image_gen: ImageGenConfig,
+
+    /// Text-to-speech configuration. **Default: disabled.**
+    /// When `tts.enabled = true`, the `text_to_speech` tool registers.
+    #[serde(default)]
+    pub tts: TtsConfig,
+
+    /// Mixture-of-Agents configuration. **Default: disabled.**
+    /// When `moa.enabled = true`, the `mixture_of_agents` tool registers.
+    #[serde(default)]
+    pub moa: MoaConfig,
 }
 
 impl Config {
@@ -1301,6 +1324,203 @@ impl HomeAssistantConfig {
     /// Whether the HA tools are usable (enabled + token present).
     pub fn available(&self) -> bool {
         self.enabled && !self.token.is_empty()
+    }
+}
+
+/// Vision configuration (Hermes parity).
+///
+/// **Default behaviour: disabled.** OpenAI-compatible multimodal endpoint.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct VisionConfig {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default = "default_vision_model")]
+    pub model: String,
+
+    #[serde(default = "default_vision_base_url")]
+    pub base_url: String,
+
+    #[serde(default)]
+    pub api_key: String,
+}
+
+fn default_vision_model() -> String {
+    "google/gemini-3-flash-preview".to_string()
+}
+
+fn default_vision_base_url() -> String {
+    "https://openrouter.ai/api/v1".to_string()
+}
+
+impl Default for VisionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            model: default_vision_model(),
+            base_url: default_vision_base_url(),
+            api_key: String::new(),
+        }
+    }
+}
+
+impl VisionConfig {
+    pub fn available(&self) -> bool {
+        self.enabled && !self.api_key.is_empty()
+    }
+}
+
+/// Image generation configuration (Hermes parity).
+///
+/// **Default behaviour: disabled.** OpenAI-compatible image endpoint.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ImageGenConfig {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default = "default_image_model")]
+    pub model: String,
+
+    #[serde(default = "default_image_base_url")]
+    pub base_url: String,
+
+    #[serde(default)]
+    pub api_key: String,
+}
+
+fn default_image_model() -> String {
+    "fal-ai/flux-pro/v1.1-ultra".to_string()
+}
+
+fn default_image_base_url() -> String {
+    "https://fal.run".to_string()
+}
+
+impl Default for ImageGenConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            model: default_image_model(),
+            base_url: default_image_base_url(),
+            api_key: String::new(),
+        }
+    }
+}
+
+impl ImageGenConfig {
+    pub fn available(&self) -> bool {
+        self.enabled && !self.api_key.is_empty()
+    }
+}
+
+/// Text-to-speech configuration (Hermes parity).
+///
+/// **Default behaviour: disabled.** Providers: `edge` (shells out to
+/// `edge-tts` CLI) and `openai` (OpenAI-compatible `/v1/audio/speech`).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TtsConfig {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default = "default_tts_provider")]
+    pub provider: String,
+
+    #[serde(default)]
+    pub voice: String,
+
+    #[serde(default = "default_tts_base_url")]
+    pub base_url: String,
+
+    #[serde(default)]
+    pub api_key: String,
+
+    #[serde(default = "default_tts_output_dir")]
+    pub output_dir: String,
+}
+
+fn default_tts_provider() -> String {
+    "edge".to_string()
+}
+
+fn default_tts_base_url() -> String {
+    "https://api.openai.com/v1".to_string()
+}
+
+fn default_tts_output_dir() -> String {
+    "voice-memos".to_string()
+}
+
+impl Default for TtsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: default_tts_provider(),
+            voice: String::new(),
+            base_url: default_tts_base_url(),
+            api_key: String::new(),
+            output_dir: default_tts_output_dir(),
+        }
+    }
+}
+
+impl TtsConfig {
+    pub fn available(&self) -> bool {
+        // Edge TTS needs no key; OpenAI provider needs a key.
+        if !self.enabled {
+            return false;
+        }
+        self.provider.to_lowercase() == "edge" || !self.api_key.is_empty()
+    }
+}
+
+/// Mixture-of-Agents configuration (Hermes parity).
+///
+/// **Default behaviour: disabled.** Ensemble of reference models + aggregator.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MoaConfig {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default)]
+    pub base_url: String,
+
+    #[serde(default)]
+    pub api_key: String,
+
+    #[serde(default = "default_moa_reference_models")]
+    pub reference_models: Vec<String>,
+
+    #[serde(default = "default_moa_aggregator_model")]
+    pub aggregator_model: String,
+}
+
+fn default_moa_reference_models() -> Vec<String> {
+    vec![
+        "openai/gpt-5.2-pro".to_string(),
+        "anthropic/claude-opus-4.5".to_string(),
+        "google/gemini-3-pro-preview".to_string(),
+    ]
+}
+
+fn default_moa_aggregator_model() -> String {
+    "anthropic/claude-opus-4.5".to_string()
+}
+
+impl Default for MoaConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            base_url: default_vision_base_url(),
+            api_key: String::new(),
+            reference_models: default_moa_reference_models(),
+            aggregator_model: default_moa_aggregator_model(),
+        }
+    }
+}
+
+impl MoaConfig {
+    pub fn available(&self) -> bool {
+        self.enabled && !self.api_key.is_empty() && !self.reference_models.is_empty()
     }
 }
 

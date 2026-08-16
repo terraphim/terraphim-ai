@@ -19,6 +19,7 @@ pub mod session_tools;
 pub mod shell;
 pub mod subagent;
 pub mod todo;
+pub mod vision;
 pub mod voice_transcribe;
 pub mod web;
 
@@ -181,27 +182,33 @@ pub async fn create_default_registry(
         sessions,
         web_tools_config,
         memory_config,
-        None,
-        None,
-        None,
-        None,
-        None,
+        ParityConfig::default(),
     )
     .await
 }
 
+/// Bundled Hermes-parity tool configuration.
+#[derive(Default)]
+pub struct ParityConfig<'a> {
+    pub sandbox: Option<&'a crate::config::SandboxConfig>,
+    pub subagent: Option<&'a crate::config::SubagentConfig>,
+    pub browser: Option<&'a crate::config::BrowserConfig>,
+    pub scheduler: Option<&'a crate::config::SchedulerConfig>,
+    pub homeassistant: Option<&'a crate::config::HomeAssistantConfig>,
+    pub vision: Option<&'a crate::config::VisionConfig>,
+    pub image_gen: Option<&'a crate::config::ImageGenConfig>,
+    pub tts: Option<&'a crate::config::TtsConfig>,
+    pub moa: Option<&'a crate::config::MoaConfig>,
+}
+
 /// Create a standard tool registry including the Hermes-parity tools
-/// (sandbox / subagent / browser) when their configs are enabled.
-#[allow(clippy::too_many_arguments)]
+/// (sandbox / subagent / browser / scheduler / homeassistant / vision /
+/// image_gen / tts / moa) when their configs are enabled.
 pub async fn create_default_registry_with_parity(
     sessions: Option<std::sync::Arc<tokio::sync::Mutex<crate::session::SessionManager>>>,
     web_tools_config: Option<&crate::config::WebToolsConfig>,
     memory_config: Option<&crate::config::MemoryConfig>,
-    sandbox_config: Option<&crate::config::SandboxConfig>,
-    subagent_config: Option<&crate::config::SubagentConfig>,
-    browser_config: Option<&crate::config::BrowserConfig>,
-    scheduler_config: Option<&crate::config::SchedulerConfig>,
-    homeassistant_config: Option<&crate::config::HomeAssistantConfig>,
+    parity: ParityConfig<'_>,
 ) -> ToolRegistry {
     use crate::tools::agent_memory::{
         AgentMemoryConfig, LearnCaptureTool, MemoryApplyTool, MemoryCaptureTool, MemoryRetrieveTool,
@@ -253,9 +260,10 @@ pub async fn create_default_registry_with_parity(
         registry.register(Box::new(LearnCaptureTool::new(agent_mem_cfg)));
     }
 
-    // Register Hermes-parity tools (sandbox / subagent / browser).
-    // Each is off by default; enabled via tinyclaw.toml sections.
-    if let Some(cfg) = sandbox_config
+    // Register Hermes-parity tools (sandbox / subagent / browser / scheduler /
+    // homeassistant / vision / image_gen / tts / moa). Each is off by default;
+    // enabled via tinyclaw.toml sections.
+    if let Some(cfg) = parity.sandbox
         && cfg.enabled
     {
         match crate::tools::sandbox::SandboxTool::from_config(cfg).await {
@@ -263,14 +271,14 @@ pub async fn create_default_registry_with_parity(
             Err(e) => log::warn!("sandbox tool disabled: {}", e),
         }
     }
-    if let Some(cfg) = subagent_config
+    if let Some(cfg) = parity.subagent
         && cfg.enabled
     {
         registry.register(Box::new(crate::tools::subagent::SubagentTool::from_config(
             cfg,
         )));
     }
-    if let Some(cfg) = browser_config
+    if let Some(cfg) = parity.browser
         && cfg.enabled
     {
         match crate::tools::browser::BrowserTool::from_config(cfg) {
@@ -278,7 +286,7 @@ pub async fn create_default_registry_with_parity(
             Err(e) => log::warn!("browser tool disabled: {}", e),
         }
     }
-    if let Some(cfg) = scheduler_config
+    if let Some(cfg) = parity.scheduler
         && cfg.enabled
     {
         match crate::tools::scheduler::ScheduleTool::from_config(cfg).await {
@@ -286,14 +294,17 @@ pub async fn create_default_registry_with_parity(
             Err(e) => log::warn!("schedule tool disabled: {}", e),
         }
     }
-
-    // Register Home Assistant tools when enabled + token present.
-    if let Some(cfg) = homeassistant_config
+    if let Some(cfg) = parity.homeassistant
         && cfg.available()
     {
         for tool in crate::tools::homeassistant::build_tools(cfg) {
             registry.register(tool);
         }
+    }
+    if let Some(cfg) = parity.vision
+        && cfg.available()
+    {
+        registry.register(Box::new(crate::tools::vision::VisionTool::from_config(cfg)));
     }
 
     registry

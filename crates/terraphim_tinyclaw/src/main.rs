@@ -18,7 +18,7 @@ use terraphim_tinyclaw::credentials::{
 };
 use terraphim_tinyclaw::session::SessionManager;
 use terraphim_tinyclaw::skills::{Skill, SkillExecutor};
-use terraphim_tinyclaw::tools::create_default_registry_with_parity;
+use terraphim_tinyclaw::tools::{ParityConfig, create_default_registry_with_parity};
 
 /// Multi-channel AI assistant powered by Terraphim.
 #[derive(Parser, Debug)]
@@ -231,11 +231,15 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
             Some(sessions.clone()),
             web_tools_config,
             memory_config,
-            Some(&config.sandbox),
-            Some(&config.subagent),
-            Some(&config.browser),
-            Some(&config.scheduler),
-            Some(&config.homeassistant),
+            ParityConfig {
+                sandbox: Some(&config.sandbox),
+                subagent: Some(&config.subagent),
+                browser: Some(&config.browser),
+                scheduler: Some(&config.scheduler),
+                homeassistant: Some(&config.homeassistant),
+                vision: Some(&config.vision),
+                ..Default::default()
+            },
         )
         .await,
     );
@@ -302,11 +306,15 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
             Some(sessions.clone()),
             web_tools_config,
             memory_config_gw,
-            Some(&config.sandbox),
-            Some(&config.subagent),
-            Some(&config.browser),
-            Some(&config.scheduler),
-            Some(&config.homeassistant),
+            ParityConfig {
+                sandbox: Some(&config.sandbox),
+                subagent: Some(&config.subagent),
+                browser: Some(&config.browser),
+                scheduler: Some(&config.scheduler),
+                homeassistant: Some(&config.homeassistant),
+                vision: Some(&config.vision),
+                ..Default::default()
+            },
         )
         .await,
     );
