@@ -54,6 +54,13 @@ pub struct Config {
     /// shares the same store.
     #[serde(default)]
     pub scheduler: SchedulerConfig,
+
+    /// Home Assistant configuration. **Default: disabled.**
+    /// When `homeassistant.enabled = true`, the four HA tools
+    /// (ha_list_entities / ha_get_state / ha_list_services / ha_call_service)
+    /// are registered over the HA REST API.
+    #[serde(default)]
+    pub homeassistant: HomeAssistantConfig,
 }
 
 impl Config {
@@ -1254,6 +1261,46 @@ impl Default for SchedulerConfig {
             enabled: false,
             store_key: default_scheduler_store_key(),
         }
+    }
+}
+
+/// Home Assistant configuration (Hermes parity).
+///
+/// **Default behaviour: disabled.** When `enabled = true` and `token` is set,
+/// the HA tools register and talk to the HA REST API.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HomeAssistantConfig {
+    /// Master switch. `false` = no HA tools registered.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Base URL of the Home Assistant instance.
+    #[serde(default = "default_hass_url")]
+    pub url: String,
+
+    /// Long-lived access token.
+    #[serde(default)]
+    pub token: String,
+}
+
+fn default_hass_url() -> String {
+    "http://homeassistant.local:8123".to_string()
+}
+
+impl Default for HomeAssistantConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            url: default_hass_url(),
+            token: String::new(),
+        }
+    }
+}
+
+impl HomeAssistantConfig {
+    /// Whether the HA tools are usable (enabled + token present).
+    pub fn available(&self) -> bool {
+        self.enabled && !self.token.is_empty()
     }
 }
 

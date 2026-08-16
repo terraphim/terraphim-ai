@@ -9,6 +9,7 @@ pub mod debug_helpers;
 pub mod edit;
 pub mod filesystem;
 pub mod fuzzy_match;
+pub mod homeassistant;
 pub mod interrupt;
 pub mod patch_parser;
 pub mod process_registry;
@@ -184,12 +185,14 @@ pub async fn create_default_registry(
         None,
         None,
         None,
+        None,
     )
     .await
 }
 
 /// Create a standard tool registry including the Hermes-parity tools
 /// (sandbox / subagent / browser) when their configs are enabled.
+#[allow(clippy::too_many_arguments)]
 pub async fn create_default_registry_with_parity(
     sessions: Option<std::sync::Arc<tokio::sync::Mutex<crate::session::SessionManager>>>,
     web_tools_config: Option<&crate::config::WebToolsConfig>,
@@ -198,6 +201,7 @@ pub async fn create_default_registry_with_parity(
     subagent_config: Option<&crate::config::SubagentConfig>,
     browser_config: Option<&crate::config::BrowserConfig>,
     scheduler_config: Option<&crate::config::SchedulerConfig>,
+    homeassistant_config: Option<&crate::config::HomeAssistantConfig>,
 ) -> ToolRegistry {
     use crate::tools::agent_memory::{
         AgentMemoryConfig, LearnCaptureTool, MemoryApplyTool, MemoryCaptureTool, MemoryRetrieveTool,
@@ -280,6 +284,15 @@ pub async fn create_default_registry_with_parity(
         match crate::tools::scheduler::ScheduleTool::from_config(cfg).await {
             Ok(tool) => registry.register(Box::new(tool)),
             Err(e) => log::warn!("schedule tool disabled: {}", e),
+        }
+    }
+
+    // Register Home Assistant tools when enabled + token present.
+    if let Some(cfg) = homeassistant_config
+        && cfg.available()
+    {
+        for tool in crate::tools::homeassistant::build_tools(cfg) {
+            registry.register(tool);
         }
     }
 

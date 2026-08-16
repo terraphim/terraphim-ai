@@ -4,8 +4,8 @@
 
 mod common;
 
-use terraphim_tinyclaw::config::{Config, ToolsConfig, WebToolsConfig};
-use terraphim_tinyclaw::tools::create_default_registry;
+use terraphim_tinyclaw::config::{Config, HomeAssistantConfig, ToolsConfig, WebToolsConfig};
+use terraphim_tinyclaw::tools::{create_default_registry, create_default_registry_with_parity};
 
 /// Test that web tools configuration is wired through to the registry.
 #[tokio::test]
@@ -88,4 +88,54 @@ async fn test_all_expected_tools_registered() {
             tool_name
         );
     }
+}
+
+/// Test that Home Assistant tools are gated by `enabled` + token.
+#[tokio::test]
+async fn test_homeassistant_tools_gated_by_config() {
+    common::scrub_env();
+
+    // Disabled by default: no HA tools.
+    let registry = create_default_registry(None, None, None).await;
+    assert!(registry.get("ha_list_entities").is_none());
+
+    // Enabled + token: HA tools registered.
+    let cfg = HomeAssistantConfig {
+        enabled: true,
+        url: "http://ha.local:8123".into(),
+        token: "secret".into(),
+    };
+    let registry =
+        create_default_registry_with_parity(None, None, None, None, None, None, None, Some(&cfg))
+            .await;
+    for name in [
+        "ha_list_entities",
+        "ha_get_state",
+        "ha_list_services",
+        "ha_call_service",
+    ] {
+        assert!(
+            registry.get(name).is_some(),
+            "HA tool '{}' should be registered",
+            name
+        );
+    }
+
+    // Enabled but no token: no HA tools.
+    let cfg_no_token = HomeAssistantConfig {
+        enabled: true,
+        ..Default::default()
+    };
+    let registry = create_default_registry_with_parity(
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        Some(&cfg_no_token),
+    )
+    .await;
+    assert!(registry.get("ha_list_entities").is_none());
 }

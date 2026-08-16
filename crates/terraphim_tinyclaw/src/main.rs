@@ -235,6 +235,7 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
             Some(&config.subagent),
             Some(&config.browser),
             Some(&config.scheduler),
+            Some(&config.homeassistant),
         )
         .await,
     );
@@ -305,6 +306,7 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
             Some(&config.subagent),
             Some(&config.browser),
             Some(&config.scheduler),
+            Some(&config.homeassistant),
         )
         .await,
     );
