@@ -1,7 +1,9 @@
 //! Tool registry and implementations for TinyClaw agent.
 
 pub mod agent_memory;
+pub mod approval;
 pub mod browser;
+pub mod clarify;
 pub mod debug_helpers;
 pub mod edit;
 pub mod filesystem;
@@ -198,6 +200,7 @@ pub async fn create_default_registry_with_parity(
     use crate::tools::agent_memory::{
         AgentMemoryConfig, LearnCaptureTool, MemoryApplyTool, MemoryCaptureTool, MemoryRetrieveTool,
     };
+    use crate::tools::clarify::ClarifyTool;
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
     use crate::tools::patch_parser::PatchParseTool;
@@ -218,6 +221,7 @@ pub async fn create_default_registry_with_parity(
         TodoStore::new(),
     ))));
     registry.register(Box::new(PatchParseTool::new()));
+    registry.register(Box::new(ClarifyTool::new()));
 
     // Register session tools if SessionManager is provided
     if let Some(sessions) = sessions {
