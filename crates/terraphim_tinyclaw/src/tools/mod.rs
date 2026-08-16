@@ -46,6 +46,21 @@ pub enum ToolError {
     #[error("Tool '{tool}' execution failed: {message}")]
     ExecutionFailed { tool: String, message: String },
 
+    /// The command ran to completion but exited non-zero. Carries the
+    /// exit code and stderr in structured form so the agent loop can
+    /// capture the failure as a learning (#3225) without parsing
+    /// display strings. The `Display` output is byte-identical to the
+    /// previous `ExecutionFailed` rendering, so the tool-result text
+    /// seen by the model is unchanged.
+    #[error(
+        "Tool '{tool}' execution failed: Command exited with code {exit_code}\nSTDERR: {stderr}"
+    )]
+    NonZeroExit {
+        tool: String,
+        exit_code: i32,
+        stderr: String,
+    },
+
     #[error("Tool '{tool}' was blocked: {reason}")]
     Blocked { tool: String, reason: String },
 
