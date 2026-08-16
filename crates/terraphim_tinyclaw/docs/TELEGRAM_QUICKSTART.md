@@ -21,13 +21,17 @@ cat > ~/.config/terraphim/tinyclaw.toml << 'EOF'
 [agent]
 workspace = "/tmp/tinyclaw"
 
-[llm]
+[llm.proxy]
+base_url = "http://127.0.0.1:3456"
+
+[llm.direct]
 provider = "ollama"
-model = "llama3.2:3b"
-base_url = "http://localhost:11434"
+model = "llama3.2"
+base_url = "http://127.0.0.1:11434"
 
 [channels.telegram]
 token = "${TELEGRAM_BOT_TOKEN}"
+allow_from = ["*"]
 EOF
 
 # Set token as environment variable
