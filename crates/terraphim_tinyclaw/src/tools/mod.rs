@@ -20,6 +20,7 @@ pub mod session_tools;
 pub mod shell;
 pub mod subagent;
 pub mod todo;
+pub mod tts;
 pub mod vision;
 pub mod voice_transcribe;
 pub mod web;
@@ -313,6 +314,13 @@ pub async fn create_default_registry_with_parity(
         registry.register(Box::new(
             crate::tools::image_generation::ImageGenerateTool::from_config(cfg),
         ));
+    }
+    if let Some(cfg) = parity.tts
+        && cfg.available()
+    {
+        registry.register(Box::new(crate::tools::tts::TextToSpeechTool::from_config(
+            cfg,
+        )));
     }
 
     registry
