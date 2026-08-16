@@ -460,3 +460,165 @@ exit 42
         other => panic!("Expected ExecutionFailed, got: {:?}", other),
     }
 }
+
+// ---------------------------------------------------------------------------
+// Contract 10: retrieve prefers `memory retrieve --format json` (#3226)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn contract_retrieve_prefers_upstream_json_when_supported() {
+    common::scrub_env();
+
+    let tmp = tempfile::tempdir().unwrap();
+    // The shim serves ranked JSON from `memory retrieve` and fails hard on
+    // `memory export`: if the tool fell back to export, the test fails.
+    let shim = write_shim(
+        tmp.path(),
+        r#"#!/bin/sh
+case "$1 $2" in
+  "memory retrieve")
+    cat <<'ENDJSON'
+{"memory_items":[{"id":"r1","item_type":"Experience","content":"ranked by upstream","importance":"Medium","tags":[],"access_count":0,"created_at":"2026-01-01T00:00:00Z"}]}
+ENDJSON
+    ;;
+  "memory export")
+    echo "export path must not be used when retrieve --format json works" >&2
+    exit 9
+    ;;
+  *)
+    echo "unknown: $*" >&2
+    exit 1
+    ;;
+esac
+"#,
+    );
+
+    let cfg = make_config(shim);
+    let tool = MemoryRetrieveTool::new(cfg);
+
+    let result = tool
+        .execute(serde_json::json!({"query": "ranked", "limit": 5}))
+        .await
+        .expect("retrieve via upstream JSON path should succeed");
+
+    let items: Vec<serde_json::Value> = serde_json::from_str(&result).unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["id"], "r1");
+}
+
+// ---------------------------------------------------------------------------
+// Contract 11: role is scoped client-side on the upstream path (#3226)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn contract_retrieve_upstream_results_are_role_scoped() {
+    common::scrub_env();
+
+    let tmp = tempfile::tempdir().unwrap();
+    // Upstream returns items for two roles; the tool must drop the
+    // reviewer-scoped one because the config role is "developer".
+    let shim = write_shim(
+        tmp.path(),
+        r#"#!/bin/sh
+case "$1 $2" in
+  "memory retrieve")
+    cat <<'ENDJSON'
+[{"id":"dev","item_type":"Experience","content":"run cargo nextest","importance":"Medium","tags":["role:developer"],"access_count":0,"created_at":"2026-01-01T00:00:00Z"},{"id":"rev","item_type":"Experience","content":"reviewer checklist","importance":"Medium","tags":["role:reviewer"],"access_count":0,"created_at":"2026-01-01T00:00:00Z"}]
+ENDJSON
+    ;;
+  *)
+    echo "unknown: $*" >&2
+    exit 1
+    ;;
+esac
+"#,
+    );
+
+    let cfg = Arc::new(AgentMemoryConfig {
+        binary: shim,
+        role: Some("developer".to_string()),
+        timeout_secs: 5,
+        max_context_chars: 4000,
+    });
+    let tool = MemoryRetrieveTool::new(cfg);
+
+    let result = tool
+        .execute(serde_json::json!({"query": "checklist"}))
+        .await
+        .expect("retrieve should succeed");
+
+    let items: Vec<serde_json::Value> = serde_json::from_str(&result).unwrap();
+    assert_eq!(items.len(), 1, "expected role scoping, got: {}", result);
+    assert_eq!(items[0]["id"], "dev");
+}
+
+// ---------------------------------------------------------------------------
+// Contract 12: fallback export path is ranked and role-scoped (#3226)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn contract_retrieve_fallback_ranks_and_scopes() {
+    common::scrub_env();
+
+    let tmp = tempfile::tempdir().unwrap();
+    // Shim without `memory retrieve` support (exit 2 like clap does for an
+    // unrecognised argument): the tool must fall back to export and rank.
+    let export_json = r#"{"agent":"test","exported_at":"2026-01-01T00:00:00Z","memory_items":[{"id":"incidental","item_type":"Experience","content":"The escargot nextestimonial dinner was lovely","importance":"Low","tags":[],"access_count":0,"created_at":"2026-01-01T00:00:00Z"},{"id":"exact","item_type":"Experience","content":"Use cargo nextest for faster Rust test runs","importance":"High","tags":["role:developer"],"access_count":3,"created_at":"2026-01-02T00:00:00Z"},{"id":"other-role","item_type":"Experience","content":"cargo nextest guidance for reviewers","importance":"Medium","tags":["role:reviewer"],"access_count":1,"created_at":"2026-01-03T00:00:00Z"}],"lessons":[],"summary":{"memory_count":3,"lesson_count":0}}"#;
+    let script = format!(
+        r#"#!/bin/sh
+case "$1 $2" in
+  "memory retrieve")
+    echo "error: unrecognized argument" >&2
+    exit 2
+    ;;
+  "memory export")
+    cat <<'ENDJSON'
+{}
+ENDJSON
+    ;;
+  *)
+    echo "unknown: $*" >&2
+    exit 1
+    ;;
+esac
+"#,
+        export_json
+    );
+    let shim = write_shim(tmp.path(), &script);
+
+    let cfg = Arc::new(AgentMemoryConfig {
+        binary: shim,
+        role: Some("developer".to_string()),
+        timeout_secs: 5,
+        max_context_chars: 4000,
+    });
+    let tool = MemoryRetrieveTool::new(cfg);
+
+    let result = tool
+        .execute(serde_json::json!({"query": "cargo nextest", "limit": 5}))
+        .await
+        .expect("fallback retrieve should succeed");
+
+    let items: Vec<serde_json::Value> = serde_json::from_str(&result).unwrap();
+    assert!(
+        !items.is_empty(),
+        "expected ranked fallback results, got: {}",
+        result
+    );
+    assert_eq!(
+        items[0]["id"], "exact",
+        "exact concept match must rank first, got: {}",
+        result
+    );
+    let ids: Vec<&str> = items.iter().filter_map(|i| i["id"].as_str()).collect();
+    assert!(
+        !ids.contains(&"incidental"),
+        "incidental substring match must not surface, got: {:?}",
+        ids
+    );
+    assert!(
+        !ids.contains(&"other-role"),
+        "reviewer-scoped item must be excluded for developer role, got: {:?}",
+        ids
+    );
+}
