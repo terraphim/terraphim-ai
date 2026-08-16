@@ -1,0 +1,90 @@
+# Disciplined engineering flow — terraphim-ai (fleet standard)
+#
+# Issue -> implement -> test -> PR -> structured review -> merge.
+# Phases mirror the fleet agents in .terraphim/adf.toml (same cli_tool +
+# model routing per 2026-08-14 enablement guide §3.3/§3.4):
+#   developer (pi-rust / kimi k3) -> reviewer (claude / MiniMax-M3)
+#   -> merge-coordinator (pi-rust / kimi k3)
+# (rewritten per guide §8; the legacy 13-step pipeline referenced phase
+#  agents that no longer exist in adf.toml).
+#
+# Run with:
+#   adf-ctl flow disciplined-engineering-flow --context "issue=<IDX>" --local
+
+name = "disciplined-engineering-flow"
+project = "terraphim-ai"
+repo_path = "."
+timeout_secs = 3600
+
+# ── Phase 1: implement (developer: pi-rust / kimi k3) ──
+[[steps]]
+name = "implement"
+kind = "agent"
+cli_tool = "/usr/local/bin/pi-rust"
+model = "kimi-for-coding/k3"
+persona = "ferrox"
+task = '''
+source ~/.profile
+export GITEA_TOKEN="$(grep -o 'token = "[^"]*"' /opt/ai-dark-factory/conf.d/terraphim-ai.toml | head -1 | cut -d'"' -f2)"
+export GITEA_URL="https://git.terraphim.cloud"
+
+Implement issue {{issue}} following the disciplined engineering flow:
+1. Claim: gtr claim --owner terraphim --repo terraphim-ai --issue {{issue}} --agent developer
+2. git checkout -b task/{{issue}}-impl
+3. Implement per the issue spec (real code, no placeholders).
+4. cargo test --workspace && cargo clippy --workspace must pass.
+5. Commit: git commit --no-verify -m "[agent] feat: implement #{{issue}}. Refs terraphim/terraphim-ai#{{issue}}"
+6. Push and open PR: gtr create-pull --owner terraphim --repo terraphim-ai --title "Fix #{{issue}}" --base main --head task/{{issue}}-impl
+7. Comment "@adf:reviewer please review PR." on the issue. Do NOT close the issue.
+'''
+timeout_secs = 2400
+on_fail = "abort"
+
+[[steps]]
+name = "gate-implement"
+kind = "gate"
+condition = "{{steps.implement.exit_code}} == 0"
+on_fail = "abort"
+
+# ── Phase 2: structured review (reviewer: claude / MiniMax-M3) ──
+[[steps]]
+name = "review"
+kind = "agent"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "minimax-coding-plan/MiniMax-M3"
+persona = "carthos"
+task = '''
+Run the 9-dimension structural review on the PR opened for issue {{issue}}.
+Post the verdict on the issue: "compound-review verdict: GO" or
+"compound-review verdict: NO-GO" with severity-tiered findings.
+'''
+timeout_secs = 900
+on_fail = "abort"
+
+[[steps]]
+name = "gate-review"
+kind = "gate"
+condition = "{{steps.review.exit_code}} == 0"
+on_fail = "abort"
+
+# ── Phase 3: merge (merge-coordinator: pi-rust / kimi k3) ──
+[[steps]]
+name = "merge"
+kind = "agent"
+cli_tool = "/usr/local/bin/pi-rust"
+model = "kimi-for-coding/k3"
+persona = "conduit"
+task = '''
+source ~/.profile
+Read all review comments on issue {{issue}}. If all required verdicts are
+GO/PASS, merge the linked PR (gtr merge-pull --owner terraphim --repo
+terraphim-ai) and close the issue. Otherwise post a status summary and wait.
+'''
+timeout_secs = 600
+on_fail = "abort"
+
+[[steps]]
+name = "gate-merge"
+kind = "gate"
+condition = "{{steps.merge.exit_code}} == 0"
+on_fail = "abort"
