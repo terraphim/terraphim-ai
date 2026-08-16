@@ -1420,6 +1420,10 @@ pub struct ImageGenConfig {
 
     #[serde(default)]
     pub api_key: String,
+
+    /// Enable the provider-side content safety checker. Defaults to true.
+    #[serde(default = "default_true")]
+    pub safety_checker: bool,
 }
 
 fn default_image_model() -> String {
@@ -1430,6 +1434,10 @@ fn default_image_base_url() -> String {
     "https://fal.run".to_string()
 }
 
+fn default_true() -> bool {
+    true
+}
+
 impl Default for ImageGenConfig {
     fn default() -> Self {
         Self {
@@ -1437,6 +1445,7 @@ impl Default for ImageGenConfig {
             model: default_image_model(),
             base_url: default_image_base_url(),
             api_key: String::new(),
+            safety_checker: true,
         }
     }
 }

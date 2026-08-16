@@ -12,6 +12,29 @@ use std::time::Duration;
 
 const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+/// Maximum size (bytes) of a remotely-fetched image before we refuse it.
+const MAX_IMAGE_BYTES: usize = 10 * 1024 * 1024;
+
+/// Fetch a remote image with a hard size cap to bound SSRF/memory exposure.
+async fn fetch_image_bytes(
+    http: &reqwest::Client,
+    url: &str,
+    max_bytes: usize,
+) -> Result<Vec<u8>, String> {
+    let mut resp = http.get(url).send().await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("image fetch failed: HTTP {}", resp.status()));
+    }
+    let mut buf = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(|e| e.to_string())? {
+        if buf.len() + chunk.len() > max_bytes {
+            return Err(format!("image exceeds {} byte limit", max_bytes));
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    Ok(buf)
+}
+
 /// Minimal standard base64 encoder (with padding).
 pub fn base64_encode(data: &[u8]) -> String {
     let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
@@ -87,15 +110,7 @@ impl VisionClient {
     pub async fn analyze(&self, image_url: &str, question: &str) -> Result<String, String> {
         // Resolve image to a base64 data URL.
         let data_url = if image_url.starts_with("http://") || image_url.starts_with("https://") {
-            let bytes = self
-                .http
-                .get(image_url)
-                .send()
-                .await
-                .map_err(|e| e.to_string())?
-                .bytes()
-                .await
-                .map_err(|e| e.to_string())?;
+            let bytes = fetch_image_bytes(&self.http, image_url, MAX_IMAGE_BYTES).await?;
             let mime =
                 determine_mime_type(Path::new(image_url.split('?').next().unwrap_or(image_url)));
             format!("data:{};base64,{}", mime, base64_encode(&bytes))
@@ -247,5 +262,31 @@ mod tests {
             ..Default::default()
         };
         assert!(!cfg2.available());
+    }
+
+    #[tokio::test]
+    async fn fetch_rejects_oversized_image() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut sock, _) = listener.accept().await.unwrap();
+            let mut req = [0u8; 2048];
+            let _ = sock.read(&mut req).await;
+            let body = vec![b'a'; 64 * 1024];
+            let header = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = sock.write_all(header.as_bytes()).await;
+            let _ = sock.write_all(&body).await;
+        });
+
+        let http = reqwest::Client::new();
+        let url = format!("http://{}/big", addr);
+        // Cap far below the 64 KB body forces the oversize error.
+        let err = fetch_image_bytes(&http, &url, 1024).await.unwrap_err();
+        assert!(err.contains("exceeds"), "unexpected error: {}", err);
+        let _ = server.await;
     }
 }
