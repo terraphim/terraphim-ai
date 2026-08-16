@@ -4,10 +4,18 @@
 //! Each tool shells out to the `terraphim-agent` binary via
 //! `tokio::process::Command`, following the same subprocess pattern as
 //! [`ShellTool`](super::shell::ShellTool).
+//!
+//! Retrieval is ranked and role-scoped (issue #3226): `memory_retrieve`
+//! prefers `terraphim-agent memory retrieve --format json` (upstream
+//! ranked retrieval) and falls back to `memory export --format json`
+//! with a local BM25 ranker plus exact-phrase boost when the installed
+//! binary lacks the flag.
 
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use terraphim_types::score::OkapiBM25Scorer;
+use terraphim_types::{Document, DocumentType};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -207,18 +215,181 @@ pub(crate) fn truncate_chars(s: &str, max: usize) -> &str {
     &s[..end]
 }
 
-/// Client-side filter: case-insensitive substring match on `content`.
-pub(crate) fn filter_items<'a>(
+// ---------------------------------------------------------------------------
+// Ranked hybrid retrieval (issue #3226)
+// ---------------------------------------------------------------------------
+
+/// Additive score boost when the full query phrase appears verbatim
+/// (case-insensitive) in an item's content. Mirrors the concept boost in
+/// `terraphim_sessions::search` (`KG_BOOST_MULTIPLIER`): an exact-concept
+/// match must outrank items that merely share a term.
+const EXACT_PHRASE_BOOST: f64 = 10.0;
+
+/// Tag prefix marking an item as belonging to a role (`role:<name>`).
+/// Items without any such marker are shared across roles.
+const ROLE_TAG_PREFIX: &str = "role:";
+
+/// Clamp the caller-supplied limit to the documented contract:
+/// 1..=20, default 5.
+pub(crate) fn clamp_limit(limit: Option<u64>) -> usize {
+    limit.unwrap_or(5).clamp(1, 20) as usize
+}
+
+/// Normalise free text into lowercase alphanumeric tokens separated by
+/// single spaces. `OkapiBM25Scorer` tokenises on whitespace only, so
+/// punctuation must be stripped here for `rust,` to match `rust`.
+pub(crate) fn normalise_tokens(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut last_was_space = true;
+    for ch in text.chars() {
+        if ch.is_alphanumeric() {
+            out.extend(ch.to_lowercase());
+            last_was_space = false;
+        } else if !last_was_space {
+            out.push(' ');
+            last_was_space = true;
+        }
+    }
+    while out.ends_with(' ') {
+        out.pop();
+    }
+    out
+}
+
+/// Role markers carried by an item: the `<name>` part of each
+/// `role:<name>` tag (prefix matched case-insensitively).
+fn item_role_markers(item: &MemoryItem) -> Vec<&str> {
+    item.tags
+        .iter()
+        .filter_map(|tag| {
+            if tag.len() > ROLE_TAG_PREFIX.len()
+                && tag[..ROLE_TAG_PREFIX.len()].eq_ignore_ascii_case(ROLE_TAG_PREFIX)
+            {
+                Some(&tag[ROLE_TAG_PREFIX.len()..])
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// An item is visible to `role` when it carries no `role:` markers at all
+/// (shared memory) or at least one marker matches case-insensitively.
+pub(crate) fn in_role_scope(item: &MemoryItem, role: Option<&str>) -> bool {
+    let Some(role) = role else {
+        return true;
+    };
+    let markers = item_role_markers(item);
+    markers.is_empty() || markers.iter().any(|m| m.eq_ignore_ascii_case(role))
+}
+
+/// Convert a memory item into a `terraphim_types::Document` for BM25
+/// scoring. The body is the normalised content so the
+/// whitespace-tokenising scorer sees clean terms.
+fn memory_item_to_document(item: &MemoryItem) -> Document {
+    Document {
+        id: item.id.clone(),
+        url: String::new(),
+        title: item.id.clone(),
+        body: normalise_tokens(&item.content),
+        description: None,
+        summarization: None,
+        stub: None,
+        tags: if item.tags.is_empty() {
+            None
+        } else {
+            Some(item.tags.clone())
+        },
+        rank: None,
+        source_haystack: None,
+        doc_type: DocumentType::default(),
+        synonyms: None,
+        route: None,
+        priority: None,
+        quality_score: None,
+    }
+}
+
+/// Rank `items` against `query` with BM25 over tokenised content plus an
+/// exact-phrase boost, scoped to `role`. Returns at most `limit` items,
+/// best first. Items with no term overlap and no phrase match score zero
+/// and are dropped: an incidental substring no longer surfaces.
+pub(crate) fn rank_items<'a>(
     items: &'a [MemoryItem],
     query: &str,
+    role: Option<&str>,
     limit: usize,
 ) -> Vec<&'a MemoryItem> {
-    let query_lower = query.to_lowercase();
-    items
+    if query.trim().is_empty() || items.is_empty() || limit == 0 {
+        return Vec::new();
+    }
+
+    let scoped: Vec<&MemoryItem> = items
         .iter()
-        .filter(|item| item.content.to_lowercase().contains(&query_lower))
+        .filter(|item| in_role_scope(item, role))
+        .collect();
+
+    let documents: Vec<Document> = scoped.iter().map(|i| memory_item_to_document(i)).collect();
+
+    let mut scorer = OkapiBM25Scorer::new();
+    scorer.initialize(&documents);
+
+    let normalised_query = normalise_tokens(query);
+    let phrase = query.trim().to_lowercase();
+
+    let mut scored: Vec<(f64, usize)> = documents
+        .iter()
+        .enumerate()
+        .map(|(idx, doc)| {
+            let mut score = scorer.score(&normalised_query, doc);
+            if !phrase.is_empty() && scoped[idx].content.to_lowercase().contains(&phrase) {
+                score += EXACT_PHRASE_BOOST;
+            }
+            (score, idx)
+        })
+        .filter(|(score, _)| *score > 0.0)
+        .collect();
+
+    scored.sort_by(|a, b| {
+        b.0.partial_cmp(&a.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            // Stable tie-break on original position.
+            .then(a.1.cmp(&b.1))
+    });
+
+    scored
+        .into_iter()
         .take(limit)
+        .map(|(_, idx)| scoped[idx])
         .collect()
+}
+
+/// Lenient payload shape for `memory retrieve --format json` once the
+/// upstream flag lands (companion change filed as a follow-up to #3226).
+/// Accepts either a bare array of items or an envelope object carrying
+/// `memory_items` (alias `items`).
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub(crate) enum RetrievePayload {
+    Items(Vec<MemoryItem>),
+    Envelope(RetrieveEnvelope),
+}
+
+/// Envelope variant of [`RetrievePayload`].
+#[derive(Debug, Deserialize)]
+pub(crate) struct RetrieveEnvelope {
+    #[serde(default, alias = "items")]
+    pub memory_items: Vec<MemoryItem>,
+}
+
+/// Parse the stdout of `memory retrieve --format json`. Returns `None`
+/// when the output is not recognisable JSON, signalling the caller to
+/// fall back to the export path.
+pub(crate) fn parse_retrieve_items(raw: &str) -> Option<Vec<MemoryItem>> {
+    match serde_json::from_str::<RetrievePayload>(raw.trim()).ok()? {
+        RetrievePayload::Items(items) => Some(items),
+        RetrievePayload::Envelope(envelope) => Some(envelope.memory_items),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +479,60 @@ impl MemoryRetrieveTool {
     pub fn new(config: Arc<AgentMemoryConfig>) -> Self {
         Self { config }
     }
+
+    /// Attempt ranked retrieval via `memory retrieve --format json`.
+    ///
+    /// Returns `None` when the installed binary lacks the flag or the
+    /// output is not parseable JSON, signalling the caller to fall back
+    /// to the export path with local ranking.
+    async fn retrieve_upstream(&self, query: &str, limit: usize) -> Option<Vec<MemoryItem>> {
+        let limit_str = limit.to_string();
+        let mut cli_args = vec![
+            "memory",
+            "retrieve",
+            query,
+            "--limit",
+            &limit_str,
+            "--format",
+            "json",
+        ];
+
+        // Pass the configured role through to retrieval, not only
+        // capture/apply (#3226).
+        let role_owned;
+        if let Some(ref role) = self.config.role {
+            role_owned = role.clone();
+            cli_args.push("--role");
+            cli_args.push(&role_owned);
+        }
+
+        let raw = match run_agent(&self.config, &cli_args, None).await {
+            Ok(raw) => raw,
+            Err(e) => {
+                tracing::debug!(
+                    "memory retrieve --format json unavailable, falling back to export: {}",
+                    e
+                );
+                return None;
+            }
+        };
+
+        let mut items = match parse_retrieve_items(&raw) {
+            Some(items) => items,
+            None => {
+                tracing::debug!(
+                    "memory retrieve output not parseable as JSON, falling back to export"
+                );
+                return None;
+            }
+        };
+
+        // Defence in depth: enforce role scope and the limit client-side
+        // even when the binary claims to handle them.
+        items.retain(|item| in_role_scope(item, self.config.role.as_deref()));
+        items.truncate(limit);
+        Some(items)
+    }
 }
 
 #[async_trait]
@@ -349,11 +574,22 @@ impl Tool for MemoryRetrieveTool {
                 message: "Missing required 'query' parameter".to_string(),
             })?;
 
-        let limit = args["limit"].as_u64().unwrap_or(5) as usize;
-        let limit = limit.clamp(1, 20);
+        let limit = clamp_limit(args["limit"].as_u64());
 
-        // Use `memory export --format json` and filter client-side.
-        // (memory retrieve lacks --json; see research.md:183-192)
+        // Primary path: ranked, role-scoped retrieval upstream. Requires
+        // `--format json` on `memory retrieve` (companion change filed as
+        // a follow-up to #3226).
+        if let Some(items) = self.retrieve_upstream(query, limit).await {
+            let json =
+                serde_json::to_string(&items).map_err(|e| ToolError::ExecutionFailed {
+                    tool: "memory_retrieve".to_string(),
+                    message: format!("Failed to serialise results: {}", e),
+                })?;
+            return Ok(json);
+        }
+
+        // Fallback path: `memory export --format json` plus local BM25
+        // ranking with role scoping. Ranked, never a raw substring scan.
         let cli_args = vec!["memory", "export", "--format", "json"];
         let raw = run_agent(&self.config, &cli_args, None).await?;
 
@@ -367,7 +603,12 @@ impl Tool for MemoryRetrieveTool {
                 ),
             })?;
 
-        let matches = filter_items(&export.memory_items, query, limit);
+        let matches = rank_items(
+            &export.memory_items,
+            query,
+            self.config.role.as_deref(),
+            limit,
+        );
         let json = serde_json::to_string(&matches).map_err(|e| ToolError::ExecutionFailed {
             tool: "memory_retrieve".to_string(),
             message: format!("Failed to serialise results: {}", e),
@@ -674,53 +915,192 @@ mod tests {
         assert_eq!(export.memory_items[0].content, "hello");
     }
 
-    // -- Filter tests -------------------------------------------------------
+    // -- Ranking tests (#3226) ----------------------------------------------
 
-    #[test]
-    fn test_filter_items_case_insensitive() {
-        let items = vec![MemoryItem {
-            id: "1".to_string(),
+    fn fixture_item(id: &str, content: &str, tags: Vec<&str>) -> MemoryItem {
+        MemoryItem {
+            id: id.to_string(),
             item_type: "Experience".to_string(),
-            content: "Writing Rust code is fun".to_string(),
+            content: content.to_string(),
             importance: "Medium".to_string(),
-            tags: vec![],
+            tags: tags.into_iter().map(str::to_string).collect(),
             access_count: 0,
             created_at: String::new(),
-        }];
-        let matches = filter_items(&items, "rust", 5);
+        }
+    }
+
+    #[test]
+    fn test_normalise_tokens_strips_punctuation_and_case() {
+        assert_eq!(normalise_tokens("Rust, cargo!  NEXTEST."), "rust cargo nextest");
+        assert_eq!(normalise_tokens(""), "");
+        assert_eq!(normalise_tokens("---"), "");
+    }
+
+    #[test]
+    fn test_rank_items_case_insensitive() {
+        let items = vec![fixture_item("1", "Writing Rust code is fun", vec![])];
+        let matches = rank_items(&items, "rust", None, 5);
         assert_eq!(matches.len(), 1);
     }
 
     #[test]
-    fn test_filter_items_no_match() {
-        let items = vec![MemoryItem {
-            id: "1".to_string(),
-            item_type: "Experience".to_string(),
-            content: "Python is great".to_string(),
-            importance: "Medium".to_string(),
-            tags: vec![],
-            access_count: 0,
-            created_at: String::new(),
-        }];
-        let matches = filter_items(&items, "rust", 5);
+    fn test_rank_items_exact_concept_outranks_incidental_substring() {
+        // "incidental" contains the query as a pure substring
+        // ("esc**argo nextest**imonial") but shares no token with it; the
+        // old substring filter would have surfaced it. Ranked retrieval
+        // must put the exact-concept match first and drop the incidental
+        // one entirely.
+        let items = vec![
+            fixture_item(
+                "incidental",
+                "The escargot nextestimonial dinner was lovely",
+                vec![],
+            ),
+            fixture_item(
+                "exact",
+                "Use cargo nextest for faster Rust test runs in CI",
+                vec![],
+            ),
+        ];
+        let matches = rank_items(&items, "cargo nextest", None, 5);
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].id, "exact");
+        assert!(
+            matches.iter().all(|m| m.id != "incidental"),
+            "incidental substring match must not be returned"
+        );
+    }
+
+    #[test]
+    fn test_rank_items_no_match_returns_empty() {
+        let items = vec![fixture_item("1", "Python is great", vec![])];
+        let matches = rank_items(&items, "rust", None, 5);
         assert!(matches.is_empty());
     }
 
     #[test]
-    fn test_filter_items_respects_limit() {
+    fn test_rank_items_respects_limit() {
         let items: Vec<MemoryItem> = (0..10)
-            .map(|i| MemoryItem {
-                id: i.to_string(),
-                item_type: "Experience".to_string(),
-                content: format!("match item {}", i),
-                importance: "Medium".to_string(),
-                tags: vec![],
-                access_count: 0,
-                created_at: String::new(),
-            })
+            .map(|i| fixture_item(&i.to_string(), &format!("match item {}", i), vec![]))
             .collect();
-        let matches = filter_items(&items, "match", 3);
+        let matches = rank_items(&items, "match", None, 3);
         assert_eq!(matches.len(), 3);
+    }
+
+    #[test]
+    fn test_rank_items_empty_query_returns_empty() {
+        let items = vec![fixture_item("1", "anything at all", vec![])];
+        assert!(rank_items(&items, "", None, 5).is_empty());
+        assert!(rank_items(&items, "   ", None, 5).is_empty());
+    }
+
+    #[test]
+    fn test_rank_items_role_scoping() {
+        let items = vec![
+            fixture_item("dev", "testing strategy for the backend", vec!["role:developer"]),
+            fixture_item("rev", "testing checklist for reviewers", vec!["role:reviewer"]),
+            fixture_item("shared", "testing is everyone's job", vec![]),
+        ];
+
+        // No role: everything is in scope.
+        let all = rank_items(&items, "testing", None, 10);
+        assert_eq!(all.len(), 3);
+
+        // Developer role: reviewer-tagged item is excluded, shared stays.
+        let dev = rank_items(&items, "testing", Some("developer"), 10);
+        assert!(dev.iter().any(|m| m.id == "dev"));
+        assert!(dev.iter().any(|m| m.id == "shared"));
+        assert!(
+            dev.iter().all(|m| m.id != "rev"),
+            "reviewer-scoped item must not leak into developer retrieval"
+        );
+    }
+
+    #[test]
+    fn test_in_role_scope_marker_matching() {
+        let dev = fixture_item("a", "x", vec!["role:Developer"]);
+        assert!(in_role_scope(&dev, Some("developer"))); // case-insensitive
+        assert!(!in_role_scope(&dev, Some("reviewer")));
+        assert!(in_role_scope(&dev, None));
+        let shared = fixture_item("b", "x", vec!["testing"]);
+        assert!(in_role_scope(&shared, Some("reviewer")));
+    }
+
+    #[test]
+    fn test_clamp_limit_contract() {
+        assert_eq!(clamp_limit(None), 5, "default is 5");
+        assert_eq!(clamp_limit(Some(0)), 1, "minimum is 1");
+        assert_eq!(clamp_limit(Some(7)), 7);
+        assert_eq!(clamp_limit(Some(20)), 20);
+        assert_eq!(clamp_limit(Some(21)), 20, "maximum is 20");
+        assert_eq!(clamp_limit(Some(u64::MAX)), 20);
+    }
+
+    #[test]
+    fn test_parse_retrieve_items_bare_array() {
+        let raw = r#"[{"id":"1","content":"hello"}]"#;
+        let items = parse_retrieve_items(raw).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, "1");
+    }
+
+    #[test]
+    fn test_parse_retrieve_items_envelope() {
+        let raw = r#"{"memory_items":[{"id":"2","content":"world"}],"query":"w"}"#;
+        let items = parse_retrieve_items(raw).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, "2");
+
+        let raw_alias = r#"{"items":[{"id":"3","content":"alias"}]}"#;
+        let items = parse_retrieve_items(raw_alias).unwrap();
+        assert_eq!(items[0].id, "3");
+    }
+
+    #[test]
+    fn test_parse_retrieve_items_rejects_human_readable_output() {
+        assert!(parse_retrieve_items("Memory retrieve: routing to search").is_none());
+        assert!(parse_retrieve_items("").is_none());
+    }
+
+    #[test]
+    fn test_rank_items_from_tempdir_fixture_store() {
+        // Fixture learnings persisted in a tempdir store: the ranking
+        // pipeline runs over exactly what a real `memory export` file
+        // would contain, with no mocked collaborators.
+        let dir = tempfile::tempdir().unwrap();
+        let store_path = dir.path().join("memory-export.json");
+        let fixture = r#"{
+            "agent": "fixture",
+            "exported_at": "2026-08-16T00:00:00Z",
+            "memory_items": [
+                {"id": "a", "item_type": "Experience",
+                 "content": "Always run cargo nextest before pushing",
+                 "importance": "High", "tags": ["role:developer"],
+                 "access_count": 3, "created_at": "2026-08-01T00:00:00Z"},
+                {"id": "b", "item_type": "Experience",
+                 "content": "The cargo ship docked next to the test pier",
+                 "importance": "Low", "tags": [],
+                 "access_count": 0, "created_at": "2026-08-02T00:00:00Z"},
+                {"id": "c", "item_type": "Lesson",
+                 "content": "Reviewers run cargo nextest with --all-features",
+                 "importance": "Medium", "tags": ["role:reviewer"],
+                 "access_count": 1, "created_at": "2026-08-03T00:00:00Z"}
+            ],
+            "lessons": [],
+            "summary": {"memory_count": 3, "lesson_count": 0}
+        }"#;
+        std::fs::write(&store_path, fixture).unwrap();
+
+        let raw = std::fs::read_to_string(&store_path).unwrap();
+        let export: MemoryExport = serde_json::from_str(&raw).unwrap();
+        assert_eq!(export.memory_items.len(), 3);
+
+        let ranked = rank_items(&export.memory_items, "cargo nextest", Some("developer"), 5);
+        assert_eq!(ranked[0].id, "a", "exact concept match must rank first");
+        assert!(
+            ranked.iter().all(|m| m.id != "c"),
+            "reviewer-scoped item must be excluded for developer role"
+        );
     }
 
     // -- Missing args tests -------------------------------------------------
