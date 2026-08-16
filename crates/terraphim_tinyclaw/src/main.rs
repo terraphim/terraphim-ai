@@ -20,6 +20,37 @@ use terraphim_tinyclaw::session::SessionManager;
 use terraphim_tinyclaw::skills::{Skill, SkillExecutor};
 use terraphim_tinyclaw::tools::create_default_registry_with_parity;
 
+/// Select the session memory backend for the agent loop (#3227, T4).
+///
+/// `memory.backend = "sqlite"` (with `memory.enabled = true`) routes
+/// session persistence through `SqliteBackend` on the shared
+/// `DeviceStorage`. Any other value — or a `DeviceStorage` initialisation
+/// failure — falls back to the default `JsonlBackend` over the shared
+/// `SessionManager`, preserving the existing on-disk layout so legacy
+/// session files keep loading.
+async fn select_session_backend(
+    config: &Config,
+    sessions: Arc<tokio::sync::Mutex<SessionManager>>,
+) -> terraphim_tinyclaw::memory::SharedBackend {
+    use terraphim_tinyclaw::memory::jsonl::JsonlBackend;
+    use terraphim_tinyclaw::memory::sqlite::SqliteBackend;
+
+    if config.memory.enabled && config.memory.backend == "sqlite" {
+        match terraphim_persistence::DeviceStorage::arc_instance().await {
+            Ok(storage) => {
+                log::info!("Session memory backend: sqlite (DeviceStorage)");
+                return Arc::new(SqliteBackend::new(storage, "tinyclaw"));
+            }
+            Err(e) => {
+                log::warn!(
+                    "DeviceStorage init failed ({e}); falling back to jsonl session backend"
+                );
+            }
+        }
+    }
+    Arc::new(JsonlBackend::from_shared(sessions))
+}
+
 /// Multi-channel AI assistant powered by Terraphim.
 #[derive(Parser, Debug)]
 #[command(name = "terraphim-tinyclaw")]
@@ -243,11 +274,12 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     let router = build_router(&config)?;
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(
+    let backend = select_session_backend(&config, sessions).await;
+    let agent = ToolCallingLoop::with_backend(
         &config.agent,
         router,
         tools,
-        sessions,
+        backend,
         system_prompt,
         memory_config,
     );
@@ -313,11 +345,12 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     let router = build_router(&config)?;
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(
+    let backend = select_session_backend(&config, sessions).await;
+    let agent = ToolCallingLoop::with_backend(
         &config.agent,
         router,
         tools,
-        sessions,
+        backend,
         system_prompt,
         memory_config_gw,
     );

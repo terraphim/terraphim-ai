@@ -1066,6 +1066,14 @@ pub struct MemoryConfig {
     /// prompt per request. Prevents token-budget overflow.
     #[serde(default = "default_max_context_chars")]
     pub max_context_chars: usize,
+
+    /// Session memory backend for the agent loop: `"jsonl"` (default;
+    /// per-session JSON-line files, preserving the existing on-disk
+    /// layout) or `"sqlite"` (keyed JSON via
+    /// `terraphim_persistence::DeviceStorage`). Unknown values fall back
+    /// to `"jsonl"`.
+    #[serde(default = "default_memory_backend")]
+    pub backend: String,
 }
 
 fn default_agent_binary() -> String {
@@ -1080,6 +1088,10 @@ fn default_max_context_chars() -> usize {
     4000
 }
 
+fn default_memory_backend() -> String {
+    "jsonl".to_string()
+}
+
 impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
@@ -1088,6 +1100,7 @@ impl Default for MemoryConfig {
             binary: default_agent_binary(),
             timeout_secs: default_memory_timeout(),
             max_context_chars: default_max_context_chars(),
+            backend: default_memory_backend(),
         }
     }
 }

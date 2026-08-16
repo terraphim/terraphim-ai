@@ -8,6 +8,7 @@ use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::commands::CommandRegistry;
 use crate::config::{AgentConfig, DirectLlmConfig};
 use crate::credentials::{CredentialPool, CredentialSource, EnvVarSource, ProviderId};
+use crate::memory::{SharedBackend, jsonl::JsonlBackend};
 use crate::session::{ChatMessage, MessageRole, SessionManager};
 use crate::tools::agent_memory::{AgentMemoryConfig, run_agent};
 use crate::tools::{ToolError, ToolRegistry};
@@ -431,7 +432,10 @@ pub struct ToolCallingLoop {
     router: HybridLlmRouter,
     guard: ExecutionGuard,
     tools: Arc<ToolRegistry>,
-    sessions: Arc<Mutex<SessionManager>>,
+    /// Session memory backend (#3227, T4). All session reads/writes in
+    /// the loop go through this trait object so the storage backend is
+    /// swappable (jsonl files by default; sqlite via `with_backend`).
+    backend: SharedBackend,
     commands: Arc<Mutex<CommandRegistry>>,
     system_prompt: String,
     shutdown: CancellationToken,
@@ -446,6 +450,11 @@ pub struct ToolCallingLoop {
 
 impl ToolCallingLoop {
     /// Create a new tool-calling loop.
+    ///
+    /// The session manager is wrapped in a [`JsonlBackend`] so the loop
+    /// persists through the [`crate::memory::MemoryBackend`] trait while
+    /// sharing the same manager (mutex + cache + on-disk layout) with the
+    /// session tools.
     pub fn new(
         agent_config: &AgentConfig,
         router: HybridLlmRouter,
@@ -480,6 +489,53 @@ impl ToolCallingLoop {
         commands: CommandRegistry,
         memory_config: Option<&crate::config::MemoryConfig>,
     ) -> Self {
+        Self::with_backend_and_commands(
+            agent_config,
+            router,
+            tools,
+            Arc::new(JsonlBackend::from_shared(sessions)),
+            system_prompt,
+            commands,
+            memory_config,
+        )
+    }
+
+    /// Create with an explicit memory backend and default commands.
+    ///
+    /// Use this to select a non-default backend (e.g. `SqliteBackend`)
+    /// from configuration. The default [`Self::new`] path preserves the
+    /// legacy jsonl on-disk layout.
+    pub fn with_backend(
+        agent_config: &AgentConfig,
+        router: HybridLlmRouter,
+        tools: Arc<ToolRegistry>,
+        backend: SharedBackend,
+        system_prompt: String,
+        memory_config: Option<&crate::config::MemoryConfig>,
+    ) -> Self {
+        let mut commands = CommandRegistry::with_defaults();
+        let _ = commands.load_all();
+        Self::with_backend_and_commands(
+            agent_config,
+            router,
+            tools,
+            backend,
+            system_prompt,
+            commands,
+            memory_config,
+        )
+    }
+
+    /// Create with an explicit memory backend and command registry.
+    pub fn with_backend_and_commands(
+        agent_config: &AgentConfig,
+        router: HybridLlmRouter,
+        tools: Arc<ToolRegistry>,
+        backend: SharedBackend,
+        system_prompt: String,
+        commands: CommandRegistry,
+        memory_config: Option<&crate::config::MemoryConfig>,
+    ) -> Self {
         let (memory_enabled, mem_cfg_arc) = match memory_config {
             Some(cfg) if cfg.enabled => (true, Some(Arc::new(AgentMemoryConfig::from(cfg)))),
             _ => (false, None),
@@ -493,7 +549,7 @@ impl ToolCallingLoop {
             router,
             guard: ExecutionGuard::new(),
             tools,
-            sessions,
+            backend,
             commands: Arc::new(Mutex::new(commands)),
             system_prompt,
             shutdown: CancellationToken::new(),
@@ -541,13 +597,10 @@ impl ToolCallingLoop {
         // Handle /reset command specially - it needs to clear the session
         if msg.content.trim() == "/reset" {
             let session_key = msg.session_key();
-            let mut sessions_guard = self.sessions.lock().await;
-            // Get session, clear it, then save
-            let session = sessions_guard.get_or_create(&session_key);
+            // Get session, clear it, then persist
+            let mut session = self.backend.get_or_create(&session_key).await;
             session.clear();
-            let session_clone = session.clone();
-            sessions_guard.save(&session_clone)?;
-            drop(sessions_guard);
+            self.backend.persist(&session).await?;
 
             let response = OutboundMessage::new(
                 &msg.channel,
@@ -566,8 +619,7 @@ impl ToolCallingLoop {
 
         // Get or create session
         let session_key = msg.session_key();
-        let mut sessions_guard = self.sessions.lock().await;
-        let session = sessions_guard.get_or_create(&session_key);
+        let mut session = self.backend.get_or_create(&session_key).await;
 
         // Add user message to session (augmented with media context if present)
         let user_msg = ChatMessage {
@@ -579,11 +631,9 @@ impl ToolCallingLoop {
         };
         session.add_message(user_msg.clone());
 
-        // Save session before releasing lock
-        let session_clone = session.clone();
+        // Persist session with the new user message
         let message_count = session.messages.len();
-        sessions_guard.save(&session_clone)?;
-        drop(sessions_guard);
+        self.backend.persist(&session).await?;
 
         // Check if we need compression using configured ratio
         let needs_compress = message_count > self.config.keep_last_messages * 2;
@@ -591,10 +641,9 @@ impl ToolCallingLoop {
             // Keep the last N messages, compress the rest
             let keep_count = self.config.keep_last_messages;
 
-            // Re-acquire lock to read messages for compression
+            // Reload the session to read messages for compression
             let messages_to_compress = {
-                let mut sessions_guard = self.sessions.lock().await;
-                let session = sessions_guard.get_or_create(&session_key);
+                let session = self.backend.get_or_create(&session_key).await;
                 if session.messages.len() > keep_count {
                     session.messages[..session.messages.len() - keep_count].to_vec()
                 } else {
@@ -607,9 +656,14 @@ impl ToolCallingLoop {
                 .compress(messages_to_compress, self.system_prompt.clone())
                 .await?;
 
-            // Re-acquire lock to update session
-            let mut sessions_guard = self.sessions.lock().await;
-            let session = sessions_guard.get_or_create(&session_key);
+            // T4 (#3227): write the summary back to the agent-memory
+            // bridge so compression stops being lossy-and-lost. Fail-open:
+            // the session file remains the authoritative record.
+            self.capture_compression_summary(&session_key, &summary)
+                .await;
+
+            // Reload the session to record the summary and trim messages
+            let mut session = self.backend.get_or_create(&session_key).await;
             session.set_summary(summary);
             // Keep only the recent messages
             let recent: Vec<_> = session
@@ -623,15 +677,12 @@ impl ToolCallingLoop {
                 .rev()
                 .collect();
             session.messages = recent;
-            let session_clone = session.clone();
-            sessions_guard.save(&session_clone)?;
-            drop(sessions_guard);
+            self.backend.persist(&session).await?;
         }
 
         // Build proxy messages from CURRENT session state (post-compression)
         let proxy_messages = {
-            let mut sessions_guard = self.sessions.lock().await;
-            let session = sessions_guard.get_or_create(&session_key);
+            let session = self.backend.get_or_create(&session_key).await;
             build_proxy_messages(&session.messages, session.summary.as_deref())
         };
 
@@ -716,9 +767,8 @@ impl ToolCallingLoop {
                 .await?
         };
 
-        // Add assistant response to session (re-acquire lock)
-        let mut sessions_guard = self.sessions.lock().await;
-        let session = sessions_guard.get_or_create(&session_key);
+        // Add assistant response to session
+        let mut session = self.backend.get_or_create(&session_key).await;
 
         let assistant_msg = ChatMessage {
             role: MessageRole::Assistant,
@@ -729,16 +779,54 @@ impl ToolCallingLoop {
         };
         session.add_message(assistant_msg.clone());
 
-        // Save session - clone to avoid borrow issues
-        let session_clone = session.clone();
-        sessions_guard.save(&session_clone)?;
-        drop(sessions_guard);
+        // Persist session with the assistant response
+        self.backend.persist(&session).await?;
 
         // Send response
         let outbound = OutboundMessage::new(&msg.channel, &msg.chat_id, final_response);
         outbound_tx.send(outbound).await?;
 
         Ok(())
+    }
+
+    /// Write a compression summary back to the agent-memory bridge
+    /// (`terraphim-agent memory capture`) with a provenance tag
+    /// (`session-compression:<session_key>`), so the knowledge condensed
+    /// out of the trimmed messages remains retrievable (#3227, T4).
+    ///
+    /// Fail-open and gated on `memory.enabled`: any bridge error is
+    /// logged and swallowed — the session file stays the authoritative
+    /// record. No-op when the memory bridge is disabled.
+    async fn capture_compression_summary(&self, session_key: &str, summary: &str) {
+        if !self.memory_enabled {
+            return;
+        }
+        let Some(ref mem_config) = self.memory_config else {
+            return;
+        };
+
+        let tag = format!("session-compression:{session_key}");
+        let stdin_json = serde_json::json!({
+            "content": summary,
+            "item_type": "Experience",
+            "importance": "Medium",
+        })
+        .to_string();
+
+        let mut cli_args = vec!["memory", "capture", "--provenance-tag", tag.as_str()];
+        let role_owned;
+        if let Some(ref role) = mem_config.role {
+            role_owned = role.clone();
+            cli_args.push("--role");
+            cli_args.push(&role_owned);
+        }
+
+        match run_agent(mem_config, &cli_args, Some(&stdin_json)).await {
+            Ok(_) => log::info!("Compression summary captured to memory bridge (tag: {tag})"),
+            Err(e) => {
+                log::warn!("Memory capture of compression summary failed (non-fatal): {e}")
+            }
+        }
     }
 
     /// Run the iterative tool-calling loop with explicit system prompt.
