@@ -1,0 +1,8 @@
+{
+  "type": "evo.propose",
+  "signature": "tools-use-rg-for-search",
+  "target_kind": "tool",
+  "target_ref": "config/tools.toml",
+  "content": "[search]\npreferred = \"rg\"",
+  "trust_level": "L1"
+}

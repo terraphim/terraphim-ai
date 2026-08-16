@@ -8863,6 +8863,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_engine_events"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "terraphim_types 1.20.2",
+]
+
+[[package]]
 name = "terraphim_eval_check"
 version = "1.21.3"
 dependencies = [

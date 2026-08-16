@@ -1,0 +1,22 @@
+[package]
+name = "terraphim_engine_events"
+description = "Shared TACP EngineEvent vocabulary for Terraphim surfaces (Desktop P1 contract freeze), including the evo.* evolution lifecycle family (TACP spec section 5.1)"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["terraphim", "tacp", "engine-events", "evolution", "contract"]
+categories = ["data-structures", "parser-implementations"]
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+# `TrustLevel` is re-used from the shared-learning trust ladder, not redeclared.
+terraphim_types = { version = "1.20.2", registry = "terraphim", features = ["kg-integration"] }
+
+[dev-dependencies]
+serde_json = { workspace = true }
