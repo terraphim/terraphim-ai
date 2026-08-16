@@ -4,6 +4,7 @@ pub mod agent_memory;
 pub mod approval;
 pub mod browser;
 pub mod clarify;
+pub mod clipboard;
 pub mod debug_helpers;
 pub mod edit;
 pub mod filesystem;
@@ -202,6 +203,7 @@ pub async fn create_default_registry_with_parity(
         AgentMemoryConfig, LearnCaptureTool, MemoryApplyTool, MemoryCaptureTool, MemoryRetrieveTool,
     };
     use crate::tools::clarify::ClarifyTool;
+    use crate::tools::clipboard::ClipboardTool;
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
     use crate::tools::patch_parser::PatchParseTool;
@@ -224,6 +226,7 @@ pub async fn create_default_registry_with_parity(
     ))));
     registry.register(Box::new(PatchParseTool::new()));
     registry.register(Box::new(ClarifyTool::new()));
+    registry.register(Box::new(ClipboardTool::new()));
     registry.register(Box::new(ProcessTool::new(std::sync::Arc::new(
         ProcessRegistry::new(),
     ))));

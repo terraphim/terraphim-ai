@@ -78,6 +78,7 @@ async fn test_all_expected_tools_registered() {
         "patch_parse",
         "clarify",
         "process",
+        "clipboard",
     ];
 
     for tool_name in &expected_tools {
