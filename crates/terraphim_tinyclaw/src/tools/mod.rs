@@ -2,13 +2,18 @@
 
 pub mod agent_memory;
 pub mod browser;
+pub mod debug_helpers;
 pub mod edit;
 pub mod filesystem;
+pub mod fuzzy_match;
+pub mod interrupt;
+pub mod patch_parser;
 pub mod sandbox;
 pub mod scheduler;
 pub mod session_tools;
 pub mod shell;
 pub mod subagent;
+pub mod todo;
 pub mod voice_transcribe;
 pub mod web;
 
@@ -195,8 +200,10 @@ pub async fn create_default_registry_with_parity(
     };
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
+    use crate::tools::patch_parser::PatchParseTool;
     use crate::tools::session_tools::{SessionHistoryTool, SessionListTool, SessionSendTool};
     use crate::tools::shell::ShellTool;
+    use crate::tools::todo::{TodoStore, TodoTool};
     use crate::tools::voice_transcribe::VoiceTranscribeTool;
     use crate::tools::web::{WebFetchTool, WebSearchTool};
 
@@ -207,6 +214,10 @@ pub async fn create_default_registry_with_parity(
     registry.register(Box::new(WebSearchTool::from_config(web_tools_config)));
     registry.register(Box::new(WebFetchTool::from_config(web_tools_config)));
     registry.register(Box::new(VoiceTranscribeTool::new()));
+    registry.register(Box::new(TodoTool::new(std::sync::Arc::new(
+        TodoStore::new(),
+    ))));
+    registry.register(Box::new(PatchParseTool::new()));
 
     // Register session tools if SessionManager is provided
     if let Some(sessions) = sessions {
