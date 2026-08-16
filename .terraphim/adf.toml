@@ -37,15 +37,18 @@ auto_remediate = false
 [direct_dispatch]
 socket_path = "/tmp/adf-ctl-terraphim-ai.sock"
 
-# ── PR-open gate producers ──
-[pr_dispatch]
-max_dispatches_per_tick = 3
-max_concurrent_pr_agents = 6
-agents_on_pr_open = [
-    { name = "pr-reviewer", context = "adf/pr-reviewer" },
-    { name = "pr-validator", context = "adf/validation" },
-    { name = "pr-verifier", context = "adf/verification" },
-]
+# ── PR-open gate producers (per-project schema: array-of-tables) ──
+[[pr_dispatch]]
+name = "pr-reviewer"
+context = "adf/pr-reviewer"
+
+[[pr_dispatch]]
+name = "pr-validator"
+context = "adf/validation"
+
+[[pr_dispatch]]
+name = "pr-verifier"
+context = "adf/verification"
 
 # ── Auto-merge gate ──
 [auto_merge]
