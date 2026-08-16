@@ -8,6 +8,11 @@
 //! - [`SqliteBackend`]: keyed JSON via `terraphim_persistence::DeviceStorage`
 //!   (sqlite backend, opendal-mediated).
 //!
+//! The agent loop (`agent::agent_loop::ToolCallingLoop`) persists all
+//! session state through this trait (#3227, T4) and writes compression
+//! summaries back to the agent-memory bridge with a
+//! `session-compression:<session_key>` provenance tag.
+//!
 //! ## Trait shape
 //!
 //! The trait is intentionally minimal — three methods that cover all of

@@ -20,6 +20,74 @@ use terraphim_tinyclaw::session::SessionManager;
 use terraphim_tinyclaw::skills::{Skill, SkillExecutor};
 use terraphim_tinyclaw::tools::create_default_registry_with_parity;
 
+/// Routing decision for the session memory backend (#3227 review P1).
+///
+/// Pure decision function, kept separate from `select_session_backend`
+/// so the sqlite gate can be unit-tested without opening a database.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SessionBackendChoice {
+    /// Default jsonl persistence over the shared `SessionManager`.
+    Jsonl,
+    /// Opt-in sqlite persistence via `DeviceStorage`.
+    Sqlite,
+}
+
+/// Decide which session backend to use, applying the
+/// `memory.allow_sqlite_backend` safety gate (#3227 review P1).
+///
+/// The sqlite path persists session state through `DeviceStorage` while
+/// session tools still read the jsonl `SessionManager` — a known
+/// split-brain. Unless the user explicitly sets
+/// `memory.allow_sqlite_backend = true`, a requested
+/// `backend = "sqlite"` is rejected here with a prominent warning and
+/// routed to jsonl instead of silently splitting session state.
+fn choose_session_backend(config: &Config) -> SessionBackendChoice {
+    if !config.memory.enabled || config.memory.backend != "sqlite" {
+        return SessionBackendChoice::Jsonl;
+    }
+    if !config.memory.allow_sqlite_backend {
+        log::warn!(
+            "memory.allow_sqlite_backend is false; sqlite backend requested but disabled \
+             (split-brain session state with session tools is unsupported). Falling back to \
+             jsonl. Set memory.allow_sqlite_backend = true to enable sqlite."
+        );
+        return SessionBackendChoice::Jsonl;
+    }
+    SessionBackendChoice::Sqlite
+}
+
+/// Select the session memory backend for the agent loop (#3227, T4).
+///
+/// `memory.backend = "sqlite"` (with `memory.enabled = true` AND the
+/// explicit opt-in `memory.allow_sqlite_backend = true`) routes
+/// session persistence through `SqliteBackend` on the shared
+/// `DeviceStorage`. Any other value — a disabled sqlite gate, or a
+/// `DeviceStorage` initialisation failure — falls back to the default
+/// `JsonlBackend` over the shared `SessionManager`, preserving the
+/// existing on-disk layout so legacy session files keep loading.
+async fn select_session_backend(
+    config: &Config,
+    sessions: Arc<tokio::sync::Mutex<SessionManager>>,
+) -> terraphim_tinyclaw::memory::SharedBackend {
+    use terraphim_tinyclaw::memory::jsonl::JsonlBackend;
+    use terraphim_tinyclaw::memory::sqlite::SqliteBackend;
+
+    if choose_session_backend(config) == SessionBackendChoice::Sqlite {
+        match terraphim_persistence::DeviceStorage::arc_instance().await {
+            Ok(storage) => {
+                log::info!("Session memory backend: sqlite (DeviceStorage)");
+                return Arc::new(SqliteBackend::new(storage, "tinyclaw"));
+            }
+            Err(e) => {
+                log::warn!(
+                    "DeviceStorage init failed ({e}); falling back to jsonl session backend"
+                );
+            }
+        }
+    }
+    Arc::new(JsonlBackend::from_shared(sessions))
+}
+
 /// Multi-channel AI assistant powered by Terraphim.
 #[derive(Parser, Debug)]
 #[command(name = "terraphim-tinyclaw")]
@@ -243,11 +311,12 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     let router = build_router(&config)?;
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(
+    let backend = select_session_backend(&config, sessions).await;
+    let agent = ToolCallingLoop::with_backend(
         &config.agent,
         router,
         tools,
-        sessions,
+        backend,
         system_prompt,
         memory_config,
     );
@@ -313,11 +382,12 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     let router = build_router(&config)?;
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(
+    let backend = select_session_backend(&config, sessions).await;
+    let agent = ToolCallingLoop::with_backend(
         &config.agent,
         router,
         tools,
-        sessions,
+        backend,
         system_prompt,
         memory_config_gw,
     );
@@ -759,4 +829,62 @@ async fn run_schedule_command(command: ScheduleCommands) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod backend_gate_tests {
+    //! Routing-decision tests for the sqlite safety gate (#3227 review
+    //! P1). These exercise `choose_session_backend` only — the pure
+    //! decision function — so no sqlite database is ever opened.
+
+    use super::*;
+
+    /// Default config routes to jsonl even when nothing memory-related
+    /// is configured.
+    #[test]
+    fn default_config_routes_to_jsonl() {
+        let config = Config::default();
+        assert_eq!(choose_session_backend(&config), SessionBackendChoice::Jsonl);
+    }
+
+    /// Gate closed: `backend = "sqlite"` + `allow_sqlite_backend = false`
+    /// (the default) must fall back to jsonl instead of silently
+    /// splitting session state between DeviceStorage and the jsonl
+    /// SessionManager.
+    #[test]
+    fn sqlite_requested_but_gate_closed_falls_back_to_jsonl() {
+        let mut config = Config::default();
+        config.memory.enabled = true;
+        config.memory.backend = "sqlite".to_string();
+        // allow_sqlite_backend defaults to false.
+        assert!(!config.memory.allow_sqlite_backend);
+        assert_eq!(choose_session_backend(&config), SessionBackendChoice::Jsonl);
+    }
+
+    /// Gate open: explicit opt-in (`allow_sqlite_backend = true`) with
+    /// `backend = "sqlite"` routes to sqlite.
+    ///
+    /// NOTE: the sqlite path still has the split-brain caveat — the
+    /// agent loop persists via DeviceStorage while session tools read
+    /// the jsonl SessionManager. The gate only prevents *silent*
+    /// default-to-sqlite; enabling it is a deliberate acceptance of
+    /// that caveat (#3227 review P1).
+    #[test]
+    fn sqlite_requested_and_gate_open_routes_to_sqlite() {
+        let mut config = Config::default();
+        config.memory.enabled = true;
+        config.memory.backend = "sqlite".to_string();
+        config.memory.allow_sqlite_backend = true;
+        assert_eq!(choose_session_backend(&config), SessionBackendChoice::Sqlite);
+    }
+
+    /// Memory disabled: sqlite is never selected regardless of flags.
+    #[test]
+    fn memory_disabled_always_routes_to_jsonl() {
+        let mut config = Config::default();
+        config.memory.enabled = false;
+        config.memory.backend = "sqlite".to_string();
+        config.memory.allow_sqlite_backend = true;
+        assert_eq!(choose_session_backend(&config), SessionBackendChoice::Jsonl);
+    }
 }
