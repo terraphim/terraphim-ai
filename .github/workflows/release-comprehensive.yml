@@ -52,6 +52,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_REF_NAME: ${{ github.ref_name }}
+          WORKFLOW_SHA: ${{ github.sha }}
           MANUAL_RELEASE_TAG: ${{ inputs.release_tag || '' }}
           MANUAL_EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha || '' }}
         run: |
@@ -118,12 +119,17 @@ jobs:
             IS_STANDARD_RELEASE="true"
           fi
 
+          if [[ ! "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid workflow commit SHA '$WORKFLOW_SHA'"
+            exit 1
+          fi
+
           echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "version_series=${VERSION%.*}" >> "$GITHUB_OUTPUT"
           echo "source_sha=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
           echo "source_ref=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
-          echo "workflow_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
+          echo "workflow_ref=${WORKFLOW_SHA}" >> "$GITHUB_OUTPUT"
           echo "is_standard_release=${IS_STANDARD_RELEASE}" >> "$GITHUB_OUTPUT"
 
   verify-versions:
@@ -1053,15 +1059,60 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Prepare release assets
+      - name: Snapshot existing release asset digests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve-release-source.outputs.release_tag }}
         run: |
-          echo "Recovered release assets:"
-          ls -la release-assets/
+          mkdir -p existing-release
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" \
+            > existing-release/release.json
 
-      - name: Generate checksums
-        working-directory: release-assets
+      - name: Merge recovered and existing checksums
+        env:
+          RELEASE_ASSETS: release-assets
+          EXISTING_RELEASE_JSON: existing-release/release.json
         run: |
-          sha256sum * > checksums.txt
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import re
+
+          assets = Path(os.environ["RELEASE_ASSETS"])
+          release = json.loads(Path(os.environ["EXISTING_RELEASE_JSON"]).read_text())
+          name_re = re.compile(r"^[^/\r\n\t]+$")
+          digest_re = re.compile(r"^sha256:([0-9a-f]{64})$")
+          merged = {}
+
+          for asset in release.get("assets", []):
+              name = asset.get("name", "")
+              if name == "checksums.txt":
+                  continue
+              digest_match = digest_re.fullmatch(asset.get("digest") or "")
+              if not name_re.fullmatch(name) or not digest_match:
+                  raise SystemExit(f"invalid existing release asset digest metadata for {name!r}")
+              if name in merged and merged[name] != digest_match.group(1):
+                  raise SystemExit(f"conflicting existing checksum for {name}")
+              merged[name] = digest_match.group(1)
+
+          recovered = [
+              path for path in sorted(assets.iterdir())
+              if path.is_file() and path.name not in {"checksums.txt", "recovered-checksums.txt"}
+          ]
+          if not recovered:
+              raise SystemExit("no recovered release assets found")
+
+          for path in recovered:
+              if not name_re.fullmatch(path.name):
+                  raise SystemExit(f"invalid recovered release asset name: {path.name!r}")
+              merged[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+
+          (assets / "checksums.txt").write_text(
+              "".join(f"{merged[name]}  {name}\n" for name in sorted(merged))
+          )
+          PY
 
       - name: Upload recovered assets to existing release
         env:

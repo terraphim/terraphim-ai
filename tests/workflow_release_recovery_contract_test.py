@@ -3,7 +3,13 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import re
+import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -200,7 +206,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             self.assertIn(f"{output_name}:", resolver)
         self.assertIn("source_sha=${SOURCE_SHA}", self.release_text)
         self.assertIn("version_series=${VERSION%.*}", self.release_text)
-        self.assertIn("workflow_ref=${GITHUB_REF}", self.release_text)
+        self.assertIn("workflow_ref=${WORKFLOW_SHA}", self.release_text)
+        self.assertIn("WORKFLOW_SHA: ${{ github.sha }}", resolver)
+        self.assertNotIn("workflow_ref=${GITHUB_REF}", self.release_text)
 
     def test_component_version_parsing_prefers_component_separator(self) -> None:
         resolver = job_block(self.release_text, "resolve-release-source")
@@ -209,6 +217,67 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertLess(component_index, standard_index)
         self.assertIn('VERSION="${RELEASE_TAG##*-v}"', resolver)
         self.assertIn("^([A-Za-z0-9_.-]+-)?v[0-9]+\\.[0-9]+\\.[0-9]+$", resolver)
+
+    def test_recovery_checksums_merge_existing_release_digests(self) -> None:
+        recovery = job_block(self.release_text, "upload-recovered-release-assets")
+        self.assertIn("Snapshot existing release asset digests", recovery)
+        self.assertIn('releases/tags/${RELEASE_TAG}', recovery)
+        self.assertIn('digest_re = re.compile(r"^sha256:([0-9a-f]{64})$")', recovery)
+        self.assertIn('if name == "checksums.txt"', recovery)
+        self.assertIn("merged[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()", recovery)
+        self.assertIn('for name in sorted(merged)', recovery)
+        self.assertNotIn("sha256sum * > checksums.txt", recovery)
+
+    def test_recovery_checksum_merge_executes_and_fails_without_existing_digest(self) -> None:
+        step = step_run_block(
+            job_block(self.release_text, "upload-recovered-release-assets"),
+            "Merge recovered and existing checksums",
+        )
+        embedded = step.split("python3 - <<'PY'\n", 1)[1].rsplit("\n          PY", 1)[0]
+        script = textwrap.dedent(embedded)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            assets = root / "assets"
+            assets.mkdir()
+            recovered = assets / "recovered.bin"
+            recovered.write_bytes(b"recovered")
+            old_digest = hashlib.sha256(b"existing").hexdigest()
+            release_json = root / "release.json"
+            release_json.write_text(
+                json.dumps(
+                    {
+                        "assets": [
+                            {"name": "existing.bin", "digest": f"sha256:{old_digest}"},
+                            {"name": "checksums.txt", "digest": "sha256:" + "0" * 64},
+                        ]
+                    }
+                )
+            )
+            env = dict(os.environ)
+            env.update(
+                RELEASE_ASSETS=str(assets),
+                EXISTING_RELEASE_JSON=str(release_json),
+            )
+            result = subprocess.run(
+                ["python3", "-c", script], env=env, capture_output=True, text=True
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            checksums = (assets / "checksums.txt").read_text().splitlines()
+            self.assertIn(f"{old_digest}  existing.bin", checksums)
+            self.assertIn(
+                f"{hashlib.sha256(b'recovered').hexdigest()}  recovered.bin",
+                checksums,
+            )
+
+            release_json.write_text(
+                json.dumps({"assets": [{"name": "existing.bin", "digest": None}]})
+            )
+            failed = subprocess.run(
+                ["python3", "-c", script], env=env, capture_output=True, text=True
+            )
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("invalid existing release asset digest metadata", failed.stderr)
 
     def test_no_tag_moving_commands_exist(self) -> None:
         combined = f"{self.release_text}\n{self.docker_text}"
