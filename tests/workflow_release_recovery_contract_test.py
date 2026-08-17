@@ -244,6 +244,18 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         )
         self.assertTrue(has_command_retry or has_operational_manual_rerun)
 
+    def test_universal_macos_is_gated_by_source_resolution_and_complete_builds(self) -> None:
+        self.assertIn(
+            "needs: [resolve-release-source, build-binaries]", self.release_text
+        )
+        self.assertIn(
+            "needs.resolve-release-source.result == 'success'", self.release_text
+        )
+        self.assertIn("needs.build-binaries.result == 'success'", self.release_text)
+        self.assertNotIn(
+            "needs.build-binaries.result != 'cancelled'", self.release_text
+        )
+
 
 class HostileInputContract(unittest.TestCase):
     TAG_RE = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+$")

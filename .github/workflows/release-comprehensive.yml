@@ -465,9 +465,12 @@ jobs:
 
   create-universal-macos:
     name: Create macOS universal binaries
-    needs: build-binaries
-    # Run if macOS builds completed (even if other targets failed)
-    if: always() && needs.build-binaries.result != 'cancelled'
+    needs: [resolve-release-source, build-binaries]
+    # Run only after immutable-source validation and a complete build matrix.
+    if: >-
+      always() &&
+      needs.resolve-release-source.result == 'success' &&
+      needs.build-binaries.result == 'success'
     runs-on: [self-hosted, macOS]
     steps:
       - name: Download x86_64 macOS binaries
