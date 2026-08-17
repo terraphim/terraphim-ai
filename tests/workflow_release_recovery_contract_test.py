@@ -131,6 +131,7 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             "build-debian-packages",
             "verify-release-assets",
             "create-release",
+            "upload-recovered-release-assets",
             "trigger-desktop-release",
             "trigger-clients-release",
             "build-docker",
@@ -150,6 +151,7 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             "build-debian-packages",
             "verify-release-assets",
             "create-release",
+            "upload-recovered-release-assets",
         ]:
             checkouts = checkout_blocks(job_block(self.release_text, job_name))
             self.assertTrue(checkouts, job_name)
@@ -189,10 +191,18 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
 
     def test_workflow_and_source_refs_are_distinct_outputs(self) -> None:
         resolver = job_block(self.release_text, "resolve-release-source")
-        for output_name in ["source_sha", "source_ref", "workflow_ref"]:
+        for output_name in ["source_sha", "source_ref", "workflow_ref", "version_series"]:
             self.assertIn(f"{output_name}:", resolver)
         self.assertIn("source_sha=${SOURCE_SHA}", self.release_text)
+        self.assertIn("version_series=${VERSION%.*}", self.release_text)
         self.assertIn("workflow_ref=${GITHUB_REF}", self.release_text)
+
+    def test_component_version_parsing_prefers_component_separator(self) -> None:
+        resolver = job_block(self.release_text, "resolve-release-source")
+        component_index = resolver.index('if [[ "$RELEASE_TAG" == *"-v"* ]]')
+        standard_index = resolver.index('VERSION="${RELEASE_TAG#v}"')
+        self.assertLess(component_index, standard_index)
+        self.assertIn('VERSION="${RELEASE_TAG##*-v}"', resolver)
 
     def test_no_tag_moving_commands_exist(self) -> None:
         combined = f"{self.release_text}\n{self.docker_text}"
@@ -202,6 +212,10 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertNotRegex(combined, r"\bgit\s+push\b.*--delete\b")
 
     def test_self_hosted_linux_cargo_steps_sanitize_rust_wrappers(self) -> None:
+        build_binaries = job_block(self.release_text, "build-binaries")
+        sanitize = step_run_block(build_binaries, "Sanitize unavailable Rust wrappers")
+        self.assertIn("if: contains(matrix.os, 'self-hosted')", sanitize)
+        self.assertNotIn("runner.os == 'Linux'", sanitize)
         for var in ["RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"]:
             self.assertIn(var, self.release_text)
         self.assertIn('unset "$var"', self.release_text)
@@ -226,6 +240,38 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             for checkout in checkouts:
                 self.assertIn("ref: ${{ inputs.source_ref }}", checkout)
                 self.assertIn("fetch-depth: 1", checkout)
+
+    def test_docker_reusable_workflow_uses_required_resolver_inputs_for_tags(self) -> None:
+        for input_name in ["tag", "version", "version_series", "publish_latest"]:
+            block = input_block(self.docker_text, input_name)
+            self.assertIn("required: true", block, input_name)
+
+        for tag_expr in [
+            "type=raw,value=${{ inputs.tag }}-ubuntu${{ matrix.ubuntu-version }}",
+            "type=raw,value=${{ inputs.version }}-ubuntu${{ matrix.ubuntu-version }}",
+            "type=raw,value=${{ inputs.version_series }}-ubuntu${{ matrix.ubuntu-version }}",
+            "type=raw,value=latest-ubuntu${{ matrix.ubuntu-version }},enable=${{ inputs.publish_latest }}",
+        ]:
+            self.assertEqual(self.docker_text.count(tag_expr), 2, tag_expr)
+
+        self.assertNotIn("type=semver", self.docker_text)
+        self.assertNotIn("github.ref", self.docker_text)
+        self.assertIn("if: inputs.push && !inputs.test_run && inputs.publish_latest", self.docker_text)
+
+        caller = job_block(self.release_text, "build-docker")
+        self.assertIn("tag: ${{ needs.resolve-release-source.outputs.release_tag }}", caller)
+        self.assertIn("version: ${{ needs.resolve-release-source.outputs.version }}", caller)
+        self.assertIn("version_series: ${{ needs.resolve-release-source.outputs.version_series }}", caller)
+        self.assertIn("publish_latest: ${{ github.event_name == 'push' && needs.resolve-release-source.outputs.is_standard_release == 'true' && !inputs.test_run }}", caller)
+
+    def test_docker_summary_passes_source_ref_through_env(self) -> None:
+        summary = step_run_block(
+            job_block(self.docker_text, "build-and-push"),
+            "Document transient BuildKit EOF recovery",
+        )
+        self.assertIn("SOURCE_REF: ${{ inputs.source_ref }}", summary)
+        self.assertIn("source_ref remains $SOURCE_REF", summary)
+        self.assertNotIn("source_ref remains '${{ inputs.source_ref }}'", summary)
 
     def test_docker_buildx_has_real_bounded_retry_or_explicit_manual_rerun(self) -> None:
         has_command_retry = all(
@@ -255,6 +301,63 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertNotIn(
             "needs.build-binaries.result != 'cancelled'", self.release_text
         )
+
+    def test_test_run_skips_all_release_mutation_jobs(self) -> None:
+        for job_name in [
+            "create-release",
+            "upload-recovered-release-assets",
+            "wait-for-client-binaries",
+            "update-homebrew",
+        ]:
+            self.assertIn("!inputs.test_run", job_block(self.release_text, job_name), job_name)
+
+        for job_name in ["trigger-desktop-release", "trigger-clients-release"]:
+            job = job_block(self.release_text, job_name)
+            self.assertIn("github.event_name == 'push'", job, job_name)
+            self.assertIn("needs.resolve-release-source.outputs.is_standard_release == 'true'", job, job_name)
+
+        self.assertIn("push: ${{ !inputs.test_run }}", job_block(self.release_text, "build-docker"))
+        self.assertIn("if: inputs.push && !inputs.test_run && inputs.publish_latest", self.docker_text)
+
+    def test_push_release_creation_is_separate_from_manual_recovery_upload(self) -> None:
+        create_release = job_block(self.release_text, "create-release")
+        recovery = job_block(self.release_text, "upload-recovered-release-assets")
+
+        self.assertIn("github.event_name == 'push'", create_release)
+        self.assertIn("make_latest: true", create_release)
+        self.assertIn("body: |", create_release)
+        self.assertNotIn("gh release upload", create_release)
+
+        self.assertIn("github.event_name == 'workflow_dispatch'", recovery)
+        self.assertIn('gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY" --clobber', recovery)
+        self.assertNotIn("softprops/action-gh-release", recovery)
+        self.assertNotIn("make_latest", recovery)
+        self.assertNotIn("body: |", recovery)
+
+    def test_clients_and_desktop_dispatch_only_on_standard_tag_push(self) -> None:
+        for job_name in ["trigger-desktop-release", "trigger-clients-release"]:
+            job = job_block(self.release_text, job_name)
+            self.assertIn("github.event_name == 'push'", job, job_name)
+            self.assertIn("needs.resolve-release-source.outputs.is_standard_release == 'true'", job, job_name)
+
+        clients = job_block(self.release_text, "trigger-clients-release")
+        self.assertIn("async function resolveTagCommit", clients)
+        self.assertIn("github.rest.git.getRef", clients)
+        self.assertIn("github.rest.git.getTag", clients)
+        self.assertIn("const expectedSourceSha = await resolveTagCommit('terraphim', 'terraphim-clients', releaseTag);", clients)
+        self.assertIn("source_ref: releaseTag", clients)
+        self.assertIn("expected_source_sha: expectedSourceSha", clients)
+
+    def test_wait_and_homebrew_are_tag_push_only_and_wait_does_not_need_trigger_clients(self) -> None:
+        wait = job_block(self.release_text, "wait-for-client-binaries")
+        homebrew = job_block(self.release_text, "update-homebrew")
+
+        self.assertTrue(has_need(wait, "create-release"))
+        self.assertFalse(has_need(wait, "trigger-clients-release"))
+        for job in [wait, homebrew]:
+            self.assertIn("github.event_name == 'push'", job)
+            self.assertIn("!inputs.test_run", job)
+            self.assertIn("needs.resolve-release-source.outputs.is_standard_release == 'true'", job)
 
 
 class HostileInputContract(unittest.TestCase):
