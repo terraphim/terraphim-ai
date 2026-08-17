@@ -38,6 +38,7 @@ jobs:
     outputs:
       release_tag: ${{ steps.resolve.outputs.release_tag }}
       version: ${{ steps.resolve.outputs.version }}
+      version_series: ${{ steps.resolve.outputs.version_series }}
       source_sha: ${{ steps.resolve.outputs.source_sha }}
       source_ref: ${{ steps.resolve.outputs.source_ref }}
       workflow_ref: ${{ steps.resolve.outputs.workflow_ref }}
@@ -107,16 +108,17 @@ jobs:
             exit 1
           fi
 
-          if [[ "$RELEASE_TAG" == v* ]]; then
-            VERSION="${RELEASE_TAG#v}"
-            IS_STANDARD_RELEASE="true"
-          else
+          if [[ "$RELEASE_TAG" == *"-v"* ]]; then
             VERSION="${RELEASE_TAG##*-v}"
             IS_STANDARD_RELEASE="false"
+          else
+            VERSION="${RELEASE_TAG#v}"
+            IS_STANDARD_RELEASE="true"
           fi
 
           echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_series=${VERSION%.*}" >> "$GITHUB_OUTPUT"
           echo "source_sha=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
           echo "source_ref=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
           echo "workflow_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
@@ -246,7 +248,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Sanitize unavailable Rust wrappers
-        if: contains(matrix.os, 'self-hosted') && runner.os == 'Linux'
+        if: contains(matrix.os, 'self-hosted')
         shell: bash
         run: |
           for var in RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER; do
@@ -692,7 +694,7 @@ jobs:
     name: Trigger Desktop Release
     needs: [resolve-release-source, verify-versions]
     runs-on: ubuntu-latest
-    if: needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.verify-versions.result == 'success'
+    if: github.event_name == 'push' && needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.verify-versions.result == 'success'
     steps:
       - name: Trigger terraphim-ai-desktop release workflow
         uses: actions/github-script@v9
@@ -716,7 +718,7 @@ jobs:
     name: Trigger Client Binary Release
     needs: [resolve-release-source, verify-versions]
     runs-on: ubuntu-latest
-    if: needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.verify-versions.result == 'success'
+    if: github.event_name == 'push' && needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.verify-versions.result == 'success'
     continue-on-error: true
     permissions:
       actions: write
@@ -733,6 +735,32 @@ jobs:
             const releaseTag = '${{ needs.resolve-release-source.outputs.release_tag }}';
             console.log(`Triggering client binaries for ${releaseTag} (version ${version})`);
 
+            async function resolveTagCommit(owner, repo, tag) {
+              const ref = await github.rest.git.getRef({
+                owner,
+                repo,
+                ref: `tags/${tag}`
+              });
+              let object = ref.data.object;
+
+              while (object.type === 'tag') {
+                const tagObject = await github.rest.git.getTag({
+                  owner,
+                  repo,
+                  tag_sha: object.sha
+                });
+                object = tagObject.data.object;
+              }
+
+              if (object.type !== 'commit') {
+                throw new Error(`Tag ${tag} peeled to unsupported object type ${object.type}`);
+              }
+              return object.sha;
+            }
+
+            const expectedSourceSha = await resolveTagCommit('terraphim', 'terraphim-clients', releaseTag);
+            console.log(`Resolved terraphim-clients ${releaseTag} to ${expectedSourceSha}`);
+
             await github.rest.actions.createWorkflowDispatch({
               owner: 'terraphim',
               repo: 'terraphim-clients',
@@ -741,6 +769,8 @@ jobs:
               inputs: {
                 version: version,
                 release_tag: releaseTag,
+                source_ref: releaseTag,
+                expected_source_sha: expectedSourceSha,
                 target_repo: 'terraphim-ai'
               }
             });
@@ -757,6 +787,9 @@ jobs:
       ubuntu-versions: '["20.04", "22.04"]'
       push: ${{ !inputs.test_run }}
       tag: ${{ needs.resolve-release-source.outputs.release_tag }}
+      version: ${{ needs.resolve-release-source.outputs.version }}
+      version_series: ${{ needs.resolve-release-source.outputs.version_series }}
+      publish_latest: ${{ github.event_name == 'push' && needs.resolve-release-source.outputs.is_standard_release == 'true' && !inputs.test_run }}
       source_ref: ${{ needs.resolve-release-source.outputs.source_sha }}
       dockerhub-username: ${{ vars.DOCKERHUB_USERNAME || '' }}
       test_run: ${{ inputs.test_run || false }}
@@ -838,6 +871,9 @@ jobs:
     if: >-
       always() &&
       !cancelled() &&
+      github.event_name == 'push' &&
+      !inputs.test_run &&
+      needs.resolve-release-source.outputs.is_standard_release == 'true' &&
       needs.verify-versions.result == 'success' &&
       needs.sign-and-notarize-macos.result == 'success' &&
       needs.verify-release-assets.result == 'success'
@@ -989,11 +1025,64 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  upload-recovered-release-assets:
+    name: Upload recovered release assets
+    needs: [resolve-release-source, verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos]
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'workflow_dispatch' &&
+      !inputs.test_run &&
+      needs.verify-versions.result == 'success' &&
+      needs.sign-and-notarize-macos.result == 'success' &&
+      needs.verify-release-assets.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binaries-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Download Debian package artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: debian-packages
+          path: release-assets
+          merge-multiple: true
+
+      - name: Prepare release assets
+        run: |
+          echo "Recovered release assets:"
+          ls -la release-assets/
+
+      - name: Generate checksums
+        working-directory: release-assets
+        run: |
+          sha256sum * > checksums.txt
+
+      - name: Upload recovered assets to existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve-release-source.outputs.release_tag }}
+        run: |
+          gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY" --clobber
+
   wait-for-client-binaries:
     name: Wait for client binaries on release
-    needs: [resolve-release-source, create-release, trigger-clients-release]
+    needs: [resolve-release-source, create-release]
     runs-on: ubuntu-latest
-    if: needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.create-release.result == 'success'
+    if: github.event_name == 'push' && !inputs.test_run && needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.create-release.result == 'success'
     steps:
       - name: Wait until terraphim-clients uploads client assets
         env:
@@ -1027,7 +1116,7 @@ jobs:
     name: Update Homebrew formulas
     needs: [resolve-release-source, wait-for-client-binaries]
     runs-on: ubuntu-latest
-    if: needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.wait-for-client-binaries.result == 'success'
+    if: github.event_name == 'push' && !inputs.test_run && needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.wait-for-client-binaries.result == 'success'
     steps:
       - name: Extract version from tag
         id: version

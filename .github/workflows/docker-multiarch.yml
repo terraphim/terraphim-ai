@@ -20,9 +20,20 @@ on:
         default: false
       tag:
         description: 'Docker image tag'
-        required: false
+        required: true
         type: string
-        default: 'latest'
+      version:
+        description: 'Normalized release version without v prefix'
+        required: true
+        type: string
+      version_series:
+        description: 'Major.minor release version series'
+        required: true
+        type: string
+      publish_latest:
+        description: 'Publish/move latest tags for a standard tag-push release'
+        required: true
+        type: boolean
       source_ref:
         description: 'Immutable source ref or SHA to check out for Docker builds'
         required: true
@@ -184,9 +195,9 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ inputs.tag }}-ubuntu${{ matrix.ubuntu-version }}
-            type=raw,value=latest-ubuntu${{ matrix.ubuntu-version }},enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-            type=semver,pattern={{version}}-ubuntu${{ matrix.ubuntu-version }}
-            type=semver,pattern={{major}}.{{minor}}-ubuntu${{ matrix.ubuntu-version }}
+            type=raw,value=${{ inputs.version }}-ubuntu${{ matrix.ubuntu-version }}
+            type=raw,value=${{ inputs.version_series }}-ubuntu${{ matrix.ubuntu-version }}
+            type=raw,value=latest-ubuntu${{ matrix.ubuntu-version }},enable=${{ inputs.publish_latest }}
           labels: |
             org.opencontainers.image.title=Terraphim Server
             org.opencontainers.image.description=Privacy-first AI assistant with semantic search
@@ -201,9 +212,9 @@ jobs:
           images: ${{ env.DOCKERHUB_IMAGE }}
           tags: |
             type=raw,value=${{ inputs.tag }}-ubuntu${{ matrix.ubuntu-version }}
-            type=raw,value=latest-ubuntu${{ matrix.ubuntu-version }},enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-            type=semver,pattern={{version}}-ubuntu${{ matrix.ubuntu-version }}
-            type=semver,pattern={{major}}.{{minor}}-ubuntu${{ matrix.ubuntu-version }}
+            type=raw,value=${{ inputs.version }}-ubuntu${{ matrix.ubuntu-version }}
+            type=raw,value=${{ inputs.version_series }}-ubuntu${{ matrix.ubuntu-version }}
+            type=raw,value=latest-ubuntu${{ matrix.ubuntu-version }},enable=${{ inputs.publish_latest }}
           labels: |
             org.opencontainers.image.title=Terraphim Server
             org.opencontainers.image.description=Privacy-first AI assistant with semantic search
@@ -234,8 +245,10 @@ jobs:
           echo "token_file=${RUNNER_TEMP}/cargo_registry_token" >> "${GITHUB_OUTPUT}"
 
       - name: Document transient BuildKit EOF recovery
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
         run: |
-          echo "Known transient BuildKit EOF: rerun the failed Docker job manually after verifying the source_ref remains '${{ inputs.source_ref }}'." >> "$GITHUB_STEP_SUMMARY"
+          echo "Known transient BuildKit EOF: rerun the failed Docker job manually after verifying the source_ref remains $SOURCE_REF." >> "$GITHUB_STEP_SUMMARY"
           echo "No automatic reusable-workflow retry is configured for this recovery path." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build and push to GHCR
@@ -296,7 +309,7 @@ jobs:
   create-latest-tag:
     needs: build-and-push
     runs-on: [self-hosted, Linux, X64]
-    if: inputs.push && !inputs.test_run
+    if: inputs.push && !inputs.test_run && inputs.publish_latest
 
     steps:
       - name: Set up Docker Buildx
