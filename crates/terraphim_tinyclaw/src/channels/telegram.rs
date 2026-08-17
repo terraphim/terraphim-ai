@@ -123,6 +123,14 @@ impl Channel for TelegramChannel {
 
             log::info!("Telegram bot starting");
 
+            // Pre-flight: validate the token before dispatching so an invalid
+            // token fails gracefully (clean error) instead of panicking inside
+            // teloxide's dispatcher when it cannot prepare the dispatching context.
+            if let Err(e) = bot.get_me().await {
+                self.running.store(false, Ordering::SeqCst);
+                anyhow::bail!("Telegram bot token validation failed: {e}");
+            }
+
             tokio::spawn(async move {
                 let handler = Update::filter_message().endpoint(
                     move |msg: teloxide::types::Message, bot: teloxide::Bot| {

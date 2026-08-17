@@ -99,24 +99,39 @@ terraphim_persistence = { version = "1.20.4" }
 opendal = "0.54"
 
 # Wave 5 (Phase C2) OpenAI-compatible HTTP proxy — TinyClaw provides its own
-# minimal proxy here. We attempted to leverage the sibling
-# `terraphim-llm-proxy` crate (0.1.12), but it is unbuildable as a git
-# dep because its `claude_code_agents` git submodule is registered
-# (gitlink in HEAD) but missing from `.gitmodules` (no URL configured).
-# The submodule content is therefore not fetchable. Until the
-# `terraphim-llm-proxy` maintainer publishes a clean version (or
-# fixes `.gitmodules`), TinyClaw ships a minimal echo proxy.
-# See ADR-0010 for the full investigation notes (2026-08-08).
+# minimal proxy here. Rather than depending on the sibling `terraphim-llm-proxy`
+# crate (0.1.12) as a git dep (blocked: its `claude_code_agents` git submodule is
+# registered in HEAD but missing from `.gitmodules`, so it is unfetchable from a
+# fresh clone), TinyClaw forwards to the DEPLOYED proxy instance when
+# `TERRAPHIM_LLM_PROXY_URL` is set (bigbox: http://100.106.66.7:3456,
+# `PROXY_API_KEY` via `TERRAPHIM_LLM_PROXY_API_KEY`). Without the env var the
+# proxy stays a hermetic echo stub so tests remain self-contained.
+# See ADR-0010 for the full investigation notes (2026-08-08) and the deployed-
+# leverage resolution (2026-08-11).
 
-# Wave 4 (Phase B) Email channel — leverage the existing `jmap_client`
-# crate (path: `terraphim-private/crates/haystack_jmap`). Brings in
-# `haystack_core` + `terraphim_types` from the same `terraphim-private`
-# workspace. The path is valid relative to `crates/terraphim_tinyclaw`.
-jmap_client = { path = "../../../terraphim-private/crates/haystack_jmap" }
+# Wave 4 (Phase B) Email channel — `haystack_jmap` from the terraphim
+# registry (moved out of terraphim-private into the terraphim-service
+# crates repo, #3198). Brings in `haystack_core` + `terraphim_types`
+# from the same registry. Lib name is `haystack_jmap` (was `jmap_client`
+# in the private copy); API: `JMAPClient::new(token, session_url)`,
+# `search_emails(query, limit)`.
+haystack_jmap = { version = "1.20.2", registry = "terraphim" }
 
 # Wave 4 (Phase B) GitHub channel — HMAC-SHA256 webhook verification.
 hmac = "0.12"
 sha2 = "0.10"
+
+# Wave 5 (Phase E) Hermes parity tools — sandbox, subagents, browser.
+# terraphim_rlm: sandboxed execution (Local/Docker backends). Not a
+# workspace member (firecracker-excluded) — path dep, minimal features:
+# llm (LLM bridge), kg-validation (validator types), docker-backend.
+# Sessions are in-memory (DashMap) so a CLI bridge cannot hold them;
+# the crate must be called in-process (see research-tinyclaw-parity-tools).
+terraphim_rlm = { path = "../terraphim_rlm", default-features = false, features = ["llm", "kg-validation", "docker-backend"] }
+# terraphim_spawner: subagent pool + handles. Tiny standalone crate.
+terraphim_spawner = { path = "../terraphim_spawner" }
+# Provider/ProviderType/Capability types used by the subagent tool.
+terraphim_types = { version = "1.20.2", registry = "terraphim" }
 
 # Wave 5 (Phase C1) dashboard: axum-based HTTP server (Hermes parity).
 axum = { version = "0.8", features = ["macros"] }

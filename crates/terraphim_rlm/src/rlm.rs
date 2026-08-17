@@ -219,6 +219,23 @@ impl TerraphimRlm {
     /// This releases all resources associated with the session, including
     /// the VM, snapshots, and budget tracker.
     ///
+    /// # Errors
+    ///
+    /// Returns the executor's teardown error when the backend could not
+    /// release the session's resources — for example when Apple Container
+    /// reports that the session's VM could not be deleted. **The logical
+    /// session is still destroyed** in that case, and the error is what tells
+    /// the caller that a backend resource outlived it: reporting success while
+    /// a VM is still running would hide exactly the failure this backend goes
+    /// out of its way to detect.
+    ///
+    /// Retry ownership stays with the executor, not the caller: a container
+    /// whose deletion failed remains tracked by the backend, so
+    /// [`crate::executor::ExecutionEnvironment::cleanup`] (and the executor's
+    /// `Drop`) retries it. Calling `destroy_session` again is not the recovery
+    /// path — the session id is gone, and for backends like Apple Container it
+    /// is deliberately terminal.
+    ///
     /// # Arguments
     ///
     /// * `session_id` - The session to destroy
@@ -228,20 +245,33 @@ impl TerraphimRlm {
             let _ = sender.send(()).await;
         }
 
-        // Release executor-side per-session resources (Docker container,
-        // Firecracker VM via the trait's default Ok(()) on backends without
-        // per-session state). Errors are logged but not propagated: session
-        // teardown must succeed even if the backend is unreachable.
-        if let Err(e) = self.executor.end_session(session_id).await {
-            log::warn!(
-                "executor.end_session({}) failed during destroy_session: {}",
-                session_id,
-                e
-            );
+        // Release executor-side per-session resources (Docker container, Apple
+        // Container VM, Firecracker VM via the trait's default Ok(()) on
+        // backends without per-session state).
+        let teardown = self.executor.end_session(session_id).await;
+
+        // The logical session is destroyed either way: the executor's teardown
+        // is terminal for that session id, so keeping the record would leave a
+        // session no backend would serve.
+        if let Err(e) = self.session_manager.destroy_session(session_id) {
+            if let Err(teardown_error) = teardown {
+                log::warn!(
+                    "executor.end_session({session_id}) failed during destroy_session: \
+                     {teardown_error}"
+                );
+            }
+            return Err(e);
         }
 
-        // Destroy the session
-        self.session_manager.destroy_session(session_id)?;
+        teardown.map_err(|e| {
+            log::warn!(
+                "executor.end_session({session_id}) failed during destroy_session: {e}. \
+                 The session record was removed; the backend still tracks the resource it \
+                 could not release and retries it in cleanup()."
+            );
+            e
+        })?;
+
         log::info!("Destroyed session: {}", session_id);
         Ok(())
     }
@@ -376,6 +406,7 @@ impl TerraphimRlm {
         let ctx = ExecutionContext {
             session_id: *session_id,
             timeout_ms: self.config.time_budget_ms,
+            max_output_bytes: self.config.max_inline_output_bytes,
             ..Default::default()
         };
 
@@ -447,6 +478,7 @@ impl TerraphimRlm {
         let ctx = ExecutionContext {
             session_id: *session_id,
             timeout_ms: self.config.time_budget_ms,
+            max_output_bytes: self.config.max_inline_output_bytes,
             ..Default::default()
         };
 
@@ -1136,6 +1168,9 @@ mod tests {
     struct MockExecutor {
         capabilities: Vec<Capability>,
         end_session_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        /// Teardown failure the backend reports, as Apple Container does when a
+        /// session VM cannot be deleted.
+        end_session_error: Option<String>,
     }
 
     impl MockExecutor {
@@ -1143,11 +1178,113 @@ mod tests {
             Self {
                 capabilities: vec![Capability::PythonExecution, Capability::BashExecution],
                 end_session_calls: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+                end_session_error: None,
+            }
+        }
+
+        /// A backend whose per-session teardown fails.
+        fn failing_end_session(message: &str) -> Self {
+            Self {
+                end_session_error: Some(message.to_string()),
+                ..Self::new()
             }
         }
 
         fn end_session_counter(&self) -> std::sync::Arc<std::sync::atomic::AtomicUsize> {
             self.end_session_calls.clone()
+        }
+    }
+
+    #[derive(Clone, Default)]
+    struct RecordedContexts {
+        code: std::sync::Arc<std::sync::Mutex<Option<ExecutionContext>>>,
+        command: std::sync::Arc<std::sync::Mutex<Option<ExecutionContext>>>,
+    }
+
+    struct RecordingExecutor {
+        contexts: RecordedContexts,
+        capabilities: Vec<Capability>,
+    }
+
+    impl RecordingExecutor {
+        fn new(contexts: RecordedContexts) -> Self {
+            Self {
+                contexts,
+                capabilities: vec![Capability::PythonExecution, Capability::BashExecution],
+            }
+        }
+    }
+
+    #[async_trait]
+    impl ExecutionEnvironment for RecordingExecutor {
+        type Error = RlmError;
+
+        async fn execute_code(
+            &self,
+            _code: &str,
+            ctx: &ExecutionContext,
+        ) -> Result<ExecutionResult, Self::Error> {
+            *self.contexts.code.lock().unwrap() = Some(ctx.clone());
+            Ok(ExecutionResult::success("recorded code context"))
+        }
+
+        async fn execute_command(
+            &self,
+            _command: &str,
+            ctx: &ExecutionContext,
+        ) -> Result<ExecutionResult, Self::Error> {
+            *self.contexts.command.lock().unwrap() = Some(ctx.clone());
+            Ok(ExecutionResult::success("recorded command context"))
+        }
+
+        async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
+            Ok(ValidationResult::valid(vec![]))
+        }
+
+        async fn create_snapshot(
+            &self,
+            session_id: &SessionId,
+            name: &str,
+        ) -> Result<SnapshotId, Self::Error> {
+            Ok(SnapshotId::new(name, *session_id))
+        }
+
+        async fn restore_snapshot(&self, _snapshot: &SnapshotId) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        async fn list_snapshots(
+            &self,
+            _session_id: &SessionId,
+        ) -> Result<Vec<SnapshotId>, Self::Error> {
+            Ok(vec![])
+        }
+
+        async fn delete_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        async fn delete_session_snapshots(
+            &self,
+            _session_id: &SessionId,
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn capabilities(&self) -> &[Capability] {
+            &self.capabilities
+        }
+
+        fn backend_type(&self) -> BackendType {
+            BackendType::Docker
+        }
+
+        async fn health_check(&self) -> Result<bool, Self::Error> {
+            Ok(true)
+        }
+
+        async fn cleanup(&self) -> Result<(), Self::Error> {
+            Ok(())
         }
     }
 
@@ -1224,7 +1361,12 @@ mod tests {
         async fn end_session(&self, _session_id: &SessionId) -> Result<(), Self::Error> {
             self.end_session_calls
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            Ok(())
+            match &self.end_session_error {
+                Some(message) => Err(RlmError::Internal {
+                    message: message.clone(),
+                }),
+                None => Ok(()),
+            }
         }
     }
 
@@ -1282,6 +1424,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_destroy_session_propagates_executor_teardown_failure() {
+        // The public API must not report a clean destruction when the backend
+        // says it could not release the session's resources: an Apple Container
+        // VM that failed to delete is still running, and a caller told `Ok(())`
+        // has no way to learn that.
+        let config = RlmConfig::minimal();
+        let executor = MockExecutor::failing_end_session("container delete failed: resource busy");
+        let counter = executor.end_session_counter();
+        let rlm = TerraphimRlm::with_executor(config, executor).unwrap();
+
+        let session = rlm.create_session().await.unwrap();
+        let err = rlm.destroy_session(&session.id).await.unwrap_err();
+        assert!(err.to_string().contains("resource busy"), "{err}");
+        assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+        // The logical session is still gone, and retry ownership stays with the
+        // executor: destroy_session is not the retry path, cleanup() is.
+        assert!(
+            rlm.get_session(&session.id).is_err(),
+            "the session record must not survive a reported teardown failure"
+        );
+    }
+
+    #[tokio::test]
     async fn test_execute_code() {
         let config = RlmConfig::minimal();
         let rlm = TerraphimRlm::with_executor(config, MockExecutor::new()).unwrap();
@@ -1306,6 +1472,50 @@ mod tests {
 
         assert!(result.stdout.contains("Ran"));
         assert_eq!(result.exit_code, 0);
+    }
+
+    #[tokio::test]
+    async fn execute_code_passes_configured_max_inline_output_bytes_to_executor_context() {
+        let mut config = RlmConfig::minimal();
+        config.max_inline_output_bytes = 17;
+        let contexts = RecordedContexts::default();
+        let rlm =
+            TerraphimRlm::with_executor(config, RecordingExecutor::new(contexts.clone())).unwrap();
+
+        let session = rlm.create_session().await.unwrap();
+        rlm.execute_code(&session.id, "print('hello')")
+            .await
+            .unwrap();
+
+        let ctx = contexts
+            .code
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("executor should receive code execution context");
+        assert_eq!(ctx.max_output_bytes, 17);
+    }
+
+    #[tokio::test]
+    async fn execute_command_passes_configured_max_inline_output_bytes_to_executor_context() {
+        let mut config = RlmConfig::minimal();
+        config.max_inline_output_bytes = 23;
+        let contexts = RecordedContexts::default();
+        let rlm =
+            TerraphimRlm::with_executor(config, RecordingExecutor::new(contexts.clone())).unwrap();
+
+        let session = rlm.create_session().await.unwrap();
+        rlm.execute_command(&session.id, "echo hello")
+            .await
+            .unwrap();
+
+        let ctx = contexts
+            .command
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("executor should receive command execution context");
+        assert_eq!(ctx.max_output_bytes, 23);
     }
 
     #[tokio::test]

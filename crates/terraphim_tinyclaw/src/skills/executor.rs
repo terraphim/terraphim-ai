@@ -1,6 +1,7 @@
 //! Skill executor for loading and executing skill workflows.
 
 use crate::agent::execution_guard::{ExecutionGuard, GuardDecision};
+use crate::cron::CronStore;
 #[cfg(test)]
 use crate::skills::types::SkillInput;
 use crate::skills::types::{Skill, SkillResult, SkillStatus, SkillStep, StepResult};
@@ -31,6 +32,10 @@ pub enum SkillError {
     MissingInput(String),
     #[error("Command blocked by safety policy: {0}")]
     Blocked(String),
+    #[error("Configuration error: {0}")]
+    Config(String),
+    #[error("Cron store error: {0}")]
+    Cron(#[from] crate::cron::CronError),
 }
 
 /// Executes skills with progress tracking and cancellation support.
@@ -41,6 +46,9 @@ pub struct SkillExecutor {
     cancelled: Arc<AtomicBool>,
     /// Optional tool registry for executing tool steps
     tool_registry: Option<Arc<ToolRegistry>>,
+    /// Optional cron store for `SkillStep::Schedule` (#3147). When unset,
+    /// schedule steps fail with a clear "scheduler not configured" error.
+    cron_store: Option<CronStore>,
 }
 
 impl SkillExecutor {
@@ -53,12 +61,19 @@ impl SkillExecutor {
             storage_dir,
             cancelled: Arc::new(AtomicBool::new(false)),
             tool_registry: None,
+            cron_store: None,
         })
     }
 
     /// Set the tool registry for executing tool steps.
     pub fn with_tool_registry(mut self, registry: Arc<ToolRegistry>) -> Self {
         self.tool_registry = Some(registry);
+        self
+    }
+
+    /// Set the cron store for `SkillStep::Schedule` (#3147).
+    pub fn with_cron_store(mut self, store: CronStore) -> Self {
+        self.cron_store = Some(store);
         self
     }
 
@@ -184,6 +199,11 @@ impl SkillExecutor {
                     self.execute_shell_step(command, working_dir.as_deref(), &inputs)
                         .await
                 }
+                SkillStep::Schedule {
+                    cron,
+                    skill,
+                    inputs,
+                } => self.execute_schedule_step(cron, skill, inputs).await,
             };
 
             let step_duration = step_start.elapsed().as_millis() as u64;
@@ -449,6 +469,35 @@ impl SkillExecutor {
             ))
         }
     }
+
+    /// Execute a `SkillStep::Schedule` — persist a recurring job in the
+    /// cron store (#3147). The job's prompt runs the named skill with the
+    /// provided inputs when the schedule fires.
+    async fn execute_schedule_step(
+        &self,
+        cron: &str,
+        skill: &str,
+        inputs: &serde_json::Value,
+    ) -> Result<String, SkillError> {
+        let store = self.cron_store.clone().ok_or_else(|| {
+            SkillError::Config("scheduler not configured (no cron store wired)".to_string())
+        })?;
+        let schedule = crate::cron::Schedule::parse(cron)
+            .map_err(|e| SkillError::Config(format!("invalid schedule '{cron}': {e}")))?;
+        let prompt = format!(
+            "run skill '{}' with inputs {}",
+            skill,
+            serde_json::to_string(inputs).unwrap_or_else(|_| "{}".to_string())
+        );
+        let mut job = crate::cron::CronJob::new(prompt, schedule);
+        job.skills = vec![skill.to_string()];
+
+        let job_id = job.id.clone();
+        let mut jobs = store.load_all().await.map_err(SkillError::Cron)?;
+        jobs.push(job);
+        store.save_all(&jobs).await.map_err(SkillError::Cron)?;
+        Ok(format!("scheduled job {job_id}: {cron}"))
+    }
 }
 
 fn step_type_name(step: &SkillStep) -> String {
@@ -456,6 +505,7 @@ fn step_type_name(step: &SkillStep) -> String {
         SkillStep::Tool { .. } => "tool".to_string(),
         SkillStep::Llm { .. } => "llm".to_string(),
         SkillStep::Shell { .. } => "shell".to_string(),
+        SkillStep::Schedule { .. } => "schedule".to_string(),
     }
 }
 
@@ -826,6 +876,83 @@ mod tests {
             }
             _ => panic!(
                 "Expected Failed status for curl | sh, got {:?}",
+                result.status
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn schedule_step_persists_job_when_store_wired() {
+        use crate::cron::CronStore;
+        use terraphim_persistence::DeviceStorage;
+
+        let temp_dir = TempDir::new().unwrap();
+        let executor = SkillExecutor::new(temp_dir.path()).unwrap();
+
+        // Memory-only storage, unique key.
+        let storage_ref = DeviceStorage::init_memory_only().await.unwrap();
+        let storage = std::sync::Arc::new(DeviceStorage {
+            ops: storage_ref.ops.clone(),
+            fastest_op: storage_ref.fastest_op.clone(),
+        });
+        let store = CronStore::new(storage, "executor_schedule_test");
+        let executor = executor.with_cron_store(store);
+
+        let skill = Skill {
+            name: "sched-skill".to_string(),
+            version: "1.0.0".to_string(),
+            description: "schedules a job".to_string(),
+            author: None,
+            steps: vec![SkillStep::Schedule {
+                cron: "0 9 * * *".to_string(),
+                skill: "daily-report".to_string(),
+                inputs: serde_json::json!({}),
+            }],
+            inputs: vec![],
+        };
+
+        let result = executor
+            .execute_skill(&skill, HashMap::new(), None)
+            .await
+            .unwrap();
+        assert!(
+            result.output.contains("scheduled job"),
+            "got: {}",
+            result.output
+        );
+    }
+
+    #[tokio::test]
+    async fn schedule_step_fails_without_store() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = SkillExecutor::new(temp_dir.path()).unwrap();
+
+        let skill = Skill {
+            name: "sched-nostore".to_string(),
+            version: "1.0.0".to_string(),
+            description: "schedules without store".to_string(),
+            author: None,
+            steps: vec![SkillStep::Schedule {
+                cron: "every 1h".to_string(),
+                skill: "daily-report".to_string(),
+                inputs: serde_json::json!({}),
+            }],
+            inputs: vec![],
+        };
+
+        let result = executor
+            .execute_skill(&skill, HashMap::new(), None)
+            .await
+            .unwrap();
+        match result.status {
+            SkillStatus::Failed { error, .. } => {
+                assert!(
+                    error.contains("scheduler not configured"),
+                    "expected config error, got: {error}"
+                );
+            }
+            _ => panic!(
+                "expected Failed status without cron store, got {:?}",
                 result.status
             ),
         }

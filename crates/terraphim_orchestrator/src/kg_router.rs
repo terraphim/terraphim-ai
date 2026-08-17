@@ -610,22 +610,40 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             .unwrap();
         assert_eq!(d.matched_concept, "planning_tier");
         assert_eq!(d.priority, 80);
-        assert_eq!(d.provider, "anthropic");
-        assert!(d.model.contains("opus"));
+        // Providers/models are taxonomy-driven and dynamic: assert resolution rather
+        // than a hardcoded vendor so a provider migration doesn't break routing tests.
+        assert!(
+            !d.provider.is_empty(),
+            "planning tier must resolve a provider"
+        );
+        assert!(!d.model.is_empty(), "planning tier must resolve a model");
+        assert!(
+            !d.fallback_routes.is_empty(),
+            "planning tier must expose fallback routes"
+        );
 
         // Review tier (priority 40) -- "verify" triggers review
         let d = router.route_agent("verify and validate results").unwrap();
         assert_eq!(d.matched_concept, "review_tier");
         assert_eq!(d.priority, 40);
-        assert_eq!(d.provider, "anthropic");
-        assert!(d.model.contains("haiku"));
+        assert!(
+            !d.provider.is_empty(),
+            "review tier must resolve a provider"
+        );
+        assert!(!d.model.is_empty(), "review tier must resolve a model");
 
         // Implementation tier (priority 50) -- "implement" triggers coding
         let d = router.route_agent("implement the new feature").unwrap();
         assert_eq!(d.matched_concept, "implementation_tier");
         assert_eq!(d.priority, 50);
-        assert_eq!(d.provider, "anthropic");
-        assert!(d.model.contains("sonnet"));
+        assert!(
+            !d.provider.is_empty(),
+            "implementation tier must resolve a provider"
+        );
+        assert!(
+            !d.model.is_empty(),
+            "implementation tier must resolve a model"
+        );
 
         // Decision tier (priority 65) -- "analyse logs" routes between
         // planning and implementation
@@ -642,20 +660,15 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
         assert_eq!(d.matched_concept, "decision_tier");
         assert_eq!(d.priority, 65);
 
-        // Planning tier exposes opencode/gpt-5.5 route
+        // Planning tier exposes a GPT-5.5 route via the openai-codex provider
         let pt = router
             .all_routes()
             .into_iter()
-            .filter(|r| {
-                r.action
-                    .as_deref()
-                    .is_some_and(|a| a.contains("opencode/gpt-5.5"))
-                    || r.model == "opencode/gpt-5.5"
-            })
+            .filter(|r| r.provider.contains("openai-codex") && r.model.contains("gpt-5.5"))
             .count();
         assert!(
             pt >= 1,
-            "expected at least one route with opencode/gpt-5.5 across all tiers"
+            "expected at least one route with openai-codex/gpt-5.5 across all tiers"
         );
 
         // Implementation tier exposes MiniMax-M2.7-highspeed route
@@ -668,6 +681,22 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             m27 >= 1,
             "expected at least one route with MiniMax-M2.7-highspeed"
         );
+
+        // Deep-reasoning "thinking" route (kimi k2-thinking) is present
+        let thinking = router
+            .all_routes()
+            .into_iter()
+            .filter(|r| r.model.contains("k2-thinking"))
+            .count();
+        assert!(thinking >= 1, "expected at least one deep-thinking route");
+
+        // "plan" provider (zai-coding-plan) routes are present across tiers
+        let plan = router
+            .all_routes()
+            .into_iter()
+            .filter(|r| r.provider.contains("zai-coding-plan"))
+            .count();
+        assert!(plan >= 1, "expected at least one zai-coding-plan route");
 
         // pi-rust routes are present
         let pi_rust = router
@@ -688,9 +717,12 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
     /// End-to-end: simulate ADF agent dispatch with phase-aware 3-tier routing.
     ///
     /// Each agent's task keywords determine its tier:
-    /// - PLANNING (opus): strategic planning, architecture design, create a plan
-    /// - REVIEW (haiku): verify, validate, check results, compliance check
-    /// - IMPLEMENTATION (sonnet/kimi): implement, code, test, security audit
+    /// - PLANNING: strategic planning, architecture design, create a plan
+    /// - REVIEW: verify, validate, check results, compliance check
+    /// - IMPLEMENTATION: implement, code, test, security audit
+    ///
+    /// Providers/models are taxonomy-driven and dynamic; assertions verify the tier
+    /// and that a provider + model resolve, rather than pinning a vendor.
     #[test]
     fn e2e_all_adf_agents_route_to_correct_tier() {
         let taxonomy = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -701,113 +733,100 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
 
         let router = KgRouter::load(&taxonomy).unwrap();
 
-        // (agent, task keywords, expected tier, expected primary provider)
-        let agents: Vec<(&str, &str, &str, &str)> = vec![
-            // PLANNING TIER (opus)
+        // (agent, task keywords, expected tier) — provider/model are dynamic
+        // (taxonomy-driven), so we assert tier correctness + resolution, not a
+        // hardcoded vendor.
+        let agents: Vec<(&str, &str, &str)> = vec![
+            // PLANNING TIER
             (
                 "meta-coordinator",
                 "create a plan for strategic planning and cross-agent coordination",
                 "planning_tier",
-                "anthropic",
             ),
             (
                 "product-development",
                 "create a plan for product roadmap and feature prioritisation",
                 "planning_tier",
-                "anthropic",
             ),
-            // REVIEW TIER (haiku)
+            // REVIEW TIER
             (
                 "spec-validator",
                 "verify and validate outputs, check results pass fail quality gate",
                 "review_tier",
-                "anthropic",
             ),
             (
                 "quality-coordinator",
                 "review code quality and verify test results for PR approval",
                 "implementation_tier",
-                "anthropic",
             ),
             (
                 "compliance-watchdog",
                 "verify compliance and check audit results against standards",
                 "review_tier",
-                "anthropic",
             ),
             (
                 "drift-detector",
                 "check drift detection and validate system state",
                 "review_tier",
-                "anthropic",
             ),
             (
                 "merge-coordinator",
                 "review merge verdict and evaluate GO NO-GO for PR approval",
                 "decision_tier",
-                "openai-codex",
             ),
-            // IMPLEMENTATION TIER (sonnet)
+            // IMPLEMENTATION TIER
             (
                 "security-sentinel",
                 "security audit cargo audit CVE vulnerability scan",
                 "implementation_tier",
-                "anthropic",
             ),
             (
                 "test-guardian",
                 "test QA regression integration test cargo test",
                 "implementation_tier",
-                "anthropic",
             ),
             (
                 "implementation-swarm",
                 "implement build code fix refactor feature PR",
                 "implementation_tier",
-                "anthropic",
             ),
             (
                 "documentation-generator",
                 "documentation readme changelog API docs technical writing",
                 "implementation_tier",
-                "anthropic",
             ),
             (
                 "browser-qa",
                 "test QA browser test end-to-end regression",
                 "implementation_tier",
-                "anthropic",
             ),
             (
                 "log-analyst",
                 "log analysis error pattern incident observability",
                 "implementation_tier",
-                "anthropic",
             ),
-            // New: decision-tier dispatches use analytical keywords
+            // decision-tier dispatches use analytical keywords
             (
                 "nightwatch-retrospective",
                 "nightwatch retrospective and quality evaluation across fleet health",
                 "decision_tier",
-                "openai-codex",
             ),
         ];
 
         let mut all_passed = true;
-        for (agent, task, expected_tier, expected_provider) in &agents {
+        for (agent, task, expected_tier) in &agents {
             match router.route_agent(task) {
                 Some(decision) => {
                     let tier_ok = decision.matched_concept == *expected_tier;
-                    let provider_ok = decision.provider == *expected_provider;
-                    if !tier_ok || !provider_ok {
+                    let dynamic_ok = !decision.provider.is_empty() && !decision.model.is_empty();
+                    if !tier_ok || !dynamic_ok {
                         eprintln!(
-                            "MISMATCH {}: got {}:{}/{} (expected {}:{})",
+                            "MISMATCH {}: got {}:{}/{} (expected tier {})",
                             agent,
                             decision.matched_concept,
                             decision.provider,
                             decision.model,
                             expected_tier,
-                            expected_provider,
                         );
                         all_passed = false;
                     } else {

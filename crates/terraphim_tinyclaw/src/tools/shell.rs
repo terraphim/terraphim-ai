@@ -98,9 +98,10 @@ impl ShellTool {
 
         if !output.status.success() {
             let exit_code = output.status.code().unwrap_or(-1);
-            return Err(ToolError::ExecutionFailed {
+            return Err(ToolError::NonZeroExit {
                 tool: "shell".to_string(),
-                message: format!("Command exited with code {}\nSTDERR: {}", exit_code, stderr),
+                exit_code,
+                stderr: stderr.to_string(),
             });
         }
 

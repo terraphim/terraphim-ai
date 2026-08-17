@@ -53,9 +53,10 @@ pub struct RunnerConfig {
     /// A hung `FetchTask` call is aborted after this duration rather than
     /// blocking the poll loop indefinitely.
     pub http_request_timeout: Duration,
-    /// Belt-and-suspenders timeout wrapping each `poll_once` call in
-    /// `run_forever`. Should exceed `http_request_timeout` so reqwest's own
-    /// timeout fires first; defaults to `2 x http_request_timeout`.
+    /// Belt-and-suspenders timeout wrapping only the pre-claim `FetchTask`
+    /// request. It must never cancel an already-claimed task's worker lifecycle.
+    /// Should exceed `http_request_timeout` so reqwest's own timeout fires first;
+    /// defaults to `2 x http_request_timeout`.
     pub poll_timeout: Duration,
     /// Directory containing `command_policy.md` for the taxonomy-driven
     /// command allowlist. If `None`, the embedded default policy is used.

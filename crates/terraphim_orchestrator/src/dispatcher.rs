@@ -230,7 +230,7 @@ impl Dispatcher {
             let project = pt.task.project();
             let last = self.last_dequeue_seq.get(project).copied().unwrap_or(0);
             let key = (last, pt.seq);
-            if best_key.map_or(true, |b| key < b) {
+            if best_key.is_none_or(|b| key < b) {
                 best_key = Some(key);
                 best_idx = i;
             }

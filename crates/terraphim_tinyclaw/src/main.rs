@@ -18,7 +18,75 @@ use terraphim_tinyclaw::credentials::{
 };
 use terraphim_tinyclaw::session::SessionManager;
 use terraphim_tinyclaw::skills::{Skill, SkillExecutor};
-use terraphim_tinyclaw::tools::create_default_registry;
+use terraphim_tinyclaw::tools::{ParityConfig, create_default_registry_with_parity};
+
+/// Routing decision for the session memory backend (#3227 review P1).
+///
+/// Pure decision function, kept separate from `select_session_backend`
+/// so the sqlite gate can be unit-tested without opening a database.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SessionBackendChoice {
+    /// Default jsonl persistence over the shared `SessionManager`.
+    Jsonl,
+    /// Opt-in sqlite persistence via `DeviceStorage`.
+    Sqlite,
+}
+
+/// Decide which session backend to use, applying the
+/// `memory.allow_sqlite_backend` safety gate (#3227 review P1).
+///
+/// The sqlite path persists session state through `DeviceStorage` while
+/// session tools still read the jsonl `SessionManager` — a known
+/// split-brain. Unless the user explicitly sets
+/// `memory.allow_sqlite_backend = true`, a requested
+/// `backend = "sqlite"` is rejected here with a prominent warning and
+/// routed to jsonl instead of silently splitting session state.
+fn choose_session_backend(config: &Config) -> SessionBackendChoice {
+    if !config.memory.enabled || config.memory.backend != "sqlite" {
+        return SessionBackendChoice::Jsonl;
+    }
+    if !config.memory.allow_sqlite_backend {
+        log::warn!(
+            "memory.allow_sqlite_backend is false; sqlite backend requested but disabled \
+             (split-brain session state with session tools is unsupported). Falling back to \
+             jsonl. Set memory.allow_sqlite_backend = true to enable sqlite."
+        );
+        return SessionBackendChoice::Jsonl;
+    }
+    SessionBackendChoice::Sqlite
+}
+
+/// Select the session memory backend for the agent loop (#3227, T4).
+///
+/// `memory.backend = "sqlite"` (with `memory.enabled = true` AND the
+/// explicit opt-in `memory.allow_sqlite_backend = true`) routes
+/// session persistence through `SqliteBackend` on the shared
+/// `DeviceStorage`. Any other value — a disabled sqlite gate, or a
+/// `DeviceStorage` initialisation failure — falls back to the default
+/// `JsonlBackend` over the shared `SessionManager`, preserving the
+/// existing on-disk layout so legacy session files keep loading.
+async fn select_session_backend(
+    config: &Config,
+    sessions: Arc<tokio::sync::Mutex<SessionManager>>,
+) -> terraphim_tinyclaw::memory::SharedBackend {
+    use terraphim_tinyclaw::memory::jsonl::JsonlBackend;
+    use terraphim_tinyclaw::memory::sqlite::SqliteBackend;
+
+    if choose_session_backend(config) == SessionBackendChoice::Sqlite {
+        match terraphim_persistence::DeviceStorage::arc_instance().await {
+            Ok(storage) => {
+                log::info!("Session memory backend: sqlite (DeviceStorage)");
+                return Arc::new(SqliteBackend::new(storage, "tinyclaw"));
+            }
+            Err(e) => {
+                log::warn!(
+                    "DeviceStorage init failed ({e}); falling back to jsonl session backend"
+                );
+            }
+        }
+    }
+    Arc::new(JsonlBackend::from_shared(sessions))
+}
 
 /// Multi-channel AI assistant powered by Terraphim.
 #[derive(Parser, Debug)]
@@ -52,6 +120,11 @@ enum Commands {
     Skill {
         #[command(subcommand)]
         command: SkillCommands,
+    },
+    /// Manage recurring schedules (Hermes parity, #3147).
+    Schedule {
+        #[command(subcommand)]
+        command: ScheduleCommands,
     },
     /// Start MCP server on stdio (9-tool channel bridge).
     Mcp {
@@ -97,6 +170,35 @@ enum SkillCommands {
         /// Maximum number of results to display. 0 = no limit.
         #[arg(long, default_value_t = 10)]
         limit: usize,
+    },
+}
+
+/// Schedule subcommands (Hermes-parity cron surface, #3147).
+#[derive(Subcommand, Debug)]
+enum ScheduleCommands {
+    /// Create a recurring schedule. Returns the job id.
+    Create {
+        /// Task prompt to run when the schedule fires.
+        prompt: String,
+        /// Schedule expression: cron ('0 9 * * *'), 'every 30m',
+        /// RFC3339 timestamp, or relative delay ('2h').
+        schedule: String,
+        /// Skill(s) to inject at job start (repeatable).
+        #[arg(long)]
+        skill: Vec<String>,
+        /// Delivery target (e.g. telegram chat id).
+        #[arg(long)]
+        deliver: Option<String>,
+        /// Model override for the job.
+        #[arg(long)]
+        model: Option<String>,
+    },
+    /// List all stored schedules.
+    List,
+    /// Delete a schedule by id.
+    Delete {
+        /// Job id (from `schedule list`).
+        id: String,
     },
 }
 
@@ -147,6 +249,10 @@ async fn main() -> anyhow::Result<()> {
             log::info!("Executing skill command");
             run_skill_command(command).await?;
         }
+        Commands::Schedule { command } => {
+            log::info!("Executing schedule command");
+            run_schedule_command(command).await?;
+        }
         Commands::Mcp { serve } => {
             log::info!("Starting MCP server mode");
             run_mcp_mode(config, serve).await?;
@@ -180,18 +286,48 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     let sessions_dir = config.agent.workspace.join("sessions");
     let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
 
-    // Create tool registry with session manager
+    // Create tool registry with session manager + Hermes-parity tools
+    // (sandbox / subagent / browser / scheduler, each gated by config).
     let web_tools_config = config.tools.web.as_ref();
-    let tools = Arc::new(create_default_registry(
-        Some(sessions.clone()),
-        web_tools_config,
-    ));
+    let memory_config = if config.memory.enabled {
+        Some(&config.memory)
+    } else {
+        None
+    };
+    let tools = Arc::new(
+        create_default_registry_with_parity(
+            Some(sessions.clone()),
+            web_tools_config,
+            memory_config,
+            ParityConfig {
+                sandbox: Some(&config.sandbox),
+                subagent: Some(&config.subagent),
+                browser: Some(&config.browser),
+                scheduler: Some(&config.scheduler),
+                homeassistant: Some(&config.homeassistant),
+                vision: Some(&config.vision),
+                image_gen: Some(&config.image_gen),
+                tts: Some(&config.tts),
+                moa: Some(&config.moa),
+                rl: Some(&config.rl),
+            },
+        )
+        .await,
+    );
 
     // Create hybrid LLM router
     let router = build_router(&config)?;
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt);
+    let backend = select_session_backend(&config, sessions).await;
+    let agent = ToolCallingLoop::with_backend(
+        &config.agent,
+        router,
+        tools,
+        backend,
+        system_prompt,
+        memory_config,
+    );
 
     // Spawn agent loop in background
     let bus_clone = bus.clone();
@@ -232,16 +368,45 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
 
     // Create tool registry with session manager
     let web_tools_config = config.tools.web.as_ref();
-    let tools = Arc::new(create_default_registry(
-        Some(sessions.clone()),
-        web_tools_config,
-    ));
+    let memory_config_gw = if config.memory.enabled {
+        Some(&config.memory)
+    } else {
+        None
+    };
+    let tools = Arc::new(
+        create_default_registry_with_parity(
+            Some(sessions.clone()),
+            web_tools_config,
+            memory_config_gw,
+            ParityConfig {
+                sandbox: Some(&config.sandbox),
+                subagent: Some(&config.subagent),
+                browser: Some(&config.browser),
+                scheduler: Some(&config.scheduler),
+                homeassistant: Some(&config.homeassistant),
+                vision: Some(&config.vision),
+                image_gen: Some(&config.image_gen),
+                tts: Some(&config.tts),
+                moa: Some(&config.moa),
+                rl: Some(&config.rl),
+            },
+        )
+        .await,
+    );
 
     // Create hybrid LLM router
     let router = build_router(&config)?;
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt);
+    let backend = select_session_backend(&config, sessions).await;
+    let agent = ToolCallingLoop::with_backend(
+        &config.agent,
+        router,
+        tools,
+        backend,
+        system_prompt,
+        memory_config_gw,
+    );
 
     // Create channel manager and register enabled channels
     let mut channel_manager = ChannelManager::new();
@@ -450,6 +615,9 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
                     }
                     terraphim_tinyclaw::skills::SkillStep::Llm { .. } => "llm".to_string(),
                     terraphim_tinyclaw::skills::SkillStep::Shell { .. } => "shell".to_string(),
+                    terraphim_tinyclaw::skills::SkillStep::Schedule { cron, .. } => {
+                        format!("schedule: {}", cron)
+                    }
                 };
                 println!("  {}. {}", i + 1, step_type);
             }
@@ -561,6 +729,9 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
                             terraphim_tinyclaw::skills::SkillStep::Shell { .. } => {
                                 "shell".to_string()
                             }
+                            terraphim_tinyclaw::skills::SkillStep::Schedule { .. } => {
+                                "schedule".to_string()
+                            }
                         })
                         .collect();
                     if let Some(author) = &s.author {
@@ -613,4 +784,126 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Execute a schedule subcommand (Hermes parity cron surface, #3147).
+///
+/// Persists via `terraphim_persistence::DeviceStorage` (same store type
+/// as the dashboard cron CRUD); shares helpers with `ScheduleTool` so the
+/// CLI and the agent-loop tool cannot drift.
+async fn run_schedule_command(command: ScheduleCommands) -> anyhow::Result<()> {
+    use terraphim_tinyclaw::cron::CronStore;
+    use terraphim_tinyclaw::tools::scheduler::ScheduleTool;
+
+    let storage = terraphim_persistence::DeviceStorage::arc_instance()
+        .await
+        .map_err(|e| anyhow::anyhow!("Device storage unavailable: {e}"))?;
+    let store = CronStore::new(storage, "tinyclaw_schedules");
+    let tool = ScheduleTool::new(store);
+
+    match command {
+        ScheduleCommands::Create {
+            prompt,
+            schedule,
+            skill,
+            deliver,
+            model,
+        } => {
+            let id = tool
+                .create_job(prompt.clone(), &schedule, skill, deliver, model)
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            println!("✓ Schedule created: {id}");
+            println!("  prompt:   {prompt}");
+            println!("  schedule: {schedule}");
+        }
+        ScheduleCommands::List => {
+            let jobs = tool.list_jobs().await.map_err(|e| anyhow::anyhow!("{e}"))?;
+            if jobs.is_empty() {
+                println!("No schedules. Use 'schedule create' to add one.");
+            } else {
+                println!("Schedules ({} total):", jobs.len());
+                for job in jobs {
+                    println!(
+                        "  • {} - {} | state={:?} | enabled={} | next={:?}",
+                        job.id, job.prompt, job.state, job.enabled, job.next_run_at
+                    );
+                }
+            }
+        }
+        ScheduleCommands::Delete { id } => {
+            let removed = tool
+                .delete_job(&id)
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            if removed {
+                println!("✓ Schedule deleted: {id}");
+            } else {
+                anyhow::bail!("Schedule '{id}' not found (use 'schedule list' to see ids)");
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod backend_gate_tests {
+    //! Routing-decision tests for the sqlite safety gate (#3227 review
+    //! P1). These exercise `choose_session_backend` only — the pure
+    //! decision function — so no sqlite database is ever opened.
+
+    use super::*;
+
+    /// Default config routes to jsonl even when nothing memory-related
+    /// is configured.
+    #[test]
+    fn default_config_routes_to_jsonl() {
+        let config = Config::default();
+        assert_eq!(choose_session_backend(&config), SessionBackendChoice::Jsonl);
+    }
+
+    /// Gate closed: `backend = "sqlite"` + `allow_sqlite_backend = false`
+    /// (the default) must fall back to jsonl instead of silently
+    /// splitting session state between DeviceStorage and the jsonl
+    /// SessionManager.
+    #[test]
+    fn sqlite_requested_but_gate_closed_falls_back_to_jsonl() {
+        let mut config = Config::default();
+        config.memory.enabled = true;
+        config.memory.backend = "sqlite".to_string();
+        // allow_sqlite_backend defaults to false.
+        assert!(!config.memory.allow_sqlite_backend);
+        assert_eq!(choose_session_backend(&config), SessionBackendChoice::Jsonl);
+    }
+
+    /// Gate open: explicit opt-in (`allow_sqlite_backend = true`) with
+    /// `backend = "sqlite"` routes to sqlite.
+    ///
+    /// NOTE: the sqlite path still has the split-brain caveat — the
+    /// agent loop persists via DeviceStorage while session tools read
+    /// the jsonl SessionManager. The gate only prevents *silent*
+    /// default-to-sqlite; enabling it is a deliberate acceptance of
+    /// that caveat (#3227 review P1).
+    #[test]
+    fn sqlite_requested_and_gate_open_routes_to_sqlite() {
+        let mut config = Config::default();
+        config.memory.enabled = true;
+        config.memory.backend = "sqlite".to_string();
+        config.memory.allow_sqlite_backend = true;
+        assert_eq!(
+            choose_session_backend(&config),
+            SessionBackendChoice::Sqlite
+        );
+    }
+
+    /// Memory disabled: sqlite is never selected regardless of flags.
+    #[test]
+    fn memory_disabled_always_routes_to_jsonl() {
+        let mut config = Config::default();
+        config.memory.enabled = false;
+        config.memory.backend = "sqlite".to_string();
+        config.memory.allow_sqlite_backend = true;
+        assert_eq!(choose_session_backend(&config), SessionBackendChoice::Jsonl);
+    }
 }

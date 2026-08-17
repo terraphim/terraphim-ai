@@ -1,0 +1,8 @@
+{
+  "type": "evo.reject",
+  "signature": "behaviour-auto-approve-prs",
+  "target_kind": "behaviour",
+  "target_ref": "rules/review.md",
+  "trust_level": "L2",
+  "disposition": "reject_always"
+}

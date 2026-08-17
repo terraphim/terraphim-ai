@@ -172,6 +172,14 @@ pub enum RlmError {
         message: String,
     },
 
+    /// Strict diagnostics runner is already handling another probe.
+    #[error("Strict diagnostics runner is busy")]
+    StrictDiagnosticsBusy,
+
+    /// Strict diagnostics runner is shutting down.
+    #[error("Strict diagnostics runner is shutting down")]
+    StrictDiagnosticsShuttingDown,
+
     /// VM pool exhausted (all VMs busy, no overflow capacity).
     #[error(
         "VM pool exhausted: all {pool_size} VMs busy, overflow at capacity ({overflow_count}/{max_overflow})"

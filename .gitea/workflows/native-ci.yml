@@ -1,12 +1,45 @@
+# Merge-authoritative build lane (ADR docs/decisions/0001-gitea-actions-authoritative-ci.md).
+#
+# Triggers
+#   push               -> emits commit-status context `native-ci / build (push)`
+#   pull_request       -> emits commit-status context `native-ci / build (pull_request)`
+#   workflow_dispatch  -> emits `native-ci / build (workflow_dispatch)`; used to
+#                         re-verify an exact SHA without pushing to the candidate.
+# The exact context string is derived by the runner from the workflow name, the
+# first job id, and the event name. Never guess it in branch protection -- read it
+# back from the Gitea status API after a run (Refs #3222 Task 7).
+#
+# Command policy
+#   Steps are classified by the literal first token of `run:`, after leading
+#   environment assignments are stripped. Repository scripts must therefore be
+#   invoked through an allowlisted interpreter (`bash ./scripts/x.sh`); naming a
+#   script path directly is rejected before execution. See
+#   crates/terraphim_gitea_runner/default_policy.md.
 name: native-ci
 on:
   push:
+  pull_request:
   workflow_dispatch:
 jobs:
   build:
     runs-on: terraphim-native
+    # Bound the job at the Gitea Actions level. The runner enforces its own
+    # independent bounds (WorkflowExecutorConfig: 1800s per step, 7200s total),
+    # so a job cannot outlive both regardless of which layer notices first.
+    timeout-minutes: 90
     steps:
+      # Optional preflight. The hermeticity script exists only on refs that carry
+      # the TinyClaw integration work, so the step must be a no-op on refs where
+      # it is absent rather than a hard failure. The first token is `bash`, which
+      # is allowlisted; the file test lives inside the shell, not in the policy.
+      - name: Optional TinyClaw hermeticity preflight
+        run: bash -c 'if [ -f ./scripts/check-tinyclaw-test-hermeticity.sh ]; then bash ./scripts/check-tinyclaw-test-hermeticity.sh; else echo preflight-script-absent-on-this-ref-skipping; fi'
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo build --workspace
+      # Deliberate scope: the workspace `--lib` command remains the stable baseline.
+      # Targeted package-default runner/companion commands close known deterministic contract gaps.
+      # Broad workspace `--all-targets` remains excluded from this merge gate (Refs #3222).
       - run: cargo test --workspace --lib --no-fail-fast
+      - run: cargo test -p terraphim_gitea_runner --no-fail-fast
+      - run: CARGO_REGISTRIES_TERRAPHIM_INDEX=sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/ cargo test -p terraphim_llm_runner --no-fail-fast

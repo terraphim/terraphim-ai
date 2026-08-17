@@ -258,8 +258,12 @@ mod tests {
         };
 
         tokio::fs::create_dir_all(dir).await.unwrap();
+        // `git init -b` requires Git 2.28. Keep this test fixture compatible
+        // with the fleet's Git 2.25 hosts by creating and selecting the branch
+        // in two portable operations.
+        assert!(run(&["init", "-q"]).status().await.unwrap().success());
         assert!(
-            run(&["init", "-q", "-b", "main"])
+            run(&["checkout", "-q", "-b", "main"])
                 .status()
                 .await
                 .unwrap()

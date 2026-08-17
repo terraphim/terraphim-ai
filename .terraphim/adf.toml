@@ -1,151 +1,359 @@
-# Local ADF configuration for repository-level end-to-end dispatch testing.
-#
-# This file intentionally satisfies both local loaders:
-# - `adf --local --check` / `adf --local --agent NAME` use ProjectAdfConfig.
-# - `adf .terraphim/adf.toml` uses the full OrchestratorConfig and enables
-#   the direct Unix socket consumed by `adf-ctl --local trigger --direct`.
+# ============================================================================
+# terraphim-ai — Repo-local full OrchestratorConfig (fleet standard)
+# ============================================================================
+# Conforms to private/cto-executive-system 2026-08-14-adf-agent-fleet-enablement.md:
+#   - no `schedule = "on_demand"` (Growth/Safety agents OMIT schedule entirely)
+#   - cli_tool is never plain `pi` (pi-rust symlink for coding agents)
+#   - cli_tool paths use ${HOME}/.local/bin/pi-rust — the standard per-user
+#     install location, env-expanded at config load so the cli_tool probe sees
+#     a literal absolute path (bare `~` is NOT expanded by the probe). On hosts
+#     that install pi-rust at /usr/local/bin/pi-rust instead, override via the
+#     AGENT_CLI_OVERRIDE mechanism or update these paths.
+#   - models: kimi-for-coding/k3, minimax-coding-plan/MiniMax-M3,
+#     zai-coding-plan/glm-5.2 only (k2p5 and M2.5 are sunset)
+#   - relative paths only (working dirs relative to repo root)
+#   - tokens via ${GITEA_TOKEN} env-ref, never literals
+# Refs terraphim/terraphim-ai#3234
 
 project_id = "terraphim-ai"
 name = "Terraphim AI"
-working_dir = "/Users/alex/projects/terraphim/terraphim-ai"
-tick_interval_secs = 1
-disk_usage_threshold = 100
+working_dir = "."
+tick_interval_secs = 30
+disk_usage_threshold = 90
+flow_state_dir = ".terraphim/flow-states"
+max_restart_count = 3
+restart_cooldown_secs = 300
 
 [nightwatch]
+eval_interval_secs = 300
+active_start_hour = 2
+active_end_hour = 6
 
+# ── Scheduled disciplined-engineering cycle ──
 [compound_review]
-schedule = "0 2 * * *"
-repo_path = "/home/alex/projects/terraphim/terraphim-ai"
+schedule = "0 6 * * *"
+repo_path = "."
+max_duration_secs = 1800
+create_prs = false
+worktree_root = ".worktrees"
+auto_file_issues = false
+auto_remediate = false
 
 [direct_dispatch]
-socket_path = "/tmp/adf-ctl.sock"
+socket_path = "/tmp/adf-ctl-terraphim-ai.sock"
 
+# ── PR-open gate producers (per-project schema: array-of-tables) ──
+[[pr_dispatch]]
+name = "pr-reviewer"
+context = "adf/pr-reviewer"
+
+[[pr_dispatch]]
+name = "pr-validator"
+context = "adf/validation"
+
+[[pr_dispatch]]
+name = "pr-verifier"
+context = "adf/verification"
+
+# ── Auto-merge gate ──
+[auto_merge]
+max_remediation_attempts = 3
+max_dispatches_per_tick = 2
+min_confidence = 5
+
+# ============================================================================
+# Project
+# ============================================================================
 [[projects]]
 id = "terraphim-ai"
-working_dir = "/Users/alex/projects/terraphim/terraphim-ai"
+working_dir = "."
 
+[projects.gitea]
+base_url = "https://git.terraphim.cloud"
+token = "${GITEA_TOKEN}"
+owner = "terraphim"
+repo = "terraphim-ai"
+
+# ============================================================================
+# Agents — fleet standard set (guide §3.5)
+# ============================================================================
+
+# ── Developer (pi-rust / kimi k3) — the code writer ──
 [[agents]]
-name = "implementation-swarm"
+name = "developer"
 layer = "Core"
-cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=implementation-swarm; pick and progress the Gitea task via local direct dispatch"
+cli_tool = "${HOME}/.local/bin/pi-rust"
+model = "kimi-for-coding/k3"
+fallback_model = "zai-coding-plan/glm-5.2"
+fallback_provider = "${HOME}/.local/bin/pi-rust"
+persona = "ferrox"
+terraphim_role = "Terraphim AI Developer"
+skill_chain = ["disciplined-research", "disciplined-design", "disciplined-implementation", "testing"]
+capabilities = ["implementation", "rust-development", "tdd"]
 project = "terraphim-ai"
+schedule = "0 6 * * *"
+task = '''
+source ~/.profile
 
+## Worktree Context
+You are running in an isolated git worktree. Your CWD is the repo root.
+Configure git identity before committing:
+  git config user.email "adf-developer@terraphim.cloud"
+  git config user.name "ADF Developer Agent"
+
+## Session Checkpoint
+1. git fetch origin 2>/dev/null
+2. echo "=== Existing task branches ===" && git branch -r | grep "task/" || true
+3. SKIP any issue where a remote branch or open PR already exists
+
+## Pick Work
+export GITEA_TOKEN="$(grep -o 'token = "[^"]*"' /opt/ai-dark-factory/conf.d/terraphim-ai.toml | head -1 | cut -d'"' -f2)"
+export GITEA_URL="https://git.terraphim.cloud"
+gtr ready --owner terraphim --repo terraphim-ai --extended
+
+## Your Job
+1. Pick the highest-priority unblocked issue from the ready list.
+2. If no ready issues, report status and exit 0.
+3. Claim it: gtr claim --owner terraphim --repo terraphim-ai --issue IDX --agent developer
+4. Create a branch: git checkout -b task/IDX-short-title
+5. Implement the fix following the issue spec (write REAL code, not placeholders).
+6. Run cargo test --workspace and cargo clippy --workspace to verify.
+7. Commit: git add -A && git commit --no-verify -m "[agent] feat: description. Refs terraphim/terraphim-ai#IDX"
+8. Push: git push origin HEAD:refs/heads/task/IDX-short-title
+9. Create PR: gtr create-pull --owner terraphim --repo terraphim-ai --title "Fix #IDX: title" --base main --head task/IDX-short-title
+10. Comment: gtr comment --owner terraphim --repo terraphim-ai --index IDX --body "Implementation complete. @adf:reviewer please review PR."
+11. DO NOT close the issue. The merge-coordinator closes after review.
+
+## CRITICAL: SDK Validation Rule
+BEFORE marking any implementation complete, you MUST validate against official SDKs:
+1. ls tests/integration/*-sdk-test.mjs 2>/dev/null
+2. Run the relevant SDK validation test: node tests/integration/<service>-sdk-test.mjs
+3. If no SDK test exists for the modified service, create one using official SDK payload fixtures.
+4. The SDK test MUST pass before you claim the work is complete.
+5. Run cargo test --workspace AND the relevant SDK tests before creating PR.
+DO NOT mark an implementation as complete unless SDK validation passes.
+'''
+
+# ── Reviewer (claude / MiniMax-M3) — structured review prose ──
 [[agents]]
-name = "disciplined-research-agent"
+name = "reviewer"
 layer = "Core"
-cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=disciplined-research; research badlogic/pi CLI support"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "minimax-coding-plan/MiniMax-M3"
+fallback_model = "zai-coding-plan/glm-5.2"
+persona = "carthos"
+terraphim_role = "Terraphim AI Reviewer"
+skill_chain = ["code-review", "testing"]
+capabilities = ["code-review", "quality-gate", "review-coordination"]
 project = "terraphim-ai"
+schedule = "30 6 * * *"
+task = '''
+source ~/.profile
 
+## Worktree: CWD is the repo root. git pull origin main
+
+## Review the PR referenced in the mention context
+1. Read the PR diff
+2. Check for: correctness, security, performance, idiomatic code
+3. Run tests if applicable
+4. Post verdict as comment on the issue:
+   - "compound-review verdict: GO" or "compound-review verdict: NO-GO"
+5. If GO, trigger downstream reviewers via @adf: mentions if needed
+'''
+
+# ── Reviewer-2 (pi-rust / MiniMax-M3) — model-diverse second opinion ──
 [[agents]]
-name = "implementation-plan-agent"
+name = "reviewer-2"
 layer = "Core"
-cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=implementation-plan; create detailed implementation plan"
+cli_tool = "${HOME}/.local/bin/pi-rust"
+model = "minimax-coding-plan/MiniMax-M3"
+fallback_model = "kimi-for-coding/k3"
+fallback_provider = "${HOME}/.local/bin/pi-rust"
+persona = "conduit"
+terraphim_role = "Terraphim AI Reviewer"
+skill_chain = ["disciplined-research", "code-review"]
+capabilities = ["code-review", "implementation"]
 project = "terraphim-ai"
+schedule = "45 6 * * *"
+task = '''
+source ~/.profile
 
-[[agents]]
-name = "disciplined-implementation-agent"
-layer = "Core"
-cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=disciplined-implementation; implement badlogic/pi CLI support"
-project = "terraphim-ai"
+## Worktree: CWD is the repo root. git pull origin main
 
-[[agents]]
-name = "structured-pr-review-agent"
-layer = "Core"
-cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=structured-pr-review; review badlogic/pi CLI support"
-project = "terraphim-ai"
+## Review the PR referenced in the mention context
+1. Read the PR diff independently of the first reviewer
+2. Check for: correctness, security, performance, idiomatic Rust
+3. Post a second-opinion verdict as comment on the issue:
+   - "reviewer-2 verdict: GO" or "reviewer-2 verdict: NO-GO"
+'''
 
-[[agents]]
-name = "disciplined-verification-agent"
-layer = "Core"
-cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=disciplined-verification; verify badlogic/pi CLI support"
-project = "terraphim-ai"
-
-[[agents]]
-name = "disciplined-validation-agent"
-layer = "Core"
-cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=disciplined-validation; validate badlogic/pi CLI support end to end"
-project = "terraphim-ai"
-
+# ── PR gate producers (claude / MiniMax-M3) ──
 [[agents]]
 name = "pr-reviewer"
-layer = "Core"
-cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=pr-reviewer; review implementation-swarm output and update Gitea"
-project = "terraphim-ai"
-
-[[agents]]
-name = "corrections"
-layer = "Core"
-cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=corrections; apply or record correction outcome in Gitea"
-project = "terraphim-ai"
-
-[[agents]]
-name = "meta-learning"
 layer = "Growth"
-cli_tool = "echo"
-task = "ADF E2E meta-learning completed"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "minimax-coding-plan/MiniMax-M3"
+fallback_model = "zai-coding-plan/glm-5.2"
+persona = "carthos"
 project = "terraphim-ai"
+task = '''
+Native structural PR gate producer role stub for terraphim-ai.
+
+The ADF orchestrator supplies a bounded PR evidence prompt at dispatch time.
+Use only that prompt, do not call tools, and emit a human report followed by
+exactly one canonical adf:gate-result block. Review implementations against
+the 9-dimension structural checklist, test evidence, and issue acceptance
+criteria. The orchestrator owns Gitea comments and commit statuses.
+'''
 
 [[agents]]
-name = "security-sentinel"
+name = "pr-validator"
 layer = "Safety"
-cli_tool = "echo"
-task = "ADF E2E security sentinel completed"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "minimax-coding-plan/MiniMax-M3"
+fallback_model = "zai-coding-plan/glm-5.2"
+persona = "carthos"
 project = "terraphim-ai"
+task = '''
+Native requirements validation PR gate producer role stub for terraphim-ai.
 
+The ADF orchestrator supplies a bounded PR evidence prompt at dispatch time.
+Validate against linked issue acceptance criteria, API contract fidelity, and
+backward compatibility. Use only that prompt, do not call tools, and emit a
+human report followed by exactly one canonical adf:gate-result block. The
+orchestrator owns Gitea comments and commit statuses.
+'''
+
+[[agents]]
+name = "pr-verifier"
+layer = "Safety"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "minimax-coding-plan/MiniMax-M3"
+fallback_model = "zai-coding-plan/glm-5.2"
+persona = "carthos"
+project = "terraphim-ai"
+task = '''
+Native design and test verification PR gate producer role stub for terraphim-ai.
+
+The ADF orchestrator supplies a bounded PR evidence prompt at dispatch time.
+Verify implementation against design docs and specs, assess test coverage
+including integration and SDK validation tests. Use only that prompt, do not
+call tools, and emit a human report followed by exactly one canonical
+adf:gate-result block. The orchestrator owns Gitea comments and commit
+statuses.
+'''
+
+# ── Merge coordinator (pi-rust / kimi k3) ──
+[[agents]]
+name = "merge-coordinator"
+layer = "Growth"
+cli_tool = "${HOME}/.local/bin/pi-rust"
+model = "kimi-for-coding/k3"
+fallback_model = "zai-coding-plan/glm-5.2"
+fallback_provider = "${HOME}/.local/bin/pi-rust"
+persona = "conduit"
+terraphim_role = "Terraphim AI Merge Coordinator"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+capabilities = ["merge-coordination", "ci-cd", "conflict-resolution"]
+project = "terraphim-ai"
+task = '''
+source ~/.profile
+
+## Worktree: CWD is the repo root. git pull origin main
+
+## Your job
+Evaluate whether all required code reviews have been posted on a Gitea issue.
+If all reviews are positive, merge the linked PR.
+
+Required reviewers: reviewer
+
+Read all comments, parse verdicts (GO/PASS = positive, NO-GO/FAIL = negative).
+If all passed: merge PR and close issue.
+If any missing or failed: post status summary and wait.
+
+Replace ISSUE_NUMBER with the issue from mention context.
+'''
+
+# ── Build runner (/bin/bash) — deterministic CI gate ──
 [[agents]]
 name = "build-runner"
-layer = "Core"
-cli_tool = "echo"
-task = "ADF E2E build runner completed"
-project = "terraphim-ai"
-
-[[agents]]
-name = "content-generator"
 layer = "Growth"
-cli_tool = "echo"
-task = "ADF E2E content generator completed"
+cli_tool = "/bin/bash"
+capabilities = ["build", "test", "deterministic-ci"]
 project = "terraphim-ai"
+task = '''
+source ~/.profile
+export PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:/usr/local/bin:/usr/bin:/bin:$PATH
+export GITEA_URL=https://git.terraphim.cloud
+export CARGO_INCREMENTAL=0
 
-# General-purpose disciplined PR review agent (not tied to a specific task).
-# Independent of the structured-pr-review-agent which targets badlogic/pi.
+if [ -z "${ADF_PUSH_SHA:-}" ]; then echo "build-runner: missing ADF_PUSH_SHA" >&2; exit 1; fi
+if [ -z "${ADF_PUSH_REF:-}" ]; then echo "build-runner: missing ADF_PUSH_REF" >&2; exit 1; fi
+
+cd "$GITEA_WORKING_DIR"
+git fetch origin "$ADF_PUSH_REF"
+git checkout -f "$ADF_PUSH_SHA"
+
+POST_STATUS() {
+  curl -fsS -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: application/json" -d "{\"state\":\"$1\",\"context\":\"adf/build\",\"description\":\"$2\"}" "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PUSH_SHA" >/dev/null 2>&1 || true
+}
+LOG="/tmp/adf-build-${GITEA_REPO}.log"; : > "$LOG"
+POST_STATUS pending "build started"
+
+run_step() { echo "=== $* ===" >>"$LOG"; "$@" >>"$LOG" 2>&1; }
+ok=1
+run_step cargo fmt --all -- --check || ok=0
+run_step cargo clippy --workspace --all-targets -- -D warnings || ok=0
+run_step cargo build --workspace || ok=0
+run_step cargo test --workspace --all-targets --no-fail-fast || ok=0
+
+if [ "$ok" -eq 1 ]; then
+  POST_STATUS success "fmt+clippy+build+test pass"
+else
+  echo "--- build failed; tail ---"; tail -40 "$LOG"
+  POST_STATUS failure "build failed; see $LOG"
+  exit 1
+fi
+'''
+
+# ── SDK coverage guardian (claude / MiniMax-M3) ──
 [[agents]]
-name = "disciplined-pr-review"
-layer = "Core"
-cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/structured-pr-review.sh"
-task = "Run structural PR review with 9-dimension checklist on the active PR. Posts review comment with Mermaid diagram, confidence score, and severity-tiered findings."
+name = "sdk-coverage-guardian"
+layer = "Safety"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "minimax-coding-plan/MiniMax-M3"
+fallback_model = "zai-coding-plan/glm-5.2"
+persona = "carthos"
 project = "terraphim-ai"
-schedule = "on_demand"
+task = '''
+Native SDK coverage PR gate producer role stub for terraphim-ai.
 
+The ADF orchestrator supplies a bounded PR evidence prompt at dispatch time.
+Analyse SDK validation test results and coverage artefacts for regressions
+against the PR diff. Flag any service whose SDK test success rate drops or
+whose endpoint coverage decreases. Use only that prompt, do not call tools,
+and emit a human report followed by exactly one canonical adf:gate-result
+block. The orchestrator owns Gitea comments and commit statuses.
+'''
+
+# ── Domain checker: knowledge-graph consistency (claude / MiniMax-M3) ──
 [[agents]]
-name = "disciplined-specification"
+name = "kg-consistency-checker"
 layer = "Core"
-cli_tool = "echo"
-task = "Specification phase: define acceptance criteria, test cases, and implementation plan"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "minimax-coding-plan/MiniMax-M3"
+fallback_model = "zai-coding-plan/glm-5.2"
+persona = "carthos"
 project = "terraphim-ai"
-schedule = "on_demand"
+schedule = "15 6 * * *"
+task = '''
+Native knowledge-graph consistency PR gate producer role stub for terraphim-ai.
 
-[[agents]]
-name = "disciplined-quality-evaluation"
-layer = "Core"
-cli_tool = "echo"
-task = "Quality phase: run test suite, clippy, fmt, verify acceptance criteria"
-project = "terraphim-ai"
-schedule = "on_demand"
-
-
-[[agents]]
-name = "auto-merge"
-layer = "Core"
-cli_tool = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/auto-merge.sh"
-task = "Check structural review confidence score on the active PR. Merge if score >= 4/5 with no P0 or P1 findings."
-project = "terraphim-ai"
-schedule = "on_demand"
+The ADF orchestrator supplies a bounded PR evidence prompt at dispatch time.
+Verify the PR does not break terraphim-ai domain invariants: role/thesaurus
+JSON schema and scoring conventions, knowledge-graph automata construction,
+haystack indexing contracts, and the terraphim_types public API shape. Use
+only that prompt, do not call tools, and emit a human report followed by
+exactly one canonical adf:gate-result block. The orchestrator owns Gitea
+comments and commit statuses.
+'''

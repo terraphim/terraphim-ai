@@ -24,7 +24,6 @@ exclude = [
     "crates/terraphim_automata",
     "crates/terraphim_cli",
     "crates/terraphim_multi_agent",
-    "crates/terraphim_orchestrator",
     "crates/terraphim_service",
     "crates/terraphim_settings",
     # Experimental crates
@@ -55,7 +54,7 @@ exclude = [
 default-members = ["terraphim_server"]
 
 [workspace.package]
-version = "1.21.0"
+version = "1.21.3"
 edition = "2024"
 rust-version = "1.91"
 authors = ["Terraphim Team <team@terraphim.ai>"]
@@ -92,13 +91,19 @@ rustls-webpki = "0.103.12"
 # LLM Router integration
 
 # terraphim-core types (provider convention: `provider: String`, mirrors `terraphim_types::llm_usage`)
-terraphim_types = { version = "1.20.4", registry = "terraphim" }
+terraphim_types = { version = "1.20.2", registry = "terraphim" }
 
 [patch.crates-io]
 # Republished Gitea 1.20.5 fixes openrouter private-method bug; override crates.io 1.20.4.
 terraphim_service = { version = "1.20.5", registry = "terraphim" }
 # 1.21.1 fixes aider-connector missing-dep bug present in crates.io 1.21.0.
 terraphim_sessions = { version = "1.21.1", registry = "terraphim" }
+# terraphim_types/automata resolve from BOTH crates.io (1.20.4) and the terraphim
+# registry (1.20.2); two copies of the same struct are distinct types to rustc.
+# Unified on 1.20.2 because 1.20.4 is YANKED on the terraphim registry -- the
+# newer line is not reachable there. See #3193.
+terraphim_types = { version = "1.20.2", registry = "terraphim" }
+terraphim_automata = { version = "1.20.2", registry = "terraphim" }
 # genai patch temporarily disabled to test crates.io 0.6.0 compatibility for v1.20.0 publish chain.
 # genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
 self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }

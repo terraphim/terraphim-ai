@@ -8,13 +8,22 @@ use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::commands::CommandRegistry;
 use crate::config::{AgentConfig, DirectLlmConfig};
 use crate::credentials::{CredentialPool, CredentialSource, EnvVarSource, ProviderId};
+use crate::memory::{SharedBackend, jsonl::JsonlBackend};
 use crate::session::{ChatMessage, MessageRole, SessionManager};
+use crate::tools::agent_memory::{
+    AgentMemoryConfig, capture_failed_command, run_agent, should_ignore_command,
+};
 use crate::tools::{ToolError, ToolRegistry};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
+
+/// Minimum interval between `memory apply` subprocess runs. Prevents a
+/// subprocess spawn + full-store scan on every single turn (PR review P2).
+const MEMORY_APPLY_COOLDOWN: Duration = Duration::from_secs(30);
 
 /// Configuration for the tool-calling loop.
 #[derive(Debug, Clone)]
@@ -425,20 +434,40 @@ pub struct ToolCallingLoop {
     router: HybridLlmRouter,
     guard: ExecutionGuard,
     tools: Arc<ToolRegistry>,
-    sessions: Arc<Mutex<SessionManager>>,
+    /// Session memory backend (#3227, T4). All session reads/writes in
+    /// the loop go through this trait object so the storage backend is
+    /// swappable (jsonl files by default; sqlite via `with_backend`).
+    backend: SharedBackend,
     commands: Arc<Mutex<CommandRegistry>>,
     system_prompt: String,
     shutdown: CancellationToken,
+    /// Whether agent memory injection is enabled.
+    memory_enabled: bool,
+    /// Shared config for the agent-memory subprocess bridge.
+    memory_config: Option<Arc<AgentMemoryConfig>>,
+    /// Agent workspace directory. Failed-command learnings are captured
+    /// with this as the subprocess working directory so the learning
+    /// lands in `<workspace>/.terraphim/learnings` (#3225).
+    workspace: std::path::PathBuf,
+    /// Last time `memory apply` ran (cooldown guard — avoids a subprocess
+    /// spawn on every single turn).
+    memory_last_apply: Arc<Mutex<std::time::Instant>>,
 }
 
 impl ToolCallingLoop {
     /// Create a new tool-calling loop.
+    ///
+    /// The session manager is wrapped in a [`JsonlBackend`] so the loop
+    /// persists through the [`crate::memory::MemoryBackend`] trait while
+    /// sharing the same manager (mutex + cache + on-disk layout) with the
+    /// session tools.
     pub fn new(
         agent_config: &AgentConfig,
         router: HybridLlmRouter,
         tools: Arc<ToolRegistry>,
         sessions: Arc<Mutex<SessionManager>>,
         system_prompt: String,
+        memory_config: Option<&crate::config::MemoryConfig>,
     ) -> Self {
         // Initialize command registry with defaults
         let mut commands = CommandRegistry::with_defaults();
@@ -452,6 +481,7 @@ impl ToolCallingLoop {
             sessions,
             system_prompt,
             commands,
+            memory_config,
         )
     }
 
@@ -463,7 +493,60 @@ impl ToolCallingLoop {
         sessions: Arc<Mutex<SessionManager>>,
         system_prompt: String,
         commands: CommandRegistry,
+        memory_config: Option<&crate::config::MemoryConfig>,
     ) -> Self {
+        Self::with_backend_and_commands(
+            agent_config,
+            router,
+            tools,
+            Arc::new(JsonlBackend::from_shared(sessions)),
+            system_prompt,
+            commands,
+            memory_config,
+        )
+    }
+
+    /// Create with an explicit memory backend and default commands.
+    ///
+    /// Use this to select a non-default backend (e.g. `SqliteBackend`)
+    /// from configuration. The default [`Self::new`] path preserves the
+    /// legacy jsonl on-disk layout.
+    pub fn with_backend(
+        agent_config: &AgentConfig,
+        router: HybridLlmRouter,
+        tools: Arc<ToolRegistry>,
+        backend: SharedBackend,
+        system_prompt: String,
+        memory_config: Option<&crate::config::MemoryConfig>,
+    ) -> Self {
+        let mut commands = CommandRegistry::with_defaults();
+        let _ = commands.load_all();
+        Self::with_backend_and_commands(
+            agent_config,
+            router,
+            tools,
+            backend,
+            system_prompt,
+            commands,
+            memory_config,
+        )
+    }
+
+    /// Create with an explicit memory backend and command registry.
+    pub fn with_backend_and_commands(
+        agent_config: &AgentConfig,
+        router: HybridLlmRouter,
+        tools: Arc<ToolRegistry>,
+        backend: SharedBackend,
+        system_prompt: String,
+        commands: CommandRegistry,
+        memory_config: Option<&crate::config::MemoryConfig>,
+    ) -> Self {
+        let (memory_enabled, mem_cfg_arc) = match memory_config {
+            Some(cfg) if cfg.enabled => (true, Some(Arc::new(AgentMemoryConfig::from(cfg)))),
+            _ => (false, None),
+        };
+
         Self {
             config: ToolCallingConfig {
                 max_iterations: agent_config.max_iterations,
@@ -472,10 +555,14 @@ impl ToolCallingLoop {
             router,
             guard: ExecutionGuard::new(),
             tools,
-            sessions,
+            backend,
             commands: Arc::new(Mutex::new(commands)),
             system_prompt,
             shutdown: CancellationToken::new(),
+            memory_enabled,
+            memory_config: mem_cfg_arc,
+            workspace: agent_config.workspace.clone(),
+            memory_last_apply: Arc::new(Mutex::new(std::time::Instant::now())),
         }
     }
 
@@ -517,13 +604,10 @@ impl ToolCallingLoop {
         // Handle /reset command specially - it needs to clear the session
         if msg.content.trim() == "/reset" {
             let session_key = msg.session_key();
-            let mut sessions_guard = self.sessions.lock().await;
-            // Get session, clear it, then save
-            let session = sessions_guard.get_or_create(&session_key);
+            // Get session, clear it, then persist
+            let mut session = self.backend.get_or_create(&session_key).await;
             session.clear();
-            let session_clone = session.clone();
-            sessions_guard.save(&session_clone)?;
-            drop(sessions_guard);
+            self.backend.persist(&session).await?;
 
             let response = OutboundMessage::new(
                 &msg.channel,
@@ -542,8 +626,7 @@ impl ToolCallingLoop {
 
         // Get or create session
         let session_key = msg.session_key();
-        let mut sessions_guard = self.sessions.lock().await;
-        let session = sessions_guard.get_or_create(&session_key);
+        let mut session = self.backend.get_or_create(&session_key).await;
 
         // Add user message to session (augmented with media context if present)
         let user_msg = ChatMessage {
@@ -555,11 +638,9 @@ impl ToolCallingLoop {
         };
         session.add_message(user_msg.clone());
 
-        // Save session before releasing lock
-        let session_clone = session.clone();
+        // Persist session with the new user message
         let message_count = session.messages.len();
-        sessions_guard.save(&session_clone)?;
-        drop(sessions_guard);
+        self.backend.persist(&session).await?;
 
         // Check if we need compression using configured ratio
         let needs_compress = message_count > self.config.keep_last_messages * 2;
@@ -567,10 +648,9 @@ impl ToolCallingLoop {
             // Keep the last N messages, compress the rest
             let keep_count = self.config.keep_last_messages;
 
-            // Re-acquire lock to read messages for compression
+            // Reload the session to read messages for compression
             let messages_to_compress = {
-                let mut sessions_guard = self.sessions.lock().await;
-                let session = sessions_guard.get_or_create(&session_key);
+                let session = self.backend.get_or_create(&session_key).await;
                 if session.messages.len() > keep_count {
                     session.messages[..session.messages.len() - keep_count].to_vec()
                 } else {
@@ -583,9 +663,14 @@ impl ToolCallingLoop {
                 .compress(messages_to_compress, self.system_prompt.clone())
                 .await?;
 
-            // Re-acquire lock to update session
-            let mut sessions_guard = self.sessions.lock().await;
-            let session = sessions_guard.get_or_create(&session_key);
+            // T4 (#3227): write the summary back to the agent-memory
+            // bridge so compression stops being lossy-and-lost. Fail-open:
+            // the session file remains the authoritative record.
+            self.capture_compression_summary(&session_key, &summary)
+                .await;
+
+            // Reload the session to record the summary and trim messages
+            let mut session = self.backend.get_or_create(&session_key).await;
             session.set_summary(summary);
             // Keep only the recent messages
             let recent: Vec<_> = session
@@ -599,16 +684,64 @@ impl ToolCallingLoop {
                 .rev()
                 .collect();
             session.messages = recent;
-            let session_clone = session.clone();
-            sessions_guard.save(&session_clone)?;
-            drop(sessions_guard);
+            self.backend.persist(&session).await?;
         }
 
         // Build proxy messages from CURRENT session state (post-compression)
         let proxy_messages = {
-            let mut sessions_guard = self.sessions.lock().await;
-            let session = sessions_guard.get_or_create(&session_key);
+            let session = self.backend.get_or_create(&session_key).await;
             build_proxy_messages(&session.messages, session.summary.as_deref())
+        };
+
+        // Memory context injection: prepend retrieved memories to system prompt.
+        // Cooldown: `memory apply` spawns a subprocess — run it at most once
+        // per MEMORY_APPLY_COOLDOWN to avoid per-turn latency (PR review P2).
+        let effective_system_prompt = if self.memory_enabled {
+            let mut last = self.memory_last_apply.lock().await;
+            let within_cooldown = last.elapsed() < MEMORY_APPLY_COOLDOWN;
+            if !within_cooldown {
+                if let Some(ref mem_config) = self.memory_config {
+                    // Extract the user's latest message as the query.
+                    let query = proxy_messages
+                        .iter()
+                        .rev()
+                        .find(|m| m.role == "user")
+                        .map(|m| m.content.as_str())
+                        .unwrap_or("");
+
+                    let result =
+                        run_agent(mem_config, &["memory", "apply", "--prompt", query], None).await;
+                    match result {
+                        Ok(context) if !context.trim().is_empty() => {
+                            // Token-budget guard: truncate to max_context_chars,
+                            // walking back to a UTF-8 char boundary so non-ASCII
+                            // content (emoji, Cyrillic, CJK) can't panic the slice.
+                            let truncated = if context.len() > mem_config.max_context_chars {
+                                let mut end = mem_config.max_context_chars;
+                                while end > 0 && !context.is_char_boundary(end) {
+                                    end -= 1;
+                                }
+                                &context[..end]
+                            } else {
+                                &context
+                            };
+                            *last = std::time::Instant::now();
+                            format!("{}\n\n## Memory Context\n{}", self.system_prompt, truncated)
+                        }
+                        Ok(_) => self.system_prompt.clone(),
+                        Err(e) => {
+                            log::warn!("Memory apply failed (non-fatal): {}", e);
+                            self.system_prompt.clone()
+                        }
+                    }
+                } else {
+                    self.system_prompt.clone()
+                }
+            } else {
+                self.system_prompt.clone()
+            }
+        } else {
+            self.system_prompt.clone()
         };
 
         // Get tool definitions
@@ -628,17 +761,21 @@ impl ToolCallingLoop {
 
         // Call LLM with tool-calling loop
         let final_response = if self.router.tools_available() && !tool_definitions.is_empty() {
-            self.run_tool_loop(proxy_messages, tool_definitions).await?
+            self.run_tool_loop_with_prompt(
+                proxy_messages,
+                tool_definitions,
+                &effective_system_prompt,
+            )
+            .await?
         } else {
             // Fallback to text-only mode
             self.router
-                .text_only(proxy_messages, Some(self.system_prompt.clone()))
+                .text_only(proxy_messages, Some(effective_system_prompt))
                 .await?
         };
 
-        // Add assistant response to session (re-acquire lock)
-        let mut sessions_guard = self.sessions.lock().await;
-        let session = sessions_guard.get_or_create(&session_key);
+        // Add assistant response to session
+        let mut session = self.backend.get_or_create(&session_key).await;
 
         let assistant_msg = ChatMessage {
             role: MessageRole::Assistant,
@@ -649,10 +786,8 @@ impl ToolCallingLoop {
         };
         session.add_message(assistant_msg.clone());
 
-        // Save session - clone to avoid borrow issues
-        let session_clone = session.clone();
-        sessions_guard.save(&session_clone)?;
-        drop(sessions_guard);
+        // Persist session with the assistant response
+        self.backend.persist(&session).await?;
 
         // Send response
         let outbound = OutboundMessage::new(&msg.channel, &msg.chat_id, final_response);
@@ -661,32 +796,140 @@ impl ToolCallingLoop {
         Ok(())
     }
 
-    /// Run the iterative tool-calling loop.
-    async fn run_tool_loop(
+    /// Write a compression summary back to the agent-memory bridge
+    /// (`terraphim-agent memory capture`) with a provenance tag
+    /// (`session-compression:<session_key>`), so the knowledge condensed
+    /// out of the trimmed messages remains retrievable (#3227, T4).
+    ///
+    /// Fail-open and gated on `memory.enabled`: any bridge error is
+    /// logged and swallowed — the session file stays the authoritative
+    /// record. No-op when the memory bridge is disabled.
+    async fn capture_compression_summary(&self, session_key: &str, summary: &str) {
+        if !self.memory_enabled {
+            return;
+        }
+        let Some(ref mem_config) = self.memory_config else {
+            return;
+        };
+
+        let tag = format!("session-compression:{session_key}");
+        let stdin_json = serde_json::json!({
+            "content": summary,
+            "item_type": "Experience",
+            "importance": "Medium",
+        })
+        .to_string();
+
+        let mut cli_args = vec!["memory", "capture", "--provenance-tag", tag.as_str()];
+        let role_owned;
+        if let Some(ref role) = mem_config.role {
+            role_owned = role.clone();
+            cli_args.push("--role");
+            cli_args.push(&role_owned);
+        }
+
+        match run_agent(mem_config, &cli_args, Some(&stdin_json)).await {
+            Ok(_) => log::info!("Compression summary captured to memory bridge (tag: {tag})"),
+            Err(e) => {
+                log::warn!("Memory capture of compression summary failed (non-fatal): {e}")
+            }
+        }
+    }
+
+    /// Invariant failure capture (#3225): when an exec-class tool call
+    /// fails, capture the failed command as a learning via
+    /// `terraphim-agent learn capture` — no model involvement required.
+    ///
+    /// Semantics mirror terraphim-agent's PostToolUse hook:
+    /// - gated on `memory.enabled` (the memory bridge master switch);
+    /// - fail-open: a capture failure is a `warn` log, never an error
+    ///   surfaced to the turn;
+    /// - test-runner commands matching the ignore globs
+    ///   (`cargo test*`, `npm test*`, `pytest*`, `yarn test*`) are
+    ///   skipped client-side;
+    /// - secret redaction is delegated to `terraphim-agent`, which
+    ///   redacts before persisting;
+    /// - the subprocess timeout and 1 MiB output guard are enforced by
+    ///   the shared bridge in `tools::agent_memory`.
+    ///
+    /// `Blocked` errors are not captured: the command never ran, so
+    /// there is no failure to learn from.
+    async fn capture_tool_failure(&self, tool_call: &crate::tools::ToolCall, error: &ToolError) {
+        if !self.memory_enabled {
+            return;
+        }
+        let Some(ref mem_config) = self.memory_config else {
+            return;
+        };
+
+        // Exec-class tools only: a failed shell command is the learning
+        // signal. Other tools (web, filesystem, …) are out of scope.
+        if !matches!(
+            tool_call.name.as_str(),
+            "shell" | "exec" | "bash" | "sandbox"
+        ) {
+            return;
+        }
+
+        // A blocked command never executed; guard rejections are policy,
+        // not command failures.
+        if matches!(error, ToolError::Blocked { .. }) {
+            return;
+        }
+
+        let Some(command) = tool_call.arguments["command"].as_str() else {
+            return;
+        };
+
+        if should_ignore_command(command) {
+            log::debug!("Skipping learning capture for ignored command: {command}");
+            return;
+        }
+
+        let (exit_code, error_output) = match error {
+            ToolError::NonZeroExit {
+                exit_code, stderr, ..
+            } => (i64::from(*exit_code), stderr.clone()),
+            // Conventional timeout exit code (cf. GNU timeout(1)).
+            ToolError::Timeout { .. } => (124, error.to_string()),
+            other => (1, other.to_string()),
+        };
+
+        match capture_failed_command(
+            mem_config,
+            command,
+            &error_output,
+            exit_code,
+            Some(&self.workspace),
+        )
+        .await
+        {
+            Ok(_) => log::info!("Captured failed command as learning: {command}"),
+            Err(e) => log::warn!("Learning capture failed (non-fatal): {e}"),
+        }
+    }
+
+    /// Run the iterative tool-calling loop with explicit system prompt.
+    async fn run_tool_loop_with_prompt(
         &self,
         mut messages: Vec<Message>,
         tools: Vec<ToolDefinition>,
+        system_prompt: &str,
     ) -> anyhow::Result<String> {
+        let prompt = system_prompt.to_string();
         for iteration in 0..self.config.max_iterations {
             log::debug!("Tool-calling iteration {}", iteration + 1);
 
             // Call LLM with tools
             let response = match self
                 .router
-                .tool_call(
-                    messages.clone(),
-                    Some(self.system_prompt.clone()),
-                    tools.clone(),
-                )
+                .tool_call(messages.clone(), Some(prompt.clone()), tools.clone())
                 .await
             {
                 Ok(resp) => resp,
                 Err(e) => {
                     log::warn!("Tool call failed: {}. Falling back to text-only.", e);
-                    return self
-                        .router
-                        .text_only(messages, Some(self.system_prompt.clone()))
-                        .await;
+                    return self.router.text_only(messages, Some(prompt.clone())).await;
                 }
             };
 
@@ -718,6 +961,8 @@ impl ToolCallingLoop {
                             format!("Tool blocked: {}", reason)
                         }
                         Err(e) => {
+                            // #3225: failure capture is a loop invariant.
+                            self.capture_tool_failure(tool_call, &e).await;
                             format!("Tool execution error: {}", e)
                         }
                     },
@@ -732,7 +977,11 @@ impl ToolCallingLoop {
                         );
                         match self.tools.execute(tool_call).await {
                             Ok(result) => result,
-                            Err(e) => format!("Tool execution error: {}", e),
+                            Err(e) => {
+                                // #3225: failure capture is a loop invariant.
+                                self.capture_tool_failure(tool_call, &e).await;
+                                format!("Tool execution error: {}", e)
+                            }
                         }
                     }
                 };
@@ -903,6 +1152,7 @@ mod tests {
             tools,
             Arc::new(Mutex::new(sessions)),
             "Test system prompt".to_string(),
+            None,
         );
 
         let msg = InboundMessage::new("cli", "user1", "chat1", "/reset");
@@ -930,6 +1180,7 @@ mod tests {
             tools,
             Arc::new(Mutex::new(sessions)),
             "Test".to_string(),
+            None,
         );
 
         let msg = InboundMessage::new("cli", "user1", "chat1", "/help");

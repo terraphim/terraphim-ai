@@ -51,6 +51,17 @@ pub enum SkillStep {
         #[serde(skip_serializing_if = "Option::is_none")]
         working_dir: Option<String>,
     },
+    /// Schedule a recurring job (Hermes parity cron surface, #3147).
+    #[serde(rename = "schedule")]
+    Schedule {
+        /// Cron expression or interval ('0 9 * * *', 'every 30m', '2h')
+        cron: String,
+        /// Skill to run when the schedule fires
+        skill: String,
+        /// Input values for the skill
+        #[serde(default)]
+        inputs: serde_json::Value,
+    },
 }
 
 /// Input parameter definition for a skill.

@@ -13,7 +13,7 @@ The TinyClaw `terraphim_tinyclaw/src/proxy/chat.rs` currently returns `[tinyclaw
 
 ## Decision
 
-**Adopt `terraphim-llm-proxy` as the LLM proxy backend in TinyClaw**, replacing the echo stub. Use it as a git dep (not a terraphim-registry dep, since it's not published there).
+**Adopt `terraphim-llm-proxy` as the LLM proxy backend in TinyClaw**, replacing the echo stub. **Resolution (2026-08-11): consume the DEPLOYED instance** (`http://100.106.66.7:3456` on bigbox) via an upstream-forwarding mode in TinyClaw's own proxy, rather than as a git dep — the git-dep path is blocked by the broken `.gitmodules` (see Verification #3). Echo stub is retained as the hermetic fallback when no upstream URL is configured. See Status below.
 
 Per the user "ignore licensing" directive, FSL-1.1-MIT is accepted.
 
@@ -104,16 +104,13 @@ Preserve OpenAI-compatible `/v1/models` + `/v1/chat/completions` shape at the Ti
 
 - ✅ Investigation: complete (v0.1.12 builds locally with --recurse-submodules, but is un-fetchable due to broken submodule in `.gitmodules`)
 - ✅ deny.toml: updated (FSL-1.1-MIT, allow-git) — defensively, in case the submodule is fixed later
-- ❌ Step 1: **BLOCKED** — git submodule `.gitmodules` has no URL for `claude_code_agents`. Cannot consume `terraphim-llm-proxy` as a git dep until upstream fixes `.gitmodules` or publishes to crates.io / terraphim registry.
-- ❌ Step 3: TODO (replace echo stub) — depends on Step 1
-- ❌ Step 4: TODO (tests + commit) — depends on Step 1
+- ✅ **RESOLVED 2026-08-11 (deployed-proxy leverage)**: instead of consuming `terraphim-llm-proxy` as a git dep, TinyClaw now **forwards to the deployed instance on bigbox** (`http://100.106.66.7:3456`, service `terraphim-llm-proxy`, v0.1.12, exposes both `/v1/chat/completions` and `/v1/messages`). TinyClaw's OpenAI-compatible proxy gains an upstream-forwarding mode enabled by env vars:
+  - `TERRAPHIM_LLM_PROXY_URL` — base URL of the deployed proxy (default: off → hermetic echo stub)
+  - `TERRAPHIM_LLM_PROXY_API_KEY` — the proxy's `PROXY_API_KEY` (bigbox: `/etc/terraphim-llm-proxy/env`)
+  - Requests (chat completions + models) are forwarded verbatim with `Authorization: Bearer`; upstream status/body/content-type pass through unchanged.
+- ✅ Step 3 (replace echo stub): DONE via forwarding mode (2026-08-11) — echo remains as hermetic fallback when no upstream is configured
+- ✅ Step 4 (tests + commit): DONE — 5 new contract tests (forward + auth header, models passthrough, 401 passthrough, 502 unreachable, env construction) + live E2E smoke test verified against the real deployed proxy (200 OK, real model list). Full tinyclaw suite green, clippy clean, fmt clean.
 
-### Alternative path forward
+### Alternative path forward (superseded 2026-08-11)
 
-1. **File an issue** in `terraphim-llm-proxy` asking the maintainers to:
-   - Either commit a `.gitmodules` with the URL for `claude_code_agents`, OR
-   - Remove the gitlink (move `claude_code_agents` content into the main repo or a separate crate).
-2. **Wait for v0.1.13** or `v1.0.0-priority-routing` to be tagged with a working `.gitmodules`.
-3. **As a fallback**, vendor `terraphim-llm-proxy` as a git submodule under `terraphim-ai/crates/terraphim-llm-proxy-vendor/` and reference it via path dep. This bypasses the upstream issue.
-
-This ADR documents the upgrade path; the actual implementation requires an upstream fix or a vendoring decision.
+The git-dep path remains blocked upstream (`.gitmodules` missing URL for `claude_code_agents`); the deployed-proxy leverage above is the chosen path and makes the git dep unnecessary for runtime. If a clean v0.1.13+ is ever published, TinyClaw can optionally switch to embedding it — revisit only if the deployed instance is retired.

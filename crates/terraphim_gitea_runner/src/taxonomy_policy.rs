@@ -450,6 +450,101 @@ mod tests {
         assert!(policy.denied.contains("docker"));
     }
 
+    // -- Explicit-shell repository-script convention (Refs #3222 Task 3) --
+    //
+    // These are *characterization* tests: they lock the behaviour the deployed
+    // runner already has, so the convention cannot regress silently. Run 23137
+    // failed because a workflow named a repository script directly; the fix is
+    // the workflow convention, not a path-normalising planner.
+
+    /// A repository-relative script path is the literal first token, is not on
+    /// the allowlist, and is therefore rejected before any execution. This is
+    /// the exact classification that failed run 23137.
+    #[tokio::test]
+    async fn direct_repo_script_is_rejected_by_default_policy() {
+        for cmd in [
+            "./scripts/check-tinyclaw-test-hermeticity.sh",
+            "./scripts/check.sh --strict",
+            "scripts/check.sh",
+            "../scripts/check.sh",
+            "/usr/local/bin/check.sh",
+        ] {
+            let err = TaxonomyPlanner::default_policy(true)
+                .compile(wf(&[cmd]))
+                .await;
+            assert!(
+                matches!(err, Err(RunnerError::PolicyRejected(_))),
+                "`{cmd}` must be rejected: repository-relative and absolute \
+                 executable paths are never allowlisted programs"
+            );
+        }
+    }
+
+    /// The supported form: `bash` is an allowlisted program, so the explicit
+    /// interpreter invocation compiles and stays on the host unrewritten.
+    #[tokio::test]
+    async fn explicit_bash_repo_script_is_allowed_by_default_policy() {
+        let cmd = "bash ./scripts/check-tinyclaw-test-hermeticity.sh";
+        let plan = TaxonomyPlanner::default_policy(true)
+            .compile(wf(&[cmd]))
+            .await
+            .expect("`bash ./scripts/...` must compile under the default policy");
+        assert_eq!(plan.routes[0], crate::policy::CommandRoute::Host);
+        assert_eq!(
+            plan.workflow.steps[0].command, cmd,
+            "an allowlisted non-rch program must not be rewritten"
+        );
+    }
+
+    /// The guarded-preflight form the native workflow uses so a step can tolerate
+    /// a script that exists only on some refs. The first token is still `bash`.
+    #[tokio::test]
+    async fn guarded_bash_preflight_is_allowed_by_default_policy() {
+        let cmd = "bash -c 'if [ -f ./scripts/check.sh ]; then bash ./scripts/check.sh; fi'";
+        let plan = TaxonomyPlanner::default_policy(true)
+            .compile(wf(&[cmd]))
+            .await
+            .expect("a `bash -c` guarded preflight must compile under the default policy");
+        assert_eq!(plan.routes[0], crate::policy::CommandRoute::Host);
+    }
+
+    /// Accepting `bash ./scripts/x.sh` must NOT have been achieved by
+    /// authorising paths broadly: a non-allowlisted interpreter naming the same
+    /// script is still rejected, and the deny list still wins.
+    #[tokio::test]
+    async fn explicit_shell_convention_did_not_broaden_path_authorisation() {
+        for cmd in [
+            "python3 ./scripts/check.py",
+            "docker ./scripts/check.sh",
+            "curl ./scripts/check.sh",
+        ] {
+            let err = TaxonomyPlanner::default_policy(true)
+                .compile(wf(&[cmd]))
+                .await;
+            assert!(
+                matches!(err, Err(RunnerError::PolicyRejected(_))),
+                "`{cmd}` must stay rejected -- only the program token is authorised, \
+                 never the path argument"
+            );
+        }
+    }
+
+    /// The embedded policy is the artefact workflow authors are pointed at, so
+    /// it must state the convention rather than leaving it to tribal knowledge.
+    #[test]
+    fn default_policy_documents_the_explicit_shell_convention() {
+        let text = DEFAULT_POLICY_TAXONOMY;
+        assert!(
+            text.contains("bash ./scripts/"),
+            "default_policy.md must document the `bash ./scripts/<name>.sh` convention"
+        );
+        assert!(
+            text.contains("first token"),
+            "default_policy.md must state that classification inspects the literal \
+             first token only (a guardrail, not recursive script inspection)"
+        );
+    }
+
     // -- Fallback tests (design-mandated) --
 
     #[test]

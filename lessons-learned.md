@@ -1321,3 +1321,68 @@ fn build_thesaurus_from_schema(schema: &OntologySchema) -> Thesaurus {
 This allows reusing the existing `terraphim_automata::find_matches()` infrastructure for any schema, not just pre-built role thesauri.
 
 ---
+
+---
+
+## 2026-08-16: Orchestrator re-include + native-ci unblock (PR #3195)
+
+### "Linux-only" CI failures are usually environment-only, not OS-only
+
+**Lesson**: A test that "passes on macOS but fails on the Linux CI runner" is very often failing because of a *host-specific environment artifact*, not a platform difference in the code path.
+
+**Discovery**: `test_handle_direct_dispatch_spawns_agent_without_mentions` failed on CI with `active_agents: []` but passed locally. The real cause: `/opt/ai-dark-factory/logs` exists on the CI host, so `agent_log_dir` resolved to `/opt/ai-dark-factory/logs/agents` (a sibling of the config `working_dir`), and the synthetic test `working_dir` (`/tmp/test-orchestrator`) was never created — the spawner's `AgentValidator::validate_working_dir()` then rejected the spawn.
+
+**Reproduction pattern**: simulate the environment instead of guessing at OS-specific code:
+```bash
+sudo mkdir -p /opt/ai-dark-factory/logs   # simulate the CI host
+rm -rf /tmp/test-orchestrator             # fresh state
+cargo test -p terraphim_orchestrator --lib test_handle_direct_dispatch_spawns_agent_without_mentions
+# reproduces the exact "active_agents: []" panic on macOS
+```
+
+**Rule**: Before chasing platform-specific explanations (spawn semantics, `/proc`, PATH), check what *host directories/files* the code branches on (e.g. `if adf_logs.parent().exists()`), and simulate that state locally.
+
+### Don't rely on `create_dir_all` to materialise a *sibling* path
+
+**Lesson**: `create_dir_all(x)` creates `x` and all its parents. If `x` is a *child* of `working_dir`, this side-effect also creates `working_dir`. If `x` is a *sibling* (or unrelated path), it does **not** — and downstream code that assumes `working_dir` now exists will fail.
+
+**Discovery**: `spawn_agent_with_event` pre-created `agent_log_dir` (which is `working_dir/logs/agents` locally, but `/opt/ai-dark-factory/logs/agents` on ADF hosts) and implicitly depended on that call to also materialise `working_dir`. On ADF hosts the paths diverged.
+
+**Fix**: create the directory you actually depend on, explicitly:
+```rust
+if let Err(e) = std::fs::create_dir_all(&agent_working_dir) { /* warn */ }
+```
+
+**Rule**: When a validation step (here `AgentValidator::validate_working_dir()`) requires a directory, create *that directory* directly — never via a coincidental side-effect of creating some other directory.
+
+### Clippy `-D warnings` in CI vs laxer local pre-commit
+
+**Lesson**: The CI gate (`cargo clippy --workspace --all-targets -- -D warnings`) can be *stricter* than the local pre-commit hook, so a branch can pass every local check yet be red in CI.
+
+**Discovery**: The re-included `terraphim_orchestrator` carried 6 clippy errors (`map_or(true, ..)`, `x % m == 0`) that were invisible in the local pre-commit run. `is_none_or(..)` and `is_multiple_of(..)` are the semantically-identical modern forms.
+
+**Rule**: This is the *inverse* of the earlier "pre-commit hook stricter than CI" note — both directions happen. After re-including a crate, run `cargo clippy --workspace --all-targets -- -D warnings` explicitly before pushing.
+
+### Spawner stdin BrokenPipe = child exited early, not a spawn failure
+
+**Lesson**: Writing the prompt to a child's stdin and getting `EPIPE` means the child exited before consuming stdin — an *early exit*, not a failed spawn. Treating it as `SpawnFailed` breaks tests that spawn short-lived commands.
+
+**Discovery**: `spawn_with_fallback` returned `Ok` immediately for agents with no fallback, so a `echo`-style agent that exited without reading stdin surfaced as `SpawnFailed (Broken pipe)`.
+
+**Fix**: tolerate `std::io::ErrorKind::BrokenPipe` on the stdin write and treat it as early-exit detection.
+
+### Golden tests should assert *dynamic* routing, not hardcoded providers
+
+**Lesson**: Tests that assert a specific provider/model (e.g. `assert_eq!(d.provider, "anthropic")`) go stale the moment routing becomes taxonomy/tier-driven. Assert the *invariant* instead: the resolved tier, priority, and that provider/model are non-empty.
+
+**Discovery**: Two `kg_router.rs` golden tests hardcoded `provider == "anthropic"` and `model.contains("opus"/"haiku"/"sonnet")`, but the taxonomy router now resolves `zai-coding-plan` for the plan tier first.
+
+**Rule**: In routing/resolution tests, assert tier + priority + "resolves to *some* provider/model", and cover each routing mode (fastest / plan / thinking) by its tier, not its vendor.
+
+### `gtr merge-pull` client timeout ≠ merge failure
+
+**Lesson**: A Gitea merge via `gtr merge-pull` can return `context deadline exceeded` from the HTTP client even when the merge **succeeds** server-side.
+
+**Discovery**: The merge of PR #3195 timed out client-side, but the PR API showed `merged: true` and `merged_at` set. The `-delete-branch` step also didn't run on the timed-out call, so the branch had to be deleted separately.
+
+**Rule**: After a merge attempt, verify via `GET /pulls/{n}` (`merged`, `merged_at`, `merged_by`) rather than trusting the CLI exit code. If the branch wasn't auto-deleted, delete it explicitly (`DELETE /branches/{name}`).

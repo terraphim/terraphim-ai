@@ -261,7 +261,10 @@ pub fn agent_author_rejection_reason(
 /// KG concept). Anything else — including human maintainers, bots from other
 /// tenants, and Renovate/Dependabot — is considered non-agent for auto-merge
 /// purposes.
-pub fn author_is_agent(login: &str, recognised_logins: &std::collections::BTreeSet<String>) -> bool {
+pub fn author_is_agent(
+    login: &str,
+    recognised_logins: &std::collections::BTreeSet<String>,
+) -> bool {
     recognised_logins.contains(login) || login.starts_with("adf-")
 }
 

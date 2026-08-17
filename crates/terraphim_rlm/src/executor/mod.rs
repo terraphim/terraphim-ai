@@ -8,6 +8,8 @@
 //! ```text
 //! ExecutionEnvironment trait
 //!     ├── FirecrackerExecutor (full VM isolation, requires KVM)
+//!     ├── AppleContainerExecutor (one lightweight Linux VM per container,
+//!     │                           Apple silicon + macOS 26, `container` CLI)
 //!     ├── DockerExecutor (container isolation, gVisor/runc)
 //!     ├── E2bExecutor (cloud-hosted Firecracker)
 //!     └── LocalExecutor (local process execution, no isolation)
@@ -17,9 +19,12 @@
 //!
 //! Backends are selected based on:
 //! 1. User preference order in `RlmConfig::backend_preference`
-//! 2. Availability (KVM for Firecracker, API key for E2B, Docker daemon)
+//! 2. Availability (KVM for Firecracker, API key for E2B, Docker daemon,
+//!    macOS/aarch64 + a responsive `container` service for Apple Container)
 //! 3. Fallback to next available backend if preferred is unavailable
 
+#[cfg(feature = "apple-container-backend")]
+mod apple_container;
 mod context;
 #[cfg(feature = "docker-backend")]
 mod docker;
@@ -29,9 +34,16 @@ mod local;
 mod ssh;
 mod r#trait;
 
+// `CommandOutput`/`ProcessRunner`/`TokioProcessRunner` stay crate-internal:
+// they exist as a test seam and are deliberately not part of the public API.
+#[cfg(feature = "apple-container-backend")]
+pub use apple_container::AppleContainerExecutor;
 pub use context::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
 #[cfg(feature = "docker-backend")]
-pub use docker::DockerExecutor;
+pub use docker::{
+    DockerExecutor, ProbeExecutionLimits, ProbeExecutionLimitsError,
+    StrictDockerDiagnosticsSandbox, StrictDockerSandboxError, strict_docker_diagnostics_sandbox,
+};
 #[cfg(feature = "firecracker")]
 pub use firecracker::FirecrackerExecutor;
 pub use local::LocalExecutor;
@@ -108,6 +120,7 @@ pub async fn select_executor(
         vec![
             BackendType::Firecracker,
             BackendType::E2b,
+            BackendType::AppleContainer,
             BackendType::Docker,
             BackendType::Local,
         ]
@@ -161,6 +174,39 @@ pub async fn select_executor(
             BackendType::E2b => {
                 log::debug!("E2B unavailable: no API key configured");
                 tried.push("e2b (no API key)".to_string());
+            }
+
+            #[cfg(feature = "apple-container-backend")]
+            BackendType::AppleContainer => {
+                // Availability is positive evidence only, and probing never
+                // starts the host service (`container system start` is
+                // operator-owned host administration).
+                match AppleContainerExecutor::new(config.clone(), validator.clone()) {
+                    Ok(executor) => match executor.probe().await {
+                        Ok(()) => {
+                            log::info!(
+                                "Selected Apple Container backend (one Linux VM per container)"
+                            );
+                            return Ok(Box::new(executor));
+                        }
+                        Err(reason) => {
+                            log::debug!("Apple Container unavailable: {}", reason);
+                            tried.push(format!("apple-container ({})", reason));
+                        }
+                    },
+                    Err(e) => {
+                        log::warn!(
+                            "AppleContainerExecutor init failed: {}. Trying next backend.",
+                            e
+                        );
+                        tried.push(format!("apple-container (init failed: {})", e));
+                    }
+                }
+            }
+            #[cfg(not(feature = "apple-container-backend"))]
+            BackendType::AppleContainer => {
+                log::debug!("Apple Container backend disabled at compile time");
+                tried.push("apple-container (compile-time disabled)".to_string());
             }
 
             #[cfg(feature = "docker-backend")]
@@ -234,6 +280,30 @@ mod tests {
 
         let executor = select_executor(&config).await.expect("should select Local");
         assert_eq!(executor.backend_type(), BackendType::Local);
+    }
+
+    #[cfg(feature = "apple-container-backend")]
+    #[tokio::test]
+    async fn select_executor_falls_through_when_apple_container_unavailable() {
+        // On any non-Apple-silicon-macOS host (including this CI runner) the
+        // Apple Container probe must fail without spawning the CLI, and the
+        // selector must continue to the next backend.
+        let config = RlmConfig {
+            backend_preference: vec![BackendType::AppleContainer, BackendType::Local],
+            ..Default::default()
+        };
+
+        let executor = select_executor(&config).await.expect("should reach Local");
+        if apple_container::platform_supported() {
+            // A real Apple silicon host with a healthy service may legitimately
+            // select Apple Container here.
+            assert!(matches!(
+                executor.backend_type(),
+                BackendType::AppleContainer | BackendType::Local
+            ));
+        } else {
+            assert_eq!(executor.backend_type(), BackendType::Local);
+        }
     }
 
     #[tokio::test]

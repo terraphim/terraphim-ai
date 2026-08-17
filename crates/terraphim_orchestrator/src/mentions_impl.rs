@@ -83,7 +83,7 @@ impl AgentOrchestrator {
         mention_cfg: &config::MentionConfig,
     ) {
         // Respect poll_modulo to reduce API traffic.
-        if self.tick_count % mention_cfg.poll_modulo != 0 {
+        if !self.tick_count.is_multiple_of(mention_cfg.poll_modulo) {
             return;
         }
 
