@@ -204,6 +204,53 @@ impl CommandRegistry {
         command.source_path = path.to_path_buf();
         Ok(command)
     }
+
+    /// Write an approved evolution patch as a section-scoped markdown command.
+    ///
+    /// This is the only sanctioned writer for evolution-authored behaviour
+    /// command files. It validates the generated markdown before writing and
+    /// refuses to replace an existing file wholesale; callers get an atomic
+    /// create of a new command file and can then reload the command directory.
+    pub fn write_validated_command_section(
+        &mut self,
+        commands_dir: &Path,
+        command_name: &str,
+        section_markdown: &str,
+    ) -> Result<PathBuf, CommandError> {
+        validate_command_name(command_name)?;
+        std::fs::create_dir_all(commands_dir)?;
+        let path = commands_dir.join(format!("{command_name}.md"));
+        if path.exists() {
+            return Err(CommandError::Execution(format!(
+                "command file already exists; refusing wholesale overwrite: {}",
+                path.display()
+            )));
+        }
+
+        let content = format!(
+            "---\nname: {command_name}\ndescription: Evolution-approved behaviour command `{command_name}`\n---\n\n# {command_name}\n\n{}\n",
+            section_markdown.trim()
+        );
+        let mut command = parse_command_markdown(&content)?;
+        command.source_path = path.clone();
+        std::fs::write(&path, content)?;
+        self.register(command);
+        Ok(path)
+    }
+}
+
+fn validate_command_name(command_name: &str) -> Result<(), CommandError> {
+    let valid = !command_name.is_empty()
+        && command_name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    if valid {
+        Ok(())
+    } else {
+        Err(CommandError::Parse(format!(
+            "invalid command name `{command_name}`; expected kebab-case ascii"
+        )))
+    }
 }
 
 impl Default for CommandRegistry {
@@ -474,7 +521,7 @@ Say hello to someone.
                 assert!(command.contains("{name}"));
                 assert_eq!(working_dir, None);
             }
-            _ => panic!("Expected Shell step"),
+            _ => unreachable!("matched Shell step above"),
         }
     }
 
@@ -497,7 +544,7 @@ use_context: true
                 assert!(prompt.contains("{code}"));
                 assert!(use_context);
             }
-            _ => panic!("Expected Llm step"),
+            _ => unreachable!("matched Llm step above"),
         }
     }
 
@@ -515,7 +562,7 @@ use_context: true
                 assert!(template.contains("## Results"));
                 assert!(template.contains("{output}"));
             }
-            _ => panic!("Expected Respond step"),
+            _ => unreachable!("matched Respond step above"),
         }
     }
 
@@ -552,5 +599,33 @@ use_context: true
         let step = parse_step_from_block("```respond", "template: Done!");
         assert!(step.is_some());
         assert!(matches!(step.unwrap(), CommandStep::Respond { .. }));
+    }
+
+    #[test]
+    fn evolution_writer_validates_and_refuses_overwrite() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut registry = CommandRegistry::new();
+        let path = registry
+            .write_validated_command_section(temp.path(), "prefer-rg", "Use rg for search.")
+            .unwrap();
+        assert!(path.exists());
+        assert!(registry.contains("prefer-rg"));
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.contains("# prefer-rg"));
+
+        let duplicate = registry.write_validated_command_section(
+            temp.path(),
+            "prefer-rg",
+            "Replace the whole file.",
+        );
+        assert!(duplicate.is_err());
+    }
+
+    #[test]
+    fn evolution_writer_rejects_non_kebab_command_name() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut registry = CommandRegistry::new();
+        let result = registry.write_validated_command_section(temp.path(), "../escape", "bad");
+        assert!(result.is_err());
     }
 }
