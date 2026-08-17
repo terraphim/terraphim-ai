@@ -187,6 +187,16 @@ impl ApprovalState {
         self.permanent_approved.lock().unwrap().extend(patterns);
     }
 
+    /// List all pending approval requests.
+    pub fn list_pending(&self) -> Vec<serde_json::Value> {
+        self.pending.lock().unwrap().values().cloned().collect()
+    }
+
+    /// Retrieve and remove a pending approval by request id.
+    pub fn pop_pending_request(&self, request_id: &str) -> Option<serde_json::Value> {
+        self.pending.lock().unwrap().remove(request_id)
+    }
+
     /// Clear all approvals and pending requests for a session.
     pub fn clear_session(&self, session_key: &str) {
         self.session_approved.lock().unwrap().remove(session_key);

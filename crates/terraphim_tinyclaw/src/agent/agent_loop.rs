@@ -16,11 +16,13 @@ use crate::session::{ChatMessage, MessageRole, SessionManager};
 use crate::tools::agent_memory::{
     AgentMemoryConfig, capture_failed_command, run_agent, should_ignore_command,
 };
+use crate::tools::approval;
 use crate::tools::{ToolError, ToolRegistry};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+use terraphim_engine_events::{Disposition, EvolutionApprove};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
@@ -924,6 +926,29 @@ impl ToolCallingLoop {
                     "evo.propose emitted: signature={} sink={}",
                     propose.signature,
                     path.display()
+                );
+                let request_id = format!("evo:{}", propose.signature);
+                let approval = EvolutionApprove {
+                    signature: propose.signature.clone(),
+                    target_kind: propose.target_kind,
+                    target_ref: propose.target_ref.clone(),
+                    trust_level: propose.trust_level,
+                    disposition: Disposition::AllowOnce,
+                };
+                approval::global().submit_pending(
+                    &request_id,
+                    serde_json::json!({
+                        "id": request_id,
+                        "tool_name": "evolution.apply",
+                        "arguments": {
+                            "signature": propose.signature,
+                            "target_kind": propose.target_kind,
+                            "target_ref": propose.target_ref,
+                        },
+                        "requested_at": chrono::Utc::now().to_rfc3339(),
+                        "proposal": propose,
+                        "approval": approval,
+                    }),
                 );
             }
             Ok(Err(e)) => log::warn!("Failed to persist evo.propose (non-fatal): {e}"),

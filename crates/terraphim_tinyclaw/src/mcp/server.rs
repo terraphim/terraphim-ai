@@ -4,13 +4,17 @@
 //! 9-tool bridge surface (pinned commit `846b14ab`).
 
 use super::tools::*;
+use crate::agent::evo_apply::{self, EvolutionApplyOutcome};
 use crate::bus::{MessageBus, OutboundMessage};
+use crate::commands::CommandRegistry;
 use crate::session::{MessageRole, SessionManager};
+use crate::tools::approval;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ServerCapabilities, ServerInfo};
 use rmcp::{ServerHandler, ServiceExt};
 use std::sync::Arc;
+use terraphim_engine_events::{EvolutionApprove, EvolutionPropose};
 use tokio::sync::Mutex;
 
 /// MCP server for TinyClaw channel bridge.
@@ -18,15 +22,34 @@ use tokio::sync::Mutex;
 pub struct TinyClawMcpServer {
     sessions: Arc<Mutex<SessionManager>>,
     bus: Arc<MessageBus>,
+    commands: Arc<Mutex<CommandRegistry>>,
+    workspace: std::path::PathBuf,
     tool_router: ToolRouter<Self>,
 }
 
 impl TinyClawMcpServer {
     /// Create a new MCP server.
     pub fn new(sessions: Arc<Mutex<SessionManager>>, bus: Arc<MessageBus>) -> Self {
+        Self::with_commands(
+            sessions,
+            bus,
+            Arc::new(Mutex::new(CommandRegistry::with_defaults())),
+            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
+        )
+    }
+
+    /// Create a new MCP server with an explicit command registry/workspace.
+    pub fn with_commands(
+        sessions: Arc<Mutex<SessionManager>>,
+        bus: Arc<MessageBus>,
+        commands: Arc<Mutex<CommandRegistry>>,
+        workspace: std::path::PathBuf,
+    ) -> Self {
         Self {
             sessions,
             bus,
+            commands,
+            workspace,
             tool_router: Self::tool_router(),
         }
     }
@@ -254,13 +277,10 @@ impl TinyClawMcpServer {
     /// List open approval requests.
     #[rmcp::tool(description = "List open approval requests")]
     pub async fn permissions_list_open(&self) -> Result<CallToolResult, rmcp::ErrorData> {
-        // TinyClaw's ExecutionGuard is a pre-execution block/warn system, not an
-        // approval queue. Wave 2 returns an empty list; a real approval system
-        // is a Wave 5+ concern.
-        // Hermes contract: wrap in {"permissions": [...], "count": N}
+        let permissions = approval::global().list_pending();
         let body = serde_json::json!({
-            "count": 0,
-            "permissions": Vec::<serde_json::Value>::new(),
+            "count": permissions.len(),
+            "permissions": permissions,
         });
         Ok(json_result(&body))
     }
@@ -271,14 +291,86 @@ impl TinyClawMcpServer {
         &self,
         params: Parameters<PermissionsRespondParams>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        // No approval system in Wave 2 — respond with error JSON, not Err
-        // (Hermes contract: error cases return JSON, not exceptions)
-        let body = serde_json::json!({
-            "status": "error",
-            "request_id": params.0.request_id,
-            "error": format!("approval request not found: {}", params.0.request_id),
-        });
-        Ok(json_result(&body))
+        let request_id = params.0.request_id;
+        let Some(request) = approval::global().pop_pending_request(&request_id) else {
+            let body = serde_json::json!({
+                "status": "error",
+                "request_id": request_id,
+                "error": format!("approval request not found: {request_id}"),
+            });
+            return Ok(json_result(&body));
+        };
+
+        if !params.0.approved {
+            let body = serde_json::json!({
+                "status": "rejected",
+                "request_id": request_id,
+            });
+            return Ok(json_result(&body));
+        }
+
+        let Some(proposal_value) = request.get("proposal").cloned() else {
+            let body = serde_json::json!({
+                "status": "error",
+                "request_id": request_id,
+                "error": "approval request missing proposal payload",
+            });
+            return Ok(json_result(&body));
+        };
+        let Some(approval_value) = request.get("approval").cloned() else {
+            let body = serde_json::json!({
+                "status": "error",
+                "request_id": request_id,
+                "error": "approval request missing approval payload",
+            });
+            return Ok(json_result(&body));
+        };
+
+        let proposal: EvolutionPropose = match serde_json::from_value(proposal_value) {
+            Ok(proposal) => proposal,
+            Err(e) => {
+                let body = serde_json::json!({
+                    "status": "error",
+                    "request_id": request_id,
+                    "error": format!("invalid proposal payload: {e}"),
+                });
+                return Ok(json_result(&body));
+            }
+        };
+        let approval: EvolutionApprove = match serde_json::from_value(approval_value) {
+            Ok(approval) => approval,
+            Err(e) => {
+                let body = serde_json::json!({
+                    "status": "error",
+                    "request_id": request_id,
+                    "error": format!("invalid approval payload: {e}"),
+                });
+                return Ok(json_result(&body));
+            }
+        };
+
+        let mut commands = self.commands.lock().await;
+        match evo_apply::apply_approved_proposal(
+            &self.workspace,
+            &mut commands,
+            &proposal,
+            &approval,
+        ) {
+            Ok(EvolutionApplyOutcome::Applied { audit_ref, .. }) => Ok(json_result(
+                &serde_json::json!({"status": "applied", "request_id": request_id, "audit_ref": audit_ref}),
+            )),
+            Ok(EvolutionApplyOutcome::Deferred { audit_ref, reason }) => Ok(json_result(
+                &serde_json::json!({"status": "deferred", "request_id": request_id, "audit_ref": audit_ref, "reason": reason}),
+            )),
+            Ok(EvolutionApplyOutcome::Rejected { audit_ref, reason }) => Ok(json_result(
+                &serde_json::json!({"status": "rejected", "request_id": request_id, "audit_ref": audit_ref, "reason": reason}),
+            )),
+            Err(e) => Ok(json_result(&serde_json::json!({
+                "status": "error",
+                "request_id": request_id,
+                "error": e.to_string(),
+            }))),
+        }
     }
 
     /// List connected channels.
@@ -333,12 +425,19 @@ mod tests {
     use super::*;
     use crate::session::SessionManager;
     use tempfile::TempDir;
+    use terraphim_engine_events::{
+        Disposition, EvolutionApprove, EvolutionPropose, TargetKind, TrustLevel,
+    };
 
     fn make_server() -> (TinyClawMcpServer, TempDir) {
         let dir = TempDir::new().unwrap();
         let sessions = Arc::new(Mutex::new(SessionManager::new(dir.path().to_path_buf())));
         let bus = Arc::new(MessageBus::new());
-        (TinyClawMcpServer::new(sessions, bus), dir)
+        let commands = Arc::new(Mutex::new(CommandRegistry::new()));
+        (
+            TinyClawMcpServer::with_commands(sessions, bus, commands, dir.path().to_path_buf()),
+            dir,
+        )
     }
 
     #[tokio::test]
@@ -404,6 +503,53 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&text.text).unwrap();
         assert_eq!(parsed["status"], "error");
         assert_eq!(parsed["request_id"], "req-123");
+    }
+
+    #[tokio::test]
+    async fn permissions_respond_applies_pending_evolution_request() {
+        let (server, dir) = make_server();
+        let proposal = EvolutionPropose {
+            signature: "prefer-rg-search".to_string(),
+            target_kind: TargetKind::Tool,
+            target_ref: Some("prefer-rg-search".to_string()),
+            content: "Use rg for repository search.".to_string(),
+            trust_level: TrustLevel::L1,
+        };
+        let approval = EvolutionApprove {
+            signature: "prefer-rg-search".to_string(),
+            target_kind: TargetKind::Tool,
+            target_ref: Some("prefer-rg-search".to_string()),
+            trust_level: TrustLevel::L1,
+            disposition: Disposition::AllowOnce,
+        };
+        approval::global().submit_pending(
+            "evo:prefer-rg-search",
+            serde_json::json!({
+                "id": "evo:prefer-rg-search",
+                "tool_name": "evolution.apply",
+                "proposal": proposal,
+                "approval": approval,
+            }),
+        );
+
+        let result = server
+            .permissions_respond(Parameters(PermissionsRespondParams {
+                request_id: "evo:prefer-rg-search".into(),
+                approved: true,
+            }))
+            .await
+            .unwrap();
+        let text = result.content[0].as_text().unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&text.text).unwrap();
+        assert_eq!(parsed["status"], "applied");
+        let audit = std::fs::read_to_string(
+            dir.path()
+                .join(".terraphim")
+                .join("evolution")
+                .join("audit.jsonl"),
+        )
+        .unwrap();
+        assert!(audit.contains("evo.applied"));
     }
 
     #[tokio::test]
