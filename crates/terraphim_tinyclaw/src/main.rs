@@ -327,7 +327,8 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
         backend,
         system_prompt,
         memory_config,
-    );
+    )
+    .with_evolution_config(&config.evolution);
 
     // Spawn agent loop in background
     let bus_clone = bus.clone();
@@ -406,7 +407,8 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
         backend,
         system_prompt,
         memory_config_gw,
-    );
+    )
+    .with_evolution_config(&config.evolution);
 
     // Create channel manager and register enabled channels
     let mut channel_manager = ChannelManager::new();

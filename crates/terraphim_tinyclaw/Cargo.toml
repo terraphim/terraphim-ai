@@ -130,6 +130,9 @@ sha2 = "0.10"
 terraphim_rlm = { path = "../terraphim_rlm", default-features = false, features = ["llm", "kg-validation", "docker-backend"] }
 # terraphim_spawner: subagent pool + handles. Tiny standalone crate.
 terraphim_spawner = { path = "../terraphim_spawner" }
+# Shared EngineEvent vocabulary incl. the evo.* family (#3228 consumes;
+# the Desktop P1 freeze landed via #3232). Workspace path dep, v0.1.0.
+terraphim_engine_events = { path = "../terraphim_engine_events" }
 # Provider/ProviderType/Capability types used by the subagent tool.
 terraphim_types = { version = "1.20.2", registry = "terraphim" }
 
