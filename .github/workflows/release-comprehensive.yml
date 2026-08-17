@@ -35,6 +35,8 @@ jobs:
   resolve-release-source:
     name: Resolve immutable release source
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
     outputs:
       release_tag: ${{ steps.resolve.outputs.release_tag }}
       version: ${{ steps.resolve.outputs.version }}
@@ -770,7 +772,7 @@ jobs:
   build-docker:
     name: Build and push Docker images
     needs: [resolve-release-source, verify-versions]
-    if: needs.verify-versions.result == 'success'
+    if: needs.verify-versions.result == 'success' && needs.resolve-release-source.outputs.is_standard_release == 'true'
     uses: ./.github/workflows/docker-multiarch.yml
     with:
       platforms: linux/amd64,linux/arm64
@@ -781,6 +783,7 @@ jobs:
       version_series: ${{ needs.resolve-release-source.outputs.version_series }}
       publish_latest: ${{ github.event_name == 'push' && needs.resolve-release-source.outputs.is_standard_release == 'true' && !inputs.test_run }}
       source_ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+      build_recipe_ref: ${{ needs.resolve-release-source.outputs.workflow_ref }}
       dockerhub-username: ${{ vars.DOCKERHUB_USERNAME || '' }}
       test_run: ${{ inputs.test_run || false }}
     secrets: inherit  # pragma: allowlist secret
@@ -863,7 +866,6 @@ jobs:
       !cancelled() &&
       github.event_name == 'push' &&
       !inputs.test_run &&
-      needs.resolve-release-source.outputs.is_standard_release == 'true' &&
       needs.verify-versions.result == 'success' &&
       needs.sign-and-notarize-macos.result == 'success' &&
       needs.verify-release-assets.result == 'success'

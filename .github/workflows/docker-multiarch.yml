@@ -38,6 +38,10 @@ on:
         description: 'Immutable source ref or SHA to check out for Docker builds'
         required: true
         type: string
+      build_recipe_ref:
+        description: 'Reviewed workflow commit that supplies the Docker build recipe'
+        required: true
+        type: string
       dockerhub-username:
         description: 'Docker Hub username'
         required: false
@@ -107,11 +111,29 @@ jobs:
       dockerhub-enabled: ${{ steps.dockerhub-check.outputs.enabled }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout immutable source
         uses: actions/checkout@v6
         with:
           ref: ${{ inputs.source_ref }}
           fetch-depth: 1
+
+      - name: Checkout reviewed Docker build recipe
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.build_recipe_ref }}
+          path: .release-recipe
+          sparse-checkout: docker/Dockerfile.multiarch
+          sparse-checkout-cone-mode: false
+          fetch-depth: 1
+
+      - name: Overlay reviewed Docker build recipe
+        shell: bash
+        run: |
+          cp .release-recipe/docker/Dockerfile.multiarch docker/Dockerfile.multiarch
+          python3 - <<'PY'
+          import shutil
+          shutil.rmtree('.release-recipe')
+          PY
 
       - name: Download frontend artifacts
         uses: actions/download-artifact@v4
@@ -196,7 +218,7 @@ jobs:
           tags: |
             type=raw,value=${{ inputs.tag }}-ubuntu${{ matrix.ubuntu-version }}
             type=raw,value=${{ inputs.version }}-ubuntu${{ matrix.ubuntu-version }}
-            type=raw,value=${{ inputs.version_series }}-ubuntu${{ matrix.ubuntu-version }}
+            type=raw,value=${{ inputs.version_series }}-ubuntu${{ matrix.ubuntu-version }},enable=${{ inputs.publish_latest }}
             type=raw,value=latest-ubuntu${{ matrix.ubuntu-version }},enable=${{ inputs.publish_latest }}
           labels: |
             org.opencontainers.image.title=Terraphim Server
@@ -213,7 +235,7 @@ jobs:
           tags: |
             type=raw,value=${{ inputs.tag }}-ubuntu${{ matrix.ubuntu-version }}
             type=raw,value=${{ inputs.version }}-ubuntu${{ matrix.ubuntu-version }}
-            type=raw,value=${{ inputs.version_series }}-ubuntu${{ matrix.ubuntu-version }}
+            type=raw,value=${{ inputs.version_series }}-ubuntu${{ matrix.ubuntu-version }},enable=${{ inputs.publish_latest }}
             type=raw,value=latest-ubuntu${{ matrix.ubuntu-version }},enable=${{ inputs.publish_latest }}
           labels: |
             org.opencontainers.image.title=Terraphim Server
@@ -305,11 +327,11 @@ jobs:
           echo "Verifying DockerHub build for Ubuntu ${{ matrix.ubuntu-version }}:"
           docker buildx imagetools inspect ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.tag }}-ubuntu${{ matrix.ubuntu-version }} || true
 
-  # Create the 'latest' tag pointing to the most recent Ubuntu LTS (22.04)
-  create-latest-tag:
+  # Publish unsuffixed release manifests from the Ubuntu 22.04 images.
+  publish-release-manifests:
     needs: build-and-push
     runs-on: [self-hosted, Linux, X64]
-    if: inputs.push && !inputs.test_run && inputs.publish_latest
+    if: inputs.push && !inputs.test_run
 
     steps:
       - name: Set up Docker Buildx
@@ -350,37 +372,49 @@ jobs:
           password: ${{ env.DOCKERHUB_TOKEN }}
         continue-on-error: true
 
-      - name: Create 'latest' tag for GHCR (pointing to Ubuntu 22.04)
+      - name: Publish release manifests for GHCR
         run: |
-          # Create manifest for 'latest' tag pointing to Ubuntu 22.04
           docker buildx imagetools create \
-            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }} \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}-ubuntu22.04
 
-          # Also create a tag without ubuntu suffix if this is a version tag
-          if [[ "${{ inputs.tag }}" =~ ^v[0-9] ]]; then
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}-ubuntu22.04
+
+          if [[ "${{ inputs.publish_latest }}" == "true" ]]; then
             docker buildx imagetools create \
-              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }} \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}-ubuntu22.04
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version_series }} \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version_series }}-ubuntu22.04
+
+            docker buildx imagetools create \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-ubuntu22.04
           fi
 
-      - name: Create 'latest' tag for DockerHub (pointing to Ubuntu 22.04)
+      - name: Publish release manifests for DockerHub
         if: steps.dockerhub-creds.outputs.has_dockerhub == 'true'
         run: |
-          # Create manifest for 'latest' tag pointing to Ubuntu 22.04
           docker buildx imagetools create \
-            --tag ${{ env.DOCKERHUB_IMAGE }}:latest \
+            --tag ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.tag }} \
             ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.tag }}-ubuntu22.04 || true
 
-          # Also create a tag without ubuntu suffix if this is a version tag
-          if [[ "${{ inputs.tag }}" =~ ^v[0-9] ]]; then
+          docker buildx imagetools create \
+            --tag ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version }} \
+            ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version }}-ubuntu22.04 || true
+
+          if [[ "${{ inputs.publish_latest }}" == "true" ]]; then
             docker buildx imagetools create \
-              --tag ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.tag }} \
-              ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.tag }}-ubuntu22.04 || true
+              --tag ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version_series }} \
+              ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version_series }}-ubuntu22.04 || true
+
+            docker buildx imagetools create \
+              --tag ${{ env.DOCKERHUB_IMAGE }}:latest \
+              ${{ env.DOCKERHUB_IMAGE }}:latest-ubuntu22.04 || true
           fi
 
   build-summary:
-    needs: [build-frontend, build-and-push, create-latest-tag]
+    needs: [build-frontend, build-and-push, publish-release-manifests]
     runs-on: [self-hosted, Linux, X64]
     if: always()
 
@@ -410,7 +444,13 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Images" >> $GITHUB_STEP_SUMMARY
-          echo "- **GHCR:** \`ghcr.io/${{ env.IMAGE_NAME }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **GHCR immutable:** \`ghcr.io/${{ env.IMAGE_NAME }}:${{ inputs.tag }}\`, \`ghcr.io/${{ env.IMAGE_NAME }}:${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ inputs.publish_latest }}" == "true" ]]; then
+            echo "- **GHCR moving:** \`ghcr.io/${{ env.IMAGE_NAME }}:${{ inputs.version_series }}\`, \`ghcr.io/${{ env.IMAGE_NAME }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          fi
           if [[ "${{ needs.build-and-push.outputs.dockerhub-enabled }}" == "true" ]]; then
-            echo "- **DockerHub:** \`${{ env.DOCKERHUB_IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **DockerHub immutable:** \`${{ env.DOCKERHUB_IMAGE }}:${{ inputs.tag }}\`, \`${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+            if [[ "${{ inputs.publish_latest }}" == "true" ]]; then
+              echo "- **DockerHub moving:** \`${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version_series }}\`, \`${{ env.DOCKERHUB_IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
+            fi
           fi
