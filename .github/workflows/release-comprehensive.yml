@@ -224,6 +224,19 @@ jobs:
             "$FIX" || true
           fi
 
+      - name: Disable Rust wrappers for self-hosted release builds
+        if: contains(matrix.os, 'self-hosted')
+        shell: bash
+        run: |
+          # Release jobs require direct rustc output. Runner wrappers may be absent
+          # (for example kache) or may write status text that corrupts toolchain
+          # action parsing (for example fix-rust-toolchain-perms.sh).
+          unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
+          {
+            echo "RUSTC_WRAPPER="
+            echo "RUSTC_WORKSPACE_WRAPPER="
+          } >> "$GITHUB_ENV"
+
       - name: Cleanup self-hosted runner
         if: contains(matrix.os, 'self-hosted')
         run: |
@@ -246,22 +259,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
-      - name: Sanitize unavailable Rust wrappers
-        if: contains(matrix.os, 'self-hosted')
-        shell: bash
-        run: |
-          for var in RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER; do
-            value="${!var:-}"
-            if [[ -n "$value" ]]; then
-              executable="${value%% *}"
-              if ! command -v "$executable" >/dev/null 2>&1 && [[ ! -x "$executable" ]]; then
-                echo "unset $var because configured executable '$executable' is unavailable"
-                unset "$var"
-                echo "$var=" >> "$GITHUB_ENV"
-              fi
-            fi
-          done
 
       - name: Install zig (required by zlob dependency)
         if: contains(matrix.target, 'apple-darwin') || contains(matrix.target, 'windows')
@@ -616,6 +613,15 @@ jobs:
     continue-on-error: true
     runs-on: [self-hosted, bigbox]
     steps:
+      - name: Disable Rust wrappers for self-hosted release builds
+        shell: bash
+        run: |
+          unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
+          {
+            echo "RUSTC_WRAPPER="
+            echo "RUSTC_WORKSPACE_WRAPPER="
+          } >> "$GITHUB_ENV"
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
@@ -624,22 +630,6 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Sanitize unavailable Rust wrappers
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          for var in RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER; do
-            value="${!var:-}"
-            if [[ -n "$value" ]]; then
-              executable="${value%% *}"
-              if ! command -v "$executable" >/dev/null 2>&1 && [[ ! -x "$executable" ]]; then
-                echo "unset $var because configured executable '$executable' is unavailable"
-                unset "$var"
-                echo "$var=" >> "$GITHUB_ENV"
-              fi
-            fi
-          done
 
       - name: Install cargo-deb
         run: |
