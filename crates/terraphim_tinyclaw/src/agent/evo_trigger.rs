@@ -25,7 +25,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use terraphim_engine_events::{EngineEvent, EvolutionPropose, TrustLevel};
+use terraphim_engine_events::{EngineEvent, EvolutionPropose, TargetKind, TrustLevel};
 
 /// The exact string a proposer subagent must emit when nothing in the turn
 /// is worth persisting (two-legal-outputs contract, output one).
@@ -317,10 +317,23 @@ pub fn parse_proposer_output(raw: &str) -> anyhow::Result<ProposerOutput> {
     // The heuristic trigger may only originate L0/L1 proposals; anything
     // claiming L2+ is rejected here rather than at disposition time.
     // (Wire form is uppercase `L0`..`L3` per the golden vectors.)
+    // TACP spec 5.1: heuristic -> L0/L1 only; L2 requires evidence criteria
+    // (applied_count>=3, agent_count>=2); L3 is human-only.
     if !matches!(propose.trust_level, TrustLevel::L0 | TrustLevel::L1) {
         anyhow::bail!(
             "proposer contract violation: trust_level must be l0 or l1, got {:?}",
             propose.trust_level
+        );
+    }
+
+    // TACP spec 5.1 constraint 2: behaviour-governing artefacts are L3-only
+    // and L3 is human-only, so a heuristic-triggered proposer capped at
+    // L0/L1 can never legitimately propose a `behaviour` target. Reject it
+    // here so a buggy proposer cannot smuggle one through the parser.
+    if matches!(propose.target_kind, TargetKind::Behaviour) {
+        anyhow::bail!(
+            "proposer contract violation: target_kind `behaviour` requires L3 \
+             (human-only); heuristic proposals are capped at L0/L1"
         );
     }
 
@@ -568,6 +581,15 @@ mod tests {
             "trust_level": "L2"
         }"#;
         assert!(parse_proposer_output(over_trusted).is_err());
+        // Behaviour targets are L3-only (human gate); rejected even at L1.
+        let behaviour_at_l1 = r#"{
+            "signature": "behaviour-change",
+            "target_kind": "behaviour",
+            "target_ref": null,
+            "content": "x",
+            "trust_level": "L1"
+        }"#;
+        assert!(parse_proposer_output(behaviour_at_l1).is_err());
     }
 
     #[test]

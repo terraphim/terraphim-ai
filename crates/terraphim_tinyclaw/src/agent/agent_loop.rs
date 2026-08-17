@@ -902,16 +902,32 @@ impl ToolCallingLoop {
             }
         };
 
-        match evo_trigger::append_proposal(&self.workspace, &propose) {
-            Ok(path) => {
+        // Record the attempt BEFORE the persist so the cooldown bounds
+        // proposer spend even when the JSONL sink fails — otherwise the
+        // cooldown restarts only on success and a persistent I/O error
+        // turns into a proposer retry storm.
+        self.evo_state.lock().await.record_proposal();
+
+        // Run the append on a blocking thread: `OpenOptions::append` plus a
+        // single `write_all` is line-atomic on POSIX for writes under
+        // PIPE_BUF (4KB), and `spawn_blocking` preserves exactly those
+        // std::fs semantics without blocking the async executor.
+        let workspace = self.workspace.clone();
+        let propose_for_write = propose.clone();
+        let persist = tokio::task::spawn_blocking(move || {
+            evo_trigger::append_proposal(&workspace, &propose_for_write)
+        })
+        .await;
+        match persist {
+            Ok(Ok(path)) => {
                 log::info!(
                     "evo.propose emitted: signature={} sink={}",
                     propose.signature,
                     path.display()
                 );
-                self.evo_state.lock().await.record_proposal();
             }
-            Err(e) => log::warn!("Failed to persist evo.propose (non-fatal): {e}"),
+            Ok(Err(e)) => log::warn!("Failed to persist evo.propose (non-fatal): {e}"),
+            Err(e) => log::warn!("evo.propose persistence task failed (non-fatal): {e}"),
         }
     }
 
