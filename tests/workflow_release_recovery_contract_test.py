@@ -211,15 +211,21 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertNotRegex(combined, r"\bgit\s+push\b.*:refs/tags/")
         self.assertNotRegex(combined, r"\bgit\s+push\b.*--delete\b")
 
-    def test_self_hosted_linux_cargo_steps_sanitize_rust_wrappers(self) -> None:
-        build_binaries = job_block(self.release_text, "build-binaries")
-        sanitize = step_run_block(build_binaries, "Sanitize unavailable Rust wrappers")
-        self.assertIn("if: contains(matrix.os, 'self-hosted')", sanitize)
-        self.assertNotIn("runner.os == 'Linux'", sanitize)
-        for var in ["RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"]:
-            self.assertIn(var, self.release_text)
-        self.assertIn('unset "$var"', self.release_text)
-        self.assertGreaterEqual(self.release_text.count("Sanitize unavailable Rust wrappers"), 2)
+    def test_self_hosted_release_jobs_disable_rust_wrappers_before_toolchain(self) -> None:
+        for job_name in ["build-binaries", "build-debian-packages"]:
+            job = job_block(self.release_text, job_name)
+            disable = step_run_block(
+                job, "Disable Rust wrappers for self-hosted release builds"
+            )
+            for var in ["RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"]:
+                self.assertIn(f"unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER", disable)
+                self.assertIn(f'echo "{var}="', disable)
+            self.assertLess(
+                job.index("Disable Rust wrappers for self-hosted release builds"),
+                job.index("Install Rust toolchain"),
+                job_name,
+            )
+        self.assertNotIn("Sanitize unavailable Rust wrappers", self.release_text)
 
     def test_cross_probe_is_non_fatal(self) -> None:
         install_cross = step_run_block(
