@@ -1,5 +1,8 @@
 //! Tool-calling loop with hybrid LLM routing.
 
+use crate::agent::evo_trigger::{
+    self, EvolutionConfig, PostTurnSignals, ProposerOutput, TriggerState,
+};
 use crate::agent::execution_guard::{ExecutionGuard, GuardDecision};
 use crate::agent::proxy_client::{
     Message, ProxyClient, ProxyClientConfig, ProxyResponse, ToolDefinition,
@@ -24,6 +27,17 @@ use tokio_util::sync::CancellationToken;
 /// Minimum interval between `memory apply` subprocess runs. Prevents a
 /// subprocess spawn + full-store scan on every single turn (PR review P2).
 const MEMORY_APPLY_COOLDOWN: Duration = Duration::from_secs(30);
+
+/// Per-turn tool statistics gathered by the tool-calling loop and fed to
+/// the post-turn evolution trigger (#3228).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ToolLoopStats {
+    /// Tool calls executed during the turn.
+    pub tool_calls: u32,
+    /// Tool calls that failed during the turn (`Blocked` excluded: a
+    /// blocked command never ran, so there is no failure signal).
+    pub tool_errors: u32,
+}
 
 /// Configuration for the tool-calling loop.
 #[derive(Debug, Clone)]
@@ -452,6 +466,11 @@ pub struct ToolCallingLoop {
     /// Last time `memory apply` ran (cooldown guard — avoids a subprocess
     /// spawn on every single turn).
     memory_last_apply: Arc<Mutex<std::time::Instant>>,
+    /// Post-turn evolution trigger configuration (#3228, T2). `None` keeps
+    /// the trigger fully inert (the default).
+    evolution_config: Option<EvolutionConfig>,
+    /// Cooldown bookkeeping for the evolution trigger.
+    evo_state: Arc<Mutex<TriggerState>>,
 }
 
 impl ToolCallingLoop {
@@ -563,7 +582,18 @@ impl ToolCallingLoop {
             memory_config: mem_cfg_arc,
             workspace: agent_config.workspace.clone(),
             memory_last_apply: Arc::new(Mutex::new(std::time::Instant::now())),
+            evolution_config: None,
+            evo_state: Arc::new(Mutex::new(TriggerState::default())),
         }
+    }
+
+    /// Enable the post-turn evolution trigger (#3228, T2). Additive builder
+    /// so existing constructors keep their signatures.
+    pub fn with_evolution_config(mut self, config: &EvolutionConfig) -> Self {
+        if config.enabled {
+            self.evolution_config = Some(config.clone());
+        }
+        self
     }
 
     /// Run the agent loop, consuming messages from the bus.
@@ -760,19 +790,22 @@ impl ToolCallingLoop {
             .collect();
 
         // Call LLM with tool-calling loop
-        let final_response = if self.router.tools_available() && !tool_definitions.is_empty() {
-            self.run_tool_loop_with_prompt(
-                proxy_messages,
-                tool_definitions,
-                &effective_system_prompt,
-            )
-            .await?
-        } else {
-            // Fallback to text-only mode
-            self.router
-                .text_only(proxy_messages, Some(effective_system_prompt))
+        let (final_response, tool_stats) =
+            if self.router.tools_available() && !tool_definitions.is_empty() {
+                self.run_tool_loop_with_prompt(
+                    proxy_messages,
+                    tool_definitions,
+                    &effective_system_prompt,
+                )
                 .await?
-        };
+            } else {
+                // Fallback to text-only mode (no tools, so zeroed stats)
+                let text = self
+                    .router
+                    .text_only(proxy_messages, Some(effective_system_prompt))
+                    .await?;
+                (text, ToolLoopStats::default())
+            };
 
         // Add assistant response to session
         let mut session = self.backend.get_or_create(&session_key).await;
@@ -790,10 +823,112 @@ impl ToolCallingLoop {
         self.backend.persist(&session).await?;
 
         // Send response
-        let outbound = OutboundMessage::new(&msg.channel, &msg.chat_id, final_response);
+        let outbound = OutboundMessage::new(&msg.channel, &msg.chat_id, &final_response);
         outbound_tx.send(outbound).await?;
 
+        // #3228 (T2): deterministic post-turn evolution trigger. Runs after
+        // the response is on the bus; gated on `evolution.enabled` and
+        // fail-open — it never breaks or blocks the turn.
+        self.maybe_emit_evolution_proposal(&msg, &final_response, &tool_stats)
+            .await;
+
         Ok(())
+    }
+
+    /// Post-turn evolution trigger (#3228, T2): evaluate the turn's
+    /// deterministic signals and, when admitted, invoke the proposer
+    /// subagent under the two-legal-outputs contract (`NOTHING_TO_SAVE` or
+    /// a single `evo.propose` payload). A proposal is appended to the
+    /// workspace audit sink as a serialised [`EngineEvent`].
+    ///
+    /// The proposer is a separate LLM invocation with its own context —
+    /// the in-process equivalent of AutoClaw's spawned subagent; the
+    /// conversation history is not shared with it.
+    ///
+    /// Fail-open like the other agent-memory hooks: every failure mode is
+    /// a `warn` log, never an error surfaced to the turn.
+    async fn maybe_emit_evolution_proposal(
+        &self,
+        msg: &InboundMessage,
+        final_response: &str,
+        stats: &ToolLoopStats,
+    ) {
+        let Some(ref config) = self.evolution_config else {
+            return;
+        };
+
+        let signals = PostTurnSignals {
+            tool_calls: stats.tool_calls,
+            tool_errors: stats.tool_errors,
+            user_text: msg.content.clone(),
+            assistant_text: final_response.to_string(),
+        };
+
+        let hit = {
+            let mut state = self.evo_state.lock().await;
+            evo_trigger::evaluate_post_turn(&signals, config, &mut state)
+        };
+        let Some(hit) = hit else {
+            return;
+        };
+
+        log::info!(
+            "Evolution trigger admitted turn ({}); invoking proposer",
+            hit.evidence
+        );
+
+        let prompt = evo_trigger::build_proposer_prompt(&signals, &hit);
+        let raw = match self
+            .router
+            .text_only(vec![Message::user(prompt)], None)
+            .await
+        {
+            Ok(text) => text,
+            Err(e) => {
+                log::warn!("Evolution proposer invocation failed (non-fatal): {e}");
+                return;
+            }
+        };
+
+        let propose = match evo_trigger::parse_proposer_output(&raw) {
+            Ok(ProposerOutput::NothingToSave) => {
+                log::debug!("Evolution proposer: NOTHING_TO_SAVE");
+                return;
+            }
+            Ok(ProposerOutput::Proposal(p)) => *p,
+            Err(e) => {
+                log::warn!("Evolution proposer output rejected (non-fatal): {e}");
+                return;
+            }
+        };
+
+        // Record the attempt BEFORE the persist so the cooldown bounds
+        // proposer spend even when the JSONL sink fails — otherwise the
+        // cooldown restarts only on success and a persistent I/O error
+        // turns into a proposer retry storm.
+        self.evo_state.lock().await.record_proposal();
+
+        // Run the append on a blocking thread: `OpenOptions::append` plus a
+        // single `write_all` is line-atomic on POSIX for writes under
+        // PIPE_BUF (4KB), and `spawn_blocking` preserves exactly those
+        // std::fs semantics without blocking the async executor.
+        let workspace = self.workspace.clone();
+        let propose_for_write = propose.clone();
+        let persist = tokio::task::spawn_blocking(move || {
+            evo_trigger::append_proposal(&workspace, &propose_for_write)
+        })
+        .await;
+        match persist {
+            Ok(Ok(path)) => {
+                log::info!(
+                    "evo.propose emitted: signature={} sink={}",
+                    propose.signature,
+                    path.display()
+                );
+            }
+            Ok(Err(e)) => log::warn!("Failed to persist evo.propose (non-fatal): {e}"),
+            Err(e) => log::warn!("evo.propose persistence task failed (non-fatal): {e}"),
+        }
     }
 
     /// Write a compression summary back to the agent-memory bridge
@@ -910,13 +1045,17 @@ impl ToolCallingLoop {
     }
 
     /// Run the iterative tool-calling loop with explicit system prompt.
+    ///
+    /// Returns the final response text together with per-turn tool
+    /// statistics consumed by the post-turn evolution trigger (#3228).
     async fn run_tool_loop_with_prompt(
         &self,
         mut messages: Vec<Message>,
         tools: Vec<ToolDefinition>,
         system_prompt: &str,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<(String, ToolLoopStats)> {
         let prompt = system_prompt.to_string();
+        let mut stats = ToolLoopStats::default();
         for iteration in 0..self.config.max_iterations {
             log::debug!("Tool-calling iteration {}", iteration + 1);
 
@@ -929,7 +1068,11 @@ impl ToolCallingLoop {
                 Ok(resp) => resp,
                 Err(e) => {
                     log::warn!("Tool call failed: {}. Falling back to text-only.", e);
-                    return self.router.text_only(messages, Some(prompt.clone())).await;
+                    let text = self
+                        .router
+                        .text_only(messages, Some(prompt.clone()))
+                        .await?;
+                    return Ok((text, stats));
                 }
             };
 
@@ -944,12 +1087,13 @@ impl ToolCallingLoop {
             // Check if there are tool calls
             if response.tool_calls.is_empty() {
                 // No tool calls - return the content
-                return Ok(response.content.unwrap_or_default());
+                return Ok((response.content.unwrap_or_default(), stats));
             }
 
             // Execute each tool call
             for tool_call in &response.tool_calls {
                 log::info!("Executing tool: {}", tool_call.name);
+                stats.tool_calls += 1;
 
                 // Check with execution guard
                 let decision = self.guard.evaluate(&tool_call.name, &tool_call.arguments);
@@ -961,6 +1105,7 @@ impl ToolCallingLoop {
                             format!("Tool blocked: {}", reason)
                         }
                         Err(e) => {
+                            stats.tool_errors += 1;
                             // #3225: failure capture is a loop invariant.
                             self.capture_tool_failure(tool_call, &e).await;
                             format!("Tool execution error: {}", e)
@@ -978,6 +1123,7 @@ impl ToolCallingLoop {
                         match self.tools.execute(tool_call).await {
                             Ok(result) => result,
                             Err(e) => {
+                                stats.tool_errors += 1;
                                 // #3225: failure capture is a loop invariant.
                                 self.capture_tool_failure(tool_call, &e).await;
                                 format!("Tool execution error: {}", e)
@@ -998,10 +1144,13 @@ impl ToolCallingLoop {
 
         // Max iterations reached
         log::warn!("Max iterations ({}) reached", self.config.max_iterations);
-        Ok(format!(
-            "I've reached the maximum number of tool calls ({}). \
-             The task may be too complex. Please try breaking it into smaller steps.",
-            self.config.max_iterations
+        Ok((
+            format!(
+                "I've reached the maximum number of tool calls ({}). \
+                 The task may be too complex. Please try breaking it into smaller steps.",
+                self.config.max_iterations
+            ),
+            stats,
         ))
     }
 

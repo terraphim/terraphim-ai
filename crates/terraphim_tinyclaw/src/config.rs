@@ -90,6 +90,15 @@ pub struct Config {
     /// a rollout server's status endpoint.
     #[serde(default)]
     pub rl: RlConfig,
+
+    /// Post-turn evolution trigger configuration (#3228, T2). **Default:
+    /// disabled.** When `evolution.enabled = true`, each completed turn is
+    /// evaluated by deterministic heuristics (ported from AutoClaw's
+    /// `evaluatePostTurn`) and admitted turns invoke a proposer subagent
+    /// whose only legal outputs are `NOTHING_TO_SAVE` or an `evo.propose`
+    /// payload (TACP spec 5.1).
+    #[serde(default)]
+    pub evolution: crate::agent::evo_trigger::EvolutionConfig,
 }
 
 impl Config {
