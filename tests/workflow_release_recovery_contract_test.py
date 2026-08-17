@@ -121,6 +121,11 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertIn("^v[0-9]+\\.[0-9]+\\.[0-9]+$", resolver)
         self.assertIn("^[0-9a-f]{40}$", resolver)
 
+    def test_resolver_has_read_only_contents_permission(self) -> None:
+        resolver = job_block(self.release_text, "resolve-release-source")
+        self.assertIn("permissions:", resolver)
+        self.assertIn("contents: read", resolver)
+
     def test_resolver_runs_before_source_dependent_jobs(self) -> None:
         self.assertIn("resolve-release-source", top_level_mapping_keys(self.release_text, "jobs"))
 
@@ -203,6 +208,7 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         standard_index = resolver.index('VERSION="${RELEASE_TAG#v}"')
         self.assertLess(component_index, standard_index)
         self.assertIn('VERSION="${RELEASE_TAG##*-v}"', resolver)
+        self.assertIn("^([A-Za-z0-9_.-]+-)?v[0-9]+\\.[0-9]+\\.[0-9]+$", resolver)
 
     def test_no_tag_moving_commands_exist(self) -> None:
         combined = f"{self.release_text}\n{self.docker_text}"
@@ -235,17 +241,34 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertIn("cross --version || true", install_cross)
         self.assertNotIn("cross --version\n            exit 0", install_cross)
 
-    def test_docker_reusable_workflow_checks_out_source_ref(self) -> None:
+    def test_docker_reusable_workflow_separates_source_and_build_recipe_refs(self) -> None:
         source_ref = input_block(self.docker_text, "source_ref")
-        self.assertIn("required: true", source_ref)
-        self.assertIn("type: string", source_ref)
+        recipe_ref = input_block(self.docker_text, "build_recipe_ref")
+        for block in [source_ref, recipe_ref]:
+            self.assertIn("required: true", block)
+            self.assertIn("type: string", block)
 
-        for job_name in ["build-frontend", "build-and-push"]:
-            checkouts = checkout_blocks(job_block(self.docker_text, job_name))
-            self.assertTrue(checkouts, job_name)
-            for checkout in checkouts:
-                self.assertIn("ref: ${{ inputs.source_ref }}", checkout)
-                self.assertIn("fetch-depth: 1", checkout)
+        frontend_checkouts = checkout_blocks(job_block(self.docker_text, "build-frontend"))
+        self.assertEqual(len(frontend_checkouts), 1)
+        self.assertIn("ref: ${{ inputs.source_ref }}", frontend_checkouts[0])
+
+        build = job_block(self.docker_text, "build-and-push")
+        build_checkouts = checkout_blocks(build)
+        self.assertEqual(len(build_checkouts), 2)
+        self.assertIn("ref: ${{ inputs.source_ref }}", build_checkouts[0])
+        self.assertIn("ref: ${{ inputs.build_recipe_ref }}", build_checkouts[1])
+        self.assertIn("sparse-checkout: docker/Dockerfile.multiarch", build_checkouts[1])
+        overlay = step_run_block(build, "Overlay reviewed Docker build recipe")
+        self.assertIn(
+            "cp .release-recipe/docker/Dockerfile.multiarch docker/Dockerfile.multiarch",
+            overlay,
+        )
+
+        caller = job_block(self.release_text, "build-docker")
+        self.assertIn(
+            "build_recipe_ref: ${{ needs.resolve-release-source.outputs.workflow_ref }}",
+            caller,
+        )
 
     def test_docker_reusable_workflow_uses_required_resolver_inputs_for_tags(self) -> None:
         for input_name in ["tag", "version", "version_series", "publish_latest"]:
@@ -255,20 +278,58 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         for tag_expr in [
             "type=raw,value=${{ inputs.tag }}-ubuntu${{ matrix.ubuntu-version }}",
             "type=raw,value=${{ inputs.version }}-ubuntu${{ matrix.ubuntu-version }}",
-            "type=raw,value=${{ inputs.version_series }}-ubuntu${{ matrix.ubuntu-version }}",
+            "type=raw,value=${{ inputs.version_series }}-ubuntu${{ matrix.ubuntu-version }},enable=${{ inputs.publish_latest }}",
             "type=raw,value=latest-ubuntu${{ matrix.ubuntu-version }},enable=${{ inputs.publish_latest }}",
         ]:
             self.assertEqual(self.docker_text.count(tag_expr), 2, tag_expr)
 
         self.assertNotIn("type=semver", self.docker_text)
         self.assertNotIn("github.ref", self.docker_text)
-        self.assertIn("if: inputs.push && !inputs.test_run && inputs.publish_latest", self.docker_text)
+        self.assertIn("if: inputs.push && !inputs.test_run", self.docker_text)
 
         caller = job_block(self.release_text, "build-docker")
         self.assertIn("tag: ${{ needs.resolve-release-source.outputs.release_tag }}", caller)
         self.assertIn("version: ${{ needs.resolve-release-source.outputs.version }}", caller)
         self.assertIn("version_series: ${{ needs.resolve-release-source.outputs.version_series }}", caller)
         self.assertIn("publish_latest: ${{ github.event_name == 'push' && needs.resolve-release-source.outputs.is_standard_release == 'true' && !inputs.test_run }}", caller)
+
+    def test_docker_reusable_job_is_standard_release_only(self) -> None:
+        caller = job_block(self.release_text, "build-docker")
+        self.assertIn("needs.verify-versions.result == 'success'", caller)
+        self.assertIn(
+            "needs.resolve-release-source.outputs.is_standard_release == 'true'",
+            caller,
+        )
+        self.assertIn("push: ${{ !inputs.test_run }}", caller)
+
+    def test_docker_recovery_publishes_immutable_manifests_without_moving_tags(self) -> None:
+        manifests = job_block(self.docker_text, "publish-release-manifests")
+        ghcr = step_run_block(manifests, "Publish release manifests for GHCR")
+        dockerhub = step_run_block(manifests, "Publish release manifests for DockerHub")
+
+        self.assertIn("if: inputs.push && !inputs.test_run", manifests)
+        self.assertNotIn("if: inputs.push && !inputs.test_run && inputs.publish_latest", manifests)
+        self.assertIn("--tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}", ghcr)
+        self.assertIn("${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}-ubuntu22.04", ghcr)
+        self.assertIn("--tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}", ghcr)
+        self.assertIn("${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}-ubuntu22.04", ghcr)
+        self.assertIn("--tag ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.tag }}", dockerhub)
+        self.assertIn("--tag ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version }}", dockerhub)
+
+    def test_docker_moving_manifest_tags_are_publish_latest_gated(self) -> None:
+        manifests = job_block(self.docker_text, "publish-release-manifests")
+        ghcr = step_run_block(manifests, "Publish release manifests for GHCR")
+        dockerhub = step_run_block(manifests, "Publish release manifests for DockerHub")
+
+        for block in [ghcr, dockerhub]:
+            moving_gate = block.index('if [[ "${{ inputs.publish_latest }}" == "true" ]]; then')
+            self.assertLess(moving_gate, block.index(":${{ inputs.version_series }}"))
+            self.assertLess(moving_gate, block.index(":latest"))
+
+        self.assertIn("${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version_series }}-ubuntu22.04", ghcr)
+        self.assertIn("${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-ubuntu22.04", ghcr)
+        self.assertIn("${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version_series }}-ubuntu22.04", dockerhub)
+        self.assertIn("${{ env.DOCKERHUB_IMAGE }}:latest-ubuntu22.04", dockerhub)
 
     def test_docker_summary_passes_source_ref_through_env(self) -> None:
         summary = step_run_block(
@@ -323,13 +384,14 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             self.assertIn("needs.resolve-release-source.outputs.is_standard_release == 'true'", job, job_name)
 
         self.assertIn("push: ${{ !inputs.test_run }}", job_block(self.release_text, "build-docker"))
-        self.assertIn("if: inputs.push && !inputs.test_run && inputs.publish_latest", self.docker_text)
+        self.assertIn("if: inputs.push && !inputs.test_run", self.docker_text)
 
     def test_push_release_creation_is_separate_from_manual_recovery_upload(self) -> None:
         create_release = job_block(self.release_text, "create-release")
         recovery = job_block(self.release_text, "upload-recovered-release-assets")
 
         self.assertIn("github.event_name == 'push'", create_release)
+        self.assertNotIn("needs.resolve-release-source.outputs.is_standard_release == 'true'", create_release)
         self.assertIn("make_latest: true", create_release)
         self.assertIn("body: |", create_release)
         self.assertNotIn("gh release upload", create_release)
