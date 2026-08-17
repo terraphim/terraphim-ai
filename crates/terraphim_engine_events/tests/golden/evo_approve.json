@@ -1,0 +1,8 @@
+{
+  "type": "evo.approve",
+  "signature": "tools-use-rg-for-search",
+  "target_kind": "tool",
+  "target_ref": "config/tools.toml",
+  "trust_level": "L3",
+  "disposition": "allow_always"
+}

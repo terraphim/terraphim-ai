@@ -1,0 +1,9 @@
+{
+  "type": "evo.applied",
+  "signature": "tools-use-rg-for-search",
+  "target_kind": "tool",
+  "target_ref": "config/tools.toml",
+  "trust_level": "L3",
+  "verify": "rg --version && grep -q 'preferred = \"rg\"' config/tools.toml",
+  "audit_ref": "evolution-log/2026-08-16.md#tools-use-rg-for-search"
+}
