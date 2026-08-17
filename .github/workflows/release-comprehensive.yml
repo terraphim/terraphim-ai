@@ -10,6 +10,14 @@ on:
       - 'terraphim_grep-v*'
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: 'Release tag to recover, for example v1.21.3'
+        required: true
+        type: string
+      expected_source_sha:
+        description: 'Expected peeled source commit SHA for manual recovery'
+        required: true
+        type: string
       test_run:
         description: 'Test run without creating release'
         required: false
@@ -24,45 +32,115 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  verify-versions:
-    name: Verify version consistency
+  resolve-release-source:
+    name: Resolve immutable release source
     runs-on: ubuntu-22.04
     outputs:
-      version: ${{ steps.extract.outputs.version }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      source_sha: ${{ steps.resolve.outputs.source_sha }}
+      source_ref: ${{ steps.resolve.outputs.source_ref }}
+      workflow_ref: ${{ steps.resolve.outputs.workflow_ref }}
+      is_standard_release: ${{ steps.resolve.outputs.is_standard_release }}
+    steps:
+      - name: Resolve and validate release source
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF_NAME: ${{ github.ref_name }}
+          MANUAL_RELEASE_TAG: ${{ inputs.release_tag || '' }}
+          MANUAL_EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha || '' }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            RELEASE_TAG="$MANUAL_RELEASE_TAG"
+            EXPECTED_SOURCE_SHA="$MANUAL_EXPECTED_SOURCE_SHA"
+
+            if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Invalid release_tag '$RELEASE_TAG' (expected vX.Y.Z)"
+              exit 1
+            fi
+            if [[ ! "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Invalid expected_source_sha '$EXPECTED_SOURCE_SHA' (expected 40 lowercase hex characters)"
+              exit 1
+            fi
+          else
+            RELEASE_TAG="$EVENT_REF_NAME"
+            EXPECTED_SOURCE_SHA=""
+
+            if [[ ! "$RELEASE_TAG" =~ ^([A-Za-z0-9_.-]+-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Invalid tag '$RELEASE_TAG' (expected vX.Y.Z or component-vX.Y.Z)"
+              exit 1
+            fi
+          fi
+
+          echo "Resolving release tag: $RELEASE_TAG"
+          OBJECT_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
+          OBJECT_SHA="$(jq -r '.object.sha' <<<"$OBJECT_JSON")"
+          OBJECT_TYPE="$(jq -r '.object.type' <<<"$OBJECT_JSON")"
+
+          while [[ "$OBJECT_TYPE" == "tag" ]]; do
+            TAG_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${OBJECT_SHA}")"
+            OBJECT_SHA="$(jq -r '.object.sha' <<<"$TAG_JSON")"
+            OBJECT_TYPE="$(jq -r '.object.type' <<<"$TAG_JSON")"
+          done
+
+          if [[ "$OBJECT_TYPE" != "commit" ]]; then
+            echo "::error::Tag '$RELEASE_TAG' peeled to unsupported object type '$OBJECT_TYPE'"
+            exit 1
+          fi
+
+          SOURCE_SHA="$OBJECT_SHA"
+          if [[ -n "$EXPECTED_SOURCE_SHA" && "$SOURCE_SHA" != "$EXPECTED_SOURCE_SHA" ]]; then
+            echo "::error::Resolved source SHA '$SOURCE_SHA' does not match expected_source_sha '$EXPECTED_SOURCE_SHA'"
+            exit 1
+          fi
+
+          git init source-check
+          git -C source-check remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -C source-check fetch --no-tags --depth=1 origin "+refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          GIT_SOURCE_SHA="$(git -C source-check rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          if [[ "$GIT_SOURCE_SHA" != "$SOURCE_SHA" ]]; then
+            echo "::error::Git peeled source SHA '$GIT_SOURCE_SHA' does not match GitHub API source SHA '$SOURCE_SHA'"
+            exit 1
+          fi
+
+          if [[ "$RELEASE_TAG" == v* ]]; then
+            VERSION="${RELEASE_TAG#v}"
+            IS_STANDARD_RELEASE="true"
+          else
+            VERSION="${RELEASE_TAG##*-v}"
+            IS_STANDARD_RELEASE="false"
+          fi
+
+          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "source_sha=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
+          echo "source_ref=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
+          echo "workflow_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
+          echo "is_standard_release=${IS_STANDARD_RELEASE}" >> "$GITHUB_OUTPUT"
+
+  verify-versions:
+    name: Verify version consistency
+    needs: resolve-release-source
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ needs.resolve-release-source.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Extract version from tag
-        id: extract
-        run: |
-          # Get the tag name
-          TAG="${{ github.ref_name }}"
-          echo "Tag: $TAG"
-
-          # Extract version (strip v prefix and any component prefix)
-          if [[ "$TAG" == *"-v"* ]]; then
-            # Component-specific tag like terraphim_agent-v1.5.2
-            VERSION="${TAG##*-v}"
-          elif [[ "$TAG" == v* ]]; then
-            # Standard version tag like v1.5.2
-            VERSION="${TAG#v}"
-          else
-            echo "::error::Invalid tag format: $TAG (expected v* or component-v*)"
-            exit 1
-          fi
-
-          echo "Extracted version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          # Also set as env var for fallback
-          echo "VERSION_FALLBACK=$VERSION" >> $GITHUB_ENV
-
       - name: Verify Cargo.toml versions match tag
         env:
-          EXPECTED_VERSION: ${{ steps.extract.outputs.version }}
+          EXPECTED_VERSION: ${{ needs.resolve-release-source.outputs.version }}
         run: |
           echo "Expected version: $EXPECTED_VERSION"
 
@@ -96,7 +174,7 @@ jobs:
 
   build-binaries:
     name: Build binaries for ${{ matrix.target }}
-    needs: verify-versions
+    needs: [resolve-release-source, verify-versions]
     # Only build if version verification passed
     if: needs.verify-versions.result == 'success'
     strategy:
@@ -158,11 +236,30 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Sanitize unavailable Rust wrappers
+        if: contains(matrix.os, 'self-hosted') && runner.os == 'Linux'
+        shell: bash
+        run: |
+          for var in RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER; do
+            value="${!var:-}"
+            if [[ -n "$value" ]]; then
+              executable="${value%% *}"
+              if ! command -v "$executable" >/dev/null 2>&1 && [[ ! -x "$executable" ]]; then
+                echo "unset $var because configured executable '$executable' is unavailable"
+                unset "$var"
+                echo "$var=" >> "$GITHUB_ENV"
+              fi
+            fi
+          done
 
       - name: Install zig (required by zlob dependency)
         if: contains(matrix.target, 'apple-darwin') || contains(matrix.target, 'windows')
@@ -184,7 +281,7 @@ jobs:
         if: matrix.use_cross
         run: |
           if command -v cross &>/dev/null; then
-            cross --version
+            cross --version || true
             exit 0
           fi
           # Self-hosted runners may alias `cargo` via rustup; use stable explicitly.
@@ -423,13 +520,16 @@ jobs:
 
   sign-and-notarize-macos:
     name: Sign and notarize macOS binaries
-    needs: create-universal-macos
+    needs: [resolve-release-source, create-universal-macos]
     # Run if universal binary creation completed (even if other jobs failed)
     if: always() && needs.create-universal-macos.result == 'success'
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Download universal macOS binaries
         uses: actions/download-artifact@v4
@@ -506,14 +606,35 @@ jobs:
 
   build-debian-packages:
     name: Build Debian packages
+    needs: [resolve-release-source, verify-versions]
+    if: needs.verify-versions.result == 'success'
     continue-on-error: true
     runs-on: [self-hosted, bigbox]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Sanitize unavailable Rust wrappers
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          for var in RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER; do
+            value="${!var:-}"
+            if [[ -n "$value" ]]; then
+              executable="${value%% *}"
+              if ! command -v "$executable" >/dev/null 2>&1 && [[ ! -x "$executable" ]]; then
+                echo "unset $var because configured executable '$executable' is unavailable"
+                unset "$var"
+                echo "$var=" >> "$GITHUB_ENV"
+              fi
+            fi
+          done
 
       - name: Install cargo-deb
         run: |
@@ -566,9 +687,9 @@ jobs:
 
   trigger-desktop-release:
     name: Trigger Desktop Release
-    needs: verify-versions
+    needs: [resolve-release-source, verify-versions]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.verify-versions.result == 'success'
     steps:
       - name: Trigger terraphim-ai-desktop release workflow
         uses: actions/github-script@v9
@@ -576,7 +697,7 @@ jobs:
         with:
           github-token: ${{ secrets.TERRAPHIM_ORG_GITHUB_TOKEN || secrets.DESKTOP_REPO_TOKEN }}
           script: |
-            const tag = context.ref.replace('refs/tags/', '');
+            const tag = '${{ needs.resolve-release-source.outputs.release_tag }}';
             console.log(`Triggering desktop release for tag: ${tag}`);
             
             await github.rest.actions.createWorkflowDispatch({
@@ -590,9 +711,9 @@ jobs:
 
   trigger-clients-release:
     name: Trigger Client Binary Release
-    needs: verify-versions
+    needs: [resolve-release-source, verify-versions]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.verify-versions.result == 'success'
     continue-on-error: true
     permissions:
       actions: write
@@ -605,8 +726,8 @@ jobs:
           # dispatch workflows in other repos regardless of job permissions.
           github-token: ${{ secrets.TERRAPHIM_ORG_GITHUB_TOKEN || secrets.DESKTOP_REPO_TOKEN || secrets.CLIENTS_REPO_TOKEN }}
           script: |
-            const version = context.ref.replace('refs/tags/v', '');
-            const releaseTag = context.ref.replace('refs/tags/', '');
+            const version = '${{ needs.resolve-release-source.outputs.version }}';
+            const releaseTag = '${{ needs.resolve-release-source.outputs.release_tag }}';
             console.log(`Triggering client binaries for ${releaseTag} (version ${version})`);
 
             await github.rest.actions.createWorkflowDispatch({
@@ -625,25 +746,31 @@ jobs:
 
   build-docker:
     name: Build and push Docker images
+    needs: [resolve-release-source, verify-versions]
+    if: needs.verify-versions.result == 'success'
     uses: ./.github/workflows/docker-multiarch.yml
     with:
       platforms: linux/amd64,linux/arm64
       ubuntu-versions: '["20.04", "22.04"]'
       push: ${{ !inputs.test_run }}
-      tag: ${{ github.ref_name }}
+      tag: ${{ needs.resolve-release-source.outputs.release_tag }}
+      source_ref: ${{ needs.resolve-release-source.outputs.source_sha }}
       dockerhub-username: ${{ vars.DOCKERHUB_USERNAME || '' }}
       test_run: ${{ inputs.test_run || false }}
     secrets: inherit  # pragma: allowlist secret
 
   verify-release-assets:
     name: Verify release assets
-    needs: [build-binaries, sign-and-notarize-macos, build-debian-packages]
+    needs: [resolve-release-source, verify-versions, build-binaries, sign-and-notarize-macos, build-debian-packages]
     # Run even if some builds failed, but verify critical assets exist
     if: always() && needs.sign-and-notarize-macos.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Download all binary artifacts
         uses: actions/download-artifact@v4
@@ -704,7 +831,7 @@ jobs:
 
   create-release:
     name: Create GitHub release
-    needs: [verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos]
+    needs: [resolve-release-source, verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos]
     if: >-
       always() &&
       !cancelled() &&
@@ -717,6 +844,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Download binary artifacts
         uses: actions/download-artifact@v4
@@ -778,32 +908,32 @@ jobs:
 
       - name: Extract release notes from tag
         id: release-notes
+        env:
+          RELEASE_TAG: ${{ needs.resolve-release-source.outputs.release_tag }}
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG=${GITHUB_REF#refs/tags/}
-            echo "Creating release for tag: $TAG"
+          TAG="$RELEASE_TAG"
+          echo "Creating release for tag: $TAG"
 
-            # Extract component and version from tag
-            if [[ "$TAG" == *"-v"* ]]; then
-              COMPONENT=${TAG%-v*}
-              VERSION=${TAG##*-v}
-              echo "Component: $COMPONENT, Version: $VERSION"
-              TITLE="$COMPONENT v$VERSION"
-            else
-              TITLE="$TAG"
-            fi
-
-            echo "title=$TITLE" >> $GITHUB_OUTPUT
+          # Extract component and version from tag
+          if [[ "$TAG" == *"-v"* ]]; then
+            COMPONENT=${TAG%-v*}
+            VERSION=${TAG##*-v}
+            echo "Component: $COMPONENT, Version: $VERSION"
+            TITLE="$COMPONENT v$VERSION"
+          else
+            TITLE="$TAG"
           fi
+
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.release-notes.outputs.title }}
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ needs.resolve-release-source.outputs.release_tag }}
           draft: false
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-          overwrite: true
+          prerelease: ${{ contains(needs.resolve-release-source.outputs.release_tag, 'alpha') || contains(needs.resolve-release-source.outputs.release_tag, 'beta') || contains(needs.resolve-release-source.outputs.release_tag, 'rc') }}
+          overwrite_files: true
           make_latest: true
           files: release-assets/*
           body: |
@@ -858,15 +988,16 @@ jobs:
 
   wait-for-client-binaries:
     name: Wait for client binaries on release
-    needs: [create-release, trigger-clients-release]
+    needs: [resolve-release-source, create-release, trigger-clients-release]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && needs.create-release.result == 'success'
+    if: needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.create-release.result == 'success'
     steps:
       - name: Wait until terraphim-clients uploads client assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve-release-source.outputs.release_tag }}
         run: |
-          TAG="${{ github.ref_name }}"
+          TAG="$RELEASE_TAG"
           # Require at least one asset matching each client binary family.
           REQUIRED_PATTERNS=('terraphim-agent' 'terraphim-cli' 'terraphim-grep')
           echo "Waiting for client binaries on release $TAG ..."
@@ -891,14 +1022,15 @@ jobs:
 
   update-homebrew:
     name: Update Homebrew formulas
-    needs: wait-for-client-binaries
+    needs: [resolve-release-source, wait-for-client-binaries]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.wait-for-client-binaries.result == 'success'
     steps:
       - name: Extract version from tag
         id: version
+        env:
+          VERSION: ${{ needs.resolve-release-source.outputs.version }}
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Updating Homebrew formulas for version: $VERSION"
 
@@ -1101,5 +1233,3 @@ jobs:
             echo "⚠️  homebrew-tap-token not found in 1Password - skipping push"
             echo "Ensure token exists at: op://TerraphimPlatform/homebrew-tap-token/token"
           fi
-
-

@@ -23,6 +23,10 @@ on:
         required: false
         type: string
         default: 'latest'
+      source_ref:
+        description: 'Immutable source ref or SHA to check out for Docker builds'
+        required: true
+        type: string
       dockerhub-username:
         description: 'Docker Hub username'
         required: false
@@ -56,6 +60,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref }}
+          fetch-depth: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -85,12 +92,15 @@ jobs:
       matrix:
         ubuntu-version: ${{ fromJSON(inputs.ubuntu-versions) }}
     outputs:
-      ghcr-image: ${{ steps.meta.outputs.tags }}
+      ghcr-image: ${{ steps.meta-ghcr.outputs.tags }}
       dockerhub-enabled: ${{ steps.dockerhub-check.outputs.enabled }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref }}
+          fetch-depth: 1
 
       - name: Download frontend artifacts
         uses: actions/download-artifact@v4
@@ -222,6 +232,11 @@ jobs:
           echo "::add-mask::${TOKEN}"
           printf '%s' "${TOKEN}" > "${RUNNER_TEMP}/cargo_registry_token"
           echo "token_file=${RUNNER_TEMP}/cargo_registry_token" >> "${GITHUB_OUTPUT}"
+
+      - name: Document transient BuildKit EOF recovery
+        run: |
+          echo "Known transient BuildKit EOF: rerun the failed Docker job manually after verifying the source_ref remains '${{ inputs.source_ref }}'." >> "$GITHUB_STEP_SUMMARY"
+          echo "No automatic reusable-workflow retry is configured for this recovery path." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build and push to GHCR
         uses: docker/build-push-action@v7
