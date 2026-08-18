@@ -475,11 +475,12 @@ async fn test_vm_reuse_after_completion() {
     assert_eq!(vms_after_1.len(), 1, "Should have 1 VM after workflow 1");
     let vm_id_1 = vms_after_1[0].clone();
 
-    // Release the session
-    session_manager
-        .release_session(&result_1.session_id)
-        .await
-        .expect("Should release session 1");
+    // The executor (`executor.rs:execute_workflow`, line 305) already
+    // auto-releases the session after every workflow completes. The
+    // backwards-incompatible lifecycle change landed in commit 979e8605e
+    // (PR #3113) to fix a Firecracker microVM leak. We therefore need
+    // neither to call `release_session` here nor to track the release
+    // count as "per-workflow" — it's one release per workflow call.
 
     let release_count_after_1 = vm_provider.get_release_count().await;
     assert_eq!(
@@ -516,9 +517,14 @@ async fn test_vm_reuse_after_completion() {
     let allocated_vms = vm_provider.get_allocated_vms().await;
     assert_eq!(allocated_vms.len(), 2, "Should have 2 VMs in history");
 
-    // Verify first VM was released
+    // Verify both VMs were released (one per workflow, auto-released
+    // by the executor in `executor.rs:execute_workflow` line 305).
     let released_vms = vm_provider.get_released_vms().await;
-    assert_eq!(released_vms.len(), 1, "Should have 1 released VM");
+    assert_eq!(
+        released_vms.len(),
+        2,
+        "Should have 2 released VMs (one per workflow)"
+    );
 
     log::info!("✅ TEST 3 PASSED: VMs properly released and new allocations work correctly");
 }

@@ -9,6 +9,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_tinyclaw::bus::MessageBus;
+use terraphim_tinyclaw::commands::CommandRegistry;
 use terraphim_tinyclaw::mcp::server::{TinyClawMcpServer, serve_mcp_stdio};
 use terraphim_tinyclaw::session::SessionManager;
 use tokio::sync::Mutex;
@@ -16,7 +17,8 @@ use tokio::sync::Mutex;
 fn make_server() -> TinyClawMcpServer {
     let sessions = Arc::new(Mutex::new(SessionManager::new(PathBuf::from("/tmp"))));
     let bus = Arc::new(MessageBus::new());
-    TinyClawMcpServer::new(sessions, bus)
+    let commands = Arc::new(Mutex::new(CommandRegistry::new()));
+    TinyClawMcpServer::with_commands(sessions, bus, commands, PathBuf::from("/tmp"))
 }
 
 /// Extract the text content from a `CallToolResult` as a `String`.
@@ -76,6 +78,7 @@ async fn contract_tool_list_has_all_10_tools() {
         terraphim_tinyclaw::mcp::tools::PermissionsRespondParams {
             request_id: "x".into(),
             approved: true,
+            disposition: None,
         },
     );
     let _ = server.permissions_respond(params).await;
@@ -320,6 +323,7 @@ async fn contract_permissions_respond_handles_unknown_request() {
         terraphim_tinyclaw::mcp::tools::PermissionsRespondParams {
             request_id: "unknown-req".into(),
             approved: true,
+            disposition: None,
         },
     );
     let result = server.permissions_respond(params).await.unwrap();
@@ -379,5 +383,14 @@ fn contract_serve_mcp_stdio_signature_exists() {
     // Hermes has `run_mcp_server(verbose: bool = False) -> None` as the
     // public entry point. Our equivalent is `serve_mcp_stdio`. Verify the
     // signature is callable (compile-time check via the function pointer).
-    let _: fn(Arc<Mutex<SessionManager>>, Arc<MessageBus>) -> _ = serve_mcp_stdio;
+    // P1#4 fix: serve_mcp_stdio now requires the shared commands registry + workspace.
+    // (Suppress type_complexity: a fn-pointer signature is exactly what
+    // this test wants to pin, not a refactor target.)
+    #[allow(clippy::type_complexity)]
+    let _: fn(
+        Arc<Mutex<SessionManager>>,
+        Arc<MessageBus>,
+        Arc<Mutex<terraphim_tinyclaw::commands::CommandRegistry>>,
+        PathBuf,
+    ) -> _ = serve_mcp_stdio;
 }

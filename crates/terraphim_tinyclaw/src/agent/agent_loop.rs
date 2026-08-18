@@ -16,6 +16,7 @@ use crate::session::{ChatMessage, MessageRole, SessionManager};
 use crate::tools::agent_memory::{
     AgentMemoryConfig, capture_failed_command, run_agent, should_ignore_command,
 };
+use crate::tools::approval;
 use crate::tools::{ToolError, ToolRegistry};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -474,6 +475,23 @@ pub struct ToolCallingLoop {
 }
 
 impl ToolCallingLoop {
+    /// Borrow the shared `Arc<Mutex<CommandRegistry>>` so an in-process
+    /// MCP server (gated on `serve_mcp_stdio(sessions, bus, commands, workspace)`)
+    /// can apply evolution-authored behaviour commands to the same registry
+    /// the agent loop executes from. Used by option-A (run MCP server
+    /// in-process alongside the agent loop) to fix P1#4 (split-brain
+    /// production wiring).
+    pub fn commands_arc(&self) -> Arc<Mutex<CommandRegistry>> {
+        Arc::clone(&self.commands)
+    }
+
+    /// Borrow the configured workspace directory. The evolution audit log
+    /// (`audit.jsonl`) and the pending evolution queue (`pending.jsonl`)
+    /// live under this directory.
+    pub fn workspace(&self) -> &std::path::Path {
+        &self.workspace
+    }
+
     /// Create a new tool-calling loop.
     ///
     /// The session manager is wrapped in a [`JsonlBackend`] so the loop
@@ -925,6 +943,19 @@ impl ToolCallingLoop {
                     propose.signature,
                     path.display()
                 );
+                let request_id = format!("evo:{}", propose.signature);
+                // Persist the pending evolution request to the cross-process
+                // JSONL queue under the workspace. The MCP server (separate
+                // OS process) reads from this file. We deliberately do NOT
+                // also self-mint an `EvolutionApprove` here — the
+                // `permissions_respond` handler constructs the approval at
+                // decision time from the persisted proposal + the operator's
+                // disposition. (#3229 P1#2, r8–r9.)
+                if let Err(e) =
+                    approval::submit_pending_evolution(&self.workspace, &request_id, &propose)
+                {
+                    log::warn!("failed to persist pending evolution {}: {}", request_id, e);
+                }
             }
             Ok(Err(e)) => log::warn!("Failed to persist evo.propose (non-fatal): {e}"),
             Err(e) => log::warn!("evo.propose persistence task failed (non-fatal): {e}"),

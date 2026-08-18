@@ -398,6 +398,12 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     // Create hybrid LLM router
     let router = build_router(&config)?;
 
+    // Clone for the MCP server (in-process, alongside the agent loop)
+    // BEFORE select_session_backend consumes the original. Option A
+    // (P1#4 fix) shares the same in-memory sessions Arc between the
+    // agent loop and the MCP server.
+    let sessions_for_mcp = sessions.clone();
+
     // Create agent loop
     let backend = select_session_backend(&config, sessions).await;
     let agent = ToolCallingLoop::with_backend(
@@ -423,11 +429,44 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     let bus_clone = bus.clone();
     channel_manager.start_all(bus_clone).await?;
 
+    // **P1#4 fix — option A**: capture the agent's shared state BEFORE
+    // moving it into the spawn below, so we can pass the SAME registry
+    // and workspace to the in-process MCP server.
+    let agent_commands = agent.commands_arc();
+    let agent_workspace = agent.workspace().to_path_buf();
+
     // Start agent loop
     let bus_clone = bus.clone();
     tokio::spawn(async move {
         if let Err(e) = agent.run(bus_clone).await {
             log::error!("Agent loop error: {}", e);
+        }
+    });
+
+    // Run the MCP server in-process alongside the agent loop, sharing the
+    // agent's `Arc<Mutex<CommandRegistry>>` and workspace. The MCP server
+    // runs on stdio (the binary's stdin/stdout); an attached MCP client
+    // sees the agent's authoritative registry and the same `audit.jsonl`
+    // / `pending.jsonl` directory.
+    //
+    // This replaces the previous topology where `Commands::Mcp` spawned a
+    // separate process with a private `CommandRegistry::with_defaults()`
+    // and `std::env::current_dir()` as the workspace — the r9 review
+    // surfaced that this split brain made evolution apply a dead end
+    // in production. With option A both processes share an in-memory
+    // registry (the MCP server is in the same OS process as the agent
+    // loop), and the workspace is the configured one.
+    let bus_for_mcp = bus.clone();
+    let mcp_handle = tokio::spawn(async move {
+        if let Err(e) = terraphim_tinyclaw::mcp::server::serve_mcp_stdio(
+            sessions_for_mcp,
+            bus_for_mcp,
+            agent_commands,
+            agent_workspace,
+        )
+        .await
+        {
+            log::error!("MCP server error: {}", e);
         }
     });
 
@@ -453,10 +492,22 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
         }
     }
 
+    // P1#4: stop the in-process MCP server.
+    mcp_handle.abort();
+
     Ok(())
 }
 
-/// Run in MCP server mode (9-tool channel bridge over stdio).
+/// Run in MCP-server-only mode (9-tool channel bridge over stdio).
+///
+/// **P1#4 fix**: this mode does *not* share a registry with the agent
+/// loop (by definition — there is no agent loop running). Evolution
+/// apply (`permissions_respond` with disposition `AllowOnce`) is
+/// therefore unsupported in this topology: behaviour commands are
+/// applied via `write_validated_command_section`, which would write to
+/// a registry the agent never reads. For the production wiring, use
+/// `run_gateway_mode` (option A: MCP server in-process alongside the
+/// agent loop) so the registry is shared.
 async fn run_mcp_mode(config: Config, serve: bool) -> anyhow::Result<()> {
     if !serve {
         anyhow::bail!("MCP client mode is not yet implemented; use --serve");
@@ -468,8 +519,15 @@ async fn run_mcp_mode(config: Config, serve: bool) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    println!("TinyClaw MCP Server");
-    println!("===================");
+    println!("TinyClaw MCP Server (standalone, no agent loop — evolution apply is unsupported)");
+    println!("================================================================");
+
+    log::warn!(
+        "run_mcp_mode now constructs an empty CommandRegistry locally; this mode is \
+         retained for forward-compatibility with separate MCP deployments. For the \
+         P1#4-fixed wiring (in-process MCP alongside agent loop), use \
+         run_gateway_mode instead."
+    );
 
     // Create message bus
     let bus = Arc::new(MessageBus::new());
@@ -478,8 +536,15 @@ async fn run_mcp_mode(config: Config, serve: bool) -> anyhow::Result<()> {
     let sessions_dir = config.agent.workspace.join("sessions");
     let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
 
-    log::info!("Starting MCP server on stdio");
-    terraphim_tinyclaw::mcp::server::serve_mcp_stdio(sessions, bus).await?;
+    // Standalone: empty registry + workspace. The agent loop is not running,
+    // so evolution apply has no shared state to consume.
+    let commands = Arc::new(tokio::sync::Mutex::new(
+        terraphim_tinyclaw::commands::CommandRegistry::new(),
+    ));
+    let workspace = config.agent.workspace.clone();
+
+    log::info!("Starting MCP server on stdio (standalone)");
+    terraphim_tinyclaw::mcp::server::serve_mcp_stdio(sessions, bus, commands, workspace).await?;
 
     Ok(())
 }

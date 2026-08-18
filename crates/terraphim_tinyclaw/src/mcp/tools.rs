@@ -85,13 +85,62 @@ pub struct ApprovalRequest {
     pub requested_at: String,
 }
 
+/// The lifetime of an approval decision. Mirrors
+/// `terraphim_engine_events::Disposition` so the operator can express the
+/// full range of dispositions, not just `AllowOnce`. The default
+/// (`ApproveOnce`) preserves the historical boolean contract for callers
+/// that still send `approved: true` without specifying a disposition.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ApprovalDispositionParam {
+    /// Allow this proposal once; the pending request is consumed.
+    #[default]
+    ApproveOnce,
+    /// Allow this proposal and all future proposals with the same signature.
+    ApproveAlways,
+    /// Reject this proposal; do not consume the pending request (requeue).
+    Reject,
+    /// Reject this proposal and all future proposals with the same signature.
+    RejectAlways,
+}
+
+impl ApprovalDispositionParam {
+    /// Convert to the engine-event `Disposition` used by the audit log.
+    pub fn to_engine_disposition(self) -> terraphim_engine_events::Disposition {
+        use terraphim_engine_events::Disposition;
+        match self {
+            ApprovalDispositionParam::ApproveOnce => Disposition::AllowOnce,
+            ApprovalDispositionParam::ApproveAlways => Disposition::AllowAlways,
+            ApprovalDispositionParam::Reject => Disposition::Reject,
+            ApprovalDispositionParam::RejectAlways => Disposition::RejectAlways,
+        }
+    }
+
+    /// Whether the decision allows the proposal to apply.
+    pub fn is_approval(self) -> bool {
+        matches!(
+            self,
+            ApprovalDispositionParam::ApproveOnce | ApprovalDispositionParam::ApproveAlways
+        )
+    }
+}
+
 /// Parameters for `permissions_respond`.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PermissionsRespondParams {
     /// Request identifier.
     pub request_id: String,
     /// Whether the request is approved.
+    ///
+    /// Preserved for backwards compatibility: `approved: true` with no
+    /// `disposition` defaults to `ApproveOnce`; `approved: false` with no
+    /// `disposition` defaults to `Reject`. When `disposition` is set,
+    /// `approved` is ignored and the explicit disposition is used.
     pub approved: bool,
+    /// The operator's decision. When omitted, the boolean `approved`
+    /// field is used to derive `ApproveOnce` (true) or `Reject` (false).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub disposition: Option<ApprovalDispositionParam>,
 }
 
 fn empty_schema() -> Arc<JsonObject> {
@@ -230,7 +279,11 @@ pub fn permissions_respond_tool() -> Tool {
         object_schema(
             serde_json::json!({
                 "request_id": { "type": "string" },
-                "approved": { "type": "boolean" }
+                "approved": { "type": "boolean" },
+                "disposition": {
+                    "type": "string",
+                    "enum": ["approve_once", "approve_always", "reject", "reject_always"]
+                }
             }),
             vec!["request_id", "approved"],
         ),
