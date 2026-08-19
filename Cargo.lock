@@ -9561,15 +9561,20 @@ dependencies = [
 name = "terraphim_spawner"
 version = "1.21.0"
 dependencies = [
+ "chrono",
  "nix 0.27.1",
  "proptest",
  "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "terraphim_types 1.20.2",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
