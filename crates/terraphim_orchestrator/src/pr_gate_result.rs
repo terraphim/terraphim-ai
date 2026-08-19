@@ -187,32 +187,71 @@ pub fn extract_assistant_text(lines: &[String], cli_tool: &str) -> String {
                     .get("delta")
                     .and_then(|delta| delta.get("text"))
                     .and_then(serde_json::Value::as_str)
+                    .map(str::to_string)
             } else {
                 None
             }
         })
     } else if cli.contains("opencode") {
-        collect_json_text(lines, |value| {
+        // opencode v3 emits assistant text only inside message_end/turn_end
+        // (`message.content[]` parts) and agent_end (`messages[]`) events; the
+        // legacy top-level `text`/`part.text` streaming shapes no longer carry
+        // the final report. Prefer the last assistant message from agent_end,
+        // falling back to message_end parts, then legacy shapes.
+        let mut agent_end_text: Option<String> = None;
+        let mut message_end_text: Option<String> = None;
+        let legacy = collect_json_text(lines, |value| {
             value
                 .get("text")
                 .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
                 .or_else(|| {
                     value
                         .get("part")
                         .and_then(|part| part.get("text"))
                         .and_then(serde_json::Value::as_str)
+                        .map(str::to_string)
                 })
-        })
+                .or_else(|| {
+                    let event_type = value.get("type").and_then(serde_json::Value::as_str)?;
+                    if event_type != "message_end" && event_type != "turn_end" {
+                        return None;
+                    }
+                    let text = assistant_text_from_message(value.get("message")?)?;
+                    message_end_text = Some(text.clone());
+                    Some(text)
+                })
+                .or_else(|| {
+                    if value.get("type").and_then(serde_json::Value::as_str) != Some("agent_end") {
+                        return None;
+                    }
+                    let messages = value.get("messages")?.as_array()?;
+                    let text = messages
+                        .iter()
+                        .rev()
+                        .find_map(assistant_text_from_message_value)
+                        .unwrap_or_default();
+                    agent_end_text = Some(text.clone());
+                    Some(text)
+                })
+        });
+        agent_end_text
+            .filter(|t| !t.trim().is_empty())
+            .or(message_end_text)
+            .filter(|t| !t.trim().is_empty())
+            .unwrap_or(legacy)
     } else {
         collect_json_text(lines, |value| {
             value
                 .get("text")
                 .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
                 .or_else(|| {
                     value
                         .get("message")
                         .and_then(|message| message.get("content"))
                         .and_then(serde_json::Value::as_str)
+                        .map(str::to_string)
                         .or_else(|| {
                             value
                                 .get("message")
@@ -223,6 +262,7 @@ pub fn extract_assistant_text(lines: &[String], cli_tool: &str) -> String {
                                         p.get("text").and_then(serde_json::Value::as_str)
                                     })
                                 })
+                                .map(str::to_string)
                         })
                 })
         })
@@ -247,9 +287,41 @@ pub fn extract_assistant_text(lines: &[String], cli_tool: &str) -> String {
         .join("\n")
 }
 
+/// Extract the concatenated text parts of an assistant `message` value
+/// (opencode v3 `message_end`/`turn_end`/`agent_end` shapes).
+fn assistant_text_from_message(message: &serde_json::Value) -> Option<String> {
+    if message.get("role").and_then(serde_json::Value::as_str) != Some("assistant") {
+        return None;
+    }
+    let content = message.get("content")?;
+    match content {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Array(parts) => {
+            let text = parts
+                .iter()
+                .filter_map(|p| {
+                    let t = p.get("text").and_then(serde_json::Value::as_str)?;
+                    Some(t)
+                })
+                .collect::<Vec<_>>()
+                .join("");
+            if text.is_empty() {
+                None
+            } else {
+                Some(text)
+            }
+        }
+        _ => None,
+    }
+}
+
+fn assistant_text_from_message_value(message: &serde_json::Value) -> Option<String> {
+    assistant_text_from_message(message)
+}
+
 fn collect_json_text<F>(lines: &[String], mut pick: F) -> String
 where
-    F: FnMut(&serde_json::Value) -> Option<&str>,
+    F: FnMut(&serde_json::Value) -> Option<String>,
 {
     let mut chunks: Vec<String> = Vec::new();
     for line in lines {
@@ -258,7 +330,7 @@ where
             continue;
         };
         if let Some(text) = pick(&value) {
-            chunks.push(text.to_string());
+            chunks.push(text);
         }
     }
     chunks.join("")
@@ -516,6 +588,40 @@ Trailing prose."#
         ];
         let text = extract_assistant_text(&lines, "/usr/local/bin/opencode");
         assert_eq!(text, "hello world");
+    }
+
+    #[test]
+    fn extract_assistant_text_parses_opencode_v3_message_end() {
+        // Real shape from bigbox drain log pr-reviewer-20260819T140935Z.log:
+        // assistant text only inside message_end.message.content[] parts.
+        let lines = vec![
+            r#"{"type":"session","version":3,"id":"s1"}"#.to_string(),
+            r#"{"type":"message_start","message":{"role":"user","content":"prompt"}}"#.to_string(),
+            r#"{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Verdict: pass.\n"}]}}"#.to_string(),
+        ];
+        let text = extract_assistant_text(&lines, "/opt/ai-dark-factory/bin/opencode");
+        assert_eq!(text, "Verdict: pass.");
+    }
+
+    #[test]
+    fn extract_assistant_text_parses_opencode_v3_agent_end_prefers_last_assistant() {
+        // agent_end carries the full message list; the LAST assistant message
+        // is the final report with the gate-result block.
+        let gate_block = "report\n<!-- adf:gate-result\n{\"status\": \"pass\"}\n-->";
+        let lines = vec![
+            r#"{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"intermediate"}]}}"#.to_string(),
+            serde_json::json!({
+                "type": "agent_end",
+                "messages": [
+                    {"role": "user", "content": "prompt"},
+                    {"role": "assistant", "content": [{"type": "text", "text": gate_block}]}
+                ]
+            })
+            .to_string(),
+        ];
+        let text = extract_assistant_text(&lines, "opencode");
+        assert!(text.contains("adf:gate-result"), "got: {text}");
+        assert!(!text.contains("intermediate"), "got: {text}");
     }
 
     #[test]
