@@ -104,3 +104,22 @@ def test_no_producer_side_shell_or_gtr():
         task = agent["task"]
         for keyword in FORBIDDEN_TASK_KEYWORDS:
             assert keyword not in task, f"{path.name} task must not contain: {keyword}"
+
+
+EXPECTED_FALLBACK_MODEL = "kimi-for-coding/k3"
+
+
+def test_pr_gate_fallback_model_is_kimi_k3():
+    """Fallback model on the three native PR gate templates must be exactly k3.
+
+    Pins issue #3266: pr-reviewer, pr-validator, and pr-verifier share the
+    same subscription-only OpenCode fallback route. Asserts the value
+    *exactly* so drift to e.g. 'kimi-for-coding/k2p5', bare 'k3', or any
+    other OpenCode subscription identifier is caught by CI.
+    """
+    for path in GATE_TEMPLATES.values():
+        agent = _load_agent(path)
+        assert agent.get("fallback_model") == EXPECTED_FALLBACK_MODEL, (
+            f"{path.name} fallback_model must be exactly "
+            f"{EXPECTED_FALLBACK_MODEL!r}, got {agent.get('fallback_model')!r}"
+        )
