@@ -77,8 +77,25 @@ trap 'POST_STATUS failure "build failed at last step"; exit 1' ERR
 # observed on GitHub Actions run 24929848023).
 /home/alex/.local/bin/rch exec -- cargo fmt --all -- --check
 /home/alex/.local/bin/rch exec -- cargo clippy --workspace --all-targets -- -D warnings
+
+# Defence-in-depth against the 2026-08-23 + 2026-07-15 regressions
+# (terraphim-ai #3277, terraphim-agents #2463): cargo can leave freshly-built
+# benchmark / test binaries in non-executable mode when their artefact cache
+# round-trips through kache -> SeaweedFS S3 -> local. Without +x, the next
+# `cargo test --workspace` fails with `could not execute process / Permission
+# denied (os error 13)`. Restore the execute bit on anything cargo produced
+# under target/ before invoking the test runner. The `|| true` keeps this
+# step idempotent on a clean build (everything already executable -> chmod is
+# a no-op -> exit 0).
+/home/alex/.local/bin/rch exec -- sh -c '
+  set +e
+  find target -type f -size +4096c -name "*-[0-9a-f][0-9a-f]*" -exec chmod +x {} +
+  find target -type f -size +4096c -name "*-benchmarks*" -exec chmod +x {} +
+  exit 0
+'
 /home/alex/.local/bin/rch exec -- cargo test --workspace --no-fail-fast
 
 POST_STATUS success "fmt+clippy+test pass via rch"
 echo "build-runner: adf/build success on $ADF_PUSH_SHA"
 '''
+
