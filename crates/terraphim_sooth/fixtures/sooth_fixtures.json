@@ -1,0 +1,130 @@
+{
+  "source": "Captured live by scripts/generate_fixtures.rb against the real `sooth` Ruby gem (2.3.2, https://github.com/kranzky/sooth, Unlicense) on Ruby 3.2.3 (x86_64-linux-gnu). Command: `ruby crates/terraphim_sooth/scripts/generate_fixtures.rb`. See crates/terraphim_sooth/scripts/generate_fixtures.rb for the capture harness.",
+  "scenarios": [
+    {
+      "name": "skewed_three_one",
+      "observe_sequence": [
+        3,
+        3,
+        3,
+        7
+      ],
+      "expected_observe_counts": [
+        1,
+        2,
+        3,
+        1
+      ],
+      "count": 4,
+      "surprise": {
+        "3": 0.4150374992788438,
+        "7": 2.0
+      },
+      "uncertainty": 0.8112781244591328
+    },
+    {
+      "name": "uniform_pair",
+      "observe_sequence": [
+        1,
+        2
+      ],
+      "expected_observe_counts": [
+        1,
+        1
+      ],
+      "count": 2,
+      "surprise": {
+        "1": 1.0,
+        "2": 1.0
+      },
+      "uncertainty": 1.0
+    },
+    {
+      "name": "single_symbol_repeated",
+      "observe_sequence": [
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "expected_observe_counts": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "count": 5,
+      "surprise": {
+        "5": -0.0
+      },
+      "uncertainty": 0.0
+    },
+    {
+      "name": "four_way_uniform",
+      "observe_sequence": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expected_observe_counts": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "count": 4,
+      "surprise": {
+        "1": 2.0,
+        "2": 2.0,
+        "3": 2.0,
+        "4": 2.0
+      },
+      "uncertainty": 2.0
+    },
+    {
+      "name": "skewed_five_way",
+      "observe_sequence": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        3,
+        4,
+        5
+      ],
+      "expected_observe_counts": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        1,
+        2,
+        1,
+        1,
+        1
+      ],
+      "count": 13,
+      "surprise": {
+        "1": 0.7004397181410921,
+        "2": 2.700439718141092,
+        "3": 3.700439718141092,
+        "4": 3.700439718141092,
+        "5": 3.700439718141092
+      },
+      "uncertainty": 1.7004397181410922
+    }
+  ]
+}

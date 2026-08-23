@@ -1,0 +1,27 @@
+[package]
+name = "terraphim_sooth"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+description = "Deterministic port of the Sooth predictor (Jason Hutchens) -- a Markov-chain based symbol predictor used by MegaHAL-style chatbots."
+license.workspace = true
+readme = "README.md"
+
+[lib]
+name = "terraphim_sooth"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+# Minimal, no OS-entropy dependency: `RngCore`/`SeedableRng` only. The library
+# never calls OS entropy (thread_rng/OsRng) itself -- callers inject a seeded
+# RNG (see `DefaultRng`), which keeps the crate wasm32-unknown-unknown safe.
+rand_core = { version = "0.10", default-features = false }
+rand_pcg = { version = "0.10", default-features = false }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
