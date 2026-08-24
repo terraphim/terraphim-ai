@@ -82,6 +82,14 @@ mod tests {
     }
 
     #[test]
+    fn parses_embedded_default_includes_kairo() {
+        let logins = parse_recognised_agents(DEFAULT_KG_MARKDOWN);
+        assert!(logins.contains("kairo"));
+        assert!(!logins.contains("not-kairo"));
+        assert!(!logins.contains("kairo-human"));
+    }
+
+    #[test]
     fn parses_multiple_synonyms_lines() {
         let markdown = "# Concept\n\nsynonyms:: alpha, beta\nsynonyms:: gamma\n";
         let logins = parse_recognised_agents(markdown);

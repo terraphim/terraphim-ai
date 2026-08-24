@@ -173,7 +173,7 @@ struct GateCommentSpec<'a> {
 
 fn gate_comment(spec: GateCommentSpec<'_>) -> PrComment {
     let body = format!(
-        "Gate report\n<!-- adf:gate-result\n{{\n  \"schema_version\": 1,\n  \"agent\": \"{}\",\n  \"context\": \"{}\",\n  \"pr_number\": {},\n  \"head_sha\": \"{}\",\n  \"status\": \"{}\",\n  \"confidence\": 4,\n  \"blocking_findings\": {},\n  \"summary\": \"ok\"\n}}\n-->",
+        "Gate report\n<!-- adf:gate-result\n{{\n  \"schema_version\": 1,\n  \"agent\": \"{}\",\n  \"context\": \"{}\",\n  \"pr_number\": {},\n  \"head_sha\": \"{}\",\n  \"status\": \"{}\",\n  \"confidence\": 5,\n  \"blocking_findings\": {},\n  \"summary\": \"ok\"\n}}\n-->",
         spec.agent,
         spec.context,
         spec.pr_number,
