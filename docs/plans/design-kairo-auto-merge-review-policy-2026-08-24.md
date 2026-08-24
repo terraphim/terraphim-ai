@@ -69,6 +69,7 @@ Modified files:
 | `crates/terraphim_orchestrator/src/pr_review.rs` | Append `kairo` to `AutoMergeCriteria::default().recognised_agent_logins`; add author/default tests if not placed elsewhere. |
 | `crates/terraphim_orchestrator/src/agent_allowlist_kg.rs` | Add assertions covering embedded/default KG recognition and unrelated login rejection. |
 | `crates/terraphim_orchestrator/src/pr_poller.rs` | Enforce canonical gate-result confidence against the existing threshold; add pure evaluator tests proving `kairo` remains subject to every polling gate. |
+| `crates/terraphim_orchestrator/tests/auto_merge_tests.rs` | Keep passing integration fixtures at the configured confidence boundary after enforcement becomes effective. |
 
 New files: none.
 
@@ -127,6 +128,8 @@ cargo test -p terraphim_orchestrator pr_review::tests::default_author_policy_rec
 cargo test -p terraphim_orchestrator pr_poller::tests::kairo_pr_awaits_missing_reviewer_status_and_result
 cargo test -p terraphim_orchestrator pr_poller::tests::kairo_pr_does_not_merge_with_stale_fail_concerns_or_blocking_reviewer_evidence_under_terraphim_ai
 cargo test -p terraphim_orchestrator pr_poller::tests::kairo_pr_requires_all_current_head_nonblocking_required_contexts
+cargo test -p terraphim_orchestrator pr_poller::tests::kairo_pr_requires_minimum_gate_confidence
+cargo test -p terraphim_orchestrator --test auto_merge_tests
 ```
 
 Then run the crate-level gate:
