@@ -18,7 +18,13 @@ tokio = { workspace = true, features = ["full"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 regex = "1.10"
-nix = { version = "0.27", features = ["process", "signal", "resource"] }
+nix = { version = "0.27", features = ["process", "signal", "resource", "fs"] }
+
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+chrono = { workspace = true, features = ["serde"] }
+sha2 = "0.10"
 
 [dev-dependencies]
 proptest = "1.4"

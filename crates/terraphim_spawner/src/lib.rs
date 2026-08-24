@@ -17,6 +17,20 @@ use tokio::time::timeout;
 
 use terraphim_types::capability::{ProcessId, Provider};
 
+/// Configuration for the durable per-run output journal (terraphim-ai#3269).
+///
+/// When attached to a [`SpawnContext`], the spawner opens the journal
+/// *before* spawning the child so a journal failure cannot leave an
+/// unmanaged process, and every captured output event is durably
+/// appended before in-memory fanout.
+#[derive(Debug, Clone)]
+pub struct OutputJournalConfig {
+    /// Root directory under which the per-run journal file lives.
+    pub root: PathBuf,
+    /// Unique run identity; determines the journal file name.
+    pub run_id: uuid::Uuid,
+}
+
 /// Per-spawn overrides that a caller can pass to AgentSpawner::spawn().
 ///
 /// Enables multi-project use: one orchestrator serving many projects can
@@ -31,6 +45,9 @@ pub struct SpawnContext {
     /// When set, the spawner creates the file and appends every stderr line
     /// directly, bypassing the bounded in-memory buffer.
     pub stderr_log_path: Option<PathBuf>,
+    /// Optional durable output journal configuration. None -> legacy
+    /// broadcast-only capture.
+    pub output_journal: Option<OutputJournalConfig>,
 }
 
 impl SpawnContext {
@@ -45,6 +62,7 @@ impl SpawnContext {
             working_dir: Some(path.into()),
             env_overrides: HashMap::new(),
             stderr_log_path: None,
+            output_journal: None,
         }
     }
 
@@ -59,11 +77,21 @@ impl SpawnContext {
         self.stderr_log_path = Some(path.into());
         self
     }
+
+    /// Attach a durable output journal for this spawn (terraphim-ai#3269).
+    pub fn with_output_journal(mut self, root: impl Into<PathBuf>, run_id: uuid::Uuid) -> Self {
+        self.output_journal = Some(OutputJournalConfig {
+            root: root.into(),
+            run_id,
+        });
+        self
+    }
 }
 
 pub mod audit;
 pub mod config;
 pub mod health;
+pub mod journal;
 pub mod mention;
 pub mod output;
 pub mod redaction;
@@ -73,8 +101,12 @@ pub use config::{AgentConfig, AgentValidator, ResourceLimits, ValidationError};
 pub use health::{
     CircuitBreaker, CircuitBreakerConfig, CircuitState, HealthChecker, HealthHistory, HealthStatus,
 };
+pub use journal::{
+    is_retention_eligible, AckMarker, CompleteMarker, Journal, JournalCheckpoint, JournalError,
+    JournalFrame, JournalRecord, OutputKind, RecoveredJournal, RecoveryLimits,
+};
 pub use mention::{MentionEvent, MentionRouter};
-pub use output::{OutputCapture, OutputEvent};
+pub use output::{OutputCapture, OutputEvent, OutputJournalError};
 pub use redaction::{redact, verify_redacted};
 
 /// Errors that can occur during agent spawning.
@@ -103,6 +135,29 @@ pub enum SpawnerError {
     /// Structured config validation error (field-level).
     #[error("Config validation error: {0}")]
     ConfigValidation(#[from] ValidationError),
+
+    /// Durable journal error (open/create failure before spawn, or a
+    /// journal-level fault propagated to the caller).
+    #[error("Journal error: {0}")]
+    Journal(#[from] JournalError),
+
+    /// Durable output journal error surfaced while draining capture
+    /// tasks or sealing the journal in `AgentHandle::wait`.
+    #[error("Output journal error: {0}")]
+    OutputJournal(#[from] OutputJournalError),
+
+    /// A journal-backed agent handle observed the child exit before its
+    /// durable journal was finalized (terraphim-ai#3269). The
+    /// synchronous `try_wait` deliberately refuses to expose the raw
+    /// exit status because doing so would let a caller observe a
+    /// terminal status before the completion marker is sealed on disk.
+    /// Callers must route through the async `AgentHandle::wait`, which
+    /// reuses the cached status, seals the journal, and succeeds.
+    #[error(
+        "durable finalization required for process {process_id}: \
+         call AgentHandle::wait to seal the journal and obtain the exit status"
+    )]
+    DurableFinalizationRequired { process_id: ProcessId },
 }
 
 /// Grace period (in seconds) for early-exit detection in
@@ -114,10 +169,14 @@ const EARLY_EXIT_GRACE_SECS: u64 = 5;
 const EARLY_EXIT_GRACE: Duration = Duration::from_secs(EARLY_EXIT_GRACE_SECS);
 
 /// Poll an agent handle for process exit at 100ms intervals.
-/// Used by `spawn_with_fallback` for early-exit detection.
+/// Used by `spawn_with_fallback` for early-exit detection. Routes
+/// through the internal draining poll so a journal-backed primary
+/// has its capture tasks settled before the status is used to
+/// decide on fallback; the journal itself is sealed by the caller
+/// (terraphim-ai#3269).
 async fn poll_exit(handle: &mut AgentHandle) -> Result<std::process::ExitStatus, SpawnerError> {
     loop {
-        if let Some(status) = handle.try_wait()? {
+        if let Some(status) = handle.try_wait_drained().await? {
             return Ok(status);
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -213,6 +272,26 @@ pub struct AgentHandle {
     health_checker: HealthChecker,
     /// Output capture
     output_capture: OutputCapture,
+    /// Whether this handle is backed by a durable output journal that
+    /// must be sealed before a terminal status is exposed to the
+    /// caller (terraphim-ai#3269). Set from [`SpawnContext`] in
+    /// [`AgentSpawner::spawn_config`].
+    journal_backed: bool,
+    /// Exit status cached from `child.try_wait` so the async `wait`
+    /// can reuse it without blocking again on the (already-reaped)
+    /// child (terraphim-ai#3269). Populated on journal-backed
+    /// handles where `try_wait` refused to expose the status, and by
+    /// the internal draining poll used by `spawn_with_fallback`.
+    cached_status: Option<std::process::ExitStatus>,
+    /// Explicit finalized terminal state (terraphim-ai#3269). Set by
+    /// `wait`/`shutdown`/`kill`/the fallback clean-primary path ONLY
+    /// after the output capture has drained and the durable journal
+    /// (when configured) has sealed successfully. Once set, public
+    /// `try_wait` returns this cached terminal status instead of
+    /// `DurableFinalizationRequired`, and `wait` returns it without
+    /// re-finalizing. Deliberately NOT set by a raw non-journal
+    /// `try_wait`: a later `wait` must still drain the output capture.
+    finalized_status: Option<std::process::ExitStatus>,
 }
 
 impl AgentHandle {
@@ -248,13 +327,24 @@ impl AgentHandle {
     ///
     /// Returns `Ok(true)` if the process exited gracefully, `Ok(false)` if it
     /// required a SIGKILL, or `Err` on I/O failure.
+    ///
+    /// The grace period bounds ONLY the child-process exit wait after
+    /// SIGTERM. Output-capture finalization (`OutputCapture::finish`,
+    /// draining the capture tasks and sealing the durable journal when
+    /// configured) always happens OUTSIDE the timeout, so a slow pipe
+    /// drain can neither cancel the capture JoinHandles (losing buffered
+    /// output) nor turn a graceful in-grace exit into a spurious
+    /// force-kill. A caller that observes `Ok` can rely on the journal
+    /// being complete on disk. Finalization errors are propagated to the
+    /// caller (terraphim-ai#3269).
     pub async fn shutdown(&mut self, grace_period: Duration) -> Result<bool, SpawnerError> {
         // Get the OS PID for signal sending
         let pid = match self.child.id() {
             Some(id) => id,
             None => {
-                // Process already exited
-                self.health_checker.mark_terminated();
+                // Process already exited; reuse the cached exit status (if
+                // any) and finalize capture/journal before returning.
+                self.wait().await?;
                 return Ok(true);
             }
         };
@@ -272,9 +362,16 @@ impl AgentHandle {
             }
         }
 
-        // Wait for graceful exit or timeout
-        match timeout(grace_period, self.child.wait()).await {
+        // The grace timeout covers ONLY waiting for the child to exit
+        // after SIGTERM — never the output drain.
+        match timeout(grace_period, self.wait_child_exit()).await {
             Ok(Ok(status)) => {
+                // Graceful exit inside the grace period. Finalize the
+                // output capture outside the timeout so a slow drain
+                // cannot degrade this into a force-kill.
+                self.output_capture.finish(status.code()).await?;
+                self.finalized_status = Some(status);
+                self.health_checker.mark_terminated();
                 tracing::info!(
                     process_id = %self.process_id,
                     status = %status,
@@ -288,24 +385,36 @@ impl AgentHandle {
                     },
                     "Agent terminated gracefully"
                 );
-                self.health_checker.mark_terminated();
                 Ok(true)
             }
             Ok(Err(e)) => {
                 self.health_checker.mark_terminated();
-                Err(SpawnerError::ProcessExit(format!(
-                    "Wait failed for {}: {}",
-                    self.process_id, e
-                )))
+                Err(e)
             }
             Err(_) => {
-                // Timeout expired -- force kill
+                // Timeout expired -- force kill, but only if the child is
+                // still alive (it may have exited just as the grace
+                // lapsed, in which case its status is already cached or
+                // reaped and must not be killed again).
                 tracing::warn!(
                     process_id = %self.process_id,
                     grace_period_ms = grace_period.as_millis() as u64,
                     "Process did not exit within grace period, sending SIGKILL"
                 );
-                self.child.kill().await?;
+                if self.child.id().is_some() {
+                    self.child.kill().await?;
+                }
+                // Obtain the exit status (reusing the cached one from a
+                // prior try_wait refusal when present) and finalize the
+                // capture/journal outside the timeout before reporting
+                // the forced termination.
+                let status = match self.cached_status.take() {
+                    Some(cached) => cached,
+                    None => self.child.wait().await.map_err(SpawnerError::Io)?,
+                };
+                self.output_capture.finish(status.code()).await?;
+                self.finalized_status = Some(status);
+                self.health_checker.mark_terminated();
                 tracing::info!(
                     target: "terraphim_spawner::audit",
                     event = %AuditEvent::AgentTerminated {
@@ -314,36 +423,142 @@ impl AgentHandle {
                     },
                     "Agent force-killed"
                 );
-                self.health_checker.mark_terminated();
                 Ok(false)
             }
         }
     }
 
+    /// Wait only for the child process to exit, without touching the
+    /// output capture (terraphim-ai#3269).
+    ///
+    /// Reuses the status cached by a prior `try_wait` refusal (or the
+    /// draining poll in `spawn_with_fallback`) instead of blocking again
+    /// on the already-reaped child. This is the future the shutdown
+    /// grace timeout wraps, so cancelling it on timeout never touches
+    /// the capture JoinHandles — finalization runs afterwards, outside
+    /// the timeout.
+    async fn wait_child_exit(&mut self) -> Result<std::process::ExitStatus, SpawnerError> {
+        if let Some(cached) = self.cached_status.take() {
+            Ok(cached)
+        } else {
+            self.child.wait().await.map_err(SpawnerError::Io)
+        }
+    }
+
     /// Hard kill the agent process (immediate SIGKILL).
+    ///
+    /// Performs an immediate hard kill when the child still has a live
+    /// process id, then always routes through the async [`AgentHandle::wait`]
+    /// finalization path (reusing/reaping the actual exit status, draining
+    /// output capture, and sealing the durable journal when configured)
+    /// before returning. Kill, wait, and finalization errors are propagated
+    /// to the caller, so a caller that observes `Ok` can rely on the journal
+    /// being complete on disk (terraphim-ai#3269).
     pub async fn kill(mut self) -> Result<(), SpawnerError> {
         self.health_checker.mark_terminated();
-        self.child.kill().await?;
+        if self.child.id().is_some() {
+            self.child.kill().await?;
+        }
+        self.wait().await?;
         Ok(())
     }
 
     /// Check if the process has exited (non-blocking).
+    ///
+    /// On **non-journal-backed** handles, preserves the exact legacy
+    /// behaviour: any observed exit status is returned to the caller
+    /// and the health checker is marked terminated.
+    ///
+    /// On **journal-backed** handles (terraphim-ai#3269), the moment
+    /// `child.try_wait` observes `Some(status)` the handle becomes an
+    /// unsafe place to expose a terminal status: the durable journal
+    /// has not been sealed yet, so a caller could observe exit before
+    /// the completion marker is on disk. The status is therefore
+    /// cached internally and `Err(DurableFinalizationRequired)` is
+    /// returned, forcing the caller through the async `wait` which
+    /// reuses the cached status, finishes the journal, and succeeds.
+    ///
+    /// Once a finalizing path (`wait`/`shutdown`) has durably
+    /// completed, the finalized terminal status is returned directly
+    /// from cache instead of the refusal.
     pub fn try_wait(&mut self) -> Result<Option<std::process::ExitStatus>, SpawnerError> {
+        if let Some(status) = self.finalized_status {
+            return Ok(Some(status));
+        }
         match self.child.try_wait() {
+            Ok(Some(status)) if self.journal_backed => {
+                self.cached_status = Some(status);
+                Err(SpawnerError::DurableFinalizationRequired {
+                    process_id: self.process_id,
+                })
+            }
             Ok(status) => {
                 if status.is_some() {
                     self.health_checker.mark_terminated();
                 }
+                // NOTE: the raw non-journal exit status is NOT recorded
+                // as finalized — a later `wait` must still drain the
+                // output capture before reporting the terminal status.
                 Ok(status)
             }
             Err(e) => Err(SpawnerError::Io(e)),
         }
     }
 
+    /// Internal async polling helper for `spawn_with_fallback`
+    /// early-exit detection (terraphim-ai#3269).
+    ///
+    /// Unlike the public synchronous [`AgentHandle::try_wait`], this
+    /// method drains the output capture tasks BEFORE marking the
+    /// health checker terminated or exposing a terminal status, so the
+    /// fallback path never observes an exit status ahead of the
+    /// captured output being settled. It deliberately does NOT seal
+    /// the durable journal: `spawn_with_fallback` shares one `run_id`
+    /// across the primary and the fallback attempt, so the journal
+    /// must stay open across a failed primary and be sealed exactly
+    /// once — either by [`OutputCapture::complete`] on the clean
+    /// primary, by the fallback's own finalization, or by the explicit
+    /// seal in the fallback-spawn-failure path. The observed status is
+    /// cached so a later [`AgentHandle::wait`] reuses it and stays
+    /// idempotent.
+    async fn try_wait_drained(&mut self) -> Result<Option<std::process::ExitStatus>, SpawnerError> {
+        let status = match self.cached_status {
+            Some(cached) => Some(cached),
+            None => self.child.try_wait().map_err(SpawnerError::Io)?,
+        };
+        let Some(status) = status else {
+            return Ok(None);
+        };
+        self.cached_status = Some(status);
+        self.output_capture.drain().await?;
+        self.health_checker.mark_terminated();
+        Ok(Some(status))
+    }
+
     /// Wait for the child process to exit naturally.
-    /// Returns the exit status.
+    ///
+    /// After the child exits, drains the output capture tasks and seals
+    /// the durable journal (when configured) *before* returning, so a
+    /// caller that observes the returned status can rely on the journal
+    /// being complete on disk. Returns the exit status.
+    ///
+    /// On journal-backed handles, reuses the status cached by a prior
+    /// `try_wait` refusal instead of blocking again on the reaped
+    /// child (terraphim-ai#3269).
     pub async fn wait(&mut self) -> Result<std::process::ExitStatus, SpawnerError> {
-        let status = self.child.wait().await.map_err(SpawnerError::Io)?;
+        if let Some(status) = self.finalized_status {
+            return Ok(status);
+        }
+        let status = if let Some(cached) = self.cached_status.take() {
+            cached
+        } else {
+            self.child.wait().await.map_err(SpawnerError::Io)?
+        };
+        self.output_capture.finish(status.code()).await?;
+        // Record the finalized terminal state ONLY after the durable
+        // finish succeeded: a failed finish leaves the handle
+        // unfinalized so a retry can re-attempt the drain/seal.
+        self.finalized_status = Some(status);
         self.health_checker.mark_terminated();
         Ok(status)
     }
@@ -617,19 +832,39 @@ impl AgentSpawner {
                     provider = %request.primary_provider.id,
                     "Primary exited cleanly during grace period"
                 );
+                // The draining poll deliberately left the journal
+                // unsealed; seal it now, before the primary handle is
+                // returned. A journal error here fails closed rather
+                // than returning a handle whose run is not durable.
+                handle.output_capture().complete(status.code()).await?;
+                // Finalized only after the durable completion
+                // succeeded: later wait/try_wait return the cached
+                // terminal status without re-finalizing.
+                handle.finalized_status = Some(status);
                 Ok(handle)
             }
-            Some(status_result) => {
-                let code = status_result.as_ref().ok().and_then(|s| s.code());
+            Some(Err(poll_err)) => {
+                // Poll/drain/journal error: fail closed immediately.
+                // The fallback is NEVER attempted on an error — an
+                // uncertain primary state must not be masked by a
+                // successful fallback (terraphim-ai#3269).
+                Err(poll_err)
+            }
+            Some(Ok(status)) => {
+                let code = status.code();
                 tracing::warn!(
                     provider = %request.primary_provider.id,
                     exit_code = ?code,
                     "Primary exited during {}s grace period, attempting fallback",
                     EARLY_EXIT_GRACE_SECS,
                 );
-                drop(handle);
+                // The primary capture has already drained. Close and join its
+                // durable writer before the fallback tries to reopen the same
+                // run, proving the old journal fd and writer lock are gone.
+                let primary_process_id = handle.process_id;
+                handle.output_capture.prepare_fallback_handoff().await?;
 
-                // Try fallback
+                // Try fallback only after ownership handoff.
                 match self
                     .spawn_with_options(
                         fallback,
@@ -645,6 +880,10 @@ impl AgentSpawner {
                             fallback_provider = %fallback.id,
                             "Fallback spawn succeeded"
                         );
+                        // The failed primary's drained handle is no
+                        // longer needed; dropping it leaves the shared
+                        // journal open for the fallback to seal.
+                        drop(handle);
                         Ok(fb_handle)
                     }
                     Err(fb_err) => {
@@ -653,6 +892,21 @@ impl AgentSpawner {
                             error = %fb_err,
                             "Fallback spawn also failed"
                         );
+                        // No fallback will finalize the logical run. The
+                        // primary writer was already joined for handoff, so
+                        // reopen the shared run and seal it with the primary's
+                        // actual terminal identity/status before surfacing the
+                        // fallback error. A seal failure supersedes the spawn
+                        // error and fails closed.
+                        if let Some(journal) = &ctx.output_journal {
+                            output::seal_reopened_journal(
+                                &journal.root,
+                                journal.run_id,
+                                primary_process_id,
+                                code,
+                            )
+                            .await?;
+                        }
                         Err(fb_err)
                     }
                 }
@@ -679,6 +933,28 @@ impl AgentSpawner {
         let validator = AgentValidator::new(config);
         validator.validate().await?;
 
+        // Open/recover the durable output journal BEFORE spawning the child,
+        // so a journal open failure cannot leave an unmanaged process
+        // running and a configured stable run id reopens an existing
+        // journal rather than refusing to spawn (terraphim-ai#3269).
+        //
+        // Fail-closed create-or-recover: a fresh run has no journal on disk
+        // yet, so a bare `NotFound` from `open` is the single case where we
+        // fall through to `create`. Every other error — including a create
+        // race where another writer created the journal between our `open`
+        // and `create` — propagates unchanged; we never retry or downgrade.
+        let journal = match &ctx.output_journal {
+            Some(cfg) => Some(match Journal::open(&cfg.root, cfg.run_id) {
+                Ok(journal) => journal,
+                Err(JournalError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {
+                    Journal::create(&cfg.root, cfg.run_id)?
+                }
+                Err(err) => return Err(err.into()),
+            }),
+            None => None,
+        };
+        let journal_backed = journal.is_some();
+
         // Spawn the agent process
         let process_id = ProcessId::new();
         let mut child = self.spawn_process(config, task, use_stdin, ctx).await?;
@@ -696,12 +972,21 @@ impl AgentSpawner {
             .take()
             .ok_or_else(|| SpawnerError::SpawnError("Failed to capture stderr".to_string()))?;
 
-        let output_capture = OutputCapture::new_with_stderr_log(
-            process_id,
-            BufReader::new(stdout),
-            BufReader::new(stderr),
-            ctx.stderr_log_path.clone(),
-        );
+        let output_capture = match journal {
+            Some(journal) => OutputCapture::new_with_journal_and_stderr_log(
+                process_id,
+                BufReader::new(stdout),
+                BufReader::new(stderr),
+                journal,
+                ctx.stderr_log_path.clone(),
+            ),
+            None => OutputCapture::new_with_stderr_log(
+                process_id,
+                BufReader::new(stdout),
+                BufReader::new(stderr),
+                ctx.stderr_log_path.clone(),
+            ),
+        };
 
         tracing::info!(
             target: "terraphim_spawner::audit",
@@ -718,6 +1003,9 @@ impl AgentSpawner {
             child,
             health_checker,
             output_capture,
+            journal_backed,
+            cached_status: None,
+            finalized_status: None,
         })
     }
 
@@ -1514,6 +1802,839 @@ mod tests {
             output.contains("inherited-value"),
             "inherited env should be visible in child without override, got: {:?}",
             output
+        );
+    }
+
+    // =========================================================================
+    // Durable Output Journal Tests (terraphim-ai#3269)
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_journal_open_failure_prevents_child_spawn() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let marker = temp.path().join("child-spawned.marker");
+        let task = format!("touch {}", marker.display());
+        let provider = Provider::new(
+            "@bash-agent",
+            "Bash Agent",
+            ProviderType::Agent {
+                agent_id: "@bash".to_string(),
+                cli_command: "bash".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![Capability::CodeGeneration],
+        );
+        let ctx = SpawnContext::global()
+            .with_output_journal(PathBuf::from("relative-journal-root"), Uuid::new_v4());
+
+        let result = AgentSpawner::new().spawn(&provider, &task, ctx).await;
+
+        match result {
+            Err(SpawnerError::Journal(_)) => {}
+            Err(other) => panic!(
+                "journal open failure must surface as typed SpawnerError::Journal, got: {:?}",
+                other
+            ),
+            Ok(_) => panic!(
+                "journal open failure must prevent child spawn instead of downgrading to broadcast-only"
+            ),
+        }
+        assert!(
+            !marker.exists(),
+            "child process must not run when journal validation fails"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_spawn_with_output_journal_persists_before_wait_returns() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let ctx = SpawnContext::global().with_output_journal(temp.path(), run_id);
+
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        let mut handle = spawner
+            .spawn(&provider, "durable-lifecycle-line", ctx)
+            .await
+            .expect("spawn with output journal should succeed");
+
+        let process_id = handle.process_id();
+
+        let status = handle.wait().await.expect("echo should exit");
+        assert!(status.success(), "echo should exit successfully");
+
+        let recovered =
+            Journal::recover_run(temp.path(), run_id).expect("journal recovery should succeed");
+
+        let completion = recovered
+            .completion
+            .as_ref()
+            .expect("recovery completion should be Some");
+        assert!(
+            completion.completion_id != Uuid::nil(),
+            "journal should carry a non-nil completion id"
+        );
+
+        assert!(
+            recovered.records.iter().any(|record| {
+                record.kind == OutputKind::Stdout
+                    && record.process_id == process_id.0
+                    && record
+                        .payload
+                        .as_str()
+                        .is_some_and(|s| s.contains("durable-lifecycle-line"))
+            }),
+            "journal should contain the stdout line for the spawned process"
+        );
+
+        assert!(
+            recovered
+                .records
+                .iter()
+                .any(|record| record.kind == OutputKind::Completed
+                    && record.process_id == process_id.0),
+            "journal should contain a Completed record for the spawned process"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_spawn_reopens_incomplete_output_journal_and_resumes_sequence() {
+        use serde_json::json;
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+
+        // Pre-seed an incomplete journal (no completion frame), as if a
+        // previous spawn crashed after writing its first record.
+        {
+            let mut journal = Journal::create(temp.path(), run_id).expect("create journal");
+            journal
+                .append(JournalRecord {
+                    run_id,
+                    sequence: 0,
+                    process_id: 777,
+                    kind: OutputKind::Stdout,
+                    payload: json!("before-crash"),
+                    completion_id: None,
+                    observed_at: chrono::Utc::now(),
+                })
+                .expect("append pre-crash record");
+        } // drop journal without completion, simulating a crash
+
+        let ctx = SpawnContext::global().with_output_journal(temp.path(), run_id);
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        let mut handle = spawner
+            .spawn(&provider, "after-crash", ctx)
+            .await
+            .expect("spawn should reopen the incomplete journal and succeed");
+
+        let status = handle.wait().await.expect("echo should exit");
+        assert!(status.success(), "echo should exit successfully");
+
+        let recovered =
+            Journal::recover_run(temp.path(), run_id).expect("journal recovery should succeed");
+
+        let sequences: Vec<u64> = recovered.records.iter().map(|r| r.sequence).collect();
+        assert_eq!(
+            sequences,
+            vec![0, 1, 2],
+            "spawn must resume the sequence after the pre-crash record"
+        );
+
+        let payloads: Vec<&str> = recovered
+            .records
+            .iter()
+            .filter_map(|r| r.payload.as_str())
+            .collect();
+        assert!(
+            payloads.iter().any(|p| p.contains("before-crash")),
+            "journal should retain the pre-crash record, got: {:?}",
+            payloads
+        );
+        assert!(
+            payloads.iter().any(|p| p.contains("after-crash")),
+            "journal should contain the new stdout line, got: {:?}",
+            payloads
+        );
+
+        assert!(
+            recovered.completion.is_some(),
+            "journal should carry a completion marker after a successful run"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_try_wait_does_not_expose_durable_status_before_async_finalization() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let ctx = SpawnContext::global().with_output_journal(temp.path(), run_id);
+
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        let mut handle = spawner
+            .spawn(&provider, "durable-try-wait", ctx)
+            .await
+            .expect("spawn with output journal should succeed");
+
+        let process_id = handle.process_id();
+
+        // Echo exits quickly; give it a moment so the child has exited.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // try_wait must NOT hand back the raw exit status while the durable
+        // journal has not been finalized: that would let a caller observe a
+        // terminal status before the completion marker is sealed on disk.
+        // Instead it must refuse with DurableFinalizationRequired carrying
+        // this handle's process id, forcing callers through the async
+        // finalizing wait().
+        match handle.try_wait() {
+            Err(SpawnerError::DurableFinalizationRequired { process_id: pid }) => {
+                assert_eq!(pid, process_id, "error must carry the handle's process id");
+            }
+            Ok(status) => panic!(
+                "try_wait must not expose exit status before durable finalization, got: {:?}",
+                status
+            ),
+            Err(other) => panic!("unexpected error from try_wait: {:?}", other),
+        }
+
+        // The async finalizing wait() must still succeed and seal the journal.
+        let status = handle.wait().await.expect("echo should exit");
+        assert!(status.success(), "echo should exit successfully");
+
+        let recovered =
+            Journal::recover_run(temp.path(), run_id).expect("journal recovery should succeed");
+        assert!(
+            recovered.completion.is_some(),
+            "journal completion should be Some after async finalization"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_shutdown_finalizes_durable_output_before_returning() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let ctx = SpawnContext::global().with_output_journal(temp.path(), run_id);
+
+        let spawner = AgentSpawner::new();
+        let provider = create_sleep_agent_provider();
+
+        // Spawn a long-running sleep 60 agent backed by the durable journal.
+        let mut handle = spawner
+            .spawn(&provider, "60", ctx)
+            .await
+            .expect("spawn with output journal should succeed");
+
+        let process_id = handle.process_id();
+
+        // Graceful shutdown must finalize the durable journal before
+        // returning: a caller that observes Ok from shutdown() must be able
+        // to rely on the completion marker being sealed on disk.
+        let result = handle.shutdown(Duration::from_secs(2)).await;
+        assert!(result.is_ok(), "shutdown should succeed");
+
+        let recovered =
+            Journal::recover_run(temp.path(), run_id).expect("journal recovery should succeed");
+
+        assert!(
+            recovered.completion.is_some(),
+            "journal completion should be Some after shutdown returns"
+        );
+
+        let completed_records: Vec<&JournalRecord> = recovered
+            .records
+            .iter()
+            .filter(|record| {
+                record.kind == OutputKind::Completed && record.process_id == process_id.0
+            })
+            .collect();
+        assert_eq!(
+            completed_records.len(),
+            1,
+            "journal should contain exactly one Completed record for the spawned process, got: {:?}",
+            completed_records
+        );
+    }
+
+    /// Regression test: `spawn_with_fallback` must not misinterpret the
+    /// journal-backed `try_wait` refusal (`DurableFinalizationRequired`) as
+    /// a primary-provider failure. A primary that exits *successfully*
+    /// within the early-exit grace window is a healthy result — the
+    /// fallback must never be attempted and the durable journal must be
+    /// finalized before any status is used (terraphim-ai#3269).
+    #[tokio::test]
+    async fn test_spawn_with_fallback_finalizes_durable_primary_before_status_use() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let journal_ctx = SpawnContext::global().with_output_journal(temp.path(), run_id);
+
+        let spawner = AgentSpawner::new();
+        let primary = create_test_agent_provider(); // echo: exits 0 within grace window
+        let invalid_fallback = Provider::new(
+            "@invalid-fallback",
+            "Invalid Fallback Agent",
+            ProviderType::Agent {
+                agent_id: "@invalid-fallback".to_string(),
+                cli_command: "definitely-not-a-real-adf-cli".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![Capability::CodeGeneration],
+        );
+
+        let request = SpawnRequest::new(primary.clone(), "primary-success")
+            .with_fallback_provider(invalid_fallback);
+
+        let mut handle = spawner
+            .spawn_with_fallback(&request, journal_ctx)
+            .await
+            .expect("primary echo exits 0 during grace window; fallback must not be attempted");
+
+        assert_eq!(
+            handle.provider.id, "@test-agent",
+            "handle must come from the primary provider, not the fallback"
+        );
+
+        // wait() must succeed and finalize the durable journal; a second
+        // wait() must be idempotent (no double-finalize, no error).
+        let status = handle.wait().await.expect("first wait should succeed");
+        assert!(status.success(), "primary echo should exit successfully");
+        let status2 = handle
+            .wait()
+            .await
+            .expect("second wait should be idempotent and succeed");
+        assert_eq!(status.code(), status2.code(), "idempotent wait result");
+
+        let recovered =
+            Journal::recover_run(temp.path(), run_id).expect("journal recovery should succeed");
+        assert!(
+            recovered.completion.is_some(),
+            "journal completion should be Some after spawn_with_fallback returns the primary handle"
+        );
+    }
+
+    /// A failed primary must NOT seal the logical run's durable journal.
+    ///
+    /// `spawn_with_fallback` shares one `run_id` across the primary and
+    /// the fallback attempt. When the primary exits non-zero inside the
+    /// early-exit grace window, only the fallback's handle is returned to
+    /// the caller — so the journal must stay open across the failed
+    /// primary and be sealed exactly once, by the fallback's own
+    /// finalization. The recovered journal must therefore contain the
+    /// fallback's stdout and exactly one `Completed` record whose
+    /// process id is the fallback handle's process id
+    /// (terraphim-ai#3269).
+    #[tokio::test]
+    async fn test_spawn_with_fallback_keeps_one_durable_run_open_across_failed_primary() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let journal_ctx = SpawnContext::global().with_output_journal(temp.path(), run_id);
+
+        let spawner = AgentSpawner::new();
+        // Primary: `AgentConfig::infer_args("bash")` prepends `-c`, so the
+        // task string runs as an inline script — `bash -c "exit 23"` —
+        // which exits 23 well inside the early-exit grace window.
+        let primary = Provider::new(
+            "@bash-agent",
+            "Bash Agent",
+            ProviderType::Agent {
+                agent_id: "@bash".to_string(),
+                cli_command: "bash".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![Capability::CodeGeneration],
+        );
+        let fallback = create_test_agent_provider(); // echo: exits 0
+
+        let request = SpawnRequest::new(primary, "exit 23").with_fallback_provider(fallback);
+
+        let mut handle = spawner
+            .spawn_with_fallback(&request, journal_ctx)
+            .await
+            .expect("primary exits 23 in grace window; fallback echo must be attempted");
+
+        assert_eq!(
+            handle.provider.id, "@test-agent",
+            "handle must come from the fallback provider, not the failed primary"
+        );
+        let fallback_pid = handle.process_id();
+
+        let status = handle
+            .wait()
+            .await
+            .expect("fallback wait should succeed and seal the run's journal");
+        assert!(status.success(), "fallback echo should exit successfully");
+
+        let recovered =
+            Journal::recover_run(temp.path(), run_id).expect("journal recovery should succeed");
+        assert!(
+            recovered.completion.is_some(),
+            "journal completion should be Some after the fallback finalizes the run"
+        );
+
+        assert!(
+            recovered.records.iter().any(|record| {
+                record.kind == OutputKind::Stdout
+                    && record.process_id == fallback_pid.0
+                    && record
+                        .payload
+                        .as_str()
+                        .is_some_and(|s| s.contains("exit 23"))
+            }),
+            "journal should contain the fallback's stdout line, got: {:?}",
+            recovered.records
+        );
+
+        let completed_records: Vec<&JournalRecord> = recovered
+            .records
+            .iter()
+            .filter(|record| record.kind == OutputKind::Completed)
+            .collect();
+        assert_eq!(
+            completed_records.len(),
+            1,
+            "the logical run must be sealed exactly once, got: {:?}",
+            completed_records
+        );
+        assert_eq!(
+            completed_records[0].process_id, fallback_pid.0,
+            "the single Completed record must belong to the fallback process; \
+             the failed primary must not seal the logical run"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_failed_fallback_spawn_reopens_and_seals_primary_run() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let ctx = SpawnContext::global().with_output_journal(temp.path(), run_id);
+        let spawner = AgentSpawner::new();
+        let primary = Provider::new(
+            "@bash-agent",
+            "Bash Agent",
+            ProviderType::Agent {
+                agent_id: "@bash".to_string(),
+                cli_command: "bash".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![Capability::CodeGeneration],
+        );
+        let invalid_fallback = Provider::new(
+            "@invalid-fallback",
+            "Invalid Fallback Agent",
+            ProviderType::Agent {
+                agent_id: "@invalid-fallback".to_string(),
+                cli_command: "definitely-not-a-real-adf-cli".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![Capability::CodeGeneration],
+        );
+        let request =
+            SpawnRequest::new(primary, "exit 23").with_fallback_provider(invalid_fallback);
+
+        spawner
+            .spawn_with_fallback(&request, ctx)
+            .await
+            .expect_err("invalid fallback must fail after primary exit");
+
+        let recovered = Journal::recover_run(temp.path(), run_id).expect("recover sealed run");
+        let completed: Vec<_> = recovered
+            .records
+            .iter()
+            .filter(|record| record.kind == OutputKind::Completed)
+            .collect();
+        assert_eq!(completed.len(), 1, "run must be sealed exactly once");
+        assert_eq!(completed[0].payload, serde_json::json!({"exit_code": 23}));
+        assert!(recovered.completion.is_some());
+    }
+
+    /// After the async finalizing `wait()` seals the durable journal,
+    /// the public `try_wait` must return the finalized terminal status
+    /// instead of refusing with `DurableFinalizationRequired`
+    /// (terraphim-ai#3269). The handle tracks an explicit finalized
+    /// terminal state that is only set after durable completion
+    /// succeeds, so callers polling after `wait()` observe the same
+    /// cached status without re-blocking on the reaped child.
+    #[tokio::test]
+    async fn test_try_wait_returns_finalized_status_after_durable_wait() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let ctx = SpawnContext::global().with_output_journal(temp.path(), run_id);
+
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        let mut handle = spawner
+            .spawn(&provider, "finalized-try-wait", ctx)
+            .await
+            .expect("spawn with output journal should succeed");
+
+        let status = handle.wait().await.expect("echo should exit");
+        assert!(status.success(), "echo should exit successfully");
+
+        // try_wait must now expose the SAME finalized terminal status —
+        // the journal is already sealed, so refusing with
+        // DurableFinalizationRequired would be wrong.
+        let polled = handle
+            .try_wait()
+            .expect("try_wait must succeed after durable finalization");
+        assert_eq!(
+            polled.map(|s| s.code()),
+            Some(status.code()),
+            "try_wait must return the finalized terminal status cached by wait()"
+        );
+
+        // And repeated polls keep returning it.
+        let polled_again = handle
+            .try_wait()
+            .expect("repeated try_wait must succeed after finalization");
+        assert_eq!(polled_again.map(|s| s.code()), Some(status.code()));
+    }
+
+    /// A graceful `shutdown` also reaches the finalized terminal state:
+    /// after it returns `Ok`, `try_wait` must expose the terminal
+    /// status rather than `DurableFinalizationRequired`
+    /// (terraphim-ai#3269).
+    #[tokio::test]
+    async fn test_try_wait_returns_finalized_status_after_durable_shutdown() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let ctx = SpawnContext::global().with_output_journal(temp.path(), run_id);
+
+        let spawner = AgentSpawner::new();
+        let provider = create_sleep_agent_provider();
+
+        let mut handle = spawner
+            .spawn(&provider, "60", ctx)
+            .await
+            .expect("spawn with output journal should succeed");
+
+        let graceful = handle
+            .shutdown(Duration::from_secs(2))
+            .await
+            .expect("shutdown should succeed");
+        assert!(
+            graceful,
+            "sleep should exit on SIGTERM within the grace period"
+        );
+
+        let polled = handle
+            .try_wait()
+            .expect("try_wait must succeed after shutdown finalized the run");
+        assert!(
+            polled.is_some(),
+            "try_wait must return the finalized terminal status after shutdown"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_kill_finalizes_durable_output_before_returning() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let ctx = SpawnContext::global().with_output_journal(temp.path(), run_id);
+
+        let spawner = AgentSpawner::new();
+        let provider = create_sleep_agent_provider();
+
+        // Spawn a long-running sleep 60 agent backed by the durable journal.
+        let handle = spawner
+            .spawn(&provider, "60", ctx)
+            .await
+            .expect("spawn with output journal should succeed");
+
+        let process_id = handle.process_id();
+
+        // Hard kill must finalize the durable journal before returning: a
+        // caller that observes Ok from the consuming kill() must be able to
+        // rely on the completion marker being sealed on disk.
+        let result = handle.kill().await;
+        assert!(result.is_ok(), "kill should succeed");
+
+        let recovered =
+            Journal::recover_run(temp.path(), run_id).expect("journal recovery should succeed");
+
+        assert!(
+            recovered.completion.is_some(),
+            "journal completion should be Some after kill returns"
+        );
+
+        let completed_records: Vec<&JournalRecord> = recovered
+            .records
+            .iter()
+            .filter(|record| {
+                record.kind == OutputKind::Completed && record.process_id == process_id.0
+            })
+            .collect();
+        assert_eq!(
+            completed_records.len(),
+            1,
+            "journal should contain exactly one Completed record for the spawned process, got: {:?}",
+            completed_records
+        );
+    }
+
+    /// Verification test: stderr redaction must apply to BOTH durable sinks
+    /// (terraphim-ai#3269). A secret printed to stderr by the child must
+    /// appear redacted in the dedicated stderr log file AND in the
+    /// recovered journal's Stderr records, with the completion marker
+    /// sealed after wait() returns.
+    #[tokio::test]
+    async fn test_spawn_journal_preserves_redacted_stderr_log() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let stderr_log = temp.path().join("stderr.log");
+
+        let ctx = SpawnContext::global()
+            .with_stderr_log(&stderr_log)
+            .with_output_journal(temp.path(), run_id);
+
+        let spawner = AgentSpawner::new().with_working_dir("/tmp");
+        let provider = Provider::new(
+            "@bash-agent",
+            "Bash Agent",
+            ProviderType::Agent {
+                agent_id: "@bash".to_string(),
+                cli_command: "bash".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![Capability::CodeGeneration],
+        );
+
+        let mut handle = spawner
+            .spawn(&provider, "printf \"api_key=supersecret\\n\" >&2", ctx)
+            .await
+            .expect("spawn with journal and stderr log should succeed");
+
+        let status = handle.wait().await.expect("bash should exit");
+        assert!(status.success(), "bash printf should exit successfully");
+
+        // The durable stderr log must hold only the redacted line.
+        let log_contents = std::fs::read_to_string(&stderr_log)
+            .expect("stderr log should exist after wait returns");
+        assert!(
+            log_contents.contains("REDACTED"),
+            "stderr log should contain the redaction marker, got: {:?}",
+            log_contents
+        );
+        assert!(
+            !log_contents.contains("supersecret"),
+            "stderr log must not contain the raw secret, got: {:?}",
+            log_contents
+        );
+
+        // The recovered journal must carry a redacted Stderr record and a
+        // sealed completion marker.
+        let recovered =
+            Journal::recover_run(temp.path(), run_id).expect("journal recovery should succeed");
+
+        let stderr_records: Vec<&JournalRecord> = recovered
+            .records
+            .iter()
+            .filter(|record| record.kind == OutputKind::Stderr)
+            .collect();
+        assert!(
+            !stderr_records.is_empty(),
+            "journal should contain at least one Stderr record"
+        );
+        assert!(
+            stderr_records.iter().any(|record| {
+                record
+                    .payload
+                    .as_str()
+                    .is_some_and(|s| s.contains("REDACTED"))
+            }),
+            "journal Stderr record should be redacted, got: {:?}",
+            stderr_records
+        );
+        assert!(
+            stderr_records.iter().all(|record| {
+                record
+                    .payload
+                    .as_str()
+                    .is_some_and(|s| !s.contains("supersecret"))
+            }),
+            "journal Stderr records must not contain the raw secret, got: {:?}",
+            stderr_records
+        );
+        assert!(
+            recovered.completion.is_some(),
+            "journal completion should be Some after wait returns"
+        );
+    }
+
+    /// The grace period must bound the *process exit* wait, not the
+    /// output drain (terraphim-ai#3269).
+    ///
+    /// The managed bash child traps SIGTERM and exits 0 promptly — well
+    /// inside the ~50ms grace window — but leaves a background
+    /// grandchild holding the stdout pipe open for ~200ms before it
+    /// writes `late-output` and exits (closing the pipe).
+    ///
+    /// Desired behaviour:
+    ///   * `shutdown` returns `Ok(true)` because the managed child
+    ///     exited gracefully inside the grace period;
+    ///   * `shutdown` still waits for the late output to drain before
+    ///     returning (return is NOT bounded by the grace period);
+    ///   * the recovered durable journal contains `late-output` and a
+    ///     sealed completion marker.
+    ///
+    /// The script touches a ready marker only after its TERM trap is
+    /// installed, and the test waits boundedly for that marker before
+    /// calling `shutdown` — otherwise SIGTERM can race process startup
+    /// and kill bash before the trap exists. The grace timeout wraps
+    /// the child-exit wait only; the output drain runs outside it.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_shutdown_grace_times_process_exit_not_output_drain() {
+        use tempfile::TempDir;
+        use uuid::Uuid;
+
+        let temp = TempDir::new().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let ready_marker = temp.path().join("trap-ready.marker");
+        let ctx = SpawnContext::global()
+            .with_output_journal(temp.path(), run_id)
+            .with_env(
+                "TRAP_READY_MARKER",
+                ready_marker.to_string_lossy().to_string(),
+            );
+
+        let spawner = AgentSpawner::new();
+        let provider = Provider::new(
+            "@bash-agent",
+            "Bash Agent",
+            ProviderType::Agent {
+                agent_id: "@bash".to_string(),
+                cli_command: "bash".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![Capability::CodeGeneration],
+        );
+
+        // `AgentConfig::infer_args("bash")` prepends `-c`, so the task
+        // runs as an inline script. The script:
+        //   * traps TERM to kill its keepalive sleep and exit 0
+        //     promptly (bash interrupts `wait` to run traps, so exit
+        //     happens within a few ms of the signal);
+        //   * spawns a background subshell that inherits the stdout
+        //     pipe, waits ~200ms, writes `late-output`, and exits —
+        //     only then does the pipe see EOF;
+        //   * touches the ready marker ONLY AFTER the trap is
+        //     installed, so the test never signals a trapless bash;
+        //   * otherwise stays alive via `wait`.
+        let script = "trap 'kill $KEEPALIVE_PID 2>/dev/null; exit 0' TERM; \
+                      ( sleep 0.2; echo late-output ) & \
+                      sleep 300 >/dev/null 2>&1 & \
+                      KEEPALIVE_PID=$!; \
+                      touch \"$TRAP_READY_MARKER\"; \
+                      wait";
+
+        let mut handle = spawner
+            .spawn(&provider, script, ctx)
+            .await
+            .expect("spawn bash agent with output journal should succeed");
+
+        let process_id = handle.process_id();
+
+        // Wait boundedly for the child to install its TERM trap
+        // (signalled by the ready marker) before shutdown sends
+        // SIGTERM. Without this the signal can race process startup
+        // and terminate bash with the default TERM disposition.
+        let ready_deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !ready_marker.exists() {
+            assert!(
+                std::time::Instant::now() < ready_deadline,
+                "child did not install its TERM trap (ready marker) within 5s"
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        // Generous timing bounds: late output lands at ~200ms; grace is
+        // 50ms, comfortably shorter so a grace-bounded drain always
+        // loses the race, while the prompt trap exit is comfortably
+        // inside it.
+        let grace = Duration::from_millis(50);
+        let started = tokio::time::Instant::now();
+        let result = handle.shutdown(grace).await;
+        let elapsed = started.elapsed();
+
+        assert!(result.is_ok(), "shutdown should succeed, got: {:?}", result);
+        assert!(
+            result.unwrap(),
+            "managed child trapped TERM and exited 0 promptly inside the \
+             {grace:?} grace period; shutdown must report graceful exit, \
+             not a force-kill (elapsed: {elapsed:?})"
+        );
+
+        assert!(
+            elapsed >= Duration::from_millis(120),
+            "shutdown must still wait for the late output drain (~200ms) \
+             before returning instead of bounding the drain by the grace \
+             period, but returned after {elapsed:?}"
+        );
+        assert!(
+            elapsed < Duration::from_secs(10),
+            "shutdown must return shortly after the ~200ms drain, took {elapsed:?}"
+        );
+
+        let recovered =
+            Journal::recover_run(temp.path(), run_id).expect("journal recovery should succeed");
+
+        assert!(
+            recovered.completion.is_some(),
+            "journal completion should be Some after shutdown returns"
+        );
+
+        assert!(
+            recovered.records.iter().any(|record| {
+                record.kind == OutputKind::Stdout
+                    && record.process_id == process_id.0
+                    && record
+                        .payload
+                        .as_str()
+                        .is_some_and(|s| s.contains("late-output"))
+            }),
+            "journal should contain the drained late-output line written \
+             after the managed child exited, got: {:?}",
+            recovered.records
         );
     }
 }
