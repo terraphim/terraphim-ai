@@ -11,4 +11,4 @@ To onboard a new fleet automation account, add its exact Gitea login to the
 `synonyms::` line below and restart (or wait for) the orchestrator's next
 allowlist reload — no code change or rebuild required.
 
-synonyms:: claude-code, root, implementation-swarm
+synonyms:: claude-code, root, implementation-swarm, kairo

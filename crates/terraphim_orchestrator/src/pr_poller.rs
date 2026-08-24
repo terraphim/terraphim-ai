@@ -387,6 +387,14 @@ pub fn evaluate_pr_gates(
                 ),
             };
         }
+        if result.confidence < criteria.min_confidence {
+            return EvaluationOutcome::HumanReviewNeeded {
+                reason: format!(
+                    "`{context}` gate confidence {} is below required {}",
+                    result.confidence, criteria.min_confidence
+                ),
+            };
+        }
         if result.blocking_findings > 0 {
             return EvaluationOutcome::HumanReviewNeeded {
                 reason: format!(
@@ -678,16 +686,67 @@ mod tests {
         }
     }
 
-    fn gate_body(context: &str, head: &str, status: &str, blocking: u32) -> String {
+    fn status(context: &str, state: CommitStatusState) -> CommitStatusSummary {
+        CommitStatusSummary {
+            context: context.to_string(),
+            state,
+            created_at_unix: None,
+        }
+    }
+
+    fn gate_body(context: &str, head: &str, status: &str, blocking: u32, confidence: u8) -> String {
         format!(
-            "<!-- adf:gate-result\n{{\n  \"schema_version\": 1,\n  \"agent\": \"agent\",\n  \"context\": \"{context}\",\n  \"pr_number\": 1,\n  \"head_sha\": \"{head}\",\n  \"status\": \"{status}\",\n  \"confidence\": 4,\n  \"blocking_findings\": {blocking},\n  \"summary\": \"ok\"\n}}\n-->"
+            "<!-- adf:gate-result\n{{\n  \"schema_version\": 1,\n  \"agent\": \"agent\",\n  \"context\": \"{context}\",\n  \"pr_number\": 1,\n  \"head_sha\": \"{head}\",\n  \"status\": \"{status}\",\n  \"confidence\": {confidence},\n  \"blocking_findings\": {blocking},\n  \"summary\": \"ok\"\n}}\n-->"
         )
+    }
+
+    fn passing_gate_body(context: &str, head: &str, status: &str, blocking: u32) -> String {
+        gate_body(context, head, status, blocking, 5)
     }
 
     fn all_green_statuses() -> Vec<CommitStatusSummary> {
         MERGE_REQUIRED_CONTEXTS
             .iter()
             .map(|context| green_status(context))
+            .collect()
+    }
+
+    fn passing_gate_comments(head: &str) -> Vec<PrComment> {
+        ADF_GATE_CONTEXTS
+            .iter()
+            .enumerate()
+            .map(|(idx, context)| {
+                comment(
+                    idx as u64 + 1,
+                    "agent",
+                    &passing_gate_body(context, head, "pass", 0),
+                    "2026-01-01T00:00:00Z",
+                )
+            })
+            .collect()
+    }
+
+    fn gate_comments_with_reviewer_result(
+        head: &str,
+        reviewer_status: &str,
+        reviewer_blocking: u32,
+    ) -> Vec<PrComment> {
+        ADF_GATE_CONTEXTS
+            .iter()
+            .enumerate()
+            .map(|(idx, context)| {
+                let (status, blocking) = if *context == ADF_REVIEWER_CONTEXT {
+                    (reviewer_status, reviewer_blocking)
+                } else {
+                    ("pass", 0)
+                };
+                comment(
+                    idx as u64 + 1,
+                    "agent",
+                    &passing_gate_body(context, head, status, blocking),
+                    "2026-01-01T00:00:00Z",
+                )
+            })
             .collect()
     }
 
@@ -738,18 +797,7 @@ mod tests {
     #[test]
     fn evaluate_gates_merges_when_every_context_is_green() {
         let p = pr(1, "claude-code", "abc", 10);
-        let comments = ADF_GATE_CONTEXTS
-            .iter()
-            .enumerate()
-            .map(|(idx, context)| {
-                comment(
-                    idx as u64 + 1,
-                    "agent",
-                    &gate_body(context, "abc", "pass", 0),
-                    "2026-01-01T00:00:00Z",
-                )
-            })
-            .collect::<Vec<_>>();
+        let comments = passing_gate_comments("abc");
         let out = evaluate_pr_gates(
             &p,
             &comments,
@@ -775,7 +823,7 @@ mod tests {
                 comment(
                     idx as u64 + 1,
                     "agent",
-                    &gate_body(context, "stale", "pass", 0),
+                    &passing_gate_body(context, "stale", "pass", 0),
                     "2026-01-01T00:00:00Z",
                 )
             })
@@ -788,6 +836,234 @@ mod tests {
             &AutoMergeCriteria::default(),
         );
         assert!(matches!(out, EvaluationOutcome::StaleGates { .. }));
+    }
+
+    #[test]
+    fn kairo_pr_awaits_missing_reviewer_status_and_result() {
+        let p = pr(1, "kairo", "abc", 10);
+        let statuses_without_reviewer = MERGE_REQUIRED_CONTEXTS
+            .iter()
+            .filter(|context| **context != ADF_REVIEWER_CONTEXT)
+            .map(|context| green_status(context))
+            .collect::<Vec<_>>();
+        let out = evaluate_pr_gates(
+            &p,
+            &passing_gate_comments("abc"),
+            &statuses_without_reviewer,
+            "terraphim-ai",
+            &AutoMergeCriteria::default(),
+        );
+        assert!(
+            matches!(
+                out,
+                EvaluationOutcome::AwaitingGates { ref reason }
+                    if reason.contains("missing commit status")
+                        && reason.contains(ADF_REVIEWER_CONTEXT)
+            ),
+            "missing reviewer status must await gates, got: {out:?}"
+        );
+
+        let comments_without_reviewer = ADF_GATE_CONTEXTS
+            .iter()
+            .filter(|context| **context != ADF_REVIEWER_CONTEXT)
+            .enumerate()
+            .map(|(idx, context)| {
+                comment(
+                    idx as u64 + 1,
+                    "agent",
+                    &passing_gate_body(context, "abc", "pass", 0),
+                    "2026-01-01T00:00:00Z",
+                )
+            })
+            .collect::<Vec<_>>();
+        let out = evaluate_pr_gates(
+            &p,
+            &comments_without_reviewer,
+            &all_green_statuses(),
+            "terraphim-ai",
+            &AutoMergeCriteria::default(),
+        );
+        assert!(
+            matches!(
+                out,
+                EvaluationOutcome::AwaitingGates { ref reason }
+                    if reason.contains("no `adf:gate-result` comment")
+                        && reason.contains(ADF_REVIEWER_CONTEXT)
+            ),
+            "missing reviewer gate result must await gates, got: {out:?}"
+        );
+    }
+
+    #[test]
+    fn kairo_pr_does_not_merge_with_stale_fail_concerns_or_blocking_reviewer_evidence_under_terraphim_ai(
+    ) {
+        let p = pr(1, "kairo", "fresh", 10);
+        let criteria = AutoMergeCriteria::default();
+
+        let comments = gate_comments_with_reviewer_result("fresh", "pass", 0)
+            .into_iter()
+            .map(|mut c| {
+                if c.body.contains(ADF_REVIEWER_CONTEXT) {
+                    c.body = passing_gate_body(ADF_REVIEWER_CONTEXT, "stale", "pass", 0);
+                }
+                c
+            })
+            .collect::<Vec<_>>();
+        let out = evaluate_pr_gates(
+            &p,
+            &comments,
+            &all_green_statuses(),
+            "terraphim-ai",
+            &criteria,
+        );
+        assert!(
+            matches!(out, EvaluationOutcome::StaleGates { .. }),
+            "stale reviewer evidence must block merge, got: {out:?}"
+        );
+
+        let out = evaluate_pr_gates(
+            &p,
+            &gate_comments_with_reviewer_result("fresh", "fail", 0),
+            &all_green_statuses(),
+            "terraphim-ai",
+            &criteria,
+        );
+        assert!(
+            matches!(out, EvaluationOutcome::HumanReviewNeeded { .. }),
+            "fail reviewer evidence must require human review, got: {out:?}"
+        );
+
+        let out = evaluate_pr_gates(
+            &p,
+            &gate_comments_with_reviewer_result("fresh", "concerns", 0),
+            &all_green_statuses(),
+            "terraphim-ai",
+            &criteria,
+        );
+        assert!(
+            matches!(out, EvaluationOutcome::HumanReviewNeeded { .. }),
+            "terraphim-ai concerns must require human review, got: {out:?}"
+        );
+
+        let out = evaluate_pr_gates(
+            &p,
+            &gate_comments_with_reviewer_result("fresh", "pass", 1),
+            &all_green_statuses(),
+            "terraphim-ai",
+            &criteria,
+        );
+        assert!(
+            matches!(out, EvaluationOutcome::HumanReviewNeeded { .. }),
+            "blocking reviewer findings must require human review, got: {out:?}"
+        );
+    }
+
+    #[test]
+    fn kairo_pr_requires_all_current_head_nonblocking_required_contexts() {
+        let p = pr(1, "kairo", "abc", 10);
+        let comments = passing_gate_comments("abc");
+        let criteria = AutoMergeCriteria::default();
+
+        for missing_context in MERGE_REQUIRED_CONTEXTS {
+            let statuses = MERGE_REQUIRED_CONTEXTS
+                .iter()
+                .filter(|context| *context != missing_context)
+                .map(|context| green_status(context))
+                .collect::<Vec<_>>();
+            let out = evaluate_pr_gates(&p, &comments, &statuses, "terraphim-ai", &criteria);
+            assert!(
+                matches!(out, EvaluationOutcome::AwaitingGates { .. }),
+                "missing `{missing_context}` must await gates, got: {out:?}"
+            );
+        }
+
+        for failed_context in MERGE_REQUIRED_CONTEXTS {
+            let statuses = MERGE_REQUIRED_CONTEXTS
+                .iter()
+                .map(|context| {
+                    if context == failed_context {
+                        status(context, CommitStatusState::Failure)
+                    } else {
+                        green_status(context)
+                    }
+                })
+                .collect::<Vec<_>>();
+            let out = evaluate_pr_gates(&p, &comments, &statuses, "terraphim-ai", &criteria);
+            assert!(
+                matches!(out, EvaluationOutcome::AwaitingGates { .. }),
+                "non-success `{failed_context}` must await gates, got: {out:?}"
+            );
+        }
+
+        let out = evaluate_pr_gates(
+            &p,
+            &comments,
+            &all_green_statuses(),
+            "terraphim-ai",
+            &criteria,
+        );
+        assert_eq!(
+            out,
+            EvaluationOutcome::Merge {
+                head_sha: "abc".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn kairo_pr_requires_minimum_gate_confidence() {
+        let p = pr(1, "kairo", "abc", 10);
+        let criteria = AutoMergeCriteria::default();
+        let under_threshold = criteria.min_confidence - 1;
+        let comments = ADF_GATE_CONTEXTS
+            .iter()
+            .enumerate()
+            .map(|(idx, context)| {
+                let confidence = if *context == ADF_REVIEWER_CONTEXT {
+                    under_threshold
+                } else {
+                    criteria.min_confidence
+                };
+                comment(
+                    idx as u64 + 1,
+                    "agent",
+                    &gate_body(context, "abc", "pass", 0, confidence),
+                    "2026-01-01T00:00:00Z",
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let out = evaluate_pr_gates(
+            &p,
+            &comments,
+            &all_green_statuses(),
+            "terraphim-ai",
+            &criteria,
+        );
+        assert!(
+            matches!(
+                out,
+                EvaluationOutcome::HumanReviewNeeded { ref reason }
+                    if reason.contains(ADF_REVIEWER_CONTEXT)
+                        && reason.contains(&under_threshold.to_string())
+                        && reason.contains(&criteria.min_confidence.to_string())
+            ),
+            "low confidence gate result must require human review, got: {out:?}"
+        );
+
+        let out = evaluate_pr_gates(
+            &p,
+            &passing_gate_comments("abc"),
+            &all_green_statuses(),
+            "terraphim-ai",
+            &criteria,
+        );
+        assert_eq!(
+            out,
+            EvaluationOutcome::Merge {
+                head_sha: "abc".to_string()
+            }
+        );
     }
 
     #[test]

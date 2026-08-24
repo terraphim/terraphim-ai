@@ -20,6 +20,7 @@ Add exact Gitea login `kairo` to the recognised fleet-agent allowlist while pres
 - `pr_poller.rs:342` requires every `MERGE_REQUIRED_CONTEXTS` status to be present and `success`.
 - `pr_poller.rs:360` requires every ADF gate context to have a canonical `adf:gate-result`.
 - `pr_poller.rs:374`, `:390`, `:398`, and `:404` preserve head-SHA, blocking-finding, fail-status, and `terraphim-ai` concerns gates.
+- Independent structural review round 1 found that `evaluate_pr_gates` parses canonical gate-result `confidence` but did not enforce the existing `AutoMergeCriteria::min_confidence` threshold. A reviewer result with confidence `4` could therefore reach `Merge` despite the configured `5/5` policy.
 
 ## Scope
 
@@ -28,11 +29,12 @@ In scope:
 - Add exact login `kairo` to `crates/terraphim_orchestrator/kg/recognised_agents.md`.
 - Add exact login `kairo` to `AutoMergeCriteria::default().recognised_agent_logins`.
 - Add RED tests before implementation for KG/default recognition and unchanged merge gates.
+- Enforce the existing `min_confidence` threshold on canonical ADF gate results before `Merge`; do not change the threshold value.
 
 Out of scope:
 
 - No changes to `author_is_agent` semantics.
-- No changes to thresholds, required contexts, reviewer result parsing, project-specific concerns handling, or head-SHA checks.
+- No changes to threshold values, required contexts, reviewer result parsing, project-specific concerns handling, or head-SHA checks.
 - No network, git operations, deployment, issue comments, or commits in this design phase.
 
 Avoid at all cost:
@@ -45,7 +47,7 @@ Avoid at all cost:
 
 ## Design
 
-The minimum implementation is two data edits and focused regression tests.
+The minimum implementation is two data edits, one fail-closed enforcement check for the already-configured confidence threshold, and focused regression tests.
 
 1. Canonical KG:
    - Change `synonyms:: claude-code, root, implementation-swarm`
@@ -55,7 +57,7 @@ The minimum implementation is two data edits and focused regression tests.
    - Change the literal array in `AutoMergeCriteria::default()` from `["claude-code", "root", "implementation-swarm"]`
    - To `["claude-code", "root", "implementation-swarm", "kairo"]`
 
-No production control flow changes are required. Existing `author_is_agent(login, recognised_logins)` remains exact-match plus `adf-` prefix, and `evaluate_pr_gates` remains the canonical end-to-end gate evaluator for PR polling.
+Existing `author_is_agent(login, recognised_logins)` remains exact-match plus `adf-` prefix. In `evaluate_pr_gates`, every canonical ADF gate result must meet `criteria.min_confidence`; otherwise return `HumanReviewNeeded` before the evaluator can reach `Merge`. This closes structural-review round 1 without changing the configured threshold or any other gate.
 
 ## File Changes
 
@@ -66,7 +68,7 @@ Modified files:
 | `crates/terraphim_orchestrator/kg/recognised_agents.md` | Append `kairo` to the `synonyms::` line. |
 | `crates/terraphim_orchestrator/src/pr_review.rs` | Append `kairo` to `AutoMergeCriteria::default().recognised_agent_logins`; add author/default tests if not placed elsewhere. |
 | `crates/terraphim_orchestrator/src/agent_allowlist_kg.rs` | Add assertions covering embedded/default KG recognition and unrelated login rejection. |
-| `crates/terraphim_orchestrator/src/pr_poller.rs` | Add pure evaluator tests proving `kairo` remains subject to every polling gate. |
+| `crates/terraphim_orchestrator/src/pr_poller.rs` | Enforce canonical gate-result confidence against the existing threshold; add pure evaluator tests proving `kairo` remains subject to every polling gate. |
 
 New files: none.
 
@@ -108,6 +110,12 @@ Write these tests before changing production data.
    - For each context in `MERGE_REQUIRED_CONTEXTS`, remove that status and assert `AwaitingGates`.
    - For each context in `MERGE_REQUIRED_CONTEXTS`, set that status to a non-success state and assert `AwaitingGates`.
    - Control assertion: with all required statuses green and all ADF gate results pass on current head, outcome is `Merge`.
+
+6. `pr_poller::tests::kairo_pr_requires_minimum_gate_confidence`
+   - Arrange: valid `kairo` PR, all required statuses green, and current-head pass results for every ADF gate.
+   - Set one canonical gate result's confidence to `criteria.min_confidence - 1`.
+   - Assert `HumanReviewNeeded` and a reason naming the context and confidence threshold.
+   - Control assertion: confidence exactly equal to `criteria.min_confidence` remains eligible for `Merge` when all other gates pass.
 
 ## Verification
 

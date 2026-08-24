@@ -79,7 +79,7 @@ impl Default for AutoMergeCriteria {
             require_all_criteria: true,
             max_diff_loc: 500,
             require_agent_author: true,
-            recognised_agent_logins: ["claude-code", "root", "implementation-swarm"]
+            recognised_agent_logins: ["claude-code", "root", "implementation-swarm", "kairo"]
                 .into_iter()
                 .map(String::from)
                 .collect(),
@@ -411,6 +411,14 @@ mod tests {
         assert!(!author_is_agent("alex", &recognised));
         assert!(!author_is_agent("dependabot[bot]", &recognised));
         assert!(!author_is_agent("renovate[bot]", &recognised));
+    }
+
+    #[test]
+    fn default_author_policy_recognises_kairo_and_rejects_unrelated_login() {
+        let recognised = AutoMergeCriteria::default().recognised_agent_logins;
+        assert!(author_is_agent("kairo", &recognised));
+        assert!(!author_is_agent("not-kairo", &recognised));
+        assert!(!author_is_agent("kairo-human", &recognised));
     }
 
     #[test]
