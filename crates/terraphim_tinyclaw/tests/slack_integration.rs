@@ -12,6 +12,7 @@ mod common;
 
 #[cfg(feature = "slack")]
 mod slack_tests {
+    use crate::common;
     use std::sync::Arc;
     use terraphim_tinyclaw::bus::MessageBus;
     use terraphim_tinyclaw::channel::Channel;
