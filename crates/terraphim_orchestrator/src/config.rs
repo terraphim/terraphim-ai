@@ -2818,6 +2818,11 @@ task = "t"
     /// Exact prefix equality only: `terraphim-proxy-evil`, `terraphim-proxyx`,
     /// and `not-terraphim-proxy` must not slip through a substring match,
     /// and raw `opencode/` plus unknown pay-per-use prefixes stay banned.
+    ///
+    /// Exact-head review remediation (PR #3287): each rejection must carry
+    /// the agent name, the offending value, *and* the rejected field name,
+    /// for both validated fields (`model` and `fallback_model`). Previously
+    /// only the absolute-path regression asserted the field.
     #[test]
     fn test_terraphim_proxy_lookalikes_rejected() {
         for rejected in [
@@ -2835,13 +2840,28 @@ task = "t"
                 !is_allowed_provider(rejected),
                 "lookalike {rejected} must be rejected"
             );
-            assert!(
-                matches!(
-                    validate_model_provider("gate-agent", "model", rejected),
-                    Err(crate::error::OrchestratorError::BannedProvider { .. })
-                ),
-                "load-time gate must reject {rejected} with BannedProvider"
-            );
+            for field in ["model", "fallback_model"] {
+                let err = validate_model_provider("gate-agent", field, rejected)
+                    .expect_err("load-time gate must reject lookalikes");
+                match err {
+                    crate::error::OrchestratorError::BannedProvider {
+                        agent,
+                        provider,
+                        field: offending_field,
+                    } => {
+                        assert_eq!(agent, "gate-agent", "agent must be named for {rejected}");
+                        assert_eq!(
+                            provider, rejected,
+                            "offending value must be reported for {field}"
+                        );
+                        assert_eq!(
+                            offending_field, field,
+                            "rejected field name must be reported for {rejected}"
+                        );
+                    }
+                    other => panic!("expected BannedProvider for {rejected}, got {other}"),
+                }
+            }
         }
     }
 

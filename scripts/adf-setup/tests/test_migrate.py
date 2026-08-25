@@ -327,6 +327,25 @@ def _find_adf_binary() -> Path | None:
 # Test 7: banned-list drift detection -- script list must match Rust source
 # ---------------------------------------------------------------------------
 
+def _rust_const_entries(rust_src: str, const_name: str) -> set[str]:
+    """Parse a `pub const NAME: &[&str] = &[...]` list from Rust config.rs."""
+    match = re.search(
+        rf'pub const {const_name}:\s*&\[&str\]\s*=\s*&\[([^\]]*)\]',
+        rust_src,
+        re.DOTALL,
+    )
+    assert match, f"Could not find {const_name} in Rust config.rs"
+    return set(re.findall(r'"([^"]+)"', match.group(1)))
+
+
+def _script_list_entries(list_name: str) -> set[str]:
+    """Parse a `NAME = [...]` string list from the migration script source."""
+    script_src = SCRIPT.read_text(encoding="utf-8")
+    match = re.search(rf'{list_name}\s*=\s*\[([^\]]*)\]', script_src, re.DOTALL)
+    assert match, f"Could not find {list_name} in migrate-to-confd.py"
+    return set(re.findall(r'"([^"]+)"', match.group(1)))
+
+
 def test_banned_list_matches_rust():
     """Script BANNED_PREFIXES must match BANNED_PROVIDER_PREFIXES in Rust config.rs.
 
@@ -338,30 +357,10 @@ def test_banned_list_matches_rust():
     )
 
     rust_src = RUST_CONFIG_SRC.read_text(encoding="utf-8")
+    rust_set = _rust_const_entries(rust_src, "BANNED_PROVIDER_PREFIXES")
 
-    # Extract the BANNED_PROVIDER_PREFIXES constant block.
-    match = re.search(
-        r'pub const BANNED_PROVIDER_PREFIXES:\s*&\[&str\]\s*=\s*&\[([^\]]*)\]',
-        rust_src,
-        re.DOTALL,
-    )
-    assert match, "Could not find BANNED_PROVIDER_PREFIXES in Rust config.rs"
-
-    rust_entries = re.findall(r'"([^"]+)"', match.group(1))
-    rust_set = set(rust_entries)
-
-    # Import the script's list without executing it fully -- extract via regex.
-    script_src = SCRIPT.read_text(encoding="utf-8")
-    script_match = re.search(
-        r'BANNED_PREFIXES\s*=\s*\[([^\]]*)\]',
-        script_src,
-        re.DOTALL,
-    )
-    assert script_match, "Could not find BANNED_PREFIXES in migrate-to-confd.py"
-
-    script_entries = re.findall(r'"([^"]+)"', script_match.group(1))
     # Normalise: strip trailing '/' so both sets use bare prefix names.
-    script_set = {e.rstrip("/") for e in script_entries}
+    script_set = {e.rstrip("/") for e in _script_list_entries("BANNED_PREFIXES")}
 
     assert script_set == rust_set, (
         f"BANNED_PREFIXES mismatch.\n"
@@ -579,9 +578,118 @@ task = "Do something."
         )
 
 
+def _compound_review_fixture_toml(
+    model: str | None,
+    fallback_model: str | None,
+) -> str:
+    """Minimal monolithic config with a valid agent and a `[compound_review]`
+    block carrying the given model/fallback_model values."""
+    toml = f"""\
+working_dir = "/tmp/test"
+restart_cooldown_secs = 300
+max_restart_count = 3
+tick_interval_secs = 30
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.1
+moderate_threshold = 0.2
+severe_threshold = 0.4
+critical_threshold = 0.7
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/test"
+"""
+    if model is not None:
+        toml += f'model = "{model}"\n'
+    if fallback_model is not None:
+        toml += f'fallback_model = "{fallback_model}"\n'
+    toml += """
+[[agents]]
+name = "compound-check-agent"
+layer = "Core"
+cli_tool = "/usr/bin/opencode"
+model = "kimi-for-coding/k2p5"
+task = "Do something."
+"""
+    return toml
+
+
+def test_compound_review_rejects_terraphim_proxy_lookalike():
+    """End-to-end rejection of a lookalike route in `[compound_review]`.
+
+    Exact-head review of PR #3287: the `[compound_review]` branch of the
+    pre-flight was covered for acceptance
+    (`test_compound_review_terraphim_proxy_model_accepted`) but never for
+    rejection. `compound_review.model = "terraphim-proxy-evil/think"` must
+    exit non-zero naming the compound-review identity, the offending value,
+    and the failing field. `compound_review.fallback_model` goes through the
+    same code path (`_provider_violation` on both fields), so it is covered
+    economically in the same test.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+
+        # --- model ---
+        fixture_path = tmp_path / "compound-reject.toml"
+        fixture_path.write_text(
+            _compound_review_fixture_toml(model="terraphim-proxy-evil/think", fallback_model=None),
+            encoding="utf-8",
+        )
+        result = run_migration(
+            "--input", str(fixture_path),
+            "--output-dir", str(tmp_path / "conf.d"),
+            "--base-output", str(tmp_path / "orchestrator.toml"),
+        )
+        assert result.returncode != 0, (
+            "Expected non-zero exit for compound_review.model lookalike"
+        )
+        assert "compound_review" in result.stderr, (
+            f"Expected compound-review identity in error: {result.stderr}"
+        )
+        assert "terraphim-proxy-evil/think" in result.stderr, (
+            f"Expected offending value in error: {result.stderr}"
+        )
+        assert "field: model" in result.stderr, (
+            f"Expected the failing field to be reported: {result.stderr}"
+        )
+
+        # --- fallback_model (same code path, economical coverage) ---
+        fixture_path = tmp_path / "compound-reject-fallback.toml"
+        fixture_path.write_text(
+            _compound_review_fixture_toml(
+                model="terraphim-proxy/think",
+                fallback_model="terraphim-proxy-evil/auto",
+            ),
+            encoding="utf-8",
+        )
+        result = run_migration(
+            "--input", str(fixture_path),
+            "--output-dir", str(tmp_path / "conf.d"),
+            "--base-output", str(tmp_path / "orchestrator.toml"),
+        )
+        assert result.returncode != 0, (
+            "Expected non-zero exit for compound_review.fallback_model lookalike"
+        )
+        assert "compound_review" in result.stderr, (
+            f"Expected compound-review identity in error: {result.stderr}"
+        )
+        assert "terraphim-proxy-evil/auto" in result.stderr, (
+            f"Expected offending value in error: {result.stderr}"
+        )
+        assert "field: fallback_model" in result.stderr, (
+            f"Expected the failing field to be reported: {result.stderr}"
+        )
+
+
 def test_terraphim_proxy_lookalikes_rejected():
     """Exact prefix equality only: lookalikes, raw opencode, and unknown
-    pay-per-use prefixes must all be rejected with the offending value."""
+    pay-per-use prefixes must all be rejected with the agent name, the
+    offending value, *and* the rejected field name (exact-head review of
+    PR #3287: the field was previously asserted only by the absolute-path
+    regressions).
+    """
     for rejected in [
         "not-terraphim-proxy/auto",
         "terraphim-proxy-evil/auto",
@@ -605,6 +713,30 @@ def test_terraphim_proxy_lookalikes_rejected():
         assert rejected in result.stderr, (
             f"Expected offending value {rejected!r} in error: {result.stderr}"
         )
+        assert "field: model" in result.stderr, (
+            f"Expected the failing field to be reported: {result.stderr}"
+        )
+
+    # `fallback_model` goes through the same gate; pin that its rejection
+    # names the right field too (representative lookalike, primary model
+    # allowed so the fallback is what fails).
+    result = _run_with_agent_fixture(
+        "lookalike-fallback-agent",
+        model_value="kimi-for-coding/k2p5",
+        fallback_model="terraphim-proxy-evil/auto",
+    )
+    assert result.returncode != 0, (
+        "Expected non-zero exit for lookalike as fallback_model"
+    )
+    assert "lookalike-fallback-agent" in result.stderr, (
+        f"Expected agent name in error: {result.stderr}"
+    )
+    assert "terraphim-proxy-evil/auto" in result.stderr, (
+        f"Expected offending value in error: {result.stderr}"
+    )
+    assert "field: fallback_model" in result.stderr, (
+        f"Expected the failing field to be reported: {result.stderr}"
+    )
 
 
 def test_absolute_executable_path_fallback_provider_accepted():
@@ -708,47 +840,89 @@ def test_absolute_path_rejected_as_fallback_model():
 
 
 def test_allowed_list_matches_rust():
-    """Script ALLOWED_PREFIXES must match ALLOWED_PROVIDER_PREFIXES in config.rs.
+    """Script ALLOWED_PREFIXES must equal ALLOWED_PROVIDER_PREFIXES ∪ ANTHROPIC_BARE_PROVIDERS.
 
     Mirrors the banned-list drift test: the migration script is the C1
-    pre-flight, so its allow-list must not drift from the Rust gate. The
-    script additionally carries `anthropic/` (the claude-code CLI route the
-    Rust side tracks in ANTHROPIC_BARE_PROVIDERS), which is normalised away
-    before comparison.
+    pre-flight, so its allow-list must not drift from the Rust gate.
+
+    Exact-head review of PR #3287: this test previously *unconditionally
+    discarded* the script-only `anthropic/` entry instead of comparing it,
+    so a future second entry in the Rust `ANTHROPIC_BARE_PROVIDERS` list
+    would have escaped drift coverage entirely. The Rust gate accepts
+    `anthropic` both bare and as `anthropic/...` via that constant, so the
+    script list is now compared against the union of the two Rust constants
+    -- nothing is discarded.
     """
     assert RUST_CONFIG_SRC.exists(), (
         f"Rust config source not found: {RUST_CONFIG_SRC}"
     )
 
     rust_src = RUST_CONFIG_SRC.read_text(encoding="utf-8")
-
-    rust_match = re.search(
-        r'pub const ALLOWED_PROVIDER_PREFIXES:\s*&\[&str\]\s*=\s*&\[([^\]]*)\]',
-        rust_src,
-        re.DOTALL,
+    rust_set = _rust_const_entries(rust_src, "ALLOWED_PROVIDER_PREFIXES") | _rust_const_entries(
+        rust_src, "ANTHROPIC_BARE_PROVIDERS"
     )
-    assert rust_match, "Could not find ALLOWED_PROVIDER_PREFIXES in Rust config.rs"
-    rust_set = set(re.findall(r'"([^"]+)"', rust_match.group(1)))
 
-    script_src = SCRIPT.read_text(encoding="utf-8")
-    script_match = re.search(
-        r'ALLOWED_PREFIXES\s*=\s*\[([^\]]*)\]',
-        script_src,
-        re.DOTALL,
-    )
-    assert script_match, "Could not find ALLOWED_PREFIXES in migrate-to-confd.py"
-    script_set = {e.rstrip("/") for e in re.findall(r'"([^"]+)"', script_match.group(1))}
-
-    # `anthropic/` is script-side sugar for the Rust ANTHROPIC_BARE_PROVIDERS
-    # claude-CLI route; every other entry must match the Rust allow-list.
-    script_set.discard("anthropic")
+    # Normalise: strip the trailing '/' so both sides use bare prefix names.
+    script_set = {e.rstrip("/") for e in _script_list_entries("ALLOWED_PREFIXES")}
 
     assert script_set == rust_set, (
         f"ALLOWED_PREFIXES mismatch.\n"
         f"  Script (normalised): {sorted(script_set)}\n"
-        f"  Rust:                {sorted(rust_set)}\n"
+        f"  Rust (union):        {sorted(rust_set)}\n"
         f"  Missing from script: {sorted(rust_set - script_set)}\n"
         f"  Extra in script:     {sorted(script_set - rust_set)}"
+    )
+
+
+def test_allowed_bare_models_match_rust():
+    """Script ALLOWED_BARE_MODELS must equal CLAUDE_CLI_BARE_MODELS ∪ ANTHROPIC_BARE_PROVIDERS.
+
+    Parity check for the bare-name half of the pre-flight (exact-head review
+    of PR #3287): the claude-code CLI bare models live in
+    `CLAUDE_CLI_BARE_MODELS` on the Rust side, and `anthropic` is accepted
+    bare via `ANTHROPIC_BARE_PROVIDERS`, so the script's bare-model list is
+    compared against the union of those two Rust constants.
+
+    Bare allowed-provider *ids* (e.g. `terraphim-proxy`, `opencode-go`) are
+    deliberately not in either list: they are derived from the prefix lists
+    on both sides -- see `test_bare_allowed_provider_ids_derive_from_prefixes`
+    and `test_allowed_list_matches_rust`.
+    """
+    assert RUST_CONFIG_SRC.exists(), (
+        f"Rust config source not found: {RUST_CONFIG_SRC}"
+    )
+
+    rust_src = RUST_CONFIG_SRC.read_text(encoding="utf-8")
+    rust_set = _rust_const_entries(rust_src, "CLAUDE_CLI_BARE_MODELS") | _rust_const_entries(
+        rust_src, "ANTHROPIC_BARE_PROVIDERS"
+    )
+
+    script_set = _script_list_entries("ALLOWED_BARE_MODELS")
+
+    assert script_set == rust_set, (
+        f"ALLOWED_BARE_MODELS mismatch.\n"
+        f"  Script:              {sorted(script_set)}\n"
+        f"  Rust (union):        {sorted(rust_set)}\n"
+        f"  Missing from script: {sorted(rust_set - script_set)}\n"
+        f"  Extra in script:     {sorted(script_set - rust_set)}"
+    )
+
+
+def test_bare_allowed_provider_ids_derive_from_prefixes():
+    """Bare allowed-provider ids are accepted because they derive from the prefixes.
+
+    `opencode-go` is *not* in ALLOWED_BARE_MODELS (only sonnet/opus/haiku/
+    anthropic are), yet it is accepted as a bare `model` because the script
+    derives the bare-id set from ALLOWED_PREFIXES -- mirroring the Rust
+    validator, whose bare branch consults ALLOWED_PROVIDER_PREFIXES. Bare
+    `terraphim-proxy` is already pinned by `test_terraphim_proxy_routes_accepted`;
+    this pins the general derivation with a pre-existing prefix so it cannot
+    silently become terraphim-proxy-specific.
+    """
+    result = _run_with_agent_fixture("bare-id-agent", "opencode-go")
+    assert result.returncode == 0, (
+        "Bare allowed-provider id 'opencode-go' must be accepted (derived "
+        f"from ALLOWED_PREFIXES), got:\n{result.stderr}"
     )
 
 

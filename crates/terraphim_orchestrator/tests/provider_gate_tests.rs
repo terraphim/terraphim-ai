@@ -20,7 +20,10 @@ use chrono::{TimeZone, Utc};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use terraphim_orchestrator::config::{is_allowed_provider, ALLOWED_PROVIDER_PREFIXES};
+use terraphim_orchestrator::config::{
+    is_allowed_provider, ALLOWED_PROVIDER_PREFIXES, ANTHROPIC_BARE_PROVIDERS,
+    CLAUDE_CLI_BARE_MODELS,
+};
 use terraphim_orchestrator::control_plane::routing::{
     BudgetPressure, DispatchContext, RouteSource, RoutingDecisionEngine,
 };
@@ -705,21 +708,84 @@ fn terraphim_proxy_lookalike_prefixes_rejected() {
     }
 }
 
-// === Scenario 14: BannedProvider guidance names every allowed provider =====
+/// Exact-head review remediation (PR #3287): a lookalike rejection driven
+/// through the real load-time path (`validate()`) must name the agent, the
+/// offending value, and the rejected field -- for `model` and
+/// `fallback_model` alike. Previously only the absolute-path regression
+/// asserted the field name; the lookalike tests matched
+/// `BannedProvider { .. }` or the bool gate without it.
+#[test]
+fn terraphim_proxy_lookalike_rejection_names_agent_value_and_field() {
+    for rejected in [
+        "not-terraphim-proxy/auto",
+        "terraphim-proxy-evil/auto",
+        "terraphim-proxyx/auto",
+        "opencode/whatever",
+        "unknown-payg/some-model",
+        "not-terraphim-proxy",
+        "terraphim-proxy-evil",
+        "terraphim-proxyx",
+    ] {
+        for field in ["model", "fallback_model"] {
+            let agent = if field == "model" {
+                agent_with_model("lookalike-agent", rejected)
+            } else {
+                let mut agent = agent_with_model("lookalike-agent", "kimi-for-coding/k2p5");
+                agent.fallback_model = Some(rejected.to_string());
+                agent
+            };
 
-/// Regression (exact-head ADF review of PR #3287, findings F1/F3): the
-/// rendered `BannedProvider` message is the operator's only actionable
-/// guidance when load-time C1 validation rejects a config, so it must name
-/// every prefix in `ALLOWED_PROVIDER_PREFIXES`. At the PR head the message
-/// omitted `openai` even though `openai/` is on the allow-list, steering an
-/// operator with a valid `openai/gpt-*` route towards "fixing" a config that
-/// was already correct.
+            let tmp = tempfile::tempdir().expect("tempdir for config");
+            let config =
+                budget_aware_config(Vec::new(), None, vec![agent], tmp.path().to_path_buf());
+            let err = config
+                .validate()
+                .expect_err("lookalike must fail load-time validation");
+
+            match &err {
+                OrchestratorError::BannedProvider {
+                    agent,
+                    provider,
+                    field: offending_field,
+                } => {
+                    assert_eq!(
+                        agent, "lookalike-agent",
+                        "agent must be named for {rejected}"
+                    );
+                    assert_eq!(
+                        provider, rejected,
+                        "offending value must be reported for {field}"
+                    );
+                    assert_eq!(
+                        offending_field, field,
+                        "rejected field name must be reported for {rejected}"
+                    );
+                }
+                other => panic!("expected BannedProvider for {field}={rejected}, got: {other}"),
+            }
+        }
+    }
+}
+
+// === Scenario 14: BannedProvider guidance names every accepted form ========
+
+/// Regression (exact-head ADF review of PR #3287, findings F1/F3 and the
+/// follow-up confidence-4 review): the rendered `BannedProvider` message is
+/// the operator's only actionable guidance when load-time C1 validation
+/// rejects a config, so it must name **every** accepted `model` /
+/// `fallback_model` form, not just the allow-list prefixes. At the PR head
+/// the message omitted `openai` even though `openai/` is on the allow-list
+/// (steering an operator with a valid `openai/gpt-*` route towards
+/// "fixing" a correct config), and the follow-up review noted it also
+/// omitted the Anthropic accepted forms (`anthropic`, `anthropic/...`) and
+/// the claude-code CLI bare models (`sonnet`, `opus`, `haiku`) even though
+/// the gate accepts all of them.
 ///
 /// The error is produced through the real load-time path (`validate()` on a
-/// config whose agent uses a banned provider), then every allow-list prefix
-/// (trimmed of any trailing '/') must appear verbatim in the rendered
-/// guidance. This pins the hand-written message in `error.rs` to the
-/// allow-list constant without weakening any provider gate.
+/// config whose agent uses a banned provider), then every accepted form
+/// from the three source constants must appear verbatim in the rendered
+/// guidance. This pins the guidance to the gate's source constants without
+/// weakening any provider gate.
 #[test]
 fn banned_provider_error_guidance_lists_every_allowed_prefix() {
     let tmp = tempfile::tempdir().expect("tempdir for config");
@@ -751,6 +817,25 @@ fn banned_provider_error_guidance_lists_every_allowed_prefix() {
             rendered.contains(trimmed),
             "BannedProvider guidance must mention allowed provider '{trimmed}'; \
              rendered: {rendered}"
+        );
+    }
+    // Anthropic accepted forms: `anthropic` bare and `anthropic/...` both
+    // pass the gate via ANTHROPIC_BARE_PROVIDERS, so the guidance must name
+    // them like any other accepted provider.
+    for anthropic_form in ANTHROPIC_BARE_PROVIDERS {
+        assert!(
+            rendered.contains(anthropic_form),
+            "BannedProvider guidance must mention Anthropic accepted form \
+             '{anthropic_form}'; rendered: {rendered}"
+        );
+    }
+    // Claude CLI bare models (`sonnet`, `opus`, `haiku`) are accepted
+    // `model`/`fallback_model` values, so the guidance must name them too.
+    for bare_model in CLAUDE_CLI_BARE_MODELS {
+        assert!(
+            rendered.contains(bare_model),
+            "BannedProvider guidance must mention claude-code CLI bare model \
+             '{bare_model}'; rendered: {rendered}"
         );
     }
 }

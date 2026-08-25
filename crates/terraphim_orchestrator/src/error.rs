@@ -1,6 +1,27 @@
 use terraphim_router::RoutingError;
 use terraphim_spawner::SpawnerError;
 
+/// Render every accepted `model` / `fallback_model` form for the
+/// `BannedProvider` operator guidance.
+///
+/// Derived from the gate's source constants -- [`config::ALLOWED_PROVIDER_PREFIXES`]
+/// plus the Anthropic accepted forms ([`config::ANTHROPIC_BARE_PROVIDERS`],
+/// valid both bare and as `anthropic/...`) and the claude-code CLI bare
+/// models ([`config::CLAUDE_CLI_BARE_MODELS`]) -- so the rendered guidance
+/// can never drift from what the gate actually accepts. Every listed token
+/// is an accepted value for `model` / `fallback_model`.
+fn allowed_provider_guidance() -> String {
+    let mut forms: Vec<&str> = Vec::with_capacity(
+        crate::config::ALLOWED_PROVIDER_PREFIXES.len()
+            + crate::config::ANTHROPIC_BARE_PROVIDERS.len()
+            + crate::config::CLAUDE_CLI_BARE_MODELS.len(),
+    );
+    forms.extend_from_slice(crate::config::ALLOWED_PROVIDER_PREFIXES);
+    forms.extend_from_slice(crate::config::ANTHROPIC_BARE_PROVIDERS);
+    forms.extend_from_slice(crate::config::CLAUDE_CLI_BARE_MODELS);
+    forms.join(", ")
+}
+
 /// Errors that can occur during orchestrator operation.
 #[derive(Debug, thiserror::Error)]
 pub enum OrchestratorError {
@@ -79,11 +100,14 @@ pub enum OrchestratorError {
     UnknownFlowProject { flow: String, project: String },
 
     #[error(
-        "banned LLM provider '{provider}' in {field} for agent '{agent}' (allowed: claude-code, opencode-go, kimi-for-coding, minimax-coding-plan, openai, zai-coding-plan, terraphim-proxy)"
+        "banned LLM provider '{provider}' in {field} for agent '{agent}' (allowed: {})",
+        allowed_provider_guidance()
     )]
-    // Keep the hand-written guidance in sync with `config::ALLOWED_PROVIDER_PREFIXES`;
-    // `provider_gate_tests::banned_provider_error_guidance_lists_every_allowed_prefix`
-    // fails the build if a prefix goes missing from the message.
+    // The guidance is rendered from the gate's source constants
+    // (`ALLOWED_PROVIDER_PREFIXES` + `ANTHROPIC_BARE_PROVIDERS` +
+    // `CLAUDE_CLI_BARE_MODELS`) at format time, so it cannot drift from the
+    // allow-list; `provider_gate_tests::banned_provider_error_guidance_lists_every_allowed_prefix`
+    // fails the build if an accepted form ever goes missing from the message.
     BannedProvider {
         agent: String,
         provider: String,
