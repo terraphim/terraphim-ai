@@ -20,12 +20,13 @@ use chrono::{TimeZone, Utc};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use terraphim_orchestrator::config::is_allowed_provider;
+use terraphim_orchestrator::config::{is_allowed_provider, ALLOWED_PROVIDER_PREFIXES};
 use terraphim_orchestrator::control_plane::routing::{
     BudgetPressure, DispatchContext, RouteSource, RoutingDecisionEngine,
 };
 use terraphim_orchestrator::control_plane::telemetry::{CompletionEvent, TokenBreakdown};
 use terraphim_orchestrator::cost_tracker::{BudgetVerdict, CostTracker};
+use terraphim_orchestrator::error::OrchestratorError;
 use terraphim_orchestrator::provider_budget::{
     provider_has_budget, provider_key_for_model, ProviderBudgetConfig, ProviderBudgetTracker,
 };
@@ -700,6 +701,56 @@ fn terraphim_proxy_lookalike_prefixes_rejected() {
         assert!(
             !is_allowed_provider(rejected),
             "lookalike or unknown prefix must be rejected: {rejected}"
+        );
+    }
+}
+
+// === Scenario 14: BannedProvider guidance names every allowed provider =====
+
+/// Regression (exact-head ADF review of PR #3287, findings F1/F3): the
+/// rendered `BannedProvider` message is the operator's only actionable
+/// guidance when load-time C1 validation rejects a config, so it must name
+/// every prefix in `ALLOWED_PROVIDER_PREFIXES`. At the PR head the message
+/// omitted `openai` even though `openai/` is on the allow-list, steering an
+/// operator with a valid `openai/gpt-*` route towards "fixing" a config that
+/// was already correct.
+///
+/// The error is produced through the real load-time path (`validate()` on a
+/// config whose agent uses a banned provider), then every allow-list prefix
+/// (trimmed of any trailing '/') must appear verbatim in the rendered
+/// guidance. This pins the hand-written message in `error.rs` to the
+/// allow-list constant without weakening any provider gate.
+#[test]
+fn banned_provider_error_guidance_lists_every_allowed_prefix() {
+    let tmp = tempfile::tempdir().expect("tempdir for config");
+    let config = budget_aware_config(
+        Vec::new(),
+        None,
+        vec![agent_with_model("guidance-agent", "opencode/payg-model")],
+        tmp.path().to_path_buf(),
+    );
+
+    let err = config
+        .validate()
+        .expect_err("banned provider must fail load-time validation");
+
+    match &err {
+        OrchestratorError::BannedProvider {
+            agent, provider, ..
+        } => {
+            assert_eq!(agent, "guidance-agent");
+            assert_eq!(provider, "opencode/payg-model");
+        }
+        other => panic!("expected BannedProvider, got: {other}"),
+    }
+
+    let rendered = err.to_string();
+    for prefix in ALLOWED_PROVIDER_PREFIXES {
+        let trimmed = prefix.trim_end_matches('/');
+        assert!(
+            rendered.contains(trimmed),
+            "BannedProvider guidance must mention allowed provider '{trimmed}'; \
+             rendered: {rendered}"
         );
     }
 }

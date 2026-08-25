@@ -512,6 +512,73 @@ def test_terraphim_proxy_routes_accepted_as_fallback():
     assert result.returncode == 0, result.stderr
 
 
+def test_compound_review_terraphim_proxy_model_accepted():
+    """Regression (exact-head ADF review of PR #3287, finding F4):
+    `compound_review.model = "terraphim-proxy/think"` is accepted through
+    the real migration path.
+
+    `validate_models` gates the `[compound_review]` model/fallback_model with
+    the same provider pre-flight as agents, and the compound reviewer is
+    exactly the deep-reasoning workload that routes through the
+    `terraphim-proxy/think` semantic route. This runs the script end-to-end
+    (subprocess, no mocks) and asserts the migrated base config carries the
+    route verbatim -- the agent-level tests alone do not exercise the
+    `[compound_review]` branch of the gate.
+    """
+    fixture_toml = """\
+working_dir = "/tmp/test"
+restart_cooldown_secs = 300
+max_restart_count = 3
+tick_interval_secs = 30
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.1
+moderate_threshold = 0.2
+severe_threshold = 0.4
+critical_threshold = 0.7
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/test"
+model = "terraphim-proxy/think"
+
+[[agents]]
+name = "compound-check-agent"
+layer = "Core"
+cli_tool = "/usr/bin/opencode"
+model = "kimi-for-coding/k2p5"
+task = "Do something."
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        fixture_path = tmp_path / "compound-orchestrator.toml"
+        fixture_path.write_text(fixture_toml, encoding="utf-8")
+        base_out = tmp_path / "orchestrator.toml"
+        result = run_migration(
+            "--input", str(fixture_path),
+            "--output-dir", str(tmp_path / "conf.d"),
+            "--base-output", str(base_out),
+        )
+        assert result.returncode == 0, (
+            "Expected exit 0 for compound_review.model = 'terraphim-proxy/think', "
+            f"got:\n{result.stderr}"
+        )
+
+        # Prove the route flowed through the real migration path into the
+        # emitted base config verbatim (compound_review is a base-global key).
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib  # type: ignore[no-redef]
+        with open(base_out, "rb") as fh:
+            base = tomllib.load(fh)
+        assert base["compound_review"]["model"] == "terraphim-proxy/think", (
+            "compound_review.model must be carried through to the base "
+            f"config verbatim; got: {base['compound_review'].get('model')!r}"
+        )
+
+
 def test_terraphim_proxy_lookalikes_rejected():
     """Exact prefix equality only: lookalikes, raw opencode, and unknown
     pay-per-use prefixes must all be rejected with the offending value."""

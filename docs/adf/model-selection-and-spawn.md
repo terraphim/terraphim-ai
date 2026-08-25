@@ -135,6 +135,19 @@ always allowed. Load-time validation (`validate()`) already enforces the same
 rule on the TOML; this filter exists so a malformed KG file or a telemetry
 artefact cannot surface a banned target at runtime.
 
+The same allow-list also runs *ahead* of the orchestrator in the
+`scripts/adf-setup/migrate-to-confd.py` pre-flight, which validates agent
+`model`/`fallback_model` and `[compound_review]` model values against a
+mirror of `ALLOWED_PROVIDER_PREFIXES` (membership is drift-tested against the
+Rust constant). That pre-flight is stricter than it used to be: unknown
+`provider/...` prefixes and unknown bare model names that previously
+migrated cleanly — and would only have failed later at Rust load-time
+validation — now exit non-zero at migration time. Before deploying a
+stricter version of that script, sweep the fleet's monolithic orchestrator
+TOMLs for non-allow-listed `model`/`fallback_model` values and run a canary
+migration on a single project first; a previously-green migration that now
+fails is the sweep working as intended, not a script regression.
+
 ### 2e. ProviderBudgetTracker filter
 
 Each candidate's provider key is checked against the two-window tumbling
@@ -412,6 +425,7 @@ Reading the trace:
 | agent `model` | `conf.d/<project>.toml` | static-config routing candidate |
 | agent `fallback_provider` + `fallback_model` | `conf.d/<project>.toml` | `spawn_with_fallback` target when primary fails |
 | C1 allow-list | `crates/terraphim_orchestrator/src/config.rs` `ALLOWED_PROVIDER_PREFIXES` | recompile required |
+| C1 migration pre-flight | `scripts/adf-setup/migrate-to-confd.py` `ALLOWED_PREFIXES` | drift-tested against the Rust list; rejects unknown/bare providers that would fail Rust validation — fleet sweep + canary before deploying a stricter version |
 | KG routing table | `docs/taxonomy/routing_scenarios/adf/*.md` | hot-reloaded each orchestrator start |
 
 ## Further reading

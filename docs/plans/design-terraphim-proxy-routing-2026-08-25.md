@@ -108,6 +108,13 @@ semantics; the gate only owns the prefix (who gets traffic), not the routing.
 - The Python pre-flight must never be *more* permissive than the Rust gate:
   a config that passes migration must not fail orchestrator load. The removed
   absolute-path exemption was exactly such a hole.
+- Consequence (behaviour change): the pre-flight now rejects unknown
+  `provider/...` prefixes and unknown bare model names that previously
+  migrated successfully — and would only have failed later at Rust load-time
+  validation, if they ever got that far. Fail-late became fail-early, which
+  is intentional, but it can break a fleet migration run that used to
+  succeed. See *Deployment / rollback* for the fleet config sweep and canary
+  required before the stricter script ships.
 
 ## Test plan
 
@@ -116,6 +123,11 @@ Rust (`cargo test -p terraphim_orchestrator`):
 - `--test provider_gate_tests`: `terraphim_proxy_semantic_routes_pass_c1_gate`,
   `terraphim_proxy_lookalike_prefixes_rejected` (plus all pre-existing
   C1/C3/probe/cost tests stay green).
+- `--test provider_gate_tests`:
+  `banned_provider_error_guidance_lists_every_allowed_prefix` — review
+  remediation (F1/F3): the rendered `BannedProvider` guidance, produced via
+  `validate()`, must name every prefix in `ALLOWED_PROVIDER_PREFIXES`. It
+  failed at the PR head because `openai` was missing from the message.
 - `--lib`: `config::tests::test_terraphim_proxy_semantic_routes_allowed`,
   `config::tests::test_terraphim_proxy_lookalikes_rejected` (plus existing
   `is_allowed_provider` / `validate_model_provider` tests).
@@ -124,6 +136,11 @@ Python (`uv run pytest scripts/adf-setup/tests/test_migrate.py`):
 
 - Acceptance: `terraphim-proxy/{auto,background,think}` and bare
   `terraphim-proxy` as `model` and as `fallback_model`.
+- Acceptance (review remediation, F4):
+  `test_compound_review_terraphim_proxy_model_accepted` —
+  `compound_review.model = "terraphim-proxy/think"` migrates with exit 0 and
+  is carried verbatim into the emitted base config, exercising the
+  `[compound_review]` branch of the pre-flight gate.
 - Rejection: lookalikes (`not-terraphim-proxy`, `terraphim-proxy-evil`,
   `terraphim-proxyx`, bare and prefixed), raw `opencode/`, unknown
   pay-per-use prefixes, and the two new parity regressions — absolute path as
@@ -144,13 +161,18 @@ Formatting: `cargo fmt -p terraphim_orchestrator -- --check`.
    C1 gate (Rust load-time and runtime, Python pre-flight) as `model` and
    `fallback_model`.
 2. Lookalike and unknown prefixes fail closed on both sides with an actionable
-   error naming agent, value, and field.
+   error naming agent, value, and field; the rendered Rust `BannedProvider`
+   guidance lists every prefix in `ALLOWED_PROVIDER_PREFIXES` (pinned by
+   `banned_provider_error_guidance_lists_every_allowed_prefix`).
 3. Python and Rust allow-lists/ban-lists are byte-identical in membership
    (enforced by drift tests).
 4. Absolute executable paths are rejected as `model`/`fallback_model` on both
    sides; `fallback_provider` remains unvalidated and migrates verbatim.
 5. All focused Python tests, provider Rust tests, and `cargo fmt --check` pass.
-6. Independent reviewer signs off on this design and the diff before any
+6. `compound_review.model` accepts `terraphim-proxy/` routes through the real
+   migration path (pinned by
+   `test_compound_review_terraphim_proxy_model_accepted`).
+7. Independent reviewer signs off on this design and the diff before any
    commit/PR.
 
 ## Out of scope
@@ -170,6 +192,19 @@ Formatting: `cargo fmt -p terraphim_orchestrator -- --check`.
   agents repo per AGENTS.md (`cargo build --release -p terraphim_orchestrator`
   → `adf` → systemd restart). Gate change is load-time; existing configs with
   previously allowed providers keep loading unchanged.
+- Deploy the stricter pre-flight only after a fleet sweep + canary:
+  `scripts/adf-setup/migrate-to-confd.py` now rejects unknown/bare model
+  providers that previously migrated but would later fail Rust validation
+  (see *Fallback / fail-closed semantics*). Before shipping that script:
+  1. **Fleet config sweep** — scan every monolithic orchestrator TOML the
+     fleet still feeds the migrator for `model`/`fallback_model` (agent and
+     `[compound_review]`) values that are neither allow-listed
+     `provider/...` routes nor known bare ids; fix or remove them.
+  2. **Canary** — run the new script against one project's input
+     (`--dry-run`, then a real single-project migration) and confirm exit 0
+     plus verbatim `fallback_provider` carry-through before rolling it out
+     fleet-wide. A previously-green migration that now exits non-zero is the
+     sweep working as intended, not a script regression.
 - Verify: `adf --check` on the deployed base config plus one agent switched to
   `terraphim-proxy/auto` as a canary; confirm the spawn route in logs.
 - Rollback: revert the merge and redeploy the previous `adf` binary. The

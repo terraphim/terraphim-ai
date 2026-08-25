@@ -79,8 +79,11 @@ pub enum OrchestratorError {
     UnknownFlowProject { flow: String, project: String },
 
     #[error(
-        "banned LLM provider '{provider}' in {field} for agent '{agent}' (allowed: claude-code, opencode-go, kimi-for-coding, minimax-coding-plan, zai-coding-plan, terraphim-proxy)"
+        "banned LLM provider '{provider}' in {field} for agent '{agent}' (allowed: claude-code, opencode-go, kimi-for-coding, minimax-coding-plan, openai, zai-coding-plan, terraphim-proxy)"
     )]
+    // Keep the hand-written guidance in sync with `config::ALLOWED_PROVIDER_PREFIXES`;
+    // `provider_gate_tests::banned_provider_error_guidance_lists_every_allowed_prefix`
+    // fails the build if a prefix goes missing from the message.
     BannedProvider {
         agent: String,
         provider: String,
