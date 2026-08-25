@@ -79,7 +79,7 @@ pub enum OrchestratorError {
     UnknownFlowProject { flow: String, project: String },
 
     #[error(
-        "banned LLM provider '{provider}' in {field} for agent '{agent}' (allowed: claude-code, opencode-go, kimi-for-coding, minimax-coding-plan, zai-coding-plan)"
+        "banned LLM provider '{provider}' in {field} for agent '{agent}' (allowed: claude-code, opencode-go, kimi-for-coding, minimax-coding-plan, zai-coding-plan, terraphim-proxy)"
     )]
     BannedProvider {
         agent: String,

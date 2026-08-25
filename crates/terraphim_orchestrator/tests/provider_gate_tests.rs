@@ -651,6 +651,59 @@ fn probe_gate_accepts_allowed_providers() {
     }
 }
 
+// === Scenario 13: terraphim-proxy semantic routes (digital-twins#161) =====
+
+/// The Bigbox Terraphim LLM proxy exposes semantic routes (`auto`,
+/// `background`, `think`) that fan out to subscription-only upstreams, so
+/// the C1 gate accepts exactly the `terraphim-proxy` prefix. This keeps the
+/// subscription-only guarantee: proxy traffic cannot reach a pay-per-use
+/// provider the operator has not approved.
+#[test]
+fn terraphim_proxy_semantic_routes_pass_c1_gate() {
+    for route in [
+        "terraphim-proxy/auto",
+        "terraphim-proxy/background",
+        "terraphim-proxy/think",
+    ] {
+        assert!(
+            is_allowed_provider(route),
+            "terraphim proxy semantic route must pass C1 gate: {route}"
+        );
+    }
+    // Bare provider id form is allowed, mirroring other allow-list ids.
+    assert!(
+        is_allowed_provider("terraphim-proxy"),
+        "bare terraphim-proxy id must pass C1 gate"
+    );
+}
+
+/// Prefix matching is exact equality: lookalikes of `terraphim-proxy` and
+/// raw pay-per-use/unknown prefixes must stay rejected. A substring match
+/// would let `terraphim-proxy-evil/` or `terraphim-proxyx/` through, so the
+/// gate must never implement it that way.
+#[test]
+fn terraphim_proxy_lookalike_prefixes_rejected() {
+    for rejected in [
+        "not-terraphim-proxy/auto",
+        "terraphim-proxy-evil/auto",
+        "terraphim-proxyx/auto",
+        // Raw opencode API access stays banned (pay-per-use); only the
+        // subscription-safe opencode-go variant is allowed.
+        "opencode/whatever",
+        // Unknown / pay-per-use prefixes are rejected, not waved through.
+        "unknown-payg/some-model",
+        // Bare lookalikes are unknown bare ids -> rejected.
+        "not-terraphim-proxy",
+        "terraphim-proxy-evil",
+        "terraphim-proxyx",
+    ] {
+        assert!(
+            !is_allowed_provider(rejected),
+            "lookalike or unknown prefix must be rejected: {rejected}"
+        );
+    }
+}
+
 // === Helper: provider_key_for_model edges =================================
 
 #[test]

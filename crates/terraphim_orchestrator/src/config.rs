@@ -1190,6 +1190,12 @@ struct IncludeFragment {
 /// Any `model` or `fallback_model` string with a `/`-prefixed provider
 /// name must appear in this list; bare names (`sonnet`, `opus`) are
 /// interpreted as claude-code CLI targets and always allowed.
+///
+/// `terraphim-proxy` routes agents through the Bigbox Terraphim LLM proxy
+/// semantic routes (`terraphim-proxy/auto`, `/background`, `/think`), which
+/// fan out to subscription-only upstreams. Matching is exact prefix
+/// equality: lookalikes (`terraphim-proxy-evil`, `terraphim-proxyx`) are
+/// rejected just like any other unknown prefix.
 pub const ALLOWED_PROVIDER_PREFIXES: &[&str] = &[
     "claude-code",
     "opencode-go",
@@ -1197,6 +1203,7 @@ pub const ALLOWED_PROVIDER_PREFIXES: &[&str] = &[
     "minimax-coding-plan",
     "openai",
     "zai-coding-plan",
+    "terraphim-proxy",
 ];
 
 /// Explicitly banned provider prefixes. Anything matching these is rejected
@@ -1228,7 +1235,8 @@ pub const ANTHROPIC_BARE_PROVIDERS: &[&str] = &["anthropic"];
 /// This is an explicit allow-list: unknown bare names (including bare banned
 /// ids like `"minimax"`) are rejected. Matches prefixes by exact equality --
 /// `opencode-go` is allowed, `opencode` is banned, `minimax-coding-plan` is
-/// allowed, `minimax` is banned.
+/// allowed, `minimax` is banned, `terraphim-proxy` is allowed while
+/// `terraphim-proxy-evil` and `terraphim-proxyx` are rejected.
 ///
 /// Accepts either the full `provider/model` string (e.g. `kimi-for-coding/k2p5`)
 /// or a bare provider id (e.g. `opencode-go`).
@@ -2781,6 +2789,89 @@ task = "t"
         // And the allowed bare forms still pass.
         validate_model_provider("ok", "model", "sonnet").expect("sonnet is a bare claude CLI");
         validate_model_provider("ok", "model", "anthropic").expect("anthropic bare passes");
+    }
+
+    /// Terraphim LLM proxy semantic routes (issue terraphim/digital-twins#161):
+    /// the Bigbox proxy exposes `auto`, `background`, and `think` routes that
+    /// fan out to subscription-only upstreams. Both the load-time validator
+    /// and the runtime gate must accept exactly the `terraphim-proxy` prefix
+    /// -- lookalike prefixes and unknown/pay-per-use ids stay rejected.
+    #[test]
+    fn test_terraphim_proxy_semantic_routes_allowed() {
+        for route in [
+            "terraphim-proxy/auto",
+            "terraphim-proxy/background",
+            "terraphim-proxy/think",
+        ] {
+            assert!(is_allowed_provider(route), "route {route} must pass C1");
+            validate_model_provider("gate-agent", "model", route)
+                .unwrap_or_else(|e| panic!("load-time gate rejected {route}: {e}"));
+            validate_model_provider("gate-agent", "fallback_model", route)
+                .unwrap_or_else(|e| panic!("load-time gate rejected {route}: {e}"));
+        }
+        // Bare provider id form, mirroring other allow-list ids.
+        assert!(is_allowed_provider("terraphim-proxy"));
+        validate_model_provider("gate-agent", "model", "terraphim-proxy")
+            .expect("bare terraphim-proxy id passes");
+    }
+
+    /// Exact prefix equality only: `terraphim-proxy-evil`, `terraphim-proxyx`,
+    /// and `not-terraphim-proxy` must not slip through a substring match,
+    /// and raw `opencode/` plus unknown pay-per-use prefixes stay banned.
+    #[test]
+    fn test_terraphim_proxy_lookalikes_rejected() {
+        for rejected in [
+            "not-terraphim-proxy/auto",
+            "terraphim-proxy-evil/auto",
+            "terraphim-proxyx/auto",
+            "opencode/whatever",
+            "unknown-payg/some-model",
+            // Bare lookalikes are unknown bare ids -> rejected as well.
+            "not-terraphim-proxy",
+            "terraphim-proxy-evil",
+            "terraphim-proxyx",
+        ] {
+            assert!(
+                !is_allowed_provider(rejected),
+                "lookalike {rejected} must be rejected"
+            );
+            assert!(
+                matches!(
+                    validate_model_provider("gate-agent", "model", rejected),
+                    Err(crate::error::OrchestratorError::BannedProvider { .. })
+                ),
+                "load-time gate must reject {rejected} with BannedProvider"
+            );
+        }
+    }
+
+    /// Absolute executable paths are invalid `model` / `fallback_model`
+    /// values (parity with the migrate-to-confd.py pre-flight): a leading
+    /// `/` leaves the provider prefix empty, which matches no allow-list
+    /// entry, so a CLI binary path cannot be smuggled past the provider
+    /// gate. Only the separate, unvalidated `fallback_provider` field may
+    /// carry such a path.
+    #[test]
+    fn test_absolute_path_rejected_as_model_and_fallback_model() {
+        for field in ["model", "fallback_model"] {
+            let err = validate_model_provider("abs-path-agent", field, "/usr/bin/opencode")
+                .expect_err("absolute path must be rejected");
+            match err {
+                crate::error::OrchestratorError::BannedProvider {
+                    agent,
+                    provider,
+                    field: offending_field,
+                } => {
+                    assert_eq!(agent, "abs-path-agent");
+                    assert_eq!(
+                        provider, "/usr/bin/opencode",
+                        "offending value must be reported"
+                    );
+                    assert_eq!(offending_field, field, "offending field must be reported");
+                }
+                other => panic!("expected BannedProvider for {field}, got {other}"),
+            }
+        }
     }
 
     /// ADF Phase 2 (issue #944): when no `[pr_dispatch]` block is present in

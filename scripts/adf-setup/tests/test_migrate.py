@@ -424,6 +424,268 @@ task = "Do something."
 
 
 # ---------------------------------------------------------------------------
+# Tests 10-13: terraphim-proxy semantic routes (terraphim/digital-twins#161)
+# ---------------------------------------------------------------------------
+
+def _agent_fixture_toml(
+    agent_name: str,
+    model_value: str,
+    fallback_model: str | None = None,
+    fallback_provider: str | None = None,
+) -> str:
+    """Minimal monolithic config with a single agent for provider checks."""
+    toml = f"""\
+working_dir = "/tmp/test"
+restart_cooldown_secs = 300
+max_restart_count = 3
+tick_interval_secs = 30
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.1
+moderate_threshold = 0.2
+severe_threshold = 0.4
+critical_threshold = 0.7
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/test"
+
+[[agents]]
+name = "{agent_name}"
+layer = "Core"
+cli_tool = "/usr/bin/opencode"
+model = "{model_value}"
+"""
+    if fallback_model is not None:
+        toml += f'fallback_model = "{fallback_model}"\n'
+    if fallback_provider is not None:
+        toml += f'fallback_provider = "{fallback_provider}"\n'
+    toml += 'task = "Do something."\n'
+    return toml
+
+
+def _run_with_agent_fixture(
+    agent_name: str,
+    model_value: str,
+    fallback_model: str | None = None,
+    fallback_provider: str | None = None,
+):
+    """Write a one-agent fixture to a temp dir and run the migration on it."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        fixture_path = tmp_path / "proxy-orchestrator.toml"
+        fixture_path.write_text(
+            _agent_fixture_toml(agent_name, model_value, fallback_model, fallback_provider),
+            encoding="utf-8",
+        )
+        return run_migration(
+            "--input", str(fixture_path),
+            "--output-dir", str(tmp_path / "conf.d"),
+            "--base-output", str(tmp_path / "orchestrator.toml"),
+        )
+
+
+def test_terraphim_proxy_routes_accepted():
+    """terraphim-proxy semantic routes (auto/background/think) are accepted."""
+    for route in [
+        "terraphim-proxy/auto",
+        "terraphim-proxy/background",
+        "terraphim-proxy/think",
+    ]:
+        result = _run_with_agent_fixture("proxy-agent", route)
+        assert result.returncode == 0, (
+            f"Expected exit 0 for {route}, got:\n{result.stderr}"
+        )
+    # Bare provider id form, mirroring the other allow-list ids.
+    result = _run_with_agent_fixture("proxy-agent", "terraphim-proxy")
+    assert result.returncode == 0, result.stderr
+
+
+def test_terraphim_proxy_routes_accepted_as_fallback():
+    """Both model and fallback_model accept terraphim-proxy routes."""
+    result = _run_with_agent_fixture(
+        "proxy-agent",
+        model_value="kimi-for-coding/k2p5",
+        fallback_model="terraphim-proxy/think",
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_terraphim_proxy_lookalikes_rejected():
+    """Exact prefix equality only: lookalikes, raw opencode, and unknown
+    pay-per-use prefixes must all be rejected with the offending value."""
+    for rejected in [
+        "not-terraphim-proxy/auto",
+        "terraphim-proxy-evil/auto",
+        "terraphim-proxyx/auto",
+        # Raw opencode API access stays banned (pay-per-use).
+        "opencode/raw-model",
+        # Unknown / pay-per-use prefixes are rejected, not waved through.
+        "unknown-payg/some-model",
+        # Bare lookalikes are unknown bare ids -> rejected as well.
+        "not-terraphim-proxy",
+        "terraphim-proxy-evil",
+        "terraphim-proxyx",
+    ]:
+        result = _run_with_agent_fixture("lookalike-agent", rejected)
+        assert result.returncode != 0, (
+            f"Expected non-zero exit for {rejected}"
+        )
+        assert "lookalike-agent" in result.stderr, (
+            f"Expected agent name in error: {result.stderr}"
+        )
+        assert rejected in result.stderr, (
+            f"Expected offending value {rejected!r} in error: {result.stderr}"
+        )
+
+
+def test_absolute_executable_path_fallback_provider_accepted():
+    """Absolute executable-path fallback_provider values stay accepted.
+
+    Fleet configs set `fallback_provider` to a CLI binary path (e.g.
+    "/home/alex/.bun/bin/opencode"). That is a separate field from
+    `model`/`fallback_model`: the provider gate does not validate it
+    (mirroring the Rust side, where validate_model_provider covers only
+    model and fallback_model), so migration succeeds and the path is
+    carried through to the conf.d output verbatim. This asserts the
+    success is due to the field being untouched -- not to any absolute
+    path being allow-listed as a provider.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        fixture_path = tmp_path / "proxy-orchestrator.toml"
+        fixture_path.write_text(
+            _agent_fixture_toml(
+                "path-agent",
+                model_value="terraphim-proxy/auto",
+                fallback_provider="/home/alex/.bun/bin/opencode",
+            ),
+            encoding="utf-8",
+        )
+        confd_dir = tmp_path / "conf.d"
+        result = run_migration(
+            "--input", str(fixture_path),
+            "--output-dir", str(confd_dir),
+            "--base-output", str(tmp_path / "orchestrator.toml"),
+        )
+        assert result.returncode == 0, result.stderr
+
+        # Prove the untouched field survived migration verbatim.
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib  # type: ignore[no-redef]
+        with open(confd_dir / "proxy.toml", "rb") as fh:
+            doc = tomllib.load(fh)
+        agents = doc.get("agents", [])
+        assert len(agents) == 1, f"expected 1 agent, got {len(agents)}"
+        assert agents[0]["fallback_provider"] == "/home/alex/.bun/bin/opencode", (
+            "fallback_provider must be carried through to conf.d verbatim"
+        )
+        assert agents[0]["model"] == "terraphim-proxy/auto"
+
+
+def test_absolute_path_rejected_as_model():
+    """Regression (parity with Rust): absolute executable paths are invalid
+    `model` values.
+
+    An absolute path's prefix before the first "/" is empty, so the Rust
+    validator rejects it in `model`; the migration pre-flight must too
+    instead of waving it through. Absolute paths belong only to the
+    unvalidated `fallback_provider` field.
+    """
+    result = _run_with_agent_fixture(
+        "abs-model-agent",
+        model_value="/home/alex/.bun/bin/opencode",
+    )
+    assert result.returncode != 0, (
+        "Expected non-zero exit for absolute path as model"
+    )
+    assert "abs-model-agent" in result.stderr, (
+        f"Expected agent name in error: {result.stderr}"
+    )
+    assert "/home/alex/.bun/bin/opencode" in result.stderr, (
+        f"Expected offending value in error: {result.stderr}"
+    )
+    assert "field: model" in result.stderr, (
+        f"Expected the failing field to be reported: {result.stderr}"
+    )
+
+
+def test_absolute_path_rejected_as_fallback_model():
+    """Regression (parity with Rust): absolute executable paths are invalid
+    `fallback_model` values too.
+
+    Same empty-prefix reasoning as the model case: the Rust gate validates
+    `fallback_model` with the same allow-list, so an absolute path there
+    must exit non-zero even when the primary `model` is allowed.
+    """
+    result = _run_with_agent_fixture(
+        "abs-fallback-agent",
+        model_value="kimi-for-coding/k2p5",
+        fallback_model="/home/alex/.bun/bin/claude",
+    )
+    assert result.returncode != 0, (
+        "Expected non-zero exit for absolute path as fallback_model"
+    )
+    assert "abs-fallback-agent" in result.stderr, (
+        f"Expected agent name in error: {result.stderr}"
+    )
+    assert "/home/alex/.bun/bin/claude" in result.stderr, (
+        f"Expected offending value in error: {result.stderr}"
+    )
+    assert "field: fallback_model" in result.stderr, (
+        f"Expected the failing field to be reported: {result.stderr}"
+    )
+
+
+def test_allowed_list_matches_rust():
+    """Script ALLOWED_PREFIXES must match ALLOWED_PROVIDER_PREFIXES in config.rs.
+
+    Mirrors the banned-list drift test: the migration script is the C1
+    pre-flight, so its allow-list must not drift from the Rust gate. The
+    script additionally carries `anthropic/` (the claude-code CLI route the
+    Rust side tracks in ANTHROPIC_BARE_PROVIDERS), which is normalised away
+    before comparison.
+    """
+    assert RUST_CONFIG_SRC.exists(), (
+        f"Rust config source not found: {RUST_CONFIG_SRC}"
+    )
+
+    rust_src = RUST_CONFIG_SRC.read_text(encoding="utf-8")
+
+    rust_match = re.search(
+        r'pub const ALLOWED_PROVIDER_PREFIXES:\s*&\[&str\]\s*=\s*&\[([^\]]*)\]',
+        rust_src,
+        re.DOTALL,
+    )
+    assert rust_match, "Could not find ALLOWED_PROVIDER_PREFIXES in Rust config.rs"
+    rust_set = set(re.findall(r'"([^"]+)"', rust_match.group(1)))
+
+    script_src = SCRIPT.read_text(encoding="utf-8")
+    script_match = re.search(
+        r'ALLOWED_PREFIXES\s*=\s*\[([^\]]*)\]',
+        script_src,
+        re.DOTALL,
+    )
+    assert script_match, "Could not find ALLOWED_PREFIXES in migrate-to-confd.py"
+    script_set = {e.rstrip("/") for e in re.findall(r'"([^"]+)"', script_match.group(1))}
+
+    # `anthropic/` is script-side sugar for the Rust ANTHROPIC_BARE_PROVIDERS
+    # claude-CLI route; every other entry must match the Rust allow-list.
+    script_set.discard("anthropic")
+
+    assert script_set == rust_set, (
+        f"ALLOWED_PREFIXES mismatch.\n"
+        f"  Script (normalised): {sorted(script_set)}\n"
+        f"  Rust:                {sorted(rust_set)}\n"
+        f"  Missing from script: {sorted(rust_set - script_set)}\n"
+        f"  Extra in script:     {sorted(script_set - rust_set)}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Test 9: adf --check accepts generated output (P1-3)
 # ---------------------------------------------------------------------------
 

@@ -118,7 +118,8 @@ all_candidates.retain(|cand| {
 });
 ```
 
-Allowed prefixes live in `ALLOWED_PROVIDER_PREFIXES` (`config.rs:794`):
+Allowed prefixes live in `ALLOWED_PROVIDER_PREFIXES` in
+`crates/terraphim_orchestrator/src/config.rs`:
 
 - `claude-code`
 - `opencode-go`
@@ -126,6 +127,8 @@ Allowed prefixes live in `ALLOWED_PROVIDER_PREFIXES` (`config.rs:794`):
 - `minimax-coding-plan`
 - `zai-coding-plan`
 - `openai` (subscription-gated via the OpenAI Plus/Pro/Team plan)
+- `terraphim-proxy` (Bigbox Terraphim LLM proxy semantic routes: `auto`,
+  `background`, `think` — fanned out to subscription-only upstreams)
 
 Bare names `sonnet`, `opus`, `haiku` are recognised as claude CLI targets and
 always allowed. Load-time validation (`validate()`) already enforces the same
@@ -408,7 +411,7 @@ Reading the trace:
 | agent `schedule` | `conf.d/<project>.toml` | per-agent cron expression |
 | agent `model` | `conf.d/<project>.toml` | static-config routing candidate |
 | agent `fallback_provider` + `fallback_model` | `conf.d/<project>.toml` | `spawn_with_fallback` target when primary fails |
-| C1 allow-list | `config.rs:794` `ALLOWED_PROVIDER_PREFIXES` | recompile required |
+| C1 allow-list | `crates/terraphim_orchestrator/src/config.rs` `ALLOWED_PROVIDER_PREFIXES` | recompile required |
 | KG routing table | `docs/taxonomy/routing_scenarios/adf/*.md` | hot-reloaded each orchestrator start |
 
 ## Further reading

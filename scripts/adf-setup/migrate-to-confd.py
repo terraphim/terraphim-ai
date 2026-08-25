@@ -18,12 +18,27 @@ Usage:
 The script is idempotent: running it twice produces byte-identical output.
 
 Banned model prefixes (exits non-zero on violation):
-  opencode/  github-copilot/  google/  huggingface/
+  opencode/  github-copilot/  google/  huggingface/  minimax/
 
 Allowed providers:
-  kimi-for-coding/  minimax-coding-plan/  zai-coding-plan/
-  opencode-go/  anthropic/  bare sonnet/opus/haiku
-  /path/to/claude  /path/to/opencode  (absolute paths)
+  claude-code/  opencode-go/  kimi-for-coding/  minimax-coding-plan/
+  openai/  zai-coding-plan/  anthropic/  bare sonnet/opus/haiku
+  terraphim-proxy/  (Bigbox Terraphim LLM proxy semantic routes:
+                     auto, background, think)
+
+Any other `provider/...` prefix exits non-zero. Prefix matching is exact
+equality on the `prefix/` boundary, so lookalikes such as
+terraphim-proxy-evil/ or terraphim-proxyx/ do NOT match terraphim-proxy/.
+Absolute executable paths (e.g. "/home/alex/.bun/bin/opencode") are NOT
+exempt: their prefix before the first "/" is empty, so the Rust validator
+(`validate_model_provider`) rejects them in `model`/`fallback_model`, and
+this pre-flight mirrors that.
+
+Only `model` and `fallback_model` are validated. The separate
+`fallback_provider` field is NOT validated: fleet configs legitimately set
+it to a CLI binary path (e.g. "/home/alex/.bun/bin/opencode"), and the Rust
+side leaves it unvalidated too (`validate_model_provider` covers model and
+fallback_model only).
 """
 
 import argparse
@@ -54,6 +69,32 @@ BANNED_PREFIXES = [
     "huggingface/",
     "minimax/",
 ]
+
+# Allowed provider prefixes. Mirrors ALLOWED_PROVIDER_PREFIXES in
+# crates/terraphim_orchestrator/src/config.rs, plus `anthropic/` which the
+# Rust side tracks via ANTHROPIC_BARE_PROVIDERS (claude-code CLI route).
+#
+# Matching is exact equality on the `prefix/` boundary: the trailing "/"
+# means `terraphim-proxy-evil/` and `terraphim-proxyx/` do NOT match
+# `terraphim-proxy/`. `terraphim-proxy/` routes agents through the Bigbox
+# Terraphim LLM proxy semantic routes (auto, background, think), which fan
+# out to subscription-only upstreams.
+ALLOWED_PREFIXES = [
+    "claude-code/",
+    "opencode-go/",
+    "kimi-for-coding/",
+    "minimax-coding-plan/",
+    "openai/",
+    "zai-coding-plan/",
+    "terraphim-proxy/",
+    "anthropic/",
+]
+
+# Bare model names accepted without a `provider/` prefix: the claude-code
+# CLI models plus every bare allowed-provider id (e.g. "terraphim-proxy").
+# Mirrors CLAUDE_CLI_BARE_MODELS + ANTHROPIC_BARE_PROVIDERS + the bare-id
+# branch of the Rust validator. Unknown bare names are rejected.
+ALLOWED_BARE_MODELS = ["sonnet", "opus", "haiku", "anthropic"]
 
 # Global keys kept in base orchestrator.toml (not per-project).
 BASE_GLOBAL_KEYS = {
@@ -120,20 +161,56 @@ def _is_banned(model_value: str) -> bool:
     return False
 
 
+def _is_allowed(model_value: str) -> bool:
+    """Return True if the value passes the C1 subscription allow-list.
+
+    Mirrors the Rust validator (`is_allowed_provider` /
+    `validate_model_provider` in config.rs):
+      - `provider/...` values must match an allowed prefix exactly (the
+        slash-terminated entries mean lookalikes fail);
+      - bare names must be known claude CLI models or allowed provider ids.
+
+    Absolute executable paths (values starting with "/") are NOT exempt:
+    their prefix before the first "/" is empty, so the Rust gate rejects
+    them in `model`/`fallback_model` and this pre-flight must match.
+    Absolute paths belong only to `fallback_provider`, which this script
+    does not validate (see module docstring).
+    """
+    if "/" in model_value:
+        return any(model_value.startswith(p) for p in ALLOWED_PREFIXES)
+    allowed_bare_ids = {p.rstrip("/") for p in ALLOWED_PREFIXES}
+    return model_value in ALLOWED_BARE_MODELS or model_value in allowed_bare_ids
+
+
+def _provider_violation(model_value: str) -> str | None:
+    """Return an error snippet describing a provider-gate violation, if any."""
+    if _is_banned(model_value):
+        return f"uses banned provider '{model_value}'"
+    if not _is_allowed(model_value):
+        allowed = ", ".join(ALLOWED_PREFIXES)
+        return (
+            f"uses provider '{model_value}' which is not on the allowed "
+            f"provider list (allowed: {allowed})"
+        )
+    return None
+
+
 def validate_models(data: dict, source_path: Path) -> None:
     """Validate model/fallback_model fields across all agents.
 
-    Exits non-zero with a clear error message if a banned provider is found.
+    Exits non-zero with a clear error message if a banned or unknown
+    provider is found.
     """
     agents = data.get("agents", [])
     for agent in agents:
         agent_name = agent.get("name", "<unnamed>")
         for field in ("model", "fallback_model"):
             value = agent.get(field)
-            if value and _is_banned(value):
+            violation = _provider_violation(value) if value else None
+            if violation:
                 print(
-                    f"ERROR: Agent '{agent_name}' in {source_path} uses banned provider"
-                    f" '{value}' (field: {field}).",
+                    f"ERROR: Agent '{agent_name}' in {source_path} {violation}"
+                    f" (field: {field}).",
                     file=sys.stderr,
                 )
                 sys.exit(1)
@@ -142,10 +219,11 @@ def validate_models(data: dict, source_path: Path) -> None:
     cr = data.get("compound_review", {})
     for field in ("model", "fallback_model"):
         value = cr.get(field) if cr else None
-        if value and _is_banned(value):
+        violation = _provider_violation(value) if value else None
+        if violation:
             print(
-                f"ERROR: compound_review in {source_path} uses banned provider"
-                f" '{value}' (field: {field}).",
+                f"ERROR: compound_review in {source_path} {violation}"
+                f" (field: {field}).",
                 file=sys.stderr,
             )
             sys.exit(1)
