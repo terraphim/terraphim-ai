@@ -537,6 +537,26 @@ Trailing prose."#
         validate_gate_result(&result, &sample_meta()).expect("matching metadata should validate");
     }
 
+    #[test]
+    fn malformed_or_wrong_head_gate_output_fails_closed() {
+        let malformed = "<!-- adf:gate-result { not-json } -->";
+        assert!(matches!(
+            extract_gate_result(malformed),
+            Err(PrGateResultError::MalformedJson(_))
+        ));
+
+        let result = extract_gate_result(sample_block()).unwrap();
+        let mut meta = sample_meta();
+        meta.head_sha = "different-head".to_string();
+        assert_eq!(
+            validate_gate_result(&result, &meta),
+            Err(PrGateResultError::HeadMismatch {
+                actual: "deadbeefcafebabe".to_string(),
+                expected: "different-head".to_string(),
+            })
+        );
+    }
+
     fn result_with(status: GateStatus, blocking_findings: u32) -> PrGateResult {
         PrGateResult {
             schema_version: 1,

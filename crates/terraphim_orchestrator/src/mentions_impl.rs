@@ -4,11 +4,47 @@
 //! the Gitea #1910 god-file decomposition; behaviour unchanged.
 #![allow(clippy::too_many_lines)]
 
+use std::collections::HashSet;
+
 use tracing::{info, warn};
 
 use crate::{config, dispatcher, mention, mention_chain, AgentOrchestrator, ScheduleEvent};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct QualifiedPrGateMention {
+    project: String,
+    agent: String,
+}
+
 impl AgentOrchestrator {
+    fn qualified_canonical_pr_gate_mentions(
+        &self,
+        body: &str,
+        hinted_project: &str,
+        agents: &[config::AgentDefinition],
+    ) -> Vec<QualifiedPrGateMention> {
+        mention::parse_mention_tokens(body)
+            .into_iter()
+            .filter_map(|token| {
+                let project = token.project?;
+                let def = mention::resolve_mention(
+                    Some(project.as_str()),
+                    hinted_project,
+                    &token.agent,
+                    agents,
+                )?;
+                if def.project.as_deref() != Some(project.as_str()) {
+                    return None;
+                }
+                self.pr_gate_dispatch_entry(&project, &token.agent)?;
+                Some(QualifiedPrGateMention {
+                    project,
+                    agent: token.agent,
+                })
+            })
+            .collect()
+    }
+
     /// Uses repo-wide comments endpoint with `since` cursor. On first run
     /// (no persisted cursor), cursor is set to `now` to skip all historical
     /// mentions — preventing the mention replay storm.
@@ -212,8 +248,13 @@ impl AgentOrchestrator {
             let commands =
                 command_parser.parse_commands(&comment.body, comment.issue_number, comment.id);
 
-            // Handle qualified `@adf:project/name` mentions that AdfCommandParser cannot
-            // see (its patterns are `@adf:{name}`; a `project/` prefix is not a substring).
+            let qualified_gate_mentions =
+                self.qualified_canonical_pr_gate_mentions(&comment.body, project_id, &agents);
+            let mut qualified_gate_agents = HashSet::new();
+
+            // Handle qualified `@adf:project/name` mentions before the generic parser output.
+            // Canonical PR gates must stay bound to the explicitly named project because the
+            // project controls agent lookup, PR metadata, commit statuses, and output posting.
             for token in mention::parse_mention_tokens(&comment.body) {
                 if cursor.dispatches_this_tick >= max_dispatches {
                     break;
@@ -224,6 +265,49 @@ impl AgentOrchestrator {
                 };
                 match mention::resolve_mention(Some(proj), project_id, &token.agent, &agents) {
                     Some(def) => {
+                        if qualified_gate_mentions
+                            .iter()
+                            .any(|mention| mention.project == proj && mention.agent == token.agent)
+                        {
+                            qualified_gate_agents.insert(token.agent.clone());
+                            info!(
+                                agent = %token.agent,
+                                project = proj,
+                                issue = comment.issue_number,
+                                comment_id = comment.id,
+                                "dispatching qualified canonical PR gate mention"
+                            );
+                            let (chain_id, depth, parent_agent) = self.resolve_mention_chain(
+                                &comment.user.login,
+                                &agent_names,
+                                max_mention_depth,
+                            );
+                            match self
+                                .dispatch_canonical_pr_gate_mention_from_comment(
+                                    proj,
+                                    &token.agent,
+                                    comment.issue_number,
+                                    chain_id,
+                                    depth,
+                                    parent_agent,
+                                )
+                                .await
+                            {
+                                Ok(true) | Ok(false) => {}
+                                Err(e) => {
+                                    warn!(
+                                        agent = %token.agent,
+                                        project = proj,
+                                        issue = comment.issue_number,
+                                        error = %e,
+                                        "qualified PR gate mention failed closed"
+                                    );
+                                }
+                            }
+                            cursor.dispatches_this_tick += 1;
+                            continue;
+                        }
+
                         info!(
                             agent = %token.agent,
                             project = proj,
@@ -410,6 +494,16 @@ impl AgentOrchestrator {
                         comment_id,
                         context,
                     } => {
+                        if qualified_gate_agents.contains(&agent_name) {
+                            info!(
+                                agent = %agent_name,
+                                issue = issue_number,
+                                comment_id = comment_id,
+                                "skipping generic parser dispatch already handled as qualified PR gate mention"
+                            );
+                            continue;
+                        }
+
                         info!(
                             agent = %agent_name,
                             issue = issue_number,
@@ -930,5 +1024,61 @@ impl AgentOrchestrator {
                 PollGateRoute::FailClosed
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::adf_commands::{AdfCommand, AdfCommandParser};
+    use crate::AgentOrchestrator;
+
+    #[test]
+    fn qualified_canonical_gate_mentions_are_single_project_dispatch_targets() {
+        let orchestrator =
+            AgentOrchestrator::new(crate::pr_handlers_impl::duplicate_gate_config_for_tests())
+                .unwrap();
+        let body = "please run @adf:terraphim-llm-proxy/pr-validator";
+        let gates = orchestrator.qualified_canonical_pr_gate_mentions(
+            body,
+            "digital-twins",
+            &orchestrator.config.agents,
+        );
+
+        assert_eq!(
+            gates,
+            vec![super::QualifiedPrGateMention {
+                project: "terraphim-llm-proxy".to_string(),
+                agent: "pr-validator".to_string(),
+            }]
+        );
+
+        let selected = orchestrator
+            .agent_registry
+            .lookup_project(&gates[0].project, &gates[0].agent)
+            .expect("qualified project agent");
+        assert_eq!(selected.definition.task, "proxy validator");
+        let wrong_project = orchestrator
+            .agent_registry
+            .lookup_project("digital-twins", "pr-validator")
+            .expect("wrong-project duplicate exists");
+        assert_eq!(wrong_project.definition.task, "digital validator");
+
+        let handled_gate_agents: std::collections::HashSet<_> =
+            gates.iter().map(|gate| gate.agent.clone()).collect();
+        let parser = AdfCommandParser::new(&["pr-validator".to_string()], &[]);
+        let generic_spawn_count = parser
+            .parse_commands("@adf:pr-validator", 38, 74130)
+            .into_iter()
+            .filter(|cmd| match cmd {
+                AdfCommand::SpawnAgent { agent_name, .. } => {
+                    !handled_gate_agents.contains(agent_name)
+                }
+                _ => false,
+            })
+            .count();
+        assert_eq!(
+            generic_spawn_count, 0,
+            "qualified gate comment must not also dispatch generic spawn for the same agent"
+        );
     }
 }

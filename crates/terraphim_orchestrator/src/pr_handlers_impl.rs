@@ -45,6 +45,105 @@ struct GiteaPullUserForGateMention {
     login: String,
 }
 
+fn valid_pr_gate_mention_request(
+    project: &str,
+    agent_name: &str,
+    issue_number: u64,
+    req: &pr_dispatch::ReviewPrRequest,
+) -> bool {
+    if req.project != project {
+        warn!(
+            expected_project = project,
+            actual_project = %req.project,
+            agent = %agent_name,
+            issue = issue_number,
+            "PR gate mention rejected: project mismatch"
+        );
+        return false;
+    }
+    if req.pr_number != issue_number || req.head_sha.trim().is_empty() {
+        warn!(
+            project,
+            agent = %agent_name,
+            issue = issue_number,
+            pr_number = req.pr_number,
+            head_sha = %req.head_sha,
+            "PR gate mention rejected: PR number/head mismatch"
+        );
+        return false;
+    }
+    true
+}
+
+#[cfg(test)]
+pub(crate) fn duplicate_gate_config_for_tests() -> crate::OrchestratorConfig {
+    let mut config = crate::OrchestratorConfig::from_toml(
+        r#"
+working_dir = "/tmp/adf-root"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp"
+
+[[projects]]
+id = "terraphim-llm-proxy"
+working_dir = "/tmp/proxy"
+[projects.gitea]
+base_url = "http://127.0.0.1:1"
+token = "proxy-token"
+owner = "proxy-owner"
+repo = "proxy-repo"
+
+[[projects]]
+id = "digital-twins"
+working_dir = "/tmp/digital"
+[projects.gitea]
+base_url = "http://127.0.0.1:1"
+token = "digital-token"
+owner = "digital-owner"
+repo = "digital-repo"
+
+[[agents]]
+name = "pr-validator"
+layer = "Growth"
+cli_tool = "echo"
+task = "proxy validator"
+model = "sonnet"
+project = "terraphim-llm-proxy"
+
+[[agents]]
+name = "pr-validator"
+layer = "Growth"
+cli_tool = "echo"
+task = "digital validator"
+model = "sonnet"
+project = "digital-twins"
+"#,
+    )
+    .expect("test config parses");
+    config.pr_dispatch_per_project.insert(
+        "terraphim-llm-proxy".to_string(),
+        config::PrDispatchConfig {
+            agents_on_pr_open: vec![config::PrDispatchEntry {
+                name: "pr-validator".to_string(),
+                context: "adf/proxy-validation".to_string(),
+            }],
+        },
+    );
+    config.pr_dispatch_per_project.insert(
+        "digital-twins".to_string(),
+        config::PrDispatchConfig {
+            agents_on_pr_open: vec![config::PrDispatchEntry {
+                name: "pr-validator".to_string(),
+                context: "adf/digital-validation".to_string(),
+            }],
+        },
+    );
+    config
+}
+
 impl AgentOrchestrator {
     /// Handle a `DispatchTask::ReviewPr` dispatch: run the routing engine,
     /// enforce the C1/C3 provider allow-list, and spawn the pr-reviewer agent
@@ -175,25 +274,7 @@ impl AgentOrchestrator {
             return Ok(false);
         };
 
-        if req.project != project {
-            warn!(
-                expected_project = project,
-                actual_project = %req.project,
-                agent = %agent_name,
-                issue = issue_number,
-                "PR gate mention rejected: project mismatch"
-            );
-            return Ok(false);
-        }
-        if req.pr_number != issue_number || req.head_sha.trim().is_empty() {
-            warn!(
-                project,
-                agent = %agent_name,
-                issue = issue_number,
-                pr_number = req.pr_number,
-                head_sha = %req.head_sha,
-                "PR gate mention rejected: PR number/head mismatch"
-            );
+        if !valid_pr_gate_mention_request(project, agent_name, issue_number, &req) {
             return Ok(false);
         }
 
@@ -209,6 +290,37 @@ impl AgentOrchestrator {
                 &format!("{agent_name} dispatched by mention"),
             )
             .await;
+        }
+        Ok(spawned)
+    }
+
+    pub(crate) async fn dispatch_canonical_pr_gate_mention_from_comment(
+        &mut self,
+        project: &str,
+        agent_name: &str,
+        issue_number: u64,
+        chain_id: String,
+        depth: u32,
+        parent_agent: String,
+    ) -> Result<bool, OrchestratorError> {
+        if self.should_skip_local_dispatch(agent_name, issue_number) {
+            return Ok(false);
+        }
+
+        let spawned = self
+            .dispatch_pr_gate_mention_for_issue(project, agent_name, issue_number)
+            .await?;
+        if spawned {
+            if let Some(agent) = self.active_agents.get_mut(agent_name) {
+                agent.spawned_by_mention = true;
+                agent.mention_chain_id = Some(chain_id);
+                agent.mention_depth = Some(depth);
+                agent.mention_parent_agent = if parent_agent.is_empty() {
+                    None
+                } else {
+                    Some(parent_agent)
+                };
+            }
         }
         Ok(spawned)
     }
@@ -781,17 +893,19 @@ impl AgentOrchestrator {
         context: &str,
         description: &str,
     ) {
-        let tracker = match self.get_or_init_pre_check_tracker() {
-            Some(t) => t,
-            None => {
-                debug!(
-                    pr_number,
-                    project,
-                    context,
-                    "ReviewPr: no workflow tracker configured; skipping pending status"
-                );
-                return;
-            }
+        let tracker = if let Some(ref poster) = self.output_poster {
+            poster.tracker_for(project, context)
+        } else {
+            self.get_or_init_pre_check_tracker()
+        };
+        let Some(tracker) = tracker else {
+            debug!(
+                pr_number,
+                project,
+                context,
+                "ReviewPr: no project tracker configured; skipping pending status"
+            );
+            return;
         };
         let owner = tracker.owner().to_string();
         let repo = tracker.repo().to_string();
@@ -1093,5 +1207,83 @@ impl AgentOrchestrator {
         );
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::AgentOrchestrator;
+
+    #[test]
+    fn qualified_gate_uses_project_definition_and_status_tracker() {
+        let orchestrator =
+            AgentOrchestrator::new(super::duplicate_gate_config_for_tests()).unwrap();
+
+        let proxy_entry = orchestrator
+            .pr_gate_dispatch_entry("terraphim-llm-proxy", "pr-validator")
+            .expect("proxy pr-validator gate entry");
+        assert_eq!(proxy_entry.context, "adf/proxy-validation");
+
+        let digital_entry = orchestrator
+            .pr_gate_dispatch_entry("digital-twins", "pr-validator")
+            .expect("digital pr-validator gate entry");
+        assert_eq!(digital_entry.context, "adf/digital-validation");
+
+        let proxy_def = orchestrator
+            .agent_registry
+            .lookup_project("terraphim-llm-proxy", "pr-validator")
+            .expect("proxy agent");
+        assert_eq!(proxy_def.definition.task, "proxy validator");
+
+        let poster = orchestrator.output_poster.as_ref().expect("output poster");
+        let tracker = poster
+            .tracker_for("terraphim-llm-proxy", "adf/proxy-validation")
+            .expect("proxy tracker");
+        assert_eq!(tracker.owner(), "proxy-owner");
+        assert_eq!(tracker.repo(), "proxy-repo");
+    }
+
+    #[test]
+    fn pr_gate_request_validation_rejects_wrong_project_or_head() {
+        let req = crate::pr_dispatch::ReviewPrRequest {
+            pr_number: 38,
+            project: "digital-twins".to_string(),
+            head_sha: "abc123".to_string(),
+            head_ref: "feature".to_string(),
+            author_login: "alice".to_string(),
+            title: "test".to_string(),
+            diff_loc: 10,
+        };
+
+        assert!(!super::valid_pr_gate_mention_request(
+            "terraphim-llm-proxy",
+            "pr-validator",
+            38,
+            &req
+        ));
+
+        let empty_head = crate::pr_dispatch::ReviewPrRequest {
+            project: "terraphim-llm-proxy".to_string(),
+            head_sha: " ".to_string(),
+            ..req.clone()
+        };
+        assert!(!super::valid_pr_gate_mention_request(
+            "terraphim-llm-proxy",
+            "pr-validator",
+            38,
+            &empty_head
+        ));
+
+        let wrong_issue = crate::pr_dispatch::ReviewPrRequest {
+            project: "terraphim-llm-proxy".to_string(),
+            head_sha: "abc123".to_string(),
+            ..req
+        };
+        assert!(!super::valid_pr_gate_mention_request(
+            "terraphim-llm-proxy",
+            "pr-validator",
+            39,
+            &wrong_issue
+        ));
     }
 }
