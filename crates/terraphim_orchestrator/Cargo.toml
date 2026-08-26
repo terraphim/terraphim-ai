@@ -13,7 +13,7 @@ readme = "../../README.md"
 
 [features]
 default = ["quickwit", "evolution"]
-quickwit = ["dep:reqwest", "dep:reqwest-middleware", "dep:reqwest-retry"]
+quickwit = ["dep:reqwest-middleware", "dep:reqwest-retry"]
 evolution = ["dep:terraphim_agent_evolution"]
 # Expose `scope::test_support` to integration tests under `tests/`.
 # The dependency on `tempfile` is also pulled in by `[dev-dependencies]`,
@@ -83,7 +83,7 @@ terraphim_persistence = { version = "1.20.2", registry = "terraphim", features =
 terraphim_agent_evolution = { version = "1.20.2", registry = "terraphim", optional = true }
 
 # Quickwit integration (optional)
-reqwest = { workspace = true, optional = true }
+reqwest = { workspace = true }
 reqwest-middleware = { workspace = true, optional = true }
 reqwest-retry = { workspace = true, optional = true }
 ulid = "1.2.1"

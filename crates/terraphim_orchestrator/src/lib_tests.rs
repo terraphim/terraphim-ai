@@ -1660,6 +1660,60 @@ fn review_pr_task() -> dispatcher::DispatchTask {
     }
 }
 
+fn push_pr_gate_agent(config: &mut OrchestratorConfig, name: &str, context: &str, cli_tool: &str) {
+    config.agents.push(AgentDefinition {
+        name: name.to_string(),
+        layer: AgentLayer::Safety,
+        cli_tool: cli_tool.to_string(),
+        task: "gate".to_string(),
+        model: None,
+        default_tier: None,
+        schedule: None,
+        capabilities: vec!["review".to_string()],
+        max_memory_bytes: None,
+        budget_monthly_cents: None,
+        provider: None,
+        persona: None,
+        terraphim_role: None,
+        skill_chain: vec![],
+        sfia_skills: vec![],
+        fallback_provider: None,
+        fallback_model: None,
+        grace_period_secs: None,
+        max_cpu_seconds: None,
+        pre_check: None,
+        gitea_issue: None,
+        event_only: false,
+        evolution_enabled: false,
+        rlm_enabled: None,
+        bypass_kg_routing: false,
+        enabled: true,
+        project: Some("alpha".to_string()),
+    });
+    config.pr_dispatch_per_project.insert(
+        "alpha".to_string(),
+        crate::config::PrDispatchConfig {
+            agents_on_pr_open: vec![crate::config::PrDispatchEntry {
+                name: name.to_string(),
+                context: context.to_string(),
+            }],
+        },
+    );
+}
+
+fn write_executable_script(tmp: &TempDir, name: &str, body: &str) -> std::path::PathBuf {
+    let script_path = tmp.path().join(name);
+    std::fs::write(&script_path, body).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&script_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&script_path, perms).unwrap();
+    }
+    script_path
+}
+
 /// `handle_review_pr` must drive the routing engine and spawn the
 /// pr-reviewer agent it selected, registering it in `active_agents`.
 #[tokio::test]
@@ -1681,6 +1735,608 @@ async fn reviewpr_dispatch_routes_via_routing_engine() {
         managed.session_id.starts_with("pr-reviewer-"),
         "session id should be scoped to the agent, got: {}",
         managed.session_id
+    );
+}
+
+#[tokio::test]
+async fn webhook_pr_gate_mention_attaches_meta_posts_status_and_skips_assignment() {
+    use axum::{
+        extract::{Path, State},
+        http::StatusCode,
+        response::IntoResponse,
+        routing::{get, post},
+        Router,
+    };
+    use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+    use std::sync::Arc;
+    use tokio::net::TcpListener;
+
+    #[derive(Default)]
+    struct Captured {
+        statuses: std::sync::Mutex<Vec<serde_json::Value>>,
+        assignment_patches: AtomicUsize,
+        comments: AtomicUsize,
+    }
+
+    async fn issue_get(State(_captured): State<Arc<Captured>>) -> impl IntoResponse {
+        (StatusCode::OK, r#"{"assignees":[]}"#)
+    }
+
+    async fn issue_patch(State(captured): State<Arc<Captured>>) -> impl IntoResponse {
+        captured.assignment_patches.fetch_add(1, AOrdering::SeqCst);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "assignment should not be attempted for PR gate agents",
+        )
+    }
+
+    async fn pull_get(Path((_owner, _repo, pr)): Path<(String, String, u64)>) -> impl IntoResponse {
+        let body = serde_json::json!({
+            "number": pr,
+            "head": { "sha": "abc123", "ref": "task/pr-gate" },
+            "user": { "login": "alice" },
+            "title": "fix gate dispatch",
+            "additions": 12,
+            "deletions": 3
+        });
+        (StatusCode::OK, body.to_string())
+    }
+
+    async fn status_post(
+        Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+        State(captured): State<Arc<Captured>>,
+        body: axum::body::Bytes,
+    ) -> impl IntoResponse {
+        let parsed = serde_json::from_slice::<serde_json::Value>(&body).unwrap();
+        captured.statuses.lock().unwrap().push(parsed);
+        StatusCode::CREATED
+    }
+
+    async fn comment_post(State(captured): State<Arc<Captured>>) -> impl IntoResponse {
+        captured.comments.fetch_add(1, AOrdering::SeqCst);
+        (StatusCode::CREATED, r#"{"id":1}"#)
+    }
+
+    let captured = Arc::new(Captured::default());
+    let app = Router::new()
+        .route(
+            "/api/v1/repos/{owner}/{repo}/issues/{issue}",
+            get(issue_get).patch(issue_patch),
+        )
+        .route(
+            "/api/v1/repos/{owner}/{repo}/issues/{issue}/comments",
+            post(comment_post),
+        )
+        .route("/api/v1/repos/{owner}/{repo}/pulls/{pr}", get(pull_get))
+        .route(
+            "/api/v1/repos/{owner}/{repo}/statuses/{sha}",
+            post(status_post),
+        )
+        .with_state(captured.clone());
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.ok();
+    });
+    let base_url = format!("http://{}", addr);
+
+    let tmp = TempDir::new().unwrap();
+    let script_path = tmp.path().join("gate.sh");
+    std::fs::write(
+        &script_path,
+        r#"#!/bin/sh
+cat <<'EOF'
+Gate report
+<!-- adf:gate-result
+{
+  "schema_version": 1,
+  "agent": "pr-validator",
+  "context": "adf/validation",
+  "pr_number": 38,
+  "head_sha": "abc123",
+  "status": "pass",
+  "confidence": 5,
+  "blocking_findings": 0,
+  "summary": "Validation passed"
+}
+-->
+EOF
+"#,
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&script_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&script_path, perms).unwrap();
+    }
+
+    let (mut config, _cfg_tmp) = review_pr_config(script_path.to_str().unwrap());
+    config.mentions = Some(crate::config::MentionConfig::default());
+    config.workflow = Some(crate::config::WorkflowConfig {
+        enabled: true,
+        poll_interval_secs: 60,
+        workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+        tracker: crate::config::TrackerConfig {
+            kind: "gitea".to_string(),
+            endpoint: base_url.clone(),
+            api_key: "test-token".to_string(),
+            owner: "fakeowner".to_string(),
+            repo: "fakerepo".to_string(),
+            project_slug: None,
+            use_robot_api: false,
+            states: crate::config::TrackerStates::default(),
+        },
+        concurrency: crate::config::ConcurrencyConfig::default(),
+    });
+    config.projects[0].gitea = Some(crate::config::GiteaOutputConfig {
+        base_url,
+        token: "test-token".to_string(),
+        owner: "fakeowner".to_string(),
+        repo: "fakerepo".to_string(),
+        agent_tokens_path: None,
+    });
+    push_pr_gate_agent(
+        &mut config,
+        "pr-validator",
+        "adf/validation",
+        script_path.to_str().unwrap(),
+    );
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    orch.handle_webhook_dispatch(crate::webhook::WebhookDispatch::SpawnAgent {
+        agent_name: "pr-validator".to_string(),
+        detected_project: Some("alpha".to_string()),
+        issue_number: 38,
+        comment_id: 99,
+        context: "please validate this head".to_string(),
+        synthetic_event: None,
+    })
+    .await;
+
+    let managed = orch
+        .active_agents
+        .get("pr-validator")
+        .expect("mention must spawn PR gate agent");
+    let meta = managed
+        .gate_meta
+        .as_ref()
+        .expect("PR gate meta must attach");
+    assert_eq!(meta.pr_number, 38);
+    assert_eq!(meta.project, "alpha");
+    assert_eq!(meta.agent_name, "pr-validator");
+    assert_eq!(meta.context, "adf/validation");
+    assert_eq!(meta.head_sha, "abc123");
+    assert!(managed.spawned_by_mention);
+
+    for _ in 0..150 {
+        orch.poll_agent_exits().await;
+        if captured.statuses.lock().unwrap().len() >= 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+
+    assert_eq!(
+        captured.assignment_patches.load(AOrdering::SeqCst),
+        0,
+        "PR gate mention must not PATCH assignees for non-user gate names"
+    );
+    let statuses = captured.statuses.lock().unwrap().clone();
+    assert!(
+        statuses
+            .iter()
+            .any(|s| s["state"] == "pending" && s["context"] == "adf/validation"),
+        "pending adf/validation status missing: {statuses:?}"
+    );
+    assert!(
+        statuses
+            .iter()
+            .any(|s| s["state"] == "success" && s["context"] == "adf/validation"),
+        "canonical exact-head success status missing: {statuses:?}"
+    );
+    assert!(
+        captured.comments.load(AOrdering::SeqCst) > 0,
+        "canonical gate output should be posted back as a PR comment"
+    );
+}
+
+#[tokio::test]
+async fn pr_gate_mention_ignores_unrelated_global_workflow_assignment() {
+    use axum::{
+        extract::{Path, State},
+        http::StatusCode,
+        response::IntoResponse,
+        routing::{get, post},
+        Router,
+    };
+    use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+    use std::sync::Arc;
+    use tokio::net::TcpListener;
+
+    #[derive(Default)]
+    struct Captured {
+        issue_gets: AtomicUsize,
+        assignment_patches: AtomicUsize,
+        statuses: std::sync::Mutex<Vec<serde_json::Value>>,
+    }
+
+    async fn issue_get(State(captured): State<Arc<Captured>>) -> impl IntoResponse {
+        captured.issue_gets.fetch_add(1, AOrdering::SeqCst);
+        (
+            StatusCode::OK,
+            r#"{"assignees":[{"login":"pr-validator"}]}"#,
+        )
+    }
+
+    async fn issue_patch(State(captured): State<Arc<Captured>>) -> impl IntoResponse {
+        captured.assignment_patches.fetch_add(1, AOrdering::SeqCst);
+        (StatusCode::OK, r#"{"ok":true}"#)
+    }
+
+    async fn pull_get(Path((_owner, _repo, pr)): Path<(String, String, u64)>) -> impl IntoResponse {
+        let body = serde_json::json!({
+            "number": pr,
+            "head": { "sha": "abc123", "ref": "task/pr-gate" },
+            "user": { "login": "alice" },
+            "title": "fix gate dispatch",
+            "additions": 12,
+            "deletions": 3
+        });
+        (StatusCode::OK, body.to_string())
+    }
+
+    async fn status_post(
+        Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+        State(captured): State<Arc<Captured>>,
+        body: axum::body::Bytes,
+    ) -> impl IntoResponse {
+        captured
+            .statuses
+            .lock()
+            .unwrap()
+            .push(serde_json::from_slice::<serde_json::Value>(&body).unwrap());
+        StatusCode::CREATED
+    }
+
+    async fn comment_post() -> impl IntoResponse {
+        (StatusCode::CREATED, r#"{"id":1}"#)
+    }
+
+    let captured = Arc::new(Captured::default());
+    let app = Router::new()
+        .route(
+            "/api/v1/repos/{owner}/{repo}/issues/{issue}",
+            get(issue_get).patch(issue_patch),
+        )
+        .route(
+            "/api/v1/repos/{owner}/{repo}/issues/{issue}/comments",
+            post(comment_post),
+        )
+        .route("/api/v1/repos/{owner}/{repo}/pulls/{pr}", get(pull_get))
+        .route(
+            "/api/v1/repos/{owner}/{repo}/statuses/{sha}",
+            post(status_post),
+        )
+        .with_state(captured.clone());
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.ok();
+    });
+    let base_url = format!("http://{}", addr);
+
+    let tmp = TempDir::new().unwrap();
+    let script_path = write_executable_script(
+        &tmp,
+        "gate.sh",
+        r#"#!/bin/sh
+cat <<'EOF'
+<!-- adf:gate-result
+{
+  "schema_version": 1,
+  "agent": "pr-validator",
+  "context": "adf/validation",
+  "pr_number": 38,
+  "head_sha": "abc123",
+  "status": "pass",
+  "confidence": 5,
+  "blocking_findings": 0,
+  "summary": "Validation passed"
+}
+-->
+EOF
+"#,
+    );
+    let (mut config, _cfg_tmp) = review_pr_config(script_path.to_str().unwrap());
+    config.mentions = Some(crate::config::MentionConfig::default());
+    config.workflow = Some(crate::config::WorkflowConfig {
+        enabled: true,
+        poll_interval_secs: 60,
+        workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+        tracker: crate::config::TrackerConfig {
+            kind: "gitea".to_string(),
+            endpoint: base_url.clone(),
+            api_key: "test-token".to_string(),
+            owner: "globalowner".to_string(),
+            repo: "globalrepo".to_string(),
+            project_slug: None,
+            use_robot_api: false,
+            states: crate::config::TrackerStates::default(),
+        },
+        concurrency: crate::config::ConcurrencyConfig::default(),
+    });
+    config.projects[0].gitea = Some(crate::config::GiteaOutputConfig {
+        base_url,
+        token: "test-token".to_string(),
+        owner: "fakeowner".to_string(),
+        repo: "fakerepo".to_string(),
+        agent_tokens_path: None,
+    });
+    push_pr_gate_agent(
+        &mut config,
+        "pr-validator",
+        "adf/validation",
+        script_path.to_str().unwrap(),
+    );
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    orch.handle_webhook_dispatch(crate::webhook::WebhookDispatch::SpawnAgent {
+        agent_name: "pr-validator".to_string(),
+        detected_project: Some("alpha".to_string()),
+        issue_number: 38,
+        comment_id: 99,
+        context: "please validate this head".to_string(),
+        synthetic_event: None,
+    })
+    .await;
+
+    assert!(
+        orch.active_agents.contains_key("pr-validator"),
+        "unrelated global assignment must not suppress project-scoped gate"
+    );
+    assert_eq!(
+        captured.issue_gets.load(AOrdering::SeqCst),
+        0,
+        "project-scoped gate mention must bypass global assignee lookup"
+    );
+    assert_eq!(
+        captured.assignment_patches.load(AOrdering::SeqCst),
+        0,
+        "project-scoped gate mention must bypass global assignment"
+    );
+}
+
+#[test]
+fn non_gate_pr_fanout_agent_is_not_canonical_pr_gate() {
+    let (mut config, _tmp) = review_pr_config("echo");
+    push_pr_gate_agent(&mut config, "pr-security-sentinel", "adf/security", "echo");
+    let orch = AgentOrchestrator::new(config).unwrap();
+
+    assert!(
+        orch.pr_gate_dispatch_entry("alpha", "pr-security-sentinel")
+            .is_none(),
+        "non-gate fan-out agents must keep generic mention classification"
+    );
+    assert!(
+        orch.pr_gate_dispatch_entry("alpha", "pr-validator")
+            .is_none(),
+        "canonical names are gates only when configured for the project"
+    );
+}
+
+#[tokio::test]
+async fn pr_gate_legacy_noncanonical_output_posts_failure_not_success() {
+    use axum::{
+        extract::{Path, State},
+        http::StatusCode,
+        response::IntoResponse,
+        routing::post,
+        Router,
+    };
+    use std::sync::Arc;
+    use tokio::net::TcpListener;
+
+    #[derive(Default)]
+    struct Captured {
+        statuses: std::sync::Mutex<Vec<serde_json::Value>>,
+    }
+
+    async fn status_post(
+        Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+        State(captured): State<Arc<Captured>>,
+        body: axum::body::Bytes,
+    ) -> impl IntoResponse {
+        captured
+            .statuses
+            .lock()
+            .unwrap()
+            .push(serde_json::from_slice::<serde_json::Value>(&body).unwrap());
+        StatusCode::CREATED
+    }
+
+    let captured = Arc::new(Captured::default());
+    let app = Router::new()
+        .route(
+            "/api/v1/repos/{owner}/{repo}/statuses/{sha}",
+            post(status_post),
+        )
+        .with_state(captured.clone());
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.ok();
+    });
+    let base_url = format!("http://{}", addr);
+
+    let tmp = TempDir::new().unwrap();
+    let script_path = write_executable_script(
+        &tmp,
+        "legacy-gate.sh",
+        "#!/bin/sh\necho 'LEGACY VERDICT: APPROVED'\n",
+    );
+    let (mut config, _cfg_tmp) = review_pr_config(script_path.to_str().unwrap());
+    config.workflow = Some(crate::config::WorkflowConfig {
+        enabled: true,
+        poll_interval_secs: 60,
+        workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+        tracker: crate::config::TrackerConfig {
+            kind: "gitea".to_string(),
+            endpoint: base_url,
+            api_key: "test-token".to_string(),
+            owner: "fakeowner".to_string(),
+            repo: "fakerepo".to_string(),
+            project_slug: None,
+            use_robot_api: false,
+            states: crate::config::TrackerStates::default(),
+        },
+        concurrency: crate::config::ConcurrencyConfig::default(),
+    });
+    push_pr_gate_agent(
+        &mut config,
+        "pr-validator",
+        "adf/validation",
+        script_path.to_str().unwrap(),
+    );
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    orch.handle_review_pr(review_pr_task()).await.unwrap();
+    for _ in 0..150 {
+        orch.poll_agent_exits().await;
+        if captured.statuses.lock().unwrap().len() >= 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+
+    let statuses = captured.statuses.lock().unwrap().clone();
+    assert!(
+        !statuses
+            .iter()
+            .any(|s| s["state"] == "success" && s["context"] == "adf/validation"),
+        "legacy noncanonical output must not post success: {statuses:?}"
+    );
+    assert!(
+        statuses
+            .iter()
+            .any(|s| s["state"] == "failure" && s["context"] == "adf/validation"),
+        "legacy noncanonical output must fail closed: {statuses:?}"
+    );
+}
+
+#[tokio::test]
+async fn pr_gate_head_sha_mismatch_posts_failure_not_success() {
+    use axum::{
+        extract::{Path, State},
+        http::StatusCode,
+        response::IntoResponse,
+        routing::post,
+        Router,
+    };
+    use std::sync::Arc;
+    use tokio::net::TcpListener;
+
+    #[derive(Default)]
+    struct Captured {
+        statuses: std::sync::Mutex<Vec<serde_json::Value>>,
+    }
+
+    async fn status_post(
+        Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+        State(captured): State<Arc<Captured>>,
+        body: axum::body::Bytes,
+    ) -> impl IntoResponse {
+        captured
+            .statuses
+            .lock()
+            .unwrap()
+            .push(serde_json::from_slice::<serde_json::Value>(&body).unwrap());
+        StatusCode::CREATED
+    }
+
+    let captured = Arc::new(Captured::default());
+    let app = Router::new()
+        .route(
+            "/api/v1/repos/{owner}/{repo}/statuses/{sha}",
+            post(status_post),
+        )
+        .with_state(captured.clone());
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.ok();
+    });
+    let base_url = format!("http://{}", addr);
+
+    let tmp = TempDir::new().unwrap();
+    let script_path = write_executable_script(
+        &tmp,
+        "stale-head-gate.sh",
+        r#"#!/bin/sh
+cat <<'EOF'
+<!-- adf:gate-result
+{
+  "schema_version": 1,
+  "agent": "pr-validator",
+  "context": "adf/validation",
+  "pr_number": 641,
+  "head_sha": "staleabc",
+  "status": "pass",
+  "confidence": 5,
+  "blocking_findings": 0,
+  "summary": "Validation passed for stale head"
+}
+-->
+EOF
+"#,
+    );
+    let (mut config, _cfg_tmp) = review_pr_config(script_path.to_str().unwrap());
+    config.workflow = Some(crate::config::WorkflowConfig {
+        enabled: true,
+        poll_interval_secs: 60,
+        workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+        tracker: crate::config::TrackerConfig {
+            kind: "gitea".to_string(),
+            endpoint: base_url,
+            api_key: "test-token".to_string(),
+            owner: "fakeowner".to_string(),
+            repo: "fakerepo".to_string(),
+            project_slug: None,
+            use_robot_api: false,
+            states: crate::config::TrackerStates::default(),
+        },
+        concurrency: crate::config::ConcurrencyConfig::default(),
+    });
+    push_pr_gate_agent(
+        &mut config,
+        "pr-validator",
+        "adf/validation",
+        script_path.to_str().unwrap(),
+    );
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    orch.handle_review_pr(review_pr_task()).await.unwrap();
+    for _ in 0..150 {
+        orch.poll_agent_exits().await;
+        if captured.statuses.lock().unwrap().len() >= 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+
+    let statuses = captured.statuses.lock().unwrap().clone();
+    assert!(
+        !statuses
+            .iter()
+            .any(|s| s["state"] == "success" && s["context"] == "adf/validation"),
+        "stale-head gate result must not post success: {statuses:?}"
+    );
+    assert!(
+        statuses
+            .iter()
+            .any(|s| s["state"] == "failure" && s["context"] == "adf/validation"),
+        "stale-head gate result must fail closed: {statuses:?}"
     );
 }
 

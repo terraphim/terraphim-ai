@@ -171,15 +171,15 @@ impl AdfCommandParser {
 }
 
 /// Extract context after a command (rest of line or paragraph)
-fn extract_context(text: &str, end_pos: usize) -> String {
+pub(crate) fn extract_context(text: &str, end_pos: usize) -> String {
     let after = &text[end_pos..];
 
     // Take until end of line or paragraph
     let context = after.lines().next().unwrap_or("").trim().to_string();
 
     // Limit context length
-    if context.len() > 500 {
-        format!("{}...", &context[..497])
+    if context.chars().count() > 500 {
+        format!("{}...", context.chars().take(497).collect::<String>())
     } else {
         context
     }
@@ -253,5 +253,22 @@ mod tests {
 
         assert!(parser.has_commands("@adf:agent do something"));
         assert!(!parser.has_commands("No commands here"));
+    }
+
+    #[test]
+    fn test_context_extraction_truncates_on_utf8_boundary() {
+        let parser = AdfCommandParser::new(&["reviewer".to_string()], &[]);
+        let text = format!("@adf:reviewer {}", "é".repeat(600));
+
+        let commands = parser.parse_commands(&text, 42, 123);
+
+        match &commands[0] {
+            AdfCommand::SpawnAgent { context, .. } => {
+                assert_eq!(context.chars().count(), 500);
+                assert!(context.ends_with("..."));
+                assert!(context.is_char_boundary(context.len()));
+            }
+            _ => panic!("Expected SpawnAgent command"),
+        }
     }
 }

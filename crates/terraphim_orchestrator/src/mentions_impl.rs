@@ -700,6 +700,16 @@ impl AgentOrchestrator {
             }
         }
 
+        if self.pr_gate_dispatch_entry(&project, agent_name).is_some() {
+            info!(
+                agent = %agent_name,
+                project = %project,
+                issue = issue_number,
+                "skipping Gitea assignment for PR gate agent without requiring matching user"
+            );
+            return false;
+        }
+
         // Assign the issue to the agent
         if let Err(e) = tracker.assign_issue(issue_number, &[agent_name]).await {
             warn!(
@@ -714,6 +724,27 @@ impl AgentOrchestrator {
                 issue = issue_number,
                 "assigned issue to agent"
             );
+        }
+        false
+    }
+
+    /// Local-only duplicate guard for project-scoped PR gates.
+    ///
+    /// Canonical PR gate agents are not Gitea users in the global workflow
+    /// repository, so mention dispatch for those gates must not consult or
+    /// mutate global assignees. The active-agent map is still authoritative
+    /// for suppressing duplicate in-process dispatches.
+    pub(crate) fn should_skip_local_dispatch(&self, agent_name: &str, issue_number: u64) -> bool {
+        if issue_number == 0 {
+            return false;
+        }
+        if self.active_agents.contains_key(agent_name) {
+            warn!(
+                agent = %agent_name,
+                issue = issue_number,
+                "skipping dispatch: agent already active (local guard)"
+            );
+            return true;
         }
         false
     }

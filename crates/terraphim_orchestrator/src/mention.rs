@@ -37,6 +37,7 @@ pub enum MentionResolution {
 pub struct MentionTokens {
     pub project: Option<String>,
     pub agent: String,
+    pub end: usize,
 }
 
 /// Parse all `@adf:[project/]name` mentions in `text`, returning their
@@ -54,6 +55,7 @@ pub fn parse_mention_tokens(text: &str) -> Vec<MentionTokens> {
                 .name("agent")
                 .map(|m| m.as_str().to_string())
                 .unwrap_or_default(),
+            end: caps.get(0).map(|m| m.end()).unwrap_or_default(),
         })
         .collect()
 }
