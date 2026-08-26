@@ -104,11 +104,6 @@ impl AgentOrchestrator {
                         return;
                     }
 
-                    // Dedup: check Gitea assignment + active_agents before spawning
-                    if self.should_skip_dispatch(&agent_name, issue_number).await {
-                        return;
-                    }
-
                     let chain_id = ulid::Ulid::new().to_string();
                     let depth: u32 = 0;
                     let parent_agent = String::new();
@@ -137,6 +132,48 @@ impl AgentOrchestrator {
                                 warn!(error = %pe, "failed to post webhook chain rejection comment");
                             }
                         }
+                        return;
+                    }
+
+                    let project = def.project.as_deref().or(detected_project.as_deref());
+                    if let Some(project) = project {
+                        if self.pr_gate_dispatch_entry(project, &agent_name).is_some() {
+                            if self.should_skip_local_dispatch(&agent_name, issue_number) {
+                                return;
+                            }
+                            match self
+                                .dispatch_pr_gate_mention_for_issue(
+                                    project,
+                                    &agent_name,
+                                    issue_number,
+                                )
+                                .await
+                            {
+                                Ok(true) => {
+                                    if let Some(agent) = self.active_agents.get_mut(&agent_name) {
+                                        agent.spawned_by_mention = true;
+                                        agent.mention_chain_id = Some(chain_id);
+                                        agent.mention_depth = Some(depth);
+                                        agent.mention_parent_agent = None;
+                                    }
+                                }
+                                Ok(false) => {}
+                                Err(e) => {
+                                    warn!(
+                                        agent = %agent_name,
+                                        project,
+                                        issue = issue_number,
+                                        error = %e,
+                                        "webhook PR gate mention failed closed"
+                                    );
+                                }
+                            }
+                            return;
+                        }
+                    }
+
+                    // Dedup: check Gitea assignment + active_agents before spawning
+                    if self.should_skip_dispatch(&agent_name, issue_number).await {
                         return;
                     }
 

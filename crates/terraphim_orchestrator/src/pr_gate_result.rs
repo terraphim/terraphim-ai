@@ -233,6 +233,24 @@ pub fn extract_assistant_text(lines: &[String], cli_tool: &str) -> String {
         return trimmed.to_string();
     }
 
+    if lines
+        .iter()
+        .any(|line| line.contains(GATE_RESULT_OPEN) || line.contains(GATE_RESULT_CLOSE))
+    {
+        return lines
+            .iter()
+            .filter_map(|line| {
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
+
     lines
         .iter()
         .filter_map(|line| {

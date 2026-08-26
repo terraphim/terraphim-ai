@@ -364,7 +364,7 @@ async fn handle_gitea_webhook(
                 agent_name: token.agent.clone(),
                 issue_number: payload.issue.number,
                 comment_id: payload.comment.id,
-                context: String::new(),
+                context: crate::adf_commands::extract_context(&payload.comment.body, token.end),
                 synthetic_event: None,
             });
         }
@@ -777,5 +777,54 @@ mod tests {
                 ),
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn qualified_agent_dispatch_preserves_bounded_context() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(4);
+        let state = WebhookState {
+            agent_names: vec!["reviewer".to_string()],
+            persona_registry: std::sync::Arc::new(PersonaRegistry::new()),
+            dispatch_tx: tx,
+            secret: None,
+            project_by_repo: Default::default(),
+        };
+        let body_text = format!("@adf:alpha/reviewer {}", "é".repeat(600));
+        let payload = serde_json::json!({
+            "action": "created",
+            "comment": {
+                "id": 99,
+                "body": body_text,
+                "user": { "login": "alice" },
+                "created_at": "2026-08-26T00:00:00Z"
+            },
+            "issue": { "number": 38, "title": "PR title", "state": "open" },
+            "repository": { "full_name": "terraphim/alpha" }
+        });
+
+        let status = handle_gitea_webhook(
+            State(state),
+            axum::http::HeaderMap::new(),
+            Bytes::from(serde_json::to_vec(&payload).unwrap()),
+        )
+        .await;
+
+        assert_eq!(status, StatusCode::ACCEPTED);
+        let dispatch = rx.recv().await.expect("dispatch expected");
+        match dispatch {
+            WebhookDispatch::SpawnAgent {
+                detected_project,
+                agent_name,
+                context,
+                ..
+            } => {
+                assert_eq!(detected_project.as_deref(), Some("alpha"));
+                assert_eq!(agent_name, "reviewer");
+                assert_eq!(context.chars().count(), 500);
+                assert!(context.ends_with("..."));
+                assert!(context.is_char_boundary(context.len()));
+            }
+            other => panic!("unexpected dispatch: {other:?}"),
+        }
     }
 }

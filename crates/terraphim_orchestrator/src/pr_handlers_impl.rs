@@ -15,6 +15,36 @@ use crate::{
     pr_gate_context, pr_gate_prompt, AgentOrchestrator, ManagedAgent, OrchestratorError,
 };
 
+const CANONICAL_PR_GATE_AGENTS: [&str; 3] = ["pr-verifier", "pr-validator", "pr-reviewer"];
+
+pub(crate) fn is_canonical_pr_gate_agent(agent_name: &str) -> bool {
+    CANONICAL_PR_GATE_AGENTS.contains(&agent_name)
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct GiteaPullForGateMention {
+    number: u64,
+    head: GiteaPullRefForGateMention,
+    user: GiteaPullUserForGateMention,
+    title: String,
+    #[serde(default)]
+    additions: u32,
+    #[serde(default)]
+    deletions: u32,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct GiteaPullRefForGateMention {
+    sha: String,
+    #[serde(rename = "ref")]
+    ref_name: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct GiteaPullUserForGateMention {
+    login: String,
+}
+
 impl AgentOrchestrator {
     /// Handle a `DispatchTask::ReviewPr` dispatch: run the routing engine,
     /// enforce the C1/C3 provider allow-list, and spawn the pr-reviewer agent
@@ -101,6 +131,156 @@ impl AgentOrchestrator {
         }
 
         Ok(())
+    }
+
+    /// Dispatch a project-scoped PR gate from a comment mention on a pull
+    /// request issue. This deliberately reuses the ReviewPr spawn machinery so
+    /// mention-triggered gates get the same bounded evidence prompt,
+    /// `PrGateMeta`, pending status, and fail-closed terminal parsing as
+    /// pull_request webhook fan-out.
+    pub(crate) async fn dispatch_pr_gate_mention_for_issue(
+        &mut self,
+        project: &str,
+        agent_name: &str,
+        issue_number: u64,
+    ) -> Result<bool, OrchestratorError> {
+        let Some(entry) = self.pr_gate_dispatch_entry(project, agent_name) else {
+            return Ok(false);
+        };
+
+        if self
+            .agent_registry
+            .lookup_project(project, agent_name)
+            .is_none()
+        {
+            warn!(
+                project,
+                agent = %agent_name,
+                issue = issue_number,
+                "PR gate mention rejected: agent not configured for project"
+            );
+            return Ok(false);
+        }
+
+        let Some(req) = self
+            .review_pr_request_from_project_issue(project, issue_number)
+            .await?
+        else {
+            warn!(
+                project,
+                agent = %agent_name,
+                issue = issue_number,
+                "PR gate mention rejected: issue is not a resolvable pull request"
+            );
+            return Ok(false);
+        };
+
+        if req.project != project {
+            warn!(
+                expected_project = project,
+                actual_project = %req.project,
+                agent = %agent_name,
+                issue = issue_number,
+                "PR gate mention rejected: project mismatch"
+            );
+            return Ok(false);
+        }
+        if req.pr_number != issue_number || req.head_sha.trim().is_empty() {
+            warn!(
+                project,
+                agent = %agent_name,
+                issue = issue_number,
+                pr_number = req.pr_number,
+                head_sha = %req.head_sha,
+                "PR gate mention rejected: PR number/head mismatch"
+            );
+            return Ok(false);
+        }
+
+        let spawned = self
+            .dispatch_pr_reviewer_for_pr(&req, agent_name, &entry.context)
+            .await?;
+        if spawned {
+            self.post_pending_status(
+                &req.head_sha,
+                req.pr_number,
+                project,
+                &entry.context,
+                &format!("{agent_name} dispatched by mention"),
+            )
+            .await;
+        }
+        Ok(spawned)
+    }
+
+    pub(crate) fn pr_gate_dispatch_entry(
+        &self,
+        project: &str,
+        agent_name: &str,
+    ) -> Option<config::PrDispatchEntry> {
+        if project == dispatcher::LEGACY_PROJECT_ID {
+            return None;
+        }
+        self.config
+            .agents_on_pr_open_for_project(project)
+            .into_iter()
+            .find(|entry| entry.name == agent_name && is_canonical_pr_gate_agent(&entry.name))
+    }
+
+    async fn review_pr_request_from_project_issue(
+        &self,
+        project: &str,
+        issue_number: u64,
+    ) -> Result<Option<pr_dispatch::ReviewPrRequest>, OrchestratorError> {
+        let Some(gitea) = self.gitea_config_for_project(project) else {
+            return Ok(None);
+        };
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/pulls/{}",
+            gitea.base_url.trim_end_matches('/'),
+            gitea.owner,
+            gitea.repo,
+            issue_number
+        );
+        let response = reqwest::Client::new()
+            .get(&url)
+            .header("Authorization", format!("token {}", gitea.token))
+            .header("Accept", "application/json")
+            .send()
+            .await
+            .map_err(|e| OrchestratorError::Config(format!("failed to fetch PR metadata: {e}")))?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(OrchestratorError::Config(format!(
+                "failed to fetch PR metadata for {project}#{issue_number}: HTTP {status}: {text}"
+            )));
+        }
+        let pr: GiteaPullForGateMention = response
+            .json()
+            .await
+            .map_err(|e| OrchestratorError::Config(format!("failed to parse PR metadata: {e}")))?;
+        Ok(Some(pr_dispatch::ReviewPrRequest {
+            pr_number: pr.number,
+            project: project.to_string(),
+            head_sha: pr.head.sha,
+            head_ref: pr.head.ref_name,
+            author_login: pr.user.login,
+            title: pr.title,
+            diff_loc: pr.additions.saturating_add(pr.deletions),
+        }))
+    }
+
+    fn gitea_config_for_project(&self, project: &str) -> Option<&config::GiteaOutputConfig> {
+        self.config
+            .projects
+            .iter()
+            .find(|p| p.id == project)
+            .and_then(|p| p.gitea.as_ref())
+            .or(self.config.gitea.as_ref())
     }
 
     /// Phase 2 helper: spawn the LLM-style PR review agent (`pr-reviewer`
