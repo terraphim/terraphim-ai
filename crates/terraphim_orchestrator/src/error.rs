@@ -133,4 +133,19 @@ pub enum OrchestratorError {
 
     #[error("nightwatch probe_ttl_secs {value}s is below minimum {min}s (rate-limit protection)")]
     ProbeTtlTooShort { value: u64, min: u64 },
+
+    /// Issue #3293: the PR gate dispatch contract is fail-closed. When the
+    /// orchestrator cannot assemble the authoritative evidence pack for a
+    /// canonical PR gate agent, the dispatch is rejected — no
+    /// degraded evidence substitution, no spawn.
+    #[error(
+        "PR gate evidence unavailable for {project}#{pr_number} (agent={agent}, head={head_sha}): {reason}"
+    )]
+    PrGateEvidenceUnavailable {
+        project: String,
+        agent: String,
+        pr_number: u64,
+        head_sha: String,
+        reason: String,
+    },
 }

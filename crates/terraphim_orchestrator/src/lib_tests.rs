@@ -2,6 +2,8 @@
 //! Gitea #1910 god-file decomposition; behaviour unchanged).
 
 use super::*;
+use crate::mentions_impl::PollGateRoute;
+use crate::tests_support::pr_gate_fixture_head_sha;
 use tempfile::TempDir;
 
 fn legacy_key(name: &str) -> (String, String) {
@@ -1554,6 +1556,10 @@ async fn test_spawn_agent_runs_when_budget_uncapped() {
 fn review_pr_config(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
     let tmp = TempDir::new().unwrap();
     let working_dir = tmp.path().to_path_buf();
+    // Authoritative-evidence fixture: the project working dir is a real git
+    // repo with the PR refs the evidence builder diffs against. Tests that
+    // want the fail-closed path point the working dir at an empty dir.
+    crate::tests_support::build_pr_gate_git_fixture(&working_dir);
     let config = OrchestratorConfig {
         working_dir: working_dir.clone(),
         nightwatch: NightwatchConfig::default(),
@@ -1650,9 +1656,9 @@ fn review_pr_config(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
 
 fn review_pr_task() -> dispatcher::DispatchTask {
     dispatcher::DispatchTask::ReviewPr {
-        pr_number: 641,
+        pr_number: crate::tests_support::FIXTURE_PR_NUMBER,
         project: "alpha".to_string(),
-        head_sha: "deadbeef1234".to_string(),
+        head_sha: crate::tests_support::pr_gate_fixture_head_sha().to_string(),
         head_ref: "task/641-review".to_string(),
         author_login: "claude-code".to_string(),
         title: "fix(kg): short synonyms".to_string(),
@@ -1738,6 +1744,171 @@ async fn reviewpr_dispatch_routes_via_routing_engine() {
     );
 }
 
+/// Issue #3293 (negative): when authoritative evidence assembly fails the
+/// PR-event path must fail closed — no `fallback_evidence_pack`
+/// substitution, no spawn — and must propagate the typed
+/// `PrGateEvidenceUnavailable` outcome with deterministic diagnostics.
+#[tokio::test]
+async fn handle_review_pr_fails_closed_when_evidence_missing_and_does_not_spawn() {
+    let (mut config, _tmp) = review_pr_config("echo");
+    // Redirect the project working dir at an empty directory: no git repo,
+    // no refs, so no authoritative diff can be assembled. The bogus `.git`
+    // sentinel stops git from discovering an ancestor repository (TMPDIR can
+    // live inside a checkout, which would silently supply a diff).
+    let empty = TempDir::new().unwrap();
+    std::fs::write(empty.path().join(".git"), "not a gitfile: sentinel")
+        .expect("plant git sentinel");
+    config.working_dir = empty.path().to_path_buf();
+    config.projects[0].working_dir = empty.path().to_path_buf();
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    let err = orch
+        .handle_review_pr(review_pr_task())
+        .await
+        .expect_err("missing evidence must fail closed, not spawn");
+
+    match &err {
+        OrchestratorError::PrGateEvidenceUnavailable {
+            project,
+            agent,
+            pr_number,
+            head_sha,
+            reason,
+        } => {
+            assert_eq!(project, "alpha");
+            assert_eq!(agent, "pr-reviewer");
+            assert_eq!(*pr_number, crate::tests_support::FIXTURE_PR_NUMBER);
+            assert_eq!(
+                *head_sha,
+                crate::tests_support::pr_gate_fixture_head_sha().to_string()
+            );
+            assert!(
+                !reason.trim().is_empty(),
+                "diagnostics must carry the underlying git failure"
+            );
+        }
+        other => panic!("expected PrGateEvidenceUnavailable, got {other:?}"),
+    }
+    assert!(
+        err.to_string().contains("PR gate evidence unavailable"),
+        "deterministic error prefix must be preserved: {err}"
+    );
+    assert!(
+        orch.active_agents.is_empty(),
+        "fail-closed path must not spawn any agent"
+    );
+}
+
+/// Issue #3293 (positive observable): with authoritative evidence present
+/// the PR-event path still spawns, and the spawn is bound to the
+/// deterministic dispatch id for the exact project/pr/head/agent tuple.
+#[tokio::test]
+async fn handle_review_pr_binds_dispatch_id_when_evidence_available() {
+    let (config, _tmp) = review_pr_config("echo");
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+    let managed = orch
+        .active_agents
+        .get("pr-reviewer")
+        .expect("authoritative evidence must still produce a spawn");
+    let meta = managed
+        .gate_meta
+        .as_ref()
+        .expect("spawn must carry gate metadata");
+    let expected = format!(
+        "pr-gate-dispatch:alpha:{}:{}:pr-reviewer",
+        crate::tests_support::FIXTURE_PR_NUMBER,
+        &crate::tests_support::pr_gate_fixture_head_sha()[..12]
+    );
+    assert_eq!(
+        meta.dispatch_id.0, expected,
+        "dispatch id must bind project/pr/head/agent deterministically"
+    );
+    assert!(managed.commit_status_post.is_some());
+}
+
+/// Issue #3293 (negative): a polled mention of a canonical PR gate agent
+/// must be consumed by the authoritative mention funnel — it can never
+/// fall through to a bare `def.task` spawn.
+#[tokio::test]
+async fn poll_mention_canonical_gate_never_receives_bare_task() {
+    // pr-reviewer is canonical; no gitea config means the funnel cannot
+    // resolve the issue, so the mention must be fail-closed, not bare-spawned.
+    let (config, _tmp) = review_pr_config("echo");
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    let route = orch.route_poll_mention_pr_gate("pr-reviewer", 7).await;
+
+    assert_ne!(
+        route,
+        PollGateRoute::NotGate,
+        "canonical gate mention must never reach the bare spawn path"
+    );
+    assert!(
+        orch.active_agents.is_empty(),
+        "unresolvable canonical gate mention must produce zero spawns"
+    );
+}
+
+/// Issue #3293 (regression guard): non-canonical agents keep the existing
+/// bare mention spawn path untouched.
+#[tokio::test]
+async fn poll_mention_non_canonical_agent_keeps_bare_spawn_path() {
+    let (mut config, _tmp) = review_pr_config("echo");
+    config.agents.push(AgentDefinition {
+        name: "helper-bot".to_string(),
+        layer: AgentLayer::Growth,
+        cli_tool: "echo".to_string(),
+        task: "bare task".to_string(),
+        model: None,
+        default_tier: None,
+        schedule: None,
+        capabilities: vec!["review".to_string()],
+        max_memory_bytes: None,
+        budget_monthly_cents: None,
+        provider: None,
+        persona: None,
+        terraphim_role: None,
+        skill_chain: vec![],
+        sfia_skills: vec![],
+        fallback_provider: None,
+        fallback_model: None,
+        grace_period_secs: None,
+        max_cpu_seconds: None,
+        pre_check: None,
+        gitea_issue: None,
+        event_only: false,
+        evolution_enabled: false,
+        rlm_enabled: None,
+        bypass_kg_routing: false,
+        enabled: true,
+        project: Some("alpha".to_string()),
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    let route = orch.route_poll_mention_pr_gate("helper-bot", 7).await;
+
+    assert_eq!(
+        route,
+        PollGateRoute::NotGate,
+        "non-canonical agents must keep the bare spawn path"
+    );
+    // And that path still works unchanged: the caller spawns `def.task`.
+    let def = orch
+        .config
+        .agents
+        .iter()
+        .find(|a| a.name == "helper-bot")
+        .cloned()
+        .unwrap();
+    orch.spawn_agent(&def)
+        .await
+        .expect("bare spawn still works");
+    assert!(orch.active_agents.contains_key("helper-bot"));
+}
+
 #[tokio::test]
 async fn webhook_pr_gate_mention_attaches_meta_posts_status_and_skips_assignment() {
     use axum::{
@@ -1771,9 +1942,10 @@ async fn webhook_pr_gate_mention_attaches_meta_posts_status_and_skips_assignment
     }
 
     async fn pull_get(Path((_owner, _repo, pr)): Path<(String, String, u64)>) -> impl IntoResponse {
+        let head_sha = pr_gate_fixture_head_sha();
         let body = serde_json::json!({
             "number": pr,
-            "head": { "sha": "abc123", "ref": "task/pr-gate" },
+            "head": { "sha": head_sha, "ref": "task/pr-gate" },
             "user": { "login": "alice" },
             "title": "fix gate dispatch",
             "additions": 12,
@@ -1822,26 +1994,34 @@ async fn webhook_pr_gate_mention_attaches_meta_posts_status_and_skips_assignment
 
     let tmp = TempDir::new().unwrap();
     let script_path = tmp.path().join("gate.sh");
+    let fixture_head = pr_gate_fixture_head_sha();
+    let dispatch_id =
+        crate::pr_gate_result::PrGateDispatchId::new("alpha", 38, fixture_head, "pr-validator");
+    let gate_result = serde_json::json!({
+        "schema_version": 1,
+        "agent": "pr-validator",
+        "context": "adf/validation",
+        "pr_number": 38,
+        "head_sha": fixture_head,
+        "status": "pass",
+        "confidence": 5,
+        "blocking_findings": 0,
+        "summary": "Validation passed",
+        "dispatch_id": dispatch_id.0,
+    });
     std::fs::write(
         &script_path,
-        r#"#!/bin/sh
+        format!(
+            r#"#!/bin/sh
 cat <<'EOF'
 Gate report
 <!-- adf:gate-result
-{
-  "schema_version": 1,
-  "agent": "pr-validator",
-  "context": "adf/validation",
-  "pr_number": 38,
-  "head_sha": "abc123",
-  "status": "pass",
-  "confidence": 5,
-  "blocking_findings": 0,
-  "summary": "Validation passed"
-}
+{}
 -->
 EOF
 "#,
+            serde_json::to_string_pretty(&gate_result).unwrap()
+        ),
     )
     .unwrap();
     #[cfg(unix)]
@@ -1907,12 +2087,18 @@ EOF
     assert_eq!(meta.project, "alpha");
     assert_eq!(meta.agent_name, "pr-validator");
     assert_eq!(meta.context, "adf/validation");
-    assert_eq!(meta.head_sha, "abc123");
+    assert_eq!(meta.head_sha, pr_gate_fixture_head_sha());
     assert!(managed.spawned_by_mention);
 
     for _ in 0..150 {
         orch.poll_agent_exits().await;
-        if captured.statuses.lock().unwrap().len() >= 2 {
+        if captured
+            .statuses
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|status| status["state"] == "success" && status["context"] == "adf/validation")
+        {
             break;
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
@@ -1978,7 +2164,10 @@ async fn pr_gate_mention_ignores_unrelated_global_workflow_assignment() {
     async fn pull_get(Path((_owner, _repo, pr)): Path<(String, String, u64)>) -> impl IntoResponse {
         let body = serde_json::json!({
             "number": pr,
-            "head": { "sha": "abc123", "ref": "task/pr-gate" },
+            "head": {
+                "sha": crate::tests_support::pr_gate_fixture_head_sha(),
+                "ref": "task/pr-gate"
+            },
             "user": { "login": "alice" },
             "title": "fix gate dispatch",
             "additions": 12,
@@ -2043,7 +2232,8 @@ cat <<'EOF'
   "status": "pass",
   "confidence": 5,
   "blocking_findings": 0,
-  "summary": "Validation passed"
+  "summary": "Validation passed",
+  "dispatch_id": "pr-gate-dispatch:alpha:38:abc123000000:pr-validator"
 }
 -->
 EOF
@@ -2108,6 +2298,29 @@ EOF
     );
 }
 
+#[tokio::test]
+async fn webhook_canonical_gate_without_dispatch_entry_fails_closed() {
+    let (mut config, _tmp) = review_pr_config("echo");
+    push_pr_gate_agent(&mut config, "pr-validator", "adf/validation", "echo");
+    config.pr_dispatch_per_project.clear();
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    orch.handle_webhook_dispatch(crate::webhook::WebhookDispatch::SpawnAgent {
+        agent_name: "pr-validator".to_string(),
+        detected_project: Some("alpha".to_string()),
+        issue_number: 38,
+        comment_id: 99,
+        context: "please validate this head".to_string(),
+        synthetic_event: None,
+    })
+    .await;
+
+    assert!(
+        !orch.active_agents.contains_key("pr-validator"),
+        "canonical gate without a project dispatch entry must fail closed"
+    );
+}
+
 #[test]
 fn non_gate_pr_fanout_agent_is_not_canonical_pr_gate() {
     let (mut config, _tmp) = review_pr_config("echo");
@@ -2122,7 +2335,7 @@ fn non_gate_pr_fanout_agent_is_not_canonical_pr_gate() {
     assert!(
         orch.pr_gate_dispatch_entry("alpha", "pr-validator")
             .is_none(),
-        "canonical names are gates only when configured for the project"
+        "dispatch lookup is absent, but canonical identity must still fail closed before generic spawn"
     );
 }
 
@@ -2285,7 +2498,8 @@ cat <<'EOF'
   "status": "pass",
   "confidence": 5,
   "blocking_findings": 0,
-  "summary": "Validation passed for stale head"
+  "summary": "Validation passed for stale head",
+  "dispatch_id": "pr-gate-dispatch:alpha:641:staleabc000000:pr-validator"
 }
 -->
 EOF
@@ -2424,9 +2638,13 @@ async fn reviewpr_dispatch_posts_pending_status_when_tracker_configured() {
         1,
         "exactly one pending status post expected"
     );
+    let expected_path = format!(
+        "/api/v1/repos/fakeowner/fakerepo/statuses/{}",
+        pr_gate_fixture_head_sha()
+    );
     assert_eq!(
         captured.last_path.lock().unwrap().as_deref(),
-        Some("/api/v1/repos/fakeowner/fakerepo/statuses/deadbeef1234")
+        Some(expected_path.as_str())
     );
     let body = captured.last_body.lock().unwrap().clone().unwrap();
     assert_eq!(body["state"], "pending");
@@ -2495,7 +2713,7 @@ async fn reviewpr_dispatch_sets_env_vars() {
         "ADF_PR_NUMBER missing from dump:\n{dump}"
     );
     assert!(
-        dump.contains("ADF_PR_HEAD_SHA=deadbeef1234"),
+        dump.contains(&format!("ADF_PR_HEAD_SHA={}", pr_gate_fixture_head_sha())),
         "ADF_PR_HEAD_SHA missing from dump:\n{dump}"
     );
     assert!(
@@ -2656,7 +2874,8 @@ async fn handle_review_pr_injects_per_agent_env_correctly() {
     let push = std::fs::read_to_string(&push_dump).unwrap_or_default();
 
     let all_env = std::fs::read_to_string(&all_dump).unwrap_or_default();
-    if !pr.contains("ADF_PR_NUMBER=641") || !push.contains("ADF_PUSH_SHA=deadbeef1234") {
+    let expected_push_sha = format!("ADF_PUSH_SHA={}", pr_gate_fixture_head_sha());
+    if !pr.contains("ADF_PR_NUMBER=641") || !push.contains(&expected_push_sha) {
         eprintln!(
             "active_agents after poll loop: {:?}",
             orch.active_agents.keys().collect::<Vec<_>>()
@@ -2674,8 +2893,8 @@ async fn handle_review_pr_injects_per_agent_env_correctly() {
         "pr-reviewer env missing ADF_PR_NUMBER:\n{pr}"
     );
     assert!(
-        push.contains("ADF_PUSH_SHA=deadbeef1234"),
-        "build-runner env missing ADF_PUSH_SHA=deadbeef1234:\n{push}"
+        push.contains(&expected_push_sha),
+        "build-runner env missing {expected_push_sha}:\n{push}"
     );
     assert!(
         push.contains("ADF_PUSH_REF=refs/pull/641/head"),

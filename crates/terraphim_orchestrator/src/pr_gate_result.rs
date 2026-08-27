@@ -18,6 +18,29 @@ pub const GATE_RESULT_SCHEMA_VERSION: u8 = 1;
 const GATE_RESULT_OPEN: &str = "<!-- adf:gate-result";
 const GATE_RESULT_CLOSE: &str = "-->";
 
+/// Stable identifier binding an orchestrator dispatch to a gate result.
+///
+/// `PrGateDispatchId` is computed deterministically from
+/// `(project, pr_number, head_sha_prefix, agent)` and threaded through
+/// the spawn (as `PrGateMeta::dispatch_id`) and the canonical
+/// `adf:gate-result` JSON block (as `PrGateResult::dispatch_id`).
+/// `validate_gate_result` rejects a parsed result whose
+/// `dispatch_id` does not match the dispatching orchestrator's
+/// `dispatch_id`, defeating late-result swapping when the same
+/// agent is dispatched against multiple heads in succession.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrGateDispatchId(pub String);
+
+impl PrGateDispatchId {
+    pub fn new(project: &str, pr_number: u64, head_sha: &str, agent: &str) -> Self {
+        let prefix_len = head_sha.len().min(12);
+        Self(format!(
+            "pr-gate-dispatch:{project}:{pr_number}:{}:{agent}",
+            &head_sha[..prefix_len]
+        ))
+    }
+}
+
 /// Machine-readable gate result emitted by every PR gate agent.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct PrGateResult {
@@ -30,6 +53,14 @@ pub struct PrGateResult {
     pub confidence: u8,
     pub blocking_findings: u32,
     pub summary: String,
+    /// Orchestrator-assigned dispatch id; new agents must echo this back.
+    /// Old `schema_version=1` fixtures predate dispatch_id; they omit the
+    /// field entirely and the parser accepts them as `None`. When present
+    /// and non-empty, [`validate_gate_result`] rejects a result whose
+    /// `dispatch_id` does not match the dispatching orchestrator's
+    /// `PrGateMeta::dispatch_id`.
+    #[serde(default)]
+    pub dispatch_id: Option<String>,
 }
 
 /// Status declared by the gate agent. Maps to a commit status with the help
@@ -62,6 +93,10 @@ pub enum PrGateResultError {
     HeadMismatch { actual: String, expected: String },
     #[error("confidence {0} is outside 1..=5")]
     ConfidenceOutOfRange(u8),
+    #[error("result dispatch_id {actual:?} does not match expected {expected:?}")]
+    DispatchIdMismatch { actual: String, expected: String },
+    #[error("result missing required dispatch_id field")]
+    MissingDispatchId,
 }
 
 /// Per-dispatch metadata describing the PR and the context the agent
@@ -74,6 +109,10 @@ pub struct PrGateMeta {
     pub agent_name: String,
     pub context: String,
     pub head_sha: String,
+    /// Bind between spawn and parse. Computed by
+    /// [`PrGateDispatchId::new`] and threaded through the prompt's
+    /// canonical `adf:gate-result` block shape.
+    pub dispatch_id: PrGateDispatchId,
 }
 
 /// Extract a [`PrGateResult`] from the markdown output of a PR gate agent.
@@ -132,6 +171,23 @@ pub fn validate_gate_result(
             actual: result.head_sha.clone(),
             expected: meta.head_sha.clone(),
         });
+    }
+    // Dispatch id correlation:
+    //   * `Some(id)`  -> result must equal the meta-bound dispatch id
+    //     (new canonical agents MUST echo the orchestrator-assigned id).
+    //   * `None`      -> pre-dispatch-id fixtures: accept when the
+    //     surrounding source/project/head/gate context already binds
+    //     the result, since the agent had no dispatch id to echo.
+    //   * `Some("")`  -> treat as `None` for back-compat with hand-written
+    //     or partial fixtures.
+    match result.dispatch_id.as_deref() {
+        Some(id) if !id.is_empty() && id != meta.dispatch_id.0 => {
+            return Err(PrGateResultError::DispatchIdMismatch {
+                actual: id.to_string(),
+                expected: meta.dispatch_id.0.clone(),
+            });
+        }
+        _ => {}
     }
     Ok(())
 }
@@ -298,7 +354,8 @@ mod tests {
   "status": "concerns",
   "confidence": 4,
   "blocking_findings": 0,
-  "summary": "Validation passed with minor non-blocking concerns"
+  "summary": "Validation passed with minor non-blocking concerns",
+  "dispatch_id": "pr-gate-dispatch:terraphim-ai:2268:deadbeefcafe:pr-validator"
 }
 -->
 
@@ -312,6 +369,12 @@ Trailing prose."#
             agent_name: "pr-validator".to_string(),
             context: "adf/validation".to_string(),
             head_sha: "deadbeefcafebabe".to_string(),
+            dispatch_id: PrGateDispatchId::new(
+                "terraphim-ai",
+                2268,
+                "deadbeefcafebabe",
+                "pr-validator",
+            ),
         }
     }
 
@@ -485,6 +548,7 @@ Trailing prose."#
             confidence: 4,
             blocking_findings,
             summary: "s".to_string(),
+            dispatch_id: Some("pr-gate-dispatch:test:1:aaaaaaaaaaaa:pr-validator".to_string()),
         }
     }
 

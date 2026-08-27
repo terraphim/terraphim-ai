@@ -451,22 +451,32 @@ impl AgentOrchestrator {
         // gate receives a native bounded evidence prompt so it does not have to
         // discover PR context, read skills dynamically, or post statuses.
         let working_dir = self.config.working_dir_for_agent(&def);
-        let evidence = match pr_gate_context::build_pr_gate_evidence_pack(
+        // Issue #3293: the PR gate dispatch contract is fail-closed. When
+        // authoritative evidence cannot be assembled there is no
+        // degraded evidence substitution and no spawn — the typed
+        // error propagates with deterministic diagnostics.
+        let evidence = pr_gate_context::build_pr_gate_evidence_pack(
             req,
             Some(working_dir.as_path()),
             pr_gate_context::PrGateEvidenceLimits::default(),
         )
         .await
-        {
-            Ok(evidence) => evidence,
-            Err(e) => pr_gate_context::fallback_evidence_pack(req, &e.to_string()),
-        };
+        .map_err(|e| OrchestratorError::PrGateEvidenceUnavailable {
+            project: project.clone(),
+            agent: def.name.clone(),
+            pr_number,
+            head_sha: head_sha.clone(),
+            reason: e.to_string(),
+        })?;
         let gate_meta = crate::pr_gate_result::PrGateMeta {
             pr_number,
             project: project.clone(),
             agent_name: def.name.clone(),
             context: commit_status_context.to_string(),
             head_sha: head_sha.clone(),
+            dispatch_id: crate::pr_gate_result::PrGateDispatchId::new(
+                &project, pr_number, &head_sha, &def.name,
+            ),
         };
         let gate_kind = pr_gate_prompt::PrGateKind::for_agent(&def.name);
         let gate_prompt = pr_gate_prompt::build_pr_gate_prompt(gate_kind, &gate_meta, &evidence);

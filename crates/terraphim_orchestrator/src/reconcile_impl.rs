@@ -1638,6 +1638,7 @@ fn canonical_failure_gate_comment(
         confidence: 1,
         blocking_findings: 1,
         summary,
+        dispatch_id: Some(meta.dispatch_id.0.clone()),
     };
     let json = serde_json::to_string_pretty(&result)
         .unwrap_or_else(|_| String::from(r#"{"schema_version":1,"status":"fail"}"#));
@@ -1706,6 +1707,12 @@ mod tests {
             agent_name: "pr-validator".to_string(),
             context: "adf/validation".to_string(),
             head_sha: "b71332d".to_string(),
+            dispatch_id: crate::pr_gate_result::PrGateDispatchId::new(
+                "terraphim-ai",
+                2318,
+                "b71332d",
+                "pr-validator",
+            ),
         }
     }
 

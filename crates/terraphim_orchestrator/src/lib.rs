@@ -2144,3 +2144,5 @@ pub(crate) fn requires_isolated_worktree(def: &AgentDefinition, model: Option<&s
 
 #[cfg(test)]
 mod lib_tests;
+#[cfg(test)]
+mod tests_support;
