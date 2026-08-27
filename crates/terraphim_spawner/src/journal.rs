@@ -1137,12 +1137,17 @@ impl Journal {
 impl Drop for Journal {
     fn drop(&mut self) {
         #[cfg(unix)]
-        if self.writer_lock_held && !self.poisoned {
-            // Do not rely solely on `close(2)`: a concurrently forked
-            // child can transiently inherit this CLOEXEC descriptor until
-            // exec. Explicit unlock on the shared open-file description
-            // makes normal writer shutdown deterministic. Poisoned writers
-            // intentionally retain ownership until their descriptor closes.
+        if self.writer_lock_held {
+            // Do not rely on `close(2)` to drop the flock — for
+            // poisoned writers included. The lock lives on the
+            // open-file description, and a concurrently forked child
+            // can hold a duplicated reference to that description past
+            // this `close(2)` (transiently until exec, or longer if it
+            // lingers pre-exec). Explicit `LOCK_UN` releases the lock
+            // deterministically no matter how many duplicates exist.
+            // Poison-refusal semantics are unaffected: they are driven
+            // by the `poisoned` flag on mutation entry, and once Drop
+            // runs no caller can reach this object to mutate it.
             let _ = release_writer_lock_fd(&self.file);
             self.writer_lock_held = false;
         }
@@ -3509,6 +3514,60 @@ mod tests {
         assert!(matches!(err, JournalError::WriterBusy { .. }));
         drop(journal);
         Journal::recover_run(dir.path(), run_id).expect("drop releases poisoned ownership");
+    }
+
+    /// Regression for a native-CI flake (~15% of full-library runs):
+    /// a poisoned writer's `Drop` used to skip the explicit flock
+    /// unlock and rely on `close(2)` tearing down the open-file
+    /// description. But `flock(2)` state lives on the open-file
+    /// description, and tests in this binary concurrently fork real
+    /// children that inherit a *duplicate* reference to that
+    /// description before exec — so the exclusive lock survived the
+    /// journal's own `close(2)` whenever such a duplicate existed, and
+    /// the post-drop reopen hit `WriterBusy`.
+    ///
+    /// Deterministic model of the inherited duplicate: `dup(2)` the
+    /// journal fd while the poisoned writer is alive. The duplicate
+    /// shares the same open-file description — exactly what a forked
+    /// child holds — so closing the journal's own descriptor in `Drop`
+    /// cannot release the flock. Only `Drop`'s explicit `LOCK_UN` via
+    /// `release_writer_lock_fd` can, and it operates on the shared
+    /// description, so it succeeds even while the duplicate exists.
+    #[cfg(unix)]
+    #[test]
+    fn drop_of_poisoned_writer_releases_lock_despite_duplicated_description() {
+        use nix::unistd::{close, dup};
+
+        let dir = temp_root();
+        let run_id = Uuid::new_v4();
+        let mut journal = Journal::create(dir.path(), run_id).expect("create writer");
+        journal.append(new_record(run_id, 0, 1)).expect("append");
+        let completion_id = Uuid::new_v4();
+        append_completed(&mut journal, completion_id);
+        journal.fail_at = Some(TestFailurePoint::Sync);
+        let err = journal
+            .complete(completion_id)
+            .expect_err("sync boundary must fail");
+        assert!(matches!(err, JournalError::Io(_)));
+
+        // Stand in for the forked child: a second descriptor referring
+        // to the same open-file description.
+        let dup_fd = dup(journal.file.as_raw_fd()).expect("dup journal fd");
+
+        // While the poisoned writer is alive the duplicate must not
+        // change ownership: competing recovery still observes busy.
+        let err = Journal::recover_run(dir.path(), run_id)
+            .expect_err("live poisoned writer must retain ownership");
+        assert!(matches!(err, JournalError::WriterBusy { .. }));
+
+        // Drop closes the journal's descriptor, but `dup_fd` keeps the
+        // open-file description — and its flock — alive. Reopen only
+        // succeeds if Drop unlocked the shared description explicitly.
+        drop(journal);
+        Journal::recover_run(dir.path(), run_id)
+            .expect("drop must explicitly unlock despite duplicated description");
+
+        close(dup_fd).expect("close duplicated fd");
     }
 
     // -- completion_record + getter tests (slice 3) --
