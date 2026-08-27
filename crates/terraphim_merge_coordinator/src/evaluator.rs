@@ -8,7 +8,7 @@
 use tracing::{error, info, warn};
 
 use crate::extract_fixes;
-use crate::gitea::{GiteaClient, PrSummary};
+use crate::gitea::{GiteaOperations, PrSummary};
 use crate::types::{BlockerKind, EvalVerdict, MergeCoordinatorError, MergeOutcome};
 
 /// One evaluation of one open PR.
@@ -28,8 +28,13 @@ pub struct PrEvaluation {
 
 /// Evaluate all open PRs in `owner/repo`, sequentially. Each PR gets
 /// a verdict; no merges are performed here.
-pub async fn evaluate_all(
-    gitea: &GiteaClient,
+///
+/// `gitea` is generic over [`GiteaOperations`] so the business logic can be
+/// exercised in tests with a concrete fake instead of a live server
+/// (issue #2892). Behaviour is identical whether the caller passes a
+/// production `GiteaClient` or a test fake.
+pub async fn evaluate_all<T: GiteaOperations>(
+    gitea: &T,
     owner: &str,
     repo: &str,
 ) -> Result<Vec<PrEvaluation>, MergeCoordinatorError> {
@@ -43,8 +48,8 @@ pub async fn evaluate_all(
 }
 
 #[allow(clippy::collapsible_match)]
-async fn evaluate_one(
-    gitea: Option<&GiteaClient>,
+async fn evaluate_one<T: GiteaOperations>(
+    gitea: Option<&T>,
     owner: &str,
     repo: &str,
     pr: &PrSummary,
@@ -90,8 +95,8 @@ async fn evaluate_one(
 /// pattern preceded by `/` (e.g. `path/.sessions/session.md`).  Plain
 /// substring matching is avoided to prevent false positives like
 /// `src/sessions_parser.rs` matching `.sessions/`.
-async fn check_contamination(
-    gitea: &GiteaClient,
+async fn check_contamination<T: GiteaOperations>(
+    gitea: &T,
     owner: &str,
     repo: &str,
     pr_index: u64,
@@ -120,8 +125,8 @@ async fn check_contamination(
 }
 
 /// Query CI status and classify why a PR is blocked.
-async fn classify_blocker(
-    gitea: Option<&GiteaClient>,
+async fn classify_blocker<T: GiteaOperations>(
+    gitea: Option<&T>,
     owner: &str,
     repo: &str,
     pr: &PrSummary,
@@ -154,8 +159,8 @@ async fn classify_blocker(
 /// Failure-1: if merge succeeds but any close fails, returns
 /// `PartialFailure` so the caller can emit CRITICAL + exit 2.
 /// Failure-2: nothing is closed if the merge itself fails.
-pub async fn merge_and_close(
-    gitea: &GiteaClient,
+pub async fn merge_and_close<T: GiteaOperations>(
+    gitea: &T,
     owner: &str,
     repo: &str,
     eval: &PrEvaluation,
@@ -223,7 +228,7 @@ mod tests {
     #[tokio::test]
     async fn evaluate_one_holds_when_not_mergeable() {
         let p = pr(1, "Fixes #2", false);
-        let e = evaluate_one(None, "o", "r", &p).await;
+        let e = evaluate_one::<crate::gitea::GiteaClient>(None, "o", "r", &p).await;
         assert!(matches!(e.verdict, EvalVerdict::Hold(_)));
         assert_eq!(e.fixes_issues, vec![2]);
         assert_eq!(e.blocker_kind, Some(BlockerKind::CiNoStatus));
@@ -233,7 +238,7 @@ mod tests {
     async fn evaluate_one_merge_with_fixes() {
         // Both "Fixes #42" and "Closes #43" are now recognised closing keywords.
         let p = pr(7, "Fixes #42 Closes #43", true);
-        let e = evaluate_one(None, "o", "r", &p).await;
+        let e = evaluate_one::<crate::gitea::GiteaClient>(None, "o", "r", &p).await;
         assert_eq!(e.verdict, EvalVerdict::Merge);
         assert_eq!(e.fixes_issues, vec![42, 43]);
         assert_eq!(e.blocker_kind, None);
@@ -242,7 +247,7 @@ mod tests {
     #[tokio::test]
     async fn evaluate_one_merge_no_fixes_still_merges() {
         let p = pr(9, "feat: refactor", true);
-        let e = evaluate_one(None, "o", "r", &p).await;
+        let e = evaluate_one::<crate::gitea::GiteaClient>(None, "o", "r", &p).await;
         assert_eq!(e.verdict, EvalVerdict::Merge);
         assert!(e.fixes_issues.is_empty());
         assert_eq!(e.blocker_kind, None);
@@ -258,7 +263,7 @@ mod tests {
             mergeable: Some(true),
             head_sha: None,
         };
-        let e = evaluate_one(None, "o", "r", &p).await;
+        let e = evaluate_one::<crate::gitea::GiteaClient>(None, "o", "r", &p).await;
         assert_eq!(e.verdict, EvalVerdict::Merge);
         assert!(e.fixes_issues.is_empty());
         assert_eq!(e.blocker_kind, None);
@@ -271,7 +276,7 @@ mod tests {
             .collect();
         let mut evaluations = Vec::with_capacity(prs.len());
         for p in &prs {
-            evaluations.push(evaluate_one(None, "o", "r", p).await);
+            evaluations.push(evaluate_one::<crate::gitea::GiteaClient>(None, "o", "r", p).await);
         }
         assert_eq!(
             evaluations.len(),
@@ -312,5 +317,213 @@ mod tests {
         assert!(!is_contaminated("src/sessions_parser.rs"));
         assert!(!is_contaminated("docs/review_tmp_guide.md"));
         assert!(!is_contaminated("tests/handoff_integration_test.rs"));
+    }
+
+    // ---- evaluate_all / merge_and_close via FakeGiteaClient (issue #2892) ----
+    //
+    // These tests are the regression guards the issue asks for: the whole
+    // evaluation + merge path is now exercisable in-process without a live
+    // Gitea server. They use the concrete `FakeGiteaClient` (not a mock).
+
+    use crate::gitea::CommitCombinedStatus;
+    use crate::gitea::test_support::FakeGiteaClient;
+
+    fn mergeable_pr(number: u64, body: &str) -> PrSummary {
+        PrSummary {
+            number,
+            title: format!("PR {number}"),
+            body: Some(body.into()),
+            state: "open".into(),
+            mergeable: Some(true),
+            head_sha: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn evaluate_all_returns_empty_when_no_prs() {
+        let fake = FakeGiteaClient::new();
+        let evals = evaluate_all(&fake, "owner", "repo").await.unwrap();
+        assert!(evals.is_empty(), "no open PRs -> no evaluations");
+    }
+
+    #[tokio::test]
+    async fn evaluate_all_failopen_on_list_pr_files_error_still_verdicts_all_prs() {
+        // AC: "evaluate_all with all PRs returning list_pr_files error → all
+        // verdicts still computed (fail-open)". A list_pr_files error must
+        // NOT abort the run; each PR still gets a verdict.
+        let fake = FakeGiteaClient {
+            open_prs: vec![
+                mergeable_pr(10, "Fixes #100"),
+                mergeable_pr(11, "Fixes #101"),
+                mergeable_pr(12, "Fixes #102"),
+            ],
+            list_pr_files_error: Some(MergeCoordinatorError::api("simulated Gitea 500")),
+            ..FakeGiteaClient::new()
+        };
+        let evals = evaluate_all(&fake, "owner", "repo").await.unwrap();
+        assert_eq!(
+            evals.len(),
+            3,
+            "all 3 PRs must receive a verdict despite list_pr_files errors"
+        );
+        // Every PR was returned, proving the run did not short-circuit.
+        let indexes: Vec<u64> = evals.iter().map(|e| e.pr_index).collect();
+        assert_eq!(indexes, vec![10, 11, 12]);
+    }
+
+    #[tokio::test]
+    async fn evaluate_all_holds_contaminated_pr_and_merges_clean_prs() {
+        // A contaminated PR is held; a clean, mergeable PR is merged. This
+        // proves the contamination gate runs through the trait abstraction.
+        let mut pr_files = std::collections::HashMap::new();
+        pr_files.insert(20, vec!["src/lib.rs".to_string()]);
+        pr_files.insert(21, vec![".sessions/session-1.md".to_string()]);
+        let fake = FakeGiteaClient {
+            open_prs: vec![
+                mergeable_pr(20, "Fixes #200"),
+                mergeable_pr(21, "Fixes #201"),
+            ],
+            pr_files,
+            ..FakeGiteaClient::new()
+        };
+        let evals = evaluate_all(&fake, "owner", "repo").await.unwrap();
+        assert_eq!(evals.len(), 2);
+        assert_eq!(evals[0].pr_index, 20);
+        assert_eq!(evals[0].verdict, EvalVerdict::Merge);
+        assert_eq!(evals[1].pr_index, 21);
+        assert!(
+            matches!(evals[1].verdict, EvalVerdict::Hold(ref r) if r.contains("contaminated")),
+            "contaminated PR must be held, got {:?}",
+            evals[1].verdict
+        );
+    }
+
+    #[tokio::test]
+    async fn merge_and_close_merges_and_closes_referenced_issues() {
+        // Full happy path through the generic API: merge + close the two
+        // `Fixes #N` issues. Verifies merge_pr / close_issue call counts.
+        let fake = FakeGiteaClient {
+            open_prs: vec![mergeable_pr(30, "Fixes #300\nFixes #301")],
+            pr_files: std::collections::HashMap::from([(30, vec!["src/a.rs".to_string()])]),
+            ..FakeGiteaClient::new()
+        };
+        let evals = evaluate_all(&fake, "owner", "repo").await.unwrap();
+        assert_eq!(evals[0].fixes_issues, vec![300, 301]);
+        let outcome = merge_and_close(&fake, "owner", "repo", &evals[0])
+            .await
+            .unwrap();
+        match outcome {
+            MergeOutcome::Merged { closed_issues } => {
+                assert_eq!(closed_issues, vec![300, 301]);
+            }
+            other => panic!("expected Merged, got {other:?}"),
+        }
+        assert_eq!(*fake.merge_calls.lock().unwrap(), 1, "exactly one merge");
+        assert_eq!(
+            *fake.close_calls.lock().unwrap(),
+            2,
+            "one close per referenced issue"
+        );
+        assert_eq!(
+            *fake.merged_indexes.lock().unwrap(),
+            vec![30],
+            "merged the evaluated PR"
+        );
+        assert_eq!(
+            *fake.closed_indexes.lock().unwrap(),
+            vec![300, 301],
+            "closed the referenced issues in order"
+        );
+    }
+
+    #[tokio::test]
+    async fn merge_and_close_reports_partial_failure_when_close_errors() {
+        // Failure-1 from the merge_and_close contract: merge succeeds, one
+        // close fails -> PartialFailure. Proves the error path is reachable
+        // via the trait abstraction.
+        let fake = FakeGiteaClient {
+            open_prs: vec![mergeable_pr(40, "Fixes #400\nFixes #401")],
+            pr_files: std::collections::HashMap::from([(40, vec!["src/b.rs".to_string()])]),
+            close_issue_error_for: Some(401),
+            ..FakeGiteaClient::new()
+        };
+        let evals = evaluate_all(&fake, "owner", "repo").await.unwrap();
+        let outcome = merge_and_close(&fake, "owner", "repo", &evals[0])
+            .await
+            .unwrap();
+        match outcome {
+            MergeOutcome::PartialFailure {
+                merged,
+                close_errors,
+            } => {
+                assert!(merged, "merge did succeed");
+                assert_eq!(close_errors, vec![401]);
+            }
+            other => panic!("expected PartialFailure, got {other:?}"),
+        }
+        assert_eq!(*fake.merge_calls.lock().unwrap(), 1);
+        assert_eq!(*fake.close_calls.lock().unwrap(), 2);
+    }
+
+    #[tokio::test]
+    async fn merge_and_close_skips_held_prs_without_merging() {
+        // A held (contaminated) PR must be Skipped, and merge_pr must NOT be
+        // called. Proves the Hold short-circuit survives the trait refactor.
+        let mut pr_files = std::collections::HashMap::new();
+        pr_files.insert(50, vec![".handoff/pr50.md".to_string()]);
+        let fake = FakeGiteaClient {
+            open_prs: vec![mergeable_pr(50, "Fixes #500")],
+            pr_files,
+            ..FakeGiteaClient::new()
+        };
+        let evals = evaluate_all(&fake, "owner", "repo").await.unwrap();
+        let outcome = merge_and_close(&fake, "owner", "repo", &evals[0])
+            .await
+            .unwrap();
+        assert!(
+            matches!(outcome, MergeOutcome::Skipped(ref r) if r.contains("contaminated")),
+            "expected Skipped(contaminated), got {outcome:?}"
+        );
+        assert_eq!(
+            *fake.merge_calls.lock().unwrap(),
+            0,
+            "held PR must not be merged"
+        );
+        assert_eq!(
+            *fake.close_calls.lock().unwrap(),
+            0,
+            "held PR must not close issues"
+        );
+    }
+
+    #[tokio::test]
+    async fn evaluate_all_classifies_unmergeable_via_commit_status() {
+        // An unmergeable PR with a failing CI status is classified CiFailed.
+        // Exercises classify_blocker -> get_commit_status through the trait.
+        let unmergeable = PrSummary {
+            number: 60,
+            title: "x".into(),
+            body: Some("Fixes #600".into()),
+            state: "open".into(),
+            mergeable: Some(false),
+            head_sha: Some("deadbeef".into()),
+        };
+        let mut commit_status = std::collections::HashMap::new();
+        commit_status.insert(
+            "deadbeef".to_string(),
+            CommitCombinedStatus {
+                state: "failure".into(),
+                statuses: Vec::new(),
+            },
+        );
+        let fake = FakeGiteaClient {
+            open_prs: vec![unmergeable],
+            pr_files: std::collections::HashMap::from([(60, vec!["src/c.rs".to_string()])]),
+            commit_status,
+            ..FakeGiteaClient::new()
+        };
+        let evals = evaluate_all(&fake, "owner", "repo").await.unwrap();
+        assert_eq!(evals[0].blocker_kind, Some(BlockerKind::CiFailed));
+        assert!(matches!(evals[0].verdict, EvalVerdict::Hold(_)));
     }
 }

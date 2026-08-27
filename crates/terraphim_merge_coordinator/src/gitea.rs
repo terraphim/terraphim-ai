@@ -20,6 +20,61 @@ const RETRY_DELAYS_SECS: &[u64] = &[1, 2, 4];
 /// by the evaluation loop (issue #2850).
 const OPEN_PRS_LIMIT: u32 = 300;
 
+/// Trait abstraction over the Gitea operations the merge-coordinator needs.
+///
+/// Exists so the business logic in [`crate::evaluator`] can be tested without a
+/// live Gitea server (project policy: no mocks). The production implementation
+/// is [`GiteaClient`]; tests supply a concrete [`FakeGiteaClient`] fake.
+///
+/// Methods mirror the concrete `GiteaClient` surface exactly — the only
+/// behavioural change introduced by the trait is the indirection itself.
+///
+/// Uses a generic `T: GiteaOperations` bound at call-sites (not `&dyn`) because
+/// `async fn` in a trait is not object-safe without return-type boxing, and
+/// monomorphised generics are zero-cost.
+pub trait GiteaOperations {
+    /// List open PRs for `owner/repo`.
+    fn list_open_prs(
+        &self,
+        owner: &str,
+        repo: &str,
+    ) -> impl std::future::Future<Output = Result<Vec<PrSummary>, MergeCoordinatorError>> + Send;
+
+    /// List files changed in a PR by index.
+    fn list_pr_files(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> impl std::future::Future<Output = Result<Vec<String>, MergeCoordinatorError>> + Send;
+
+    /// Merge a PR by index.
+    fn merge_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> impl std::future::Future<Output = Result<(), MergeCoordinatorError>> + Send;
+
+    /// Close an issue by index.
+    fn close_issue(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> impl std::future::Future<Output = Result<(), MergeCoordinatorError>> + Send;
+
+    /// Query CI combined status for a head commit.
+    fn get_commit_status(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+    ) -> impl std::future::Future<
+        Output = Result<Option<CommitCombinedStatus>, MergeCoordinatorError>,
+    > + Send;
+}
+
 /// Minimal Gitea API client. Caller supplies the API token via env or
 /// secure storage; it is never written to logs.
 pub struct GiteaClient {
@@ -270,6 +325,52 @@ impl GiteaClient {
     }
 }
 
+impl GiteaOperations for GiteaClient {
+    async fn list_open_prs(
+        &self,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<PrSummary>, MergeCoordinatorError> {
+        GiteaClient::list_open_prs(self, owner, repo).await
+    }
+
+    async fn list_pr_files(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<Vec<String>, MergeCoordinatorError> {
+        GiteaClient::list_pr_files(self, owner, repo, index).await
+    }
+
+    async fn merge_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<(), MergeCoordinatorError> {
+        GiteaClient::merge_pr(self, owner, repo, index).await
+    }
+
+    async fn close_issue(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<(), MergeCoordinatorError> {
+        GiteaClient::close_issue(self, owner, repo, index).await
+    }
+
+    async fn get_commit_status(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+    ) -> Result<Option<CommitCombinedStatus>, MergeCoordinatorError> {
+        GiteaClient::get_commit_status(self, owner, repo, sha).await
+    }
+}
+
 /// Gitea commit combined-status response.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CommitCombinedStatus {
@@ -376,5 +477,172 @@ mod tests {
             r#"{"filename":"docs/README.md","status":"modified","additions":5,"deletions":2}"#;
         let f: PrFile = serde_json::from_str(json).unwrap();
         assert_eq!(f.filename, "docs/README.md");
+    }
+
+    #[tokio::test]
+    async fn fake_gitea_returns_configured_open_prs() {
+        let fake = test_support::FakeGiteaClient {
+            open_prs: vec![PrSummary {
+                number: 5,
+                title: "t".into(),
+                body: None,
+                state: "open".into(),
+                mergeable: Some(true),
+                head_sha: None,
+            }],
+            ..test_support::FakeGiteaClient::new()
+        };
+        let prs = fake.list_open_prs("o", "r").await.unwrap();
+        assert_eq!(prs.len(), 1);
+        assert_eq!(prs[0].number, 5);
+    }
+}
+
+/// In-process test support: a concrete fake of the Gitea API.
+///
+/// Lives in a `pub` (test-only) module so both the gitea and evaluator unit
+/// tests can construct it. Not a mock: it holds real state (configured PRs,
+/// file lists, call counters) and exercises the exact same code path as
+/// [`GiteaClient`] would over the network (issue #2892).
+#[cfg(test)]
+pub mod test_support {
+    use super::*;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    /// Concrete in-process fake for the Gitea API.
+    ///
+    /// Construction is explicit (public fields + `..FakeGiteaClient::new()`)
+    /// so each test documents the scenario it sets up.
+    pub struct FakeGiteaClient {
+        /// Open PRs returned by `list_open_prs`.
+        pub open_prs: Vec<PrSummary>,
+        /// Files returned by `list_pr_files`, keyed by PR index. Any PR not
+        /// present here yields the `list_pr_files_error` when set, else `[]`.
+        pub pr_files: HashMap<u64, Vec<String>>,
+        /// If set, `list_pr_files` returns this error for every PR not found
+        /// in `pr_files` (the fail-open scenario the evaluator must survive).
+        pub list_pr_files_error: Option<MergeCoordinatorError>,
+        /// CI status returned by `get_commit_status`, keyed by head SHA.
+        pub commit_status: HashMap<String, CommitCombinedStatus>,
+        /// If `commit_status` has no entry for a SHA, this is returned.
+        pub commit_status_default: Option<CommitCombinedStatus>,
+        /// Number of times `merge_pr` was called.
+        pub merge_calls: Mutex<u64>,
+        /// PR indices `merge_pr` was called with, in order.
+        pub merged_indexes: Mutex<Vec<u64>>,
+        /// Number of times `close_issue` was called.
+        pub close_calls: Mutex<u64>,
+        /// Issue indices `close_issue` was called with, in order.
+        pub closed_indexes: Mutex<Vec<u64>>,
+        /// If set, `close_issue` returns this error for this issue index
+        /// (the partial-failure path).
+        pub close_issue_error_for: Option<u64>,
+    }
+
+    impl FakeGiteaClient {
+        /// Build an empty fake (no PRs, no files, no errors).
+        pub fn new() -> Self {
+            Self {
+                open_prs: Vec::new(),
+                pr_files: HashMap::new(),
+                list_pr_files_error: None,
+                commit_status: HashMap::new(),
+                commit_status_default: None,
+                merge_calls: Mutex::new(0),
+                merged_indexes: Mutex::new(Vec::new()),
+                close_calls: Mutex::new(0),
+                closed_indexes: Mutex::new(Vec::new()),
+                close_issue_error_for: None,
+            }
+        }
+    }
+
+    impl Default for FakeGiteaClient {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl GiteaOperations for FakeGiteaClient {
+        async fn list_open_prs(
+            &self,
+            _owner: &str,
+            _repo: &str,
+        ) -> Result<Vec<PrSummary>, MergeCoordinatorError> {
+            Ok(self.open_prs.clone())
+        }
+
+        async fn list_pr_files(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            index: u64,
+        ) -> Result<Vec<String>, MergeCoordinatorError> {
+            match self.pr_files.get(&index) {
+                Some(files) => Ok(files.clone()),
+                None => match &self.list_pr_files_error {
+                    Some(e) => Err(clone_error(e)),
+                    None => Ok(Vec::new()),
+                },
+            }
+        }
+
+        async fn merge_pr(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            index: u64,
+        ) -> Result<(), MergeCoordinatorError> {
+            *self.merge_calls.lock().unwrap() += 1;
+            self.merged_indexes.lock().unwrap().push(index);
+            Ok(())
+        }
+
+        async fn close_issue(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            index: u64,
+        ) -> Result<(), MergeCoordinatorError> {
+            *self.close_calls.lock().unwrap() += 1;
+            self.closed_indexes.lock().unwrap().push(index);
+            if self.close_issue_error_for == Some(index) {
+                return Err(MergeCoordinatorError::api(format!(
+                    "fake close_issue error for #{index}"
+                )));
+            }
+            Ok(())
+        }
+
+        async fn get_commit_status(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            sha: &str,
+        ) -> Result<Option<CommitCombinedStatus>, MergeCoordinatorError> {
+            Ok(self
+                .commit_status
+                .get(sha)
+                .cloned()
+                .or_else(|| self.commit_status_default.clone()))
+        }
+    }
+
+    /// Clone a `MergeCoordinatorError`. The enum only carries owned data
+    /// (`String` / `i32`/`u64`), so a manual clone is sufficient and avoids
+    /// adding `Clone` to the public error type (not derived today and whose
+    /// addition is out of scope for this refactor).
+    pub(super) fn clone_error(e: &MergeCoordinatorError) -> MergeCoordinatorError {
+        match e {
+            MergeCoordinatorError::Api(s) => MergeCoordinatorError::Api(s.clone()),
+            MergeCoordinatorError::LockHeld { pid, age_secs } => MergeCoordinatorError::LockHeld {
+                pid: *pid,
+                age_secs: *age_secs,
+            },
+            MergeCoordinatorError::Io(io) => {
+                MergeCoordinatorError::Io(std::io::Error::other(io.to_string()))
+            }
+        }
     }
 }
