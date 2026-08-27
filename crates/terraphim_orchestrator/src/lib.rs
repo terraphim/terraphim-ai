@@ -750,6 +750,70 @@ fn validate_agent_name(name: &str) -> Result<(), OrchestratorError> {
     Ok(())
 }
 
+/// Kind of agent output log whose file name is built by
+/// [`agent_log_file_name`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AgentLogKind {
+    /// Temporary stdout drain file opened at spawn time (`.tmp-` prefix).
+    StdoutTmp,
+    /// Temporary stderr file the spawner writes directly (`.tmp-` prefix).
+    StderrTmp,
+    /// Finalised log written when an agent run exits.
+    Final,
+}
+
+impl AgentLogKind {
+    /// Filename component identifying this kind.
+    fn as_component(self) -> &'static str {
+        match self {
+            Self::StdoutTmp => "stdout-tmp",
+            Self::StderrTmp => "stderr-tmp",
+            Self::Final => "final",
+        }
+    }
+
+    /// Whether this kind is a temporary (dot-prefixed) log.
+    fn is_tmp(self) -> bool {
+        matches!(self, Self::StdoutTmp | Self::StderrTmp)
+    }
+}
+
+/// Build a collision-free agent log file name.
+///
+/// The name embeds a fresh ULID, so two agents with the same name that are
+/// spawned (or finalised) within the same UTC second never share a log file
+/// under the shared default log dir — the previous `<agent>-<utc-second>`
+/// scheme let concurrent same-name runs truncate, read, and overwrite each
+/// other. The agent component is sanitised to `[A-Za-z0-9_-]` and capped,
+/// so `/`, `\`, `..`, and any other path-unsafe character are stripped and
+/// the result is always a bare relative file name ending in `.log`.
+pub(crate) fn agent_log_file_name(agent: &str, kind: AgentLogKind) -> String {
+    const MAX_AGENT_COMPONENT_CHARS: usize = 64;
+
+    let mut safe: String = agent
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .take(MAX_AGENT_COMPONENT_CHARS)
+        .collect();
+    // Dots are already stripped by the filter, so `..` cannot survive; the
+    // guard stays explicit so future edits to the filter cannot reintroduce
+    // path traversal.
+    while safe.contains("..") {
+        safe = safe.replace("..", "");
+    }
+    if safe.is_empty() {
+        safe = "agent".to_string();
+    }
+
+    let prefix = if kind.is_tmp() { ".tmp-" } else { "" };
+    format!(
+        "{prefix}{}-{}-{}.log",
+        safe,
+        kind.as_component(),
+        ulid::Ulid::new()
+    )
+}
+
 /// Truncate a string to at most `max_bytes` UTF-8 bytes, honouring char
 /// boundaries. If truncation occurs, append a marker so the reader knows.
 pub(crate) fn truncate_for_issue(s: &str, max_bytes: usize) -> String {
@@ -1072,8 +1136,7 @@ impl AgentOrchestrator {
     /// temp-file path so it can be renamed to the final name on exit.
     fn start_output_log_drain(&self, agent_name: &str, handle: &AgentHandle) -> Option<PathBuf> {
         let _ = std::fs::create_dir_all(&self.agent_log_dir);
-        let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
-        let tmp_name = format!(".tmp-{}-{}.log", agent_name, ts);
+        let tmp_name = agent_log_file_name(agent_name, AgentLogKind::StdoutTmp);
         let tmp_path = self.agent_log_dir.join(&tmp_name);
 
         let file = match std::fs::File::create(&tmp_path) {

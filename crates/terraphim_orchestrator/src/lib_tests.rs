@@ -1041,6 +1041,111 @@ fn test_validate_agent_name_rejects_special_chars() {
     assert!(validate_agent_name("agent.name").is_err()); // dots
 }
 
+// ==================== agent_log_file_name Tests ====================
+
+#[test]
+fn test_agent_log_file_name_same_agent_and_kind_unique_10k() {
+    // Same agent + same kind generated in a tight loop (same wall clock, no
+    // sleeps) must still yield 10,000 distinct file names: the ULID, not the
+    // timestamp, provides uniqueness.
+    let mut seen = std::collections::HashSet::with_capacity(10_000);
+    for _ in 0..10_000 {
+        let name = agent_log_file_name("gate-verifier", AgentLogKind::Final);
+        assert!(seen.insert(name), "duplicate file name generated");
+    }
+    assert_eq!(seen.len(), 10_000);
+}
+
+#[test]
+fn test_agent_log_file_name_shape_and_kinds() {
+    let cases = [
+        (AgentLogKind::StdoutTmp, ".tmp-", "stdout-tmp"),
+        (AgentLogKind::StderrTmp, ".tmp-", "stderr-tmp"),
+        (AgentLogKind::Final, "", "final"),
+    ];
+    for (kind, prefix, kind_component) in cases {
+        let name = agent_log_file_name("deploy-agent", kind);
+        assert!(name.starts_with(&format!("{prefix}deploy-agent-{kind_component}-")));
+        assert!(
+            name.ends_with(".log"),
+            "file name must keep the .log extension: {name}"
+        );
+        assert!(!std::path::Path::new(&name).is_absolute());
+    }
+
+    // Kinds must never collide with each other for the same agent.
+    let a = agent_log_file_name("deploy-agent", AgentLogKind::StdoutTmp);
+    let b = agent_log_file_name("deploy-agent", AgentLogKind::StderrTmp);
+    let c = agent_log_file_name("deploy-agent", AgentLogKind::Final);
+    assert_ne!(a, b);
+    assert_ne!(a, c);
+    assert_ne!(b, c);
+
+    // Agent remains recognisable in the name.
+    assert!(
+        agent_log_file_name("nightwatch-sentinel", AgentLogKind::Final)
+            .contains("nightwatch-sentinel")
+    );
+}
+
+#[test]
+fn test_agent_log_file_name_sanitises_unsafe_agent_input() {
+    let evil_inputs = [
+        "../../etc/passwd",
+        "..\\..\\windows\\system32",
+        "/opt/ai-dark-factory/logs",
+        "agent/../../escape",
+        "a/b",
+        "a\\b",
+        "..",
+        "...",
+        "....//....",
+        "",
+        "   ",
+        "@#$%^&*",
+        "caf\u{e9}-agent",
+    ];
+    for evil in evil_inputs {
+        for kind in [
+            AgentLogKind::StdoutTmp,
+            AgentLogKind::StderrTmp,
+            AgentLogKind::Final,
+        ] {
+            let name = agent_log_file_name(evil, kind);
+            assert!(
+                !name.contains('/'),
+                "'{evil}' produced path separator in {name}"
+            );
+            assert!(
+                !name.contains('\\'),
+                "'{evil}' produced path separator in {name}"
+            );
+            assert!(
+                !name.contains(".."),
+                "'{evil}' produced traversal sequence in {name}"
+            );
+            assert!(
+                !std::path::Path::new(&name).is_absolute(),
+                "'{evil}' produced absolute path {name}"
+            );
+            assert!(name.ends_with(".log"));
+            // Joining a safe dir with the name must never escape the dir.
+            let dir = std::path::Path::new("/tmp/safe-logs");
+            let joined = dir.join(&name);
+            assert!(
+                joined.starts_with(dir),
+                "'{evil}' escaped the log dir: {}",
+                joined.display()
+            );
+        }
+    }
+
+    // Unicode letters are alphanumeric and therefore kept (still safe: no
+    // separator, no traversal).
+    let unicode = agent_log_file_name("caf\u{e9}-agent", AgentLogKind::Final);
+    assert!(unicode.contains("caf\u{e9}-agent"));
+}
+
 // ==================== has_matching_changes Tests ====================
 
 #[test]

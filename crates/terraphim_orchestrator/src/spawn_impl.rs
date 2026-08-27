@@ -15,9 +15,9 @@ use crate::config::AgentDefinition;
 #[cfg(feature = "quickwit")]
 use crate::quickwit;
 use crate::{
-    agent_key, build_spawn_context_for_agent, control_plane, kg_router, project_control,
-    requires_isolated_worktree, AgentOrchestrator, ManagedAgent, OrchestratorError, PreCheckResult,
-    SyntheticEvent,
+    agent_key, agent_log_file_name, build_spawn_context_for_agent, control_plane, kg_router,
+    project_control, requires_isolated_worktree, AgentLogKind, AgentOrchestrator, ManagedAgent,
+    OrchestratorError, PreCheckResult, SyntheticEvent,
 };
 
 impl AgentOrchestrator {
@@ -537,8 +537,7 @@ impl AgentOrchestrator {
             );
         }
 
-        let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
-        let stderr_tmp_name = format!(".tmp-{}-{}.stderr.log", def.name, ts);
+        let stderr_tmp_name = agent_log_file_name(&def.name, AgentLogKind::StderrTmp);
         let stderr_tmp_path = self.agent_log_dir.join(&stderr_tmp_name);
         spawn_ctx = spawn_ctx.with_stderr_log(&stderr_tmp_path);
 
