@@ -55,6 +55,7 @@ fn isolated_config(
             ..Default::default()
         },
         workflow: None,
+        direct_dispatch: None,
         // A single trivial agent; the sweep runs unconditionally in
         // `new` regardless of agent set.
         agents: vec![AgentDefinition {
@@ -63,6 +64,7 @@ fn isolated_config(
             cli_tool: "echo".to_string(),
             task: "noop".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -81,6 +83,9 @@ fn isolated_config(
             event_only: false,
             evolution_enabled: false,
             project: None,
+            rlm_enabled: None,
+            bypass_kg_routing: false,
+            enabled: true,
         }],
         restart_cooldown_secs: 60,
         max_restart_count: 10,

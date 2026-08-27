@@ -147,7 +147,8 @@ Required final block shape:
   "status": "pass",
   "confidence": 4,
   "blocking_findings": 0,
-  "summary": "replace with one line summary"
+  "summary": "replace with one line summary",
+  "dispatch_id": "{dispatch_id}"
 }}
 -->
 "#,
@@ -165,6 +166,7 @@ Required final block shape:
         changed_files = changed_files,
         concepts = concepts,
         diff_excerpt = &evidence.diff_excerpt,
+        dispatch_id = &meta.dispatch_id.0,
     )
 }
 
@@ -172,6 +174,7 @@ Required final block shape:
 mod tests {
     use super::*;
     use crate::pr_gate_context::PrGateEvidencePack;
+    use crate::pr_gate_result::PrGateDispatchId;
     use crate::pr_gate_result::PrGateMeta;
 
     fn evidence() -> PrGateEvidencePack {
@@ -197,6 +200,7 @@ mod tests {
             agent_name: agent_name.to_string(),
             context: context.to_string(),
             head_sha: "abcdef".to_string(),
+            dispatch_id: PrGateDispatchId::new("terraphim-ai", 2334, "abcdef", agent_name),
         }
     }
 

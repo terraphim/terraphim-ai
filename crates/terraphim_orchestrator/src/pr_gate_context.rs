@@ -62,6 +62,8 @@ pub struct RelevantContextChunk {
 
 #[derive(Debug, thiserror::Error)]
 pub enum PrGateContextError {
+    #[error("authoritative PR evidence requires a working directory")]
+    MissingWorkingDirectory,
     #[error("git command failed: {0}")]
     Git(String),
 }
@@ -71,10 +73,8 @@ pub async fn build_pr_gate_evidence_pack(
     working_dir: Option<&Path>,
     limits: PrGateEvidenceLimits,
 ) -> Result<PrGateEvidencePack, PrGateContextError> {
-    let git_evidence = match working_dir {
-        Some(path) => collect_git_evidence(path, req, &limits).await?,
-        None => GitEvidence::unavailable("no working directory provided"),
-    };
+    let working_dir = working_dir.ok_or(PrGateContextError::MissingWorkingDirectory)?;
+    let git_evidence = collect_git_evidence(working_dir, req, &limits).await?;
 
     let linked_issue = extract_issue_number(&req.title).map(|number| LinkedIssueEvidence {
         number,
@@ -110,15 +110,6 @@ pub async fn build_pr_gate_evidence_pack(
 struct GitEvidence {
     changed_files: Vec<String>,
     diff_excerpt: String,
-}
-
-impl GitEvidence {
-    fn unavailable(reason: &str) -> Self {
-        Self {
-            changed_files: Vec::new(),
-            diff_excerpt: format!("Diff unavailable: {reason}"),
-        }
-    }
 }
 
 async fn collect_git_evidence(
@@ -165,13 +156,11 @@ async fn collect_git_evidence(
         }
     }
 
-    Ok(GitEvidence {
-        changed_files: Vec::new(),
-        diff_excerpt: format!(
-            "Diff unavailable: {}",
-            last_error.unwrap_or_else(|| "no usable git diff range".to_string())
-        ),
-    })
+    let reason = last_error.unwrap_or_else(|| "no usable git diff range".to_string());
+    Err(PrGateContextError::Git(format!(
+        "no authoritative diff for PR {}: {reason}",
+        req.pr_number
+    )))
 }
 
 fn is_safe_head_ref(head_ref: &str) -> bool {
@@ -319,27 +308,6 @@ fn extract_builtin_concepts(text: &str) -> Vec<String> {
     concepts
 }
 
-pub fn fallback_evidence_pack(req: &ReviewPrRequest, reason: &str) -> PrGateEvidencePack {
-    PrGateEvidencePack {
-        pr_number: req.pr_number,
-        project: req.project.clone(),
-        title: req.title.clone(),
-        author: req.author_login.clone(),
-        head_sha: req.head_sha.clone(),
-        diff_loc: req.diff_loc,
-        changed_files: Vec::new(),
-        diff_excerpt: format!("Diff unavailable: {reason}"),
-        linked_issue: extract_issue_number(&req.title).map(|number| LinkedIssueEvidence {
-            number,
-            title: format!("Issue #{number}"),
-            body_excerpt: String::new(),
-            acceptance_criteria: Vec::new(),
-        }),
-        matched_concepts: extract_builtin_concepts(&req.title),
-        relevant_context: Vec::new(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -373,21 +341,16 @@ mod tests {
         assert!(ranges.contains(&"refs/adf/base-main..abc123".to_string()));
     }
 
-    #[test]
-    fn fallback_pack_uses_automata_concept_matching() {
-        let req = ReviewPrRequest {
-            pr_number: 1,
-            project: "terraphim-ai".to_string(),
-            head_sha: "abc".to_string(),
-            head_ref: "task/2334-native-gates".to_string(),
-            author_login: "alice".to_string(),
-            title: "Fix #2334: PrGateResult validation timeout".to_string(),
-            diff_loc: 10,
-        };
-        let pack = fallback_evidence_pack(&req, "test");
-        assert!(pack.matched_concepts.contains(&"validation".to_string()));
-        assert!(pack.matched_concepts.contains(&"timeout".to_string()));
-        assert_eq!(pack.linked_issue.as_ref().map(|i| i.number), Some(2334));
+    #[tokio::test]
+    async fn evidence_pack_requires_working_directory() {
+        let err = build_pr_gate_evidence_pack(
+            &fixture_request(1, "abc"),
+            None,
+            PrGateEvidenceLimits::default(),
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, PrGateContextError::MissingWorkingDirectory));
     }
 
     #[test]
@@ -402,5 +365,67 @@ mod tests {
             None
         );
         assert_eq!(build_head_branch_refspec("feature:x", 2318), None);
+    }
+
+    fn fixture_request(pr_number: u64, head_sha: &str) -> ReviewPrRequest {
+        ReviewPrRequest {
+            pr_number,
+            project: "terraphim-ai".to_string(),
+            head_sha: head_sha.to_string(),
+            head_ref: format!("task/{pr_number}-gate"),
+            author_login: "alice".to_string(),
+            title: format!("Fix #{pr_number}: gate evidence"),
+            diff_loc: 10,
+        }
+    }
+
+    /// Issue #3293: evidence assembly must be fail-closed. A working
+    /// directory with no usable git diff (no repo, no refs) is an
+    /// authoritative-evidence failure, not a degraded pack. Callers must
+    /// surface the error instead of silently substituting
+    /// a degraded evidence pack.
+    #[tokio::test]
+    async fn build_pr_gate_evidence_pack_returns_err_when_no_diff_found() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        // Empty directory with a bogus `.git` sentinel: git cannot resolve a
+        // repository (an ancestor checkout would otherwise supply a diff).
+        std::fs::write(tmp.path().join(".git"), "not a gitfile: sentinel")
+            .expect("plant git sentinel");
+        let err = build_pr_gate_evidence_pack(
+            &fixture_request(641, "deadbeef1234"),
+            Some(tmp.path()),
+            PrGateEvidenceLimits::default(),
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, PrGateContextError::Git(_)),
+            "expected PrGateContextError::Git, got {err:?}"
+        );
+    }
+
+    /// Positive counterpart: with real refs bound in the working
+    /// directory, the pack carries the authoritative changed files.
+    #[tokio::test]
+    async fn build_pr_gate_evidence_pack_returns_changed_files_when_refs_bound() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        crate::tests_support::build_pr_gate_git_fixture(tmp.path());
+        let pack = build_pr_gate_evidence_pack(
+            &fixture_request(641, crate::tests_support::pr_gate_fixture_head_sha()),
+            Some(tmp.path()),
+            PrGateEvidenceLimits::default(),
+        )
+        .await
+        .expect("authoritative evidence must assemble from bound refs");
+        assert!(
+            pack.changed_files.iter().any(|f| f.contains("change.txt")),
+            "expected the fixture diff to list change.txt, got {:?}",
+            pack.changed_files
+        );
+        assert!(
+            !pack.diff_excerpt.contains("Diff unavailable"),
+            "authoritative pack must not carry the degraded diff marker: {}",
+            pack.diff_excerpt
+        );
     }
 }

@@ -136,40 +136,51 @@ impl AgentOrchestrator {
                     }
 
                     let project = def.project.as_deref().or(detected_project.as_deref());
-                    if let Some(project) = project {
-                        if self.pr_gate_dispatch_entry(project, &agent_name).is_some() {
-                            if self.should_skip_local_dispatch(&agent_name, issue_number) {
-                                return;
-                            }
-                            match self
-                                .dispatch_pr_gate_mention_for_issue(
-                                    project,
-                                    &agent_name,
-                                    issue_number,
-                                )
-                                .await
-                            {
-                                Ok(true) => {
-                                    if let Some(agent) = self.active_agents.get_mut(&agent_name) {
-                                        agent.spawned_by_mention = true;
-                                        agent.mention_chain_id = Some(chain_id);
-                                        agent.mention_depth = Some(depth);
-                                        agent.mention_parent_agent = None;
-                                    }
-                                }
-                                Ok(false) => {}
-                                Err(e) => {
-                                    warn!(
-                                        agent = %agent_name,
-                                        project,
-                                        issue = issue_number,
-                                        error = %e,
-                                        "webhook PR gate mention failed closed"
-                                    );
-                                }
-                            }
+                    if crate::pr_handlers_impl::is_canonical_pr_gate_agent(&agent_name) {
+                        let Some(project) = project else {
+                            warn!(
+                                agent = %agent_name,
+                                issue = issue_number,
+                                "webhook canonical PR gate mention rejected: project missing"
+                            );
+                            return;
+                        };
+                        if self.pr_gate_dispatch_entry(project, &agent_name).is_none() {
+                            warn!(
+                                agent = %agent_name,
+                                project,
+                                issue = issue_number,
+                                "webhook canonical PR gate mention rejected: dispatch entry missing"
+                            );
                             return;
                         }
+                        if self.should_skip_local_dispatch(&agent_name, issue_number) {
+                            return;
+                        }
+                        match self
+                            .dispatch_pr_gate_mention_for_issue(project, &agent_name, issue_number)
+                            .await
+                        {
+                            Ok(true) => {
+                                if let Some(agent) = self.active_agents.get_mut(&agent_name) {
+                                    agent.spawned_by_mention = true;
+                                    agent.mention_chain_id = Some(chain_id);
+                                    agent.mention_depth = Some(depth);
+                                    agent.mention_parent_agent = None;
+                                }
+                            }
+                            Ok(false) => {}
+                            Err(e) => {
+                                warn!(
+                                    agent = %agent_name,
+                                    project,
+                                    issue = issue_number,
+                                    error = %e,
+                                    "webhook PR gate mention failed closed"
+                                );
+                            }
+                        }
+                        return;
                     }
 
                     // Dedup: check Gitea assignment + active_agents before spawning

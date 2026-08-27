@@ -18,8 +18,8 @@ use crate::dispatcher::DispatchTask;
 #[cfg(feature = "quickwit")]
 use crate::quickwit;
 use crate::{
-    agent_key, control_plane, error_signatures, parse_reset_time, project_control, provider_budget,
-    AgentOrchestrator, DEFAULT_RATE_LIMIT_BLOCK,
+    agent_key, agent_log_file_name, control_plane, error_signatures, parse_reset_time,
+    project_control, provider_budget, AgentLogKind, AgentOrchestrator, DEFAULT_RATE_LIMIT_BLOCK,
 };
 
 const DEFAULT_PR_GATE_TIMEOUT_SECS: u64 = 300;
@@ -941,8 +941,7 @@ impl AgentOrchestrator {
             // written by the background drain task, then rename to final path.
             {
                 let _ = std::fs::create_dir_all(&self.agent_log_dir);
-                let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
-                let filename = format!("{}-{}.log", name, ts);
+                let filename = agent_log_file_name(name, AgentLogKind::Final);
                 let final_path = self.agent_log_dir.join(&filename);
 
                 if let Some(ref tmp_path) = agent_tmp_path {
@@ -1638,6 +1637,7 @@ fn canonical_failure_gate_comment(
         confidence: 1,
         blocking_findings: 1,
         summary,
+        dispatch_id: Some(meta.dispatch_id.0.clone()),
     };
     let json = serde_json::to_string_pretty(&result)
         .unwrap_or_else(|_| String::from(r#"{"schema_version":1,"status":"fail"}"#));
@@ -1706,6 +1706,12 @@ mod tests {
             agent_name: "pr-validator".to_string(),
             context: "adf/validation".to_string(),
             head_sha: "b71332d".to_string(),
+            dispatch_id: crate::pr_gate_result::PrGateDispatchId::new(
+                "terraphim-ai",
+                2318,
+                "b71332d",
+                "pr-validator",
+            ),
         }
     }
 
