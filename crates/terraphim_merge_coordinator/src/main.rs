@@ -4,8 +4,12 @@
 //! PRs in OWNER/REPO (default terraphim/terraphim-ai), merges
 //! mergeable ones, auto-closes Fixes #N. Exit codes: 0 success,
 //! 1 evaluation failures, 2 critical.
+//!
+//! Single-writer (#3295 §D5): a project-scoped kernel lease
+//! (`terraphim_lockfile`, key `merge-coordinator-{owner}--{repo}`)
+//! is taken for the whole run. Same-project overlap is a benign
+//! successful no-op (`lock.held`); lock/config failures exit Critical.
 
-use std::path::PathBuf;
 use std::process;
 
 use serde_json::json;
@@ -14,14 +18,12 @@ use terraphim_merge_coordinator::{
     evaluator::{evaluate_all, merge_and_close},
     gitea::GiteaClient,
     jsonlog::emit,
-    pid_lock::acquire_pid_lock,
-    types::{ExitCode, MergeCoordinatorError, MergeOutcome},
+    lock_path::{RunOutcome, acquire_run_lock, resolve_lock_dir},
+    types::{ExitCode, MergeOutcome},
 };
 
 const DEFAULT_OWNER: &str = "terraphim";
 const DEFAULT_REPO: &str = "terraphim-ai";
-const LOCK_PATH: &str = "/tmp/merge-coordinator.lock";
-const LOCK_STALE_SECS: u64 = 30;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -48,17 +50,26 @@ async fn run() -> ExitCode {
         }
     };
 
-    let _guard = match acquire_pid_lock(&PathBuf::from(LOCK_PATH), LOCK_STALE_SECS) {
-        Ok(g) => g,
-        Err(MergeCoordinatorError::LockHeld { pid, age_secs }) => {
+    // Project-scoped kernel lease (#3295 §D5): exact (owner,repo) identity,
+    // no timestamp stealing, no unlink. The RAII guard is held for the
+    // whole coordinator run and released (fd close) when `run` returns.
+    let _guard = match acquire_run_lock(&resolve_lock_dir(), &owner, &repo) {
+        Ok(guard) => guard,
+        Err(RunOutcome::LockHeld { holder_pid }) => {
+            // Single-flight overlap with a live holder: benign no-op.
             emit(
                 "lock.held",
-                &[("holder_pid", json!(pid)), ("age_secs", json!(age_secs))],
+                &[
+                    ("owner", json!(owner)),
+                    ("repo", json!(repo)),
+                    ("holder_pid", json!(holder_pid)),
+                ],
             );
-            return ExitCode::Critical;
+            return ExitCode::Success;
         }
-        Err(e) => {
-            emit("lock.error", &[("error", json!(e.to_string()))]);
+        Err(RunOutcome::Io(msg)) => {
+            // Lock directory/open/write/config errors fail closed.
+            emit("lock.error", &[("error", json!(msg))]);
             return ExitCode::Critical;
         }
     };

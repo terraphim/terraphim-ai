@@ -2590,13 +2590,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs2"
-version = "0.4.3"
+name = "fs4"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+checksum = "8640e34b88f7652208ce9e88b1a37a2ae95227d84abec377ccd3c5cfeb141ed4"
 dependencies = [
- "libc",
- "winapi",
+ "rustix 1.1.4",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8992,6 +8992,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_lockfile"
+version = "1.21.3"
+dependencies = [
+ "fs4",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
 name = "terraphim_lsp"
 version = "1.21.3"
 dependencies = [
@@ -9034,11 +9044,12 @@ name = "terraphim_merge_coordinator"
 version = "1.21.3"
 dependencies = [
  "chrono",
- "fs2",
+ "fs4",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tempfile",
+ "terraphim_lockfile",
  "thiserror 1.0.69",
  "tokio",
  "tracing",

@@ -40,6 +40,19 @@ pub trait GiteaOperations {
         repo: &str,
     ) -> impl std::future::Future<Output = Result<Vec<PrSummary>, MergeCoordinatorError>> + Send;
 
+    /// Refetch a single PR by index (fresh state for the pre-merge check).
+    ///
+    /// Added for #3295 (design §D6): immediately before merging, the
+    /// coordinator must re-read the PR and require `state=open`,
+    /// `mergeable=Some(true)` and an unchanged head SHA. Errors propagate so
+    /// callers fail closed instead of merging on stale data.
+    fn get_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> impl std::future::Future<Output = Result<PrSummary, MergeCoordinatorError>> + Send;
+
     /// List files changed in a PR by index.
     fn list_pr_files(
         &self,
@@ -84,7 +97,7 @@ pub struct GiteaClient {
 }
 
 /// PR list response item (subset of Gitea fields used here).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct PrSummary {
     /// Gitea PR number.
     pub number: u64,
@@ -96,9 +109,54 @@ pub struct PrSummary {
     pub state: String,
     /// Whether Gitea considers this PR mergeable; `None` if unknown.
     pub mergeable: Option<bool>,
-    /// Head commit SHA (for CI status lookups).
-    #[serde(default)]
+    /// Head commit SHA (for CI status lookups and the pre-merge exact-head
+    /// check, #3295 §D6).
     pub head_sha: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for PrSummary {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // Gitea nests the head SHA under `head.sha`; a top-level `head_sha`
+        // is tolerated as an alternate shape. Empty strings normalise to
+        // `None` so downstream "SHA unavailable" handling is uniform.
+        #[derive(Deserialize)]
+        struct Raw {
+            number: u64,
+            title: String,
+            #[serde(default)]
+            body: Option<String>,
+            state: String,
+            #[serde(default)]
+            mergeable: Option<bool>,
+            #[serde(default)]
+            head_sha: Option<String>,
+            #[serde(default)]
+            head: Option<HeadRef>,
+        }
+
+        #[derive(Deserialize)]
+        struct HeadRef {
+            #[serde(default)]
+            sha: Option<String>,
+        }
+
+        let raw = Raw::deserialize(deserializer)?;
+        let head_sha = raw
+            .head_sha
+            .filter(|s| !s.is_empty())
+            .or_else(|| raw.head.and_then(|h| h.sha).filter(|s| !s.is_empty()));
+        Ok(PrSummary {
+            number: raw.number,
+            title: raw.title,
+            body: raw.body,
+            state: raw.state,
+            mergeable: raw.mergeable,
+            head_sha,
+        })
+    }
 }
 
 /// A single file entry from Gitea's `/pulls/{index}/files` response.
@@ -143,6 +201,29 @@ impl GiteaClient {
             .await
             .map_err(|e| MergeCoordinatorError::Api(format!("decode pr list: {e}")))?;
         Ok(prs)
+    }
+
+    /// Refetch a single PR by index. Returns the fresh `PrSummary`
+    /// (`state`, `mergeable`, `head_sha`) used by the pre-merge check.
+    ///
+    /// A 404 or any transport error surfaces as `Err` so callers fail
+    /// closed (#3295 design §D6).
+    pub async fn get_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<PrSummary, MergeCoordinatorError> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/pulls/{}",
+            self.base_url, owner, repo, index
+        );
+        let resp = self.get_with_retry(&url).await?;
+        let pr = resp
+            .json::<PrSummary>()
+            .await
+            .map_err(|e| MergeCoordinatorError::Api(format!("decode pr: {e}")))?;
+        Ok(pr)
     }
 
     /// Merge a PR by index. Returns `Ok(())` on success.
@@ -334,6 +415,15 @@ impl GiteaOperations for GiteaClient {
         GiteaClient::list_open_prs(self, owner, repo).await
     }
 
+    async fn get_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        index: u64,
+    ) -> Result<PrSummary, MergeCoordinatorError> {
+        GiteaClient::get_pr(self, owner, repo, index).await
+    }
+
     async fn list_pr_files(
         &self,
         owner: &str,
@@ -406,6 +496,63 @@ mod tests {
         assert_eq!(pr.number, 1);
         assert_eq!(pr.body, None);
         assert_eq!(pr.mergeable, None);
+    }
+
+    #[test]
+    fn pr_summary_reads_head_sha_from_nested_gitea_shape() {
+        // Real Gitea payloads nest the head SHA under `head.sha`; the
+        // §D6 exact-head check is dead on arrival against a live server
+        // without this (#3295).
+        let json = r#"{
+            "number": 42,
+            "title": "Fix things",
+            "state": "open",
+            "mergeable": true,
+            "head": {"ref": "feature", "sha": "6dcb09b5b57875f334f61aebed695e2e4193db5e"},
+            "base": {"ref": "main", "sha": "0000000000000000000000000000000000000000"}
+        }"#;
+        let pr: PrSummary = serde_json::from_str(json).unwrap();
+        assert_eq!(pr.number, 42);
+        assert_eq!(
+            pr.head_sha.as_deref(),
+            Some("6dcb09b5b57875f334f61aebed695e2e4193db5e")
+        );
+    }
+
+    #[test]
+    fn pr_summary_top_level_head_sha_still_accepted() {
+        // Alternate/fake payload shape: top-level `head_sha` wins when both
+        // are present and non-empty.
+        let json =
+            r#"{"number":2,"title":"x","state":"open","head_sha":"aaa","head":{"sha":"bbb"}}"#;
+        let pr: PrSummary = serde_json::from_str(json).unwrap();
+        assert_eq!(pr.head_sha.as_deref(), Some("aaa"));
+    }
+
+    #[test]
+    fn pr_summary_empty_head_sha_normalises_to_none() {
+        // Empty strings read as "unavailable" so the pre-merge check fails
+        // closed uniformly instead of comparing two empty SHAs as "equal".
+        for json in [
+            r#"{"number":3,"title":"x","state":"open","head_sha":""}"#,
+            r#"{"number":3,"title":"x","state":"open","head":{"sha":""}}"#,
+            r#"{"number":3,"title":"x","state":"open"}"#,
+        ] {
+            let pr: PrSummary = serde_json::from_str(json).unwrap();
+            assert_eq!(pr.head_sha, None, "payload: {json}");
+        }
+    }
+
+    #[test]
+    fn get_pr_url_targets_single_pull() {
+        // Contract guard: the refetch must hit the single-PR endpoint, not
+        // the list endpoint (a list call would not be "fresh" per §D6).
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/pulls/{}",
+            "https://g.example", "o", "r", 12
+        );
+        assert!(url.ends_with("/repos/o/r/pulls/12"));
+        assert!(!url.contains("state=open"));
     }
 
     #[test]
@@ -527,6 +674,16 @@ pub mod test_support {
         pub commit_status: HashMap<String, CommitCombinedStatus>,
         /// If `commit_status` has no entry for a SHA, this is returned.
         pub commit_status_default: Option<CommitCombinedStatus>,
+        /// Fresh `state` override for `get_pr`, keyed by PR index (#3295 §D6:
+        /// the PR changed between evaluation and the pre-merge refetch).
+        pub pr_states: Mutex<HashMap<u64, String>>,
+        /// Fresh head-SHA override for `get_pr`, keyed by PR index (head drift
+        /// or a freshly-missing SHA).
+        pub pr_head_shas: Mutex<HashMap<u64, String>>,
+        /// Fresh `mergeable` override for `get_pr`, keyed by PR index.
+        pub pr_mergeables: Mutex<HashMap<u64, Option<bool>>>,
+        /// If set, `get_pr` returns this error (refetch transport failure).
+        pub get_pr_error: Option<MergeCoordinatorError>,
         /// Number of times `merge_pr` was called.
         pub merge_calls: Mutex<u64>,
         /// PR indices `merge_pr` was called with, in order.
@@ -549,6 +706,10 @@ pub mod test_support {
                 list_pr_files_error: None,
                 commit_status: HashMap::new(),
                 commit_status_default: None,
+                pr_states: Mutex::new(HashMap::new()),
+                pr_head_shas: Mutex::new(HashMap::new()),
+                pr_mergeables: Mutex::new(HashMap::new()),
+                get_pr_error: None,
                 merge_calls: Mutex::new(0),
                 merged_indexes: Mutex::new(Vec::new()),
                 close_calls: Mutex::new(0),
@@ -571,6 +732,44 @@ pub mod test_support {
             _repo: &str,
         ) -> Result<Vec<PrSummary>, MergeCoordinatorError> {
             Ok(self.open_prs.clone())
+        }
+
+        async fn get_pr(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            index: u64,
+        ) -> Result<PrSummary, MergeCoordinatorError> {
+            if let Some(e) = &self.get_pr_error {
+                return Err(clone_error(e));
+            }
+            let mut pr = self
+                .open_prs
+                .iter()
+                .find(|p| p.number == index)
+                .cloned()
+                .ok_or_else(|| {
+                    MergeCoordinatorError::api(format!("fake: PR #{index} not found"))
+                })?;
+            {
+                let states = self.pr_states.lock().unwrap();
+                if let Some(state) = states.get(&index) {
+                    pr.state = state.clone();
+                }
+            }
+            {
+                let mergeables = self.pr_mergeables.lock().unwrap();
+                if let Some(mergeable) = mergeables.get(&index) {
+                    pr.mergeable = *mergeable;
+                }
+            }
+            {
+                let shas = self.pr_head_shas.lock().unwrap();
+                if let Some(sha) = shas.get(&index) {
+                    pr.head_sha = Some(sha.clone());
+                }
+            }
+            Ok(pr)
         }
 
         async fn list_pr_files(
