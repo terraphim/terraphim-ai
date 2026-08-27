@@ -11,10 +11,10 @@
 
 ## Verdict
 
-**CONDITIONAL PASS / NO-GO UNTIL BLOCKERS RESOLVED.**
+**PASS — APPROVED FOR IMPLEMENTATION.**
 
-The design is approved as a design checkpoint only. Implementation must not start
-until the blocking decisions in §4 are recorded on the trackers.
+All pre-implementation decisions in §4 are resolved and recorded. End-to-end readiness
+remains gated on both independently reviewed exact heads and the coordinated smoke.
 
 ---
 
@@ -59,8 +59,8 @@ until the blocking decisions in §4 are recorded on the trackers.
 
 ## 3. Status transition
 
-`PROPOSED` → `CONDITIONALLY APPROVED` — design checkpoint preserved; the status
-block in the design artefact records the blocking conditions and points here.
+`PROPOSED` → `CONDITIONALLY APPROVED` → `APPROVED FOR IMPLEMENTATION` — the
+trait foundation and canonical child design are now landed as durable checkpoints.
 
 ---
 
@@ -69,17 +69,16 @@ block in the design artefact records the blocking conditions and points here.
 1. **Resolved — `terraphim-agents#136` created and linked** (B1): the canonical
    production-orchestrator child exists. Its C2 half lands via git only — no
    uncommitted copying (scp/cp) between repos.
-2. **Triage terraphim-ai PR #3130 for #2892**: decide up front whether the
-   `GiteaOperations` trait work (#2892 / PR #3130) lands first or is absorbed
-   into this task and superseded; D7's seam depends on the outcome.
-3. **Freeze two-repo delivery order and require both exact heads**: fix the
-   terraphim-agents ↔ terraphim-ai PR ordering, review both PRs at their exact
-   head SHAs, and enforce that neither PR alone may claim readiness.
+2. **Resolved — PR #3130 merged as `0ee58c491`** (B2): exact reviewed head
+   `eab0785b2` landed the `GiteaOperations` and stateful-fake seam; issue #2892 closed.
+3. **Resolved — two-repo order frozen**: implement/review both legs; merge/deploy
+   terraphim-ai standalone binary + template first, then canonical terraphim-agents
+   `adf`; require both exact heads and shared-lock smoke before readiness; rollback in
+   reverse order.
 
 ---
 
 ## 5. Gate decision
 
-**Preserve the design checkpoint; do NOT implement until the blockers in §4 are
-recorded on the trackers.** Re-open this evaluation if any correction is reverted
-or if either blocker resolution changes the design's seams.
+**Implementation may start.** Re-open this evaluation if the shared filename/payload/no-steal
+contract, coordinated delivery order, or exact-head dual-review requirement changes.

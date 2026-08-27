@@ -1,13 +1,13 @@
 # Design: Merge-Coordinator Single-Writer (cross-process singleton lease + pre-merge fresh-state precondition)
 
-**Status**: CONDITIONALLY APPROVED — design checkpoint preserved; B1 is resolved by
-`terraphim/terraphim-agents#136`; implementation remains **blocked** until the #2892
-merge-order decision (B2) is recorded (see §13 and
-`quality-evaluation-merge-coordinator-single-writer-2026-08-27.md`). No production
-code changed in this task.
+**Status**: APPROVED FOR IMPLEMENTATION — B1 resolved by
+`terraphim/terraphim-agents#136` (KLS-approved design `09e619bb`); B2 resolved by
+merging PR #3130 as `0ee58c491`. The coordinated merge/deploy order is frozen in
+§13. No production code changed in the design phase.
 **Date**: 2026-08-27
 **Issue**: terraphim/terraphim-ai `#3295` (producer for digital-twins `#165`)
-**Base**: `23445b9e1862104a1d68d6a155b44ef7533483df`
+**Evidence base**: `23445b9e1862104a1d68d6a155b44ef7533483df`
+**Implementation foundation**: `0ee58c491b681790c0be25130b3dfed175f51d21` (PR #3130 merged)
 **Author**: design/research agent (session-scoped, no-commit)
 
 ---
@@ -84,7 +84,7 @@ merge attempt idempotent-safe regardless of which writer wins.
 | E24 | `crates/terraphim_merge_coordinator/src/types.rs:155-163` | `LockHeld { pid, age_secs }`; `MergeOutcome::Skipped(String)` at `:64-65` |
 | E25 | `crates/terraphim_orchestrator/src/pr_handlers_impl.rs:517,721,1045` | PR-gate agents insert into `active_agents` via a *separate* path (per-PR concurrency by design) |
 | E26 | `crates/terraphim_orchestrator/src/lib_tests.rs:587-617` | `test_reconcile_detects_agent_exit` — lifecycle test pattern to reuse |
-| E27 | branch `task/2892-gitea-operations-trait` (commit `bc41176a4`, unmerged) | `GiteaOperations` trait + stateful `FakeGitea` (project treats stateful fakes as non-mocks) |
+| E27 | merged PR #3130, reviewed head `eab0785b2`, main merge `0ee58c491` | `GiteaOperations` trait + stateful `FakeGitea` foundation landed (project treats stateful fakes as non-mocks) |
 | E28 | `adf-orchestrator.service:45-46` | `ProtectSystem=strict` + `ReadWritePaths=/opt/ai-dark-factory ...` — a lock dir under `/opt/ai-dark-factory` is writable by the service |
 | E29 | `crates/terraphim_spawner/src/lib.rs:1044` + `infer_args("bash")` | task string runs as `bash -c "<task>"` — enables marker-file/counting test agents |
 
@@ -473,10 +473,15 @@ Existing suites that must remain green: `lib_tests.rs` (unchanged behavior), cur
   `terraphim/terraphim-agents#136` is linked to parent `#3295`. C2 lands there via
   git only (commit/PR/pull); **no uncommitted copying (scp/cp) between repos**.
   Deployment readiness still requires both reviewed exact heads.
-- **B2 — Unmerged `task/2892-gitea-operations-trait`** touches the same
-  `evaluator.rs`/`gitea.rs` files. D7 deliberately matches its seam to minimize
-  conflict; merge order should be decided up front (recommend: land #2892 first, or
-  fold its trait into this task and close #2892 as superseded).
+- **B2 — Trait foundation (RESOLVED)**: PR #3130 was rebased, independently
+  reviewed at exact head `eab0785b2`, passed required PR CI plus 43/43 tests and
+  strict Clippy, and merged as `0ee58c491`; issue #2892 is closed. D7 now extends
+  the landed `GiteaOperations`/stateful-fake seam.
+- **B2a — Coordinated order (FROZEN)**: implement/review both legs; merge and deploy
+  the terraphim-ai standalone binary + template first, then merge/deploy the canonical
+  terraphim-agents `adf` leg. Claim end-to-end readiness only after both reviewed exact
+  heads and the shared-lock smoke. Roll back in reverse order (`adf` first, standalone
+  binary second).
 - **B3 — Host layout assumption**: default lock dirs assume the
   `/opt/ai-dark-factory` deployment tree; cron contexts without it must set
   `MERGE_COORDINATOR_LOCK_DIR` (fail-closed otherwise — visible, not silent).
