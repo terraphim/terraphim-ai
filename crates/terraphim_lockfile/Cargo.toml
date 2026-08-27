@@ -1,0 +1,20 @@
+[package]
+name = "terraphim_lockfile"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Kernel-held cross-process singleton lease primitive (flock) shared by the orchestrator and merge-coordinator"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "lock", "flock", "singleton", "lease"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+fs4.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile = { workspace = true }

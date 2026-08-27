@@ -13,7 +13,10 @@ readme = "../../README.md"
 
 [dependencies]
 thiserror.workspace = true
-fs2 = "0.4"
+# Shared kernel-held lease primitive (#3295): project-scoped (owner,repo)
+# flock lease with no stealing and no unlinking. The legacy in-crate fs2
+# pid_lock (global /tmp path + timestamp stealing) was removed with it.
+terraphim_lockfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -23,6 +26,8 @@ chrono.workspace = true
 
 [dev-dependencies]
 tempfile = "3.27"
+# lock_tests.rs simulates a foreign lease holder to assert no-steal semantics.
+fs4.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util", "time"] }
 
 [[bin]]

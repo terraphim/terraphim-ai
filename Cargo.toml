@@ -67,6 +67,10 @@ readme = "README.md"
 [workspace.dependencies]
 # OpenRouter AI integration dependencies
 tokio = { version = "1.0", features = ["full"] }
+# Kernel-held cross-process lease locks (flock) for singleton agents (#3295).
+# fs4 0.13.x returns Ok(false) on contention from try_lock_exclusive; it
+# replaces fs2 in the shared lease primitive (no stealing, no unlinking).
+fs4 = "0.13.1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 reqwest-middleware = { version = "0.4" }
 reqwest-retry = { version = "0.7" }
@@ -82,6 +86,11 @@ anyhow = "1.0"
 log = "0.4"
 tracing = "0.1"
 tempfile = "3.27"
+# Shared kernel-held cross-process lease primitive (flock) used by both
+# terraphim_orchestrator and terraphim_merge_coordinator (#3295).
+# Path workspace member so the lockfile crate can live under crates/*
+# without breaking the `workspace = true` reference in dependents.
+terraphim_lockfile = { path = "crates/terraphim_lockfile" }
 
 # Security: Force rustls 0.23+ to fix RUSTSEC-2026-0049
 rustls = { version = "0.23", default-features = false }

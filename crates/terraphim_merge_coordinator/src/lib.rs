@@ -7,8 +7,11 @@
 pub mod evaluator;
 pub mod gitea;
 pub mod jsonlog;
-pub mod pid_lock;
+pub mod lock_path;
 pub mod types;
+
+#[cfg(test)]
+mod lock_tests;
 
 /// Extract issue-closing references from a PR body. Case-insensitive.
 ///
