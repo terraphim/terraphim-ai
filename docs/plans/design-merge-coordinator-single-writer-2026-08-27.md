@@ -143,12 +143,11 @@ auto-singleton — per-PR gate agents must stay concurrent (E25).
 ### D3 — Kernel-held advisory lease, no timestamp stealing, no unlink
 
 - **Acquire**: `create_dir_all(dir)` → `OpenOptions::read+write+create+truncate(false)`
-  → `fs2::FileExt::try_lock_exclusive`. Non-blocking, single attempt.
+  → `fs4::FileExt::try_lock_exclusive`. Non-blocking, single attempt.
 - **Contention** (`ErrorKind::WouldBlock`): benign skip — read payload best-effort for
   the holder pid, log, return `Ok(())` from the spawn gate (same skip-not-error
   contract as the concurrency gate, E5).
-- **Success**: rewrite payload (`set_len(0)`, seek 0, `pid=<pid> acquired=<unix>
-  instance=<ulid>\n`) — informational only, never used for correctness.
+- **Success**: rewrite payload (`set_len(0)`, seek 0, `pid=<pid> acquired=<unix_secs>`) — informational only, never used for correctness.
 - **Never steal**: the `stale_after_secs` machinery (E19) is deleted. Crash recovery
   is exclusively kernel fd-close. This also removes the blocking-pile-up bug.
 - **Never unlink** lock files (no `/tmp`-style unlink race: A holds inode X; an
@@ -240,7 +239,7 @@ No mocks: the fake holds real state and real counters.
 ## 5. Components (≤5, scoped)
 
 **C1 — `crates/terraphim_lockfile` (new tiny workspace crate).**
-`LeaseLock::acquire(dir, key) -> Result<LeaseGuard, LeaseError>`; `LeaseError::{LockHeld{holder_pid}, Io}`; payload write; charset validator `validate_key_component`. RAII `LeaseGuard` (Drop = unlock, best-effort). Deps: `fs2`, `tracing`, `thiserror`. ~150 LOC + unit tests. Replaces `pid_lock.rs` internals (that module becomes a thin wrapper or is deleted; its public surface shrinks to what `main.rs` needs).
+`LeaseLock::acquire(dir, key) -> Result<LeaseGuard, LeaseError>`; `LeaseError::{LockHeld{holder_pid}, Io}`; payload write; charset validator `validate_key_component`. RAII `LeaseGuard` (Drop = unlock, best-effort). Deps: `fs4` (0.13.1), `tracing`, `thiserror`; payload uses only `std::time`. ~150 LOC + unit tests. Replaces `pid_lock.rs` internals (that module becomes a thin wrapper or is deleted; its public surface shrinks to what `main.rs` needs).
 
 **C2 — Orchestrator integration (dual-repo delivery).**
 This component explicitly spans **canonical production orchestrator delivery in
