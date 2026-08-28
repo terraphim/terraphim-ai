@@ -26,12 +26,15 @@ thiserror.workspace = true
 anyhow.workspace = true
 log.workspace = true
 
-# Terraphim crates
-terraphim_service = { version = "1.20.4", optional = true, features = ["openrouter"] }
-terraphim_config = { version = "1.20.4", optional = true }
+# Terraphim crates — all pinned to the Gitea `terraphim` registry so that the
+# Cargo workspace `[patch.crates-io]` can collapse the transitive crates.io
+# copies (which use owned `Thesaurus`/`Role` types) onto the Gitea copies
+# (which use borrowed `&Thesaurus`).
+terraphim_service = { version = "1.21.1", optional = true, registry = "terraphim", features = ["openrouter"] }
+terraphim_config = { version = "1.20.2", optional = true, registry = "terraphim" }
 terraphim_automata = { version = "1.21.0", optional = true, registry = "terraphim" }
 terraphim_types = { version = "1.21.0", optional = true, registry = "terraphim" }
-terraphim_rolegraph = { version = "1.20.4", optional = true }
+terraphim_rolegraph = { version = "1.20.2", optional = true, registry = "terraphim" }
 terraphim_agent_supervisor = { version = "1.19.2", optional = true }
 # Local MCP search engine. Used by the mcp_search_tools tool to look up tools
 # from a caller-supplied corpus. Gated under the same `mcp` feature as rmcp
@@ -100,4 +103,7 @@ tokio-test = "0.4"
 tempfile = "3.0"
 test-log = "0.2"
 ahash = "0.8"
-terraphim_config = { version = "1.20.4" }
+# Pin to the Gitea registry so dev-deps and normal deps share a canonical
+# source path (Cargo errors out on "different source paths depending on
+# the build target" otherwise).
+terraphim_config = { version = "1.20.2", registry = "terraphim" }

@@ -2,7 +2,10 @@
 name = "terraphim_mcp_search"
 # Independent versioning — fresh crate, semver 0.x as we iterate.
 # Bump to 1.x once the API stabilises (after Step 3-4 of issue terraphim-agents#64).
-version = "0.1.0"
+# 0.1.3 — re-publish against terraphim_automata 1.21.0 (`find_matches` now
+# takes `&Thesaurus`). The 0.1.0/0.1.2 Gitea copies still pass owned
+# `thesaurus.clone()` which no longer compiles against automata 1.21.0+.
+version = "0.1.3"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["Terraphim Team <team@terraphim.ai>"]

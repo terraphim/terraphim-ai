@@ -1597,7 +1597,7 @@ fn open_journal_leaf(
         root.fd.as_raw_fd(),
         filename.as_str(),
         flags,
-        Mode::from_bits_truncate(JOURNAL_FILE_MODE),
+        Mode::from_bits_truncate(JOURNAL_FILE_MODE as libc::mode_t),
     )
     .map_err(|error| {
         if matches!(error, Errno::ELOOP | Errno::ENOTDIR | Errno::EEXIST) {
@@ -1617,7 +1617,7 @@ fn prepare_journal_file(file: &File, create_new: bool, path: &Path) -> Result<()
     if create_new {
         nix::sys::stat::fchmod(
             file.as_raw_fd(),
-            Mode::from_bits_truncate(JOURNAL_FILE_MODE),
+            Mode::from_bits_truncate(JOURNAL_FILE_MODE as libc::mode_t),
         )
         .map_err(|error| JournalError::Io(std::io::Error::from_raw_os_error(error as i32)))?;
     }
@@ -1625,7 +1625,7 @@ fn prepare_journal_file(file: &File, create_new: bool, path: &Path) -> Result<()
         .map_err(|error| JournalError::Io(std::io::Error::from_raw_os_error(error as i32)))?;
     let file_type = SFlag::from_bits_truncate(stat.st_mode);
     let mode = stat.st_mode & 0o777;
-    if !file_type.contains(SFlag::S_IFREG) || mode != JOURNAL_FILE_MODE {
+    if !file_type.contains(SFlag::S_IFREG) || mode != JOURNAL_FILE_MODE as libc::mode_t {
         return Err(JournalError::UnsafePath(format!(
             "journal leaf {} must be a regular file with mode 0600 (found {:o})",
             path.display(),
@@ -2460,7 +2460,10 @@ mod tests {
         {
             use std::os::unix::fs::PermissionsExt;
             let mode = meta.permissions().mode() & 0o777;
-            assert_eq!(mode, JOURNAL_FILE_MODE, "expected 0600, got {mode:o}");
+            assert_eq!(
+                mode as libc::mode_t, JOURNAL_FILE_MODE as libc::mode_t,
+                "expected 0600, got {mode:o}"
+            );
         }
         #[cfg(not(unix))]
         let _ = meta;

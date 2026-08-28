@@ -19,6 +19,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 regex = "1.10"
 nix = { version = "0.27", features = ["process", "signal", "resource", "fs"] }
+libc = "0.2"
 
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
