@@ -146,7 +146,7 @@ impl McpToolIndex {
             let search_text = tool.search_text();
 
             // Use terraphim_automata to find query keywords in the tool's search text
-            match find_matches(&search_text, thesaurus.clone(), false) {
+            match find_matches(&search_text, &thesaurus, false) {
                 Ok(matches) => {
                     if !matches.is_empty() && seen_ids.insert(tool_idx) {
                         results.push(&self.tools[tool_idx]);

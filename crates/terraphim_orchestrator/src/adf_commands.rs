@@ -106,7 +106,7 @@ impl AdfCommandParser {
         let mut commands = vec![];
 
         // Use terraphim-automata's find_matches for Aho-Corasick matching
-        let matches = match find_matches(text, self.thesaurus.clone(), true) {
+        let matches = match find_matches(text, &self.thesaurus, true) {
             Ok(m) => m,
             Err(e) => {
                 tracing::warn!(error = %e, "ADF command matching failed");
@@ -163,7 +163,7 @@ impl AdfCommandParser {
 
     /// Check if text contains any ADF commands
     pub fn has_commands(&self, text: &str) -> bool {
-        match find_matches(text, self.thesaurus.clone(), false) {
+        match find_matches(text, &self.thesaurus, false) {
             Ok(matches) => !matches.is_empty(),
             Err(_) => false,
         }

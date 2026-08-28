@@ -396,12 +396,11 @@ impl KnowledgeGraphValidator {
         };
 
         // Use terraphim_automata for term matching
-        let matches =
-            terraphim_automata::find_matches(command, thesaurus.clone(), true).map_err(|e| {
-                RlmError::ConfigError {
-                    message: format!("Term matching failed: {}", e),
-                }
-            })?;
+        let matches = terraphim_automata::find_matches(command, thesaurus, true).map_err(|e| {
+            RlmError::ConfigError {
+                message: format!("Term matching failed: {}", e),
+            }
+        })?;
 
         let matched_terms: Vec<String> = matches.iter().map(|m| m.term.clone()).collect();
         let matched_set: HashSet<_> = matched_terms.iter().map(|s| s.to_lowercase()).collect();

@@ -321,7 +321,7 @@ fn find_all_matches(
     let thesaurus = load_thesaurus_from_json(json_str)
         .map_err(|e| PyValueError::new_err(format!("Failed to load thesaurus: {}", e)))?;
 
-    let matches = find_matches(text, thesaurus, return_positions)
+    let matches = find_matches(text, &thesaurus, return_positions)
         .map_err(|e| PyRuntimeError::new_err(format!("Failed to find matches: {}", e)))?;
 
     Ok(matches.into_iter().map(PyMatched::from).collect())
@@ -387,7 +387,7 @@ fn extract_paragraphs(
     let thesaurus = load_thesaurus_from_json(json_str)
         .map_err(|e| PyValueError::new_err(format!("Failed to load thesaurus: {}", e)))?;
 
-    let paragraphs = extract_paragraphs_from_automata(text, thesaurus, include_term)
+    let paragraphs = extract_paragraphs_from_automata(text, &thesaurus, include_term)
         .map_err(|e| PyRuntimeError::new_err(format!("Failed to extract paragraphs: {}", e)))?;
 
     // Convert Vec<(Matched, String)> to Vec<(String, String)>

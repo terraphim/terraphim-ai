@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_orchestrator"
-version = "1.20.2"
+version = "1.21.0"
 edition = "2021"
 authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "AI Dark Factory orchestrator wiring spawner, router, supervisor into a reconciliation loop"
@@ -25,7 +25,7 @@ test-helpers = ["dep:tempfile"]
 # Terraphim internal crates
 terraphim_spawner = { path = "../terraphim_spawner", version = "1.0.0" }
 terraphim_router = { version = "1.20.2", registry = "terraphim" }
-terraphim_types = { version = "1.20.2", registry = "terraphim", features = ["kg-integration"] }
+terraphim_types = { version = "1.21.0", registry = "terraphim", features = ["kg-integration"] }
 terraphim_tracker = { version = "1.20.2", registry = "terraphim" }
 
 # Core dependencies
@@ -54,7 +54,7 @@ cron = "0.13"
 which = "5"
 
 # Command parsing via terraphim-automata
-terraphim_automata = { version = "1.20.2", registry = "terraphim" }
+terraphim_automata = { version = "1.21.0", registry = "terraphim" }
 
 # Config parsing
 toml = "0.8"

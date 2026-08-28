@@ -241,7 +241,7 @@ impl KgRouter {
         // Use terraphim_automata's find_matches for Aho-Corasick matching
         let matches = match terraphim_automata::find_matches(
             task_description,
-            self.thesaurus.clone(),
+            &self.thesaurus,
             false,
         ) {
             Ok(m) if !m.is_empty() => m,
