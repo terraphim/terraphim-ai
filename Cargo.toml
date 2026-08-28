@@ -108,8 +108,16 @@ terraphim_types = { version = "1.21.0", registry = "terraphim" }
 terraphim_types = { version = "1.21.0", registry = "terraphim" }
 terraphim_automata = { version = "1.21.0", registry = "terraphim" }
 terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
-# Republished Gitea 1.20.5 fixes openrouter private-method bug; override crates.io 1.20.4.
-terraphim_service = { version = "=1.20.5", registry = "terraphim" }
+# crates.io file_search 1.20.3 still passes owned Thesaurus into automata 1.21.0.
+terraphim_file_search = { version = "1.21.0", registry = "terraphim" }
+# Gitea middleware 1.21.0 uses file_search 1.21.0 and a single ConfigState.
+terraphim_middleware = { version = "1.21.0", registry = "terraphim" }
+# Unify leftover crates.io config/persistence copies onto Gitea 1.20.2.
+terraphim_config = { version = "1.20.2", registry = "terraphim" }
+terraphim_persistence = { version = "1.20.2", registry = "terraphim" }
+# 1.21.1 takes &Thesaurus, pins config/middleware to Gitea, and restores
+# pub(crate) enhance_descriptions_with_ai for the openrouter feature.
+terraphim_service = { version = "1.21.1", registry = "terraphim" }
 # 1.21.1 fixes aider-connector missing-dep bug present in crates.io 1.21.0.
 terraphim_sessions = { version = "=1.21.1", registry = "terraphim" }
 # genai patch temporarily disabled to test crates.io 0.6.0 compatibility for v1.20.0 publish chain.

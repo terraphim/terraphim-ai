@@ -13,15 +13,15 @@ license = "Apache-2.0"
 readme = "../README.md"
 
 [dependencies]
-terraphim_persistence = { version = "1.20.4", default-features = false, features = ["memory"] }
-terraphim_config = { version = "1.20.4", default-features = false }
-terraphim_middleware = { version = "1.20.3", default-features = false }
-terraphim_rolegraph = { version = "1.20.4" }
-terraphim_settings = { version = "1.20.4" }
-terraphim_types = { version = "1.20.4", default-features = false }
-terraphim_automata = { version = "1.20.4", default-features = false, features = ["tokio-runtime"] }
-terraphim_service = { version = "1.20.4", default-features = false }
-terraphim_multi_agent = { version = "1.0.0" }
+terraphim_persistence = { version = "1.20.2", default-features = false, features = ["memory"], registry = "terraphim" }
+terraphim_config = { version = "1.20.2", default-features = false, registry = "terraphim" }
+terraphim_middleware = { version = "1.21.0", default-features = false, registry = "terraphim" }
+terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
+terraphim_settings = { version = "1.20.2", registry = "terraphim" }
+terraphim_types = { version = "1.21.0", default-features = false, registry = "terraphim" }
+terraphim_automata = { version = "1.21.0", default-features = false, features = ["tokio-runtime"], registry = "terraphim" }
+terraphim_service = { version = "1.21.1", default-features = false, registry = "terraphim" }
+terraphim_multi_agent = { version = "1.0.0", registry = "terraphim" }
 terraphim_update = { path = "../crates/terraphim_update" }
 
 
