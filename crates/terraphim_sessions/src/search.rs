@@ -171,7 +171,7 @@ pub fn search_sessions_hybrid(
         return scored;
     };
 
-    let kg_terms = match extract_kg_terms(query, thesaurus) {
+    let kg_terms = match extract_kg_terms(query, &thesaurus) {
         Ok(terms) if !terms.is_empty() => terms,
         _ => return scored,
     };
@@ -206,7 +206,7 @@ pub fn search_sessions_hybrid(
 #[cfg(feature = "enrichment")]
 fn extract_kg_terms(
     query: &str,
-    thesaurus: terraphim_types::Thesaurus,
+    thesaurus: &terraphim_types::Thesaurus,
 ) -> Result<Vec<terraphim_automata::matcher::Matched>, terraphim_automata::TerraphimAutomataError> {
     terraphim_automata::matcher::find_matches(query, thesaurus, false)
 }

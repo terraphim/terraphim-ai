@@ -466,7 +466,7 @@ impl ExitClassifier {
 
     /// Run Aho-Corasick matching and group by exit class.
     fn match_patterns(&self, text: &str) -> ExitClassification {
-        let matches = match find_matches(text, self.thesaurus.clone(), false) {
+        let matches = match find_matches(text, &self.thesaurus, false) {
             Ok(m) => m,
             Err(e) => {
                 warn!(error = %e, "exit class pattern matching failed");

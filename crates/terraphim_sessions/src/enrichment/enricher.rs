@@ -100,7 +100,7 @@ impl SessionEnricher {
             chars_processed += text.len();
 
             // Find concept matches
-            let matches = find_matches(text, self.thesaurus.clone(), true)?;
+            let matches = find_matches(text, &self.thesaurus, true)?;
 
             for matched in matches {
                 let concept = self.matched_to_concept(&matched, msg_idx, text);

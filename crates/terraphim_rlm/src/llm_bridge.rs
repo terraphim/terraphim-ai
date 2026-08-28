@@ -378,7 +378,6 @@ mod tests {
             use ahash::AHashMap;
             use serde_json::Value;
             use terraphim_config::Role;
-            use terraphim_types::RelevanceFunction;
 
             if let Ok(api_key) = std::env::var("OPENROUTER_API_KEY") {
                 let mut extra = AHashMap::new();
@@ -394,7 +393,7 @@ mod tests {
                 let role = Role {
                     shortname: None,
                     name: "test".into(),
-                    relevance_function: RelevanceFunction::TitleScorer,
+                    relevance_function: Default::default(),
                     terraphim_it: false,
                     theme: "default".to_string(),
                     kg: None,
