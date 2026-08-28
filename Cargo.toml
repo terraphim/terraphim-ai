@@ -137,10 +137,8 @@ terraphim_agent = { version = "1.21.3", registry = "terraphim" }
 # pub(crate) enhance_descriptions_with_ai for the openrouter feature.
 terraphim_service = { version = "1.21.1", registry = "terraphim" }
 # 1.21.1 fixes aider-connector missing-dep bug present in crates.io 1.21.0.
-# Terraphim_agent 1.21.3 requires terraphim_sessions ^1.21.2, so pin the
-# Gitea version at =1.21.2 to satisfy both the agent constraint and the
-# "use the Gitea fix, not crates.io 1.21.0" intent.
-terraphim_sessions = { version = "=1.21.2", registry = "terraphim" }
+# terraphim_sessions is a member of this workspace, so it always resolves
+# locally and a crates-io patch is unused. Drop the patch entry.
 # genai patch temporarily disabled to test crates.io 0.6.0 compatibility for v1.20.0 publish chain.
 # genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
 self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }
