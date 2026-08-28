@@ -17,9 +17,9 @@ name = "terraphim_weather_report"
 path = "src/lib.rs"
 
 [dependencies]
-terraphim_automata = { version = "1.20.2", registry = "terraphim" }
-terraphim_orchestrator = { version = "1.20.2", registry = "terraphim" }
-terraphim_types = { version = "1.20.2", registry = "terraphim" }
+terraphim_automata = { version = "1.21.0", registry = "terraphim" }
+terraphim_orchestrator = { version = "1.21.0", registry = "terraphim" }
+terraphim_types = { version = "1.21.0", registry = "terraphim" }
 
 anyhow = "1.0"
 clap = { version = "4", features = ["derive", "env"] }

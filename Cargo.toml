@@ -24,8 +24,6 @@ exclude = [
     "crates/terraphim_automata",
     "crates/terraphim_cli",
     "crates/terraphim_multi_agent",
-    # Depends on published orchestrator 1.20.2 until this repo publishes 1.21.0.
-    "crates/terraphim_weather_report",
     "crates/terraphim_service",
     "crates/terraphim_settings",
     # Experimental crates
