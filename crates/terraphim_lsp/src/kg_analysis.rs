@@ -54,7 +54,7 @@ pub fn analyse_kg_document(text: &str, thesaurus: &Thesaurus) -> KgAnalysis {
         return KgAnalysis::empty();
     }
 
-    let matches = match find_matches(text, &thesaurus, true) {
+    let matches = match find_matches(text, thesaurus, true) {
         Ok(matches) => matches,
         Err(err) => {
             log::warn!("KG analysis find_matches failed: {}", err);

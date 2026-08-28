@@ -153,20 +153,20 @@ Required final block shape:
 -->
 "#,
         gate_title = gate.title(),
-        agent = &meta.agent_name,
-        context = &meta.context,
+        agent = meta.agent_name,
+        context = meta.context,
         instructions = gate.instructions(),
-        project = &evidence.project,
+        project = evidence.project,
         pr_number = meta.pr_number,
-        title = &evidence.title,
-        author = &evidence.author,
-        head_sha = &meta.head_sha,
+        title = evidence.title,
+        author = evidence.author,
+        head_sha = meta.head_sha,
         diff_loc = evidence.diff_loc,
         linked_issue = linked_issue,
         changed_files = changed_files,
         concepts = concepts,
-        diff_excerpt = &evidence.diff_excerpt,
-        dispatch_id = &meta.dispatch_id.0,
+        diff_excerpt = evidence.diff_excerpt,
+        dispatch_id = meta.dispatch_id.0,
     )
 }
 
