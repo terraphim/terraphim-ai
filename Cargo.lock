@@ -9182,6 +9182,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_orchestrator"
+version = "1.21.0"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "7f9750f932dda76828110a0e79001f7ce2944713408f9a229acf61f038a01393"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "chrono",
+ "clap",
+ "cron",
+ "glob",
+ "handlebars",
+ "hex",
+ "hmac 0.12.1",
+ "jiff",
+ "opendal",
+ "regex",
+ "reqwest 0.12.28",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "terraphim_agent_evolution 1.20.2",
+ "terraphim_automata",
+ "terraphim_persistence 1.20.2",
+ "terraphim_router 1.20.2",
+ "terraphim_spawner 1.21.0 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
+ "terraphim_tracker 1.20.2",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml 0.8.23",
+ "tracing",
+ "tracing-subscriber",
+ "ulid",
+ "uuid",
+ "which 5.0.0",
+]
+
+[[package]]
 name = "terraphim_persistence"
 version = "1.20.2"
 source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
@@ -9551,6 +9593,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_spawner"
+version = "1.21.0"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "af573ee5624c50330a1971dcfe4c15fad712d820ba1bd457d791e1308fe9478e"
+dependencies = [
+ "nix 0.27.1",
+ "regex",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "terraphim_tinyclaw"
 version = "1.21.3"
 dependencies = [
@@ -9784,6 +9840,22 @@ dependencies = [
  "urlencoding",
  "uuid",
  "winapi",
+]
+
+[[package]]
+name = "terraphim_weather_report"
+version = "1.20.5"
+dependencies = [
+ "anyhow",
+ "clap",
+ "jiff",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_automata",
+ "terraphim_orchestrator 1.21.0 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
+ "terraphim_types",
+ "tokio",
 ]
 
 [[package]]
