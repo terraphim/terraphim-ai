@@ -193,11 +193,14 @@ async fn test_direct_dispatch_config_starts_socket_listener() {
 
 #[tokio::test]
 async fn test_handle_direct_dispatch_spawns_agent_without_mentions() {
+    let temp = TempDir::new().unwrap();
     let mut config = test_config();
+    config.working_dir = temp.path().to_path_buf();
+    config.compound_review.worktree_root = temp.path().join(".worktrees");
     config.agents = vec![AgentDefinition {
         name: "echo-agent".to_string(),
         layer: AgentLayer::Core,
-        cli_tool: "echo".to_string(),
+        cli_tool: "/bin/echo".to_string(),
         task: "echo hello".to_string(),
         schedule: None,
         model: None,
