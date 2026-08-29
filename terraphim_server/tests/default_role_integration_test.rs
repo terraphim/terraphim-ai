@@ -115,8 +115,9 @@ async fn test_default_role_ripgrep_integration() {
     log::info!("✅ Default role configuration validated");
     log::info!("   - Ripgrep haystack: {}", ripgrep_haystack.location);
 
-    // Start server on a test port
-    let server_addr = "127.0.0.1:8085".parse().unwrap();
+    // Start server on an ephemeral port to avoid address-already-in-use conflicts
+    let port = portpicker::pick_unused_port().expect("No unused ports available");
+    let server_addr: std::net::SocketAddr = ([127, 0, 0, 1], port).into();
     let server_handle = tokio::spawn(async move {
         if let Err(e) = axum_server(server_addr, config_state).await {
             log::error!("Server error: {:?}", e);
@@ -129,7 +130,7 @@ async fn test_default_role_ripgrep_integration() {
 
     let client = terraphim_service::http_client::create_default_client()
         .expect("Failed to create HTTP client");
-    let base_url = "http://127.0.0.1:8085";
+    let base_url = format!("http://127.0.0.1:{}", port);
 
     // Test 1: Health check
     log::info!("🔍 Testing server health...");
