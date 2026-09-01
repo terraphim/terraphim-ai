@@ -160,6 +160,17 @@ pub enum OrchestratorEvent {
         /// Byte length of the captured stderr tail for forensics.
         stderr_tail_bytes: u32,
     },
+    /// Post-merge test gate observed a runner-environment non-result
+    /// (zero wall time, no parsed tests, `Unknown` classification).
+    /// Per terraphim-ai#2558 the orchestrator MUST NOT revert in this
+    /// state; this event marks the observation for ops alerting.
+    PrAutoMergeEnvUnavailable {
+        pr_number: u64,
+        project: String,
+        merge_sha: String,
+        /// Wall time the runner reported (typically `<1s`).
+        wall_time_secs: f64,
+    },
 }
 
 /// Async log shipper for Quickwit
