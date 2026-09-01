@@ -1,0 +1,206 @@
+{
+  "source": "Captured by scripts/generate_megahal_fixtures.rb against the vendored upstream MegaHAL gem sources (ruby_vendor/, kranzky/megahal, Unlicense) with the real `sooth` gem (2.3.2) on Ruby 4.0.6 (arm64-darwin25). Command: `ruby crates/terraphim_megahal/scripts/generate_megahal_fixtures.rb`. Canonical RNG contract: PCG32 (rand_pcg::Pcg32 + rand_core 0.10 seed_from_u64, mirrored below), rand(n) = next_u32 % n (n==0 -> 0, one draw always), Array#shuffle = descending Fisher-Yates.",
+  "rng_self_check": [
+    {
+      "seed": 42,
+      "first_values": [
+        3400036912,
+        3349765444,
+        515166382,
+        4224707908,
+        1556152254,
+        2777144205,
+        3631167442,
+        1399683183
+      ]
+    },
+    {
+      "seed": 7,
+      "first_values": [
+        2442223337,
+        414063806,
+        2743600285,
+        3524868804,
+        2371632060,
+        1368306093,
+        671954468,
+        3804052768
+      ]
+    },
+    {
+      "seed": 2026,
+      "first_values": [
+        701397423,
+        462223274,
+        3537277590,
+        2113764262,
+        1168098631,
+        3158231194,
+        1818621512,
+        2362038959
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "greeting_default_personality",
+      "seed": 42,
+      "personality": "default",
+      "blank": false,
+      "learning": true,
+      "train_lines": [],
+      "conversation": [
+        null,
+        null
+      ],
+      "replies": [
+        "Howdy to you.",
+        "Greetings and salutations to thee and thine."
+      ]
+    },
+    {
+      "name": "keyword_reply_love",
+      "seed": 7,
+      "personality": "default",
+      "blank": false,
+      "learning": true,
+      "train_lines": [
+        "I love Rust and WebAssembly.",
+        "Don't repeat yourself, hob-goblin of bad code.",
+        "Rust is a systems programming language.",
+        "The Rust compiler is strict but fair.",
+        "Markov chains are fun for chatting.",
+        "A second-order Markov model predicts the next word.",
+        "Terraphim builds search tools in Rust.",
+        "The lazy dog sleeps all day while the quick fox jumps."
+      ],
+      "conversation": [
+        "I love Rust.",
+        "What do you know about Markov chains?",
+        "Tell me about the fox."
+      ],
+      "replies": [
+        "The Rust compiler is strict but fair.",
+        "Markov chains are fun for chatting.",
+        "You are the least interesting person I've met all day while the quick fox jumps."
+      ]
+    },
+    {
+      "name": "learning_disabled",
+      "seed": 2026,
+      "personality": "default",
+      "blank": false,
+      "learning": false,
+      "train_lines": [
+        "I love Rust and WebAssembly.",
+        "Don't repeat yourself, hob-goblin of bad code.",
+        "Rust is a systems programming language.",
+        "The Rust compiler is strict but fair.",
+        "Markov chains are fun for chatting.",
+        "A second-order Markov model predicts the next word.",
+        "Terraphim builds search tools in Rust.",
+        "The lazy dog sleeps all day while the quick fox jumps."
+      ],
+      "conversation": [
+        "Rust compiles fast.",
+        "Do you like Rust?"
+      ],
+      "replies": [
+        "The Rust compiler is strict but fair.",
+        "The Rust compiler is strict but fair."
+      ]
+    },
+    {
+      "name": "blank_brain_small_corpus",
+      "seed": 99,
+      "personality": null,
+      "blank": true,
+      "learning": true,
+      "train_lines": [
+        "I love Rust and WebAssembly.",
+        "Don't repeat yourself, hob-goblin of bad code.",
+        "Rust is a systems programming language.",
+        "The Rust compiler is strict but fair.",
+        "Markov chains are fun for chatting.",
+        "A second-order Markov model predicts the next word.",
+        "Terraphim builds search tools in Rust.",
+        "The lazy dog sleeps all day while the quick fox jumps."
+      ],
+      "conversation": [
+        "Rust or WebAssembly?",
+        "Rust!",
+        "What is a Markov chain?"
+      ],
+      "replies": [
+        "I love Rust and WebAssembly.",
+        "Terraphim builds search tools in Rust.",
+        "A second-order Markov model predicts the next word."
+      ]
+    },
+    {
+      "name": "multi_turn_echo_guard",
+      "seed": 5150,
+      "personality": "default",
+      "blank": false,
+      "learning": true,
+      "train_lines": [
+        "I love Rust and WebAssembly.",
+        "Don't repeat yourself, hob-goblin of bad code.",
+        "Rust is a systems programming language.",
+        "The Rust compiler is strict but fair.",
+        "Markov chains are fun for chatting.",
+        "A second-order Markov model predicts the next word.",
+        "Terraphim builds search tools in Rust.",
+        "The lazy dog sleeps all day while the quick fox jumps."
+      ],
+      "conversation": [
+        "Hello there.",
+        "I am a human being.",
+        "Time flies like an arrow."
+      ],
+      "replies": [
+        "Hello there, it is!",
+        "An aborigine is a building for human habitation.",
+        "Laugh hard, it's a long time."
+      ]
+    },
+    {
+      "name": "empty_and_punctuated_input",
+      "seed": 8080,
+      "personality": "default",
+      "blank": false,
+      "learning": true,
+      "train_lines": [],
+      "conversation": [
+        "",
+        "!!!",
+        "don't stop"
+      ],
+      "replies": [
+        "Protoplasm is the answer!",
+        "Karate is a lively Bohemian folk dance.",
+        "Stop your dull little tricks, please!"
+      ]
+    },
+    {
+      "name": "long_conversation_personality",
+      "seed": 31337,
+      "personality": "sherlock",
+      "blank": false,
+      "learning": true,
+      "train_lines": [],
+      "conversation": [
+        "Hello Holmes.",
+        "What do you deduce?",
+        "Is Watson your friend?",
+        "Elementary, surely?"
+      ],
+      "replies": [
+        "By my old enemies, Watson.",
+        "Only as much as we can deduce.",
+        "Hello Holmes.",
+        "In the most commonplace crime is often the most remarkable to which I desired to ask."
+      ]
+    }
+  ]
+}

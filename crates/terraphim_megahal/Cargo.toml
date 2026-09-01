@@ -1,0 +1,37 @@
+[package]
+name = "terraphim_megahal"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+description = "Faithful Rust port of MegaHAL (Jason Hutchens' second-order Markov chatterbot), built on terraphim_sooth."
+license.workspace = true
+readme = "README.md"
+
+[lib]
+name = "terraphim_megahal"
+path = "src/lib.rs"
+
+[[bin]]
+name = "megahal"
+path = "src/bin/megahal.rs"
+
+[features]
+default = []
+# Embed the non-default upstream training corpora (Sherlock, Pepys, Star Trek,
+# ...) behind a feature flag; the :default corpus is always embedded.
+personalities = []
+
+[dependencies]
+terraphim_sooth = { path = "../terraphim_sooth" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+# Seedable RNG injection (never OS entropy on the hot path, wasm32-safe).
+rand_core = { version = "0.10", default-features = false }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"

@@ -9113,6 +9113,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_megahal"
+version = "1.21.3"
+dependencies = [
+ "rand_core 0.10.1",
+ "serde",
+ "serde_json",
+ "terraphim_sooth",
+ "thiserror 1.0.69",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "terraphim_merge_coordinator"
 version = "1.21.3"
 dependencies = [
