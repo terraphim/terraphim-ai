@@ -2,6 +2,7 @@
 name = "terraphim_sessions"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 description = "Session management for AI coding assistant history - search across Claude Code, Cursor, Aider sessions"
 license = "Apache-2.0"
 authors = ["Terraphim Contributors"]

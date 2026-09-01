@@ -2,6 +2,7 @@
 name = "terraphim_weather_report"
 version = "1.20.5"
 edition.workspace = true
+rust-version.workspace = true
 authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "Weather-report CLI for ADF model tiers: shows which LLM models are currently available across thinking / workhorse / fast-and-cheap tiers"
 license = "Apache-2.0"
