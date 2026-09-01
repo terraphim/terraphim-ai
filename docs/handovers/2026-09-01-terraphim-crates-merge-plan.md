@@ -814,7 +814,16 @@ the handover did not record:
 #5 is the same test-gate fix already merged in three sibling repos, and the
 gate breakage is pipeline-side, but overriding a fail-closed review gate
 that another agent is actively enforcing was judged an owner call, not a
-batch action. Not merged.
+batch action. The owner subsequently decided to override. The merge was
+attempted and **blocked server-side**: branch protection on
+terraphim-kg-agents main requires `native-ci / build (push)`,
+`adf/pr-reviewer`, `adf/validation` and `adf/verification` to be successful
+(the latter three are the stale failures), and direct pushes are disabled
+(405 "Not all required status checks successful"). Landing #5 therefore
+requires either a real gate re-run (blocked on the orchestrator restore,
+section 6.3) or an owner-administered branch-protection change. The
+override attempt and both paths are recorded in the PR thread (comment
+76832). Not merged.
 
 ### 6.3 New blocking finding: ADF orchestrator is down on bigbox
 
@@ -843,10 +852,13 @@ exact head `d122ebc43008327a04d167f075107be7056dc57f`.
 
 ### 6.4 Remaining work
 
-1. Owner: decide kg-agents #5 (override the stale ADF gate vs hold until
-   the orchestrator is restored and gates re-run cleanly).
-2. Owner/ops: restore the bigbox orchestrator from current main; then run
-   the #3291 acceptance smoke (section 6.3) and record the result on
+1. Owner: choose how to land kg-agents #5 (section 6.2) -- restore the
+   orchestrator so the `adf/*` gates re-run against head `99b39cd09`, or
+   temporarily amend the repo's branch protection to drop the stale
+   contexts, merge, and restore.
+2. Owner/ops: restore the bigbox orchestrator from current main (owner has
+   elected to keep it down for now, 2026-09-02); when restored, run the
+   #3291 acceptance smoke (section 6.3) and record the result on
    terraphim-llm-proxy#38.
 3. Batch 2 unchanged (terraphim-ai #3112, clients #70-76 in strict order,
    clients #22 after rebase), still gated on the clients-main divergence
