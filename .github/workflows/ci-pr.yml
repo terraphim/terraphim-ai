@@ -151,8 +151,8 @@ jobs:
           path: desktop/dist
           retention-days: 1
 
-  # Rust formatting (quick check — no sccache needed)
-  # Optimal stack: bigbox + sccache+SeaweedFS + rch dispatch.
+  # Rust formatting (quick check — no rustc wrapper needed)
+  # cargo fmt does not invoke rustc, so the kache daemon wrapper is not required here.
   # See .docs/walkthrough-ci-build-pipeline.md.
   rust-format:
     name: Rust Format Check
@@ -193,15 +193,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
     env:
-      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
-      SCCACHE_BUCKET: rust-cache
-      SCCACHE_SERVER_PORT: "4231"
-      SCCACHE_ENDPOINT: http://172.26.0.1:8333
-      SCCACHE_S3_USE_SSL: "false"
-      SCCACHE_REGION: us-east-1
-      SCCACHE_S3_KEY_PREFIX: terraphim-ai
-      AWS_ACCESS_KEY_ID: any
-      AWS_SECRET_ACCESS_KEY: any
+      RUSTC_WRAPPER: /home/alex/.local/bin/kache
+      CARGO_INCREMENTAL: "0"
 
     steps:
       - name: Fix workspace permissions
@@ -230,11 +223,6 @@ jobs:
           toolchain: "1.94.0"
           components: clippy
 
-      - name: sccache start and zero stats
-        run: |
-          /home/alex/.local/bin/sccache --start-server || true
-          /home/alex/.local/bin/sccache --zero-stats
-
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
         with:
@@ -253,9 +241,9 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
-      - name: sccache stats
+      - name: kache stats
         if: always()
-        run: /home/alex/.local/bin/sccache --show-stats
+        run: /home/alex/.local/bin/kache stats
 
   # Rust compilation verification — cargo test --no-run catches linker and codegen errors
   rust-compile:
@@ -265,15 +253,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
     env:
-      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
-      SCCACHE_BUCKET: rust-cache
-      SCCACHE_SERVER_PORT: "4231"
-      SCCACHE_ENDPOINT: http://172.26.0.1:8333
-      SCCACHE_S3_USE_SSL: "false"
-      SCCACHE_REGION: us-east-1
-      SCCACHE_S3_KEY_PREFIX: terraphim-ai
-      AWS_ACCESS_KEY_ID: any
-      AWS_SECRET_ACCESS_KEY: any
+      RUSTC_WRAPPER: /home/alex/.local/bin/kache
+      CARGO_INCREMENTAL: "0"
 
     steps:
       - name: Fix workspace permissions
@@ -306,11 +287,6 @@ jobs:
         with:
           toolchain: "1.94.0"
 
-      - name: sccache start and zero stats
-        run: |
-          /home/alex/.local/bin/sccache --start-server || true
-          /home/alex/.local/bin/sccache --zero-stats
-
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
         with:
@@ -331,9 +307,9 @@ jobs:
         run: |
           /home/alex/.local/bin/rch exec -- cargo test --workspace --all-targets --no-run --features zlob
 
-      - name: sccache stats
+      - name: kache stats
         if: always()
-        run: /home/alex/.local/bin/sccache --show-stats
+        run: /home/alex/.local/bin/kache stats
 
   # Rustdoc documentation check (gate on warnings)
   rustdoc:
@@ -343,15 +319,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
     env:
-      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
-      SCCACHE_BUCKET: rust-cache
-      SCCACHE_SERVER_PORT: "4231"
-      SCCACHE_ENDPOINT: http://172.26.0.1:8333
-      SCCACHE_S3_USE_SSL: "false"
-      SCCACHE_REGION: us-east-1
-      SCCACHE_S3_KEY_PREFIX: terraphim-ai
-      AWS_ACCESS_KEY_ID: any
-      AWS_SECRET_ACCESS_KEY: any
+      RUSTC_WRAPPER: /home/alex/.local/bin/kache
+      CARGO_INCREMENTAL: "0"
 
     steps:
       - name: Fix workspace permissions
@@ -379,11 +348,6 @@ jobs:
         with:
           toolchain: "1.94.0"
 
-      - name: sccache start and zero stats
-        run: |
-          /home/alex/.local/bin/sccache --start-server || true
-          /home/alex/.local/bin/sccache --zero-stats
-
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
         with:
@@ -403,9 +367,9 @@ jobs:
         run: |
           /home/alex/.local/bin/rch exec -- cargo doc --no-deps --workspace --features zlob
 
-      - name: sccache stats
+      - name: kache stats
         if: always()
-        run: /home/alex/.local/bin/sccache --show-stats
+        run: /home/alex/.local/bin/kache stats
 
   # Frontend linting and type checking
   frontend-check:
@@ -465,15 +429,8 @@ jobs:
     needs: [changes, rust-format, rust-compile]
     if: needs.changes.outputs.rust-changed == 'true' && needs.rust-format.result == 'success' && needs.rust-compile.result == 'success'
     env:
-      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
-      SCCACHE_BUCKET: rust-cache
-      SCCACHE_SERVER_PORT: "4231"
-      SCCACHE_ENDPOINT: http://172.26.0.1:8333
-      SCCACHE_S3_USE_SSL: "false"
-      SCCACHE_REGION: us-east-1
-      SCCACHE_S3_KEY_PREFIX: terraphim-ai
-      AWS_ACCESS_KEY_ID: any
-      AWS_SECRET_ACCESS_KEY: any
+      RUSTC_WRAPPER: /home/alex/.local/bin/kache
+      CARGO_INCREMENTAL: "0"
 
     steps:
       - name: Fix workspace permissions
@@ -505,12 +462,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-
-      - name: sccache start and zero stats
-        run: |
-
-          /home/alex/.local/bin/sccache --start-server || true
-          /home/alex/.local/bin/sccache --zero-stats
 
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
@@ -543,9 +494,9 @@ jobs:
           # Runaway ceiling guarded by scripts/ci-check-nextest-timeout.sh (#2997).
           /home/alex/.local/bin/rch exec -- cargo nextest run --workspace --profile ci --lib --bins --features zlob
 
-      - name: sccache stats
+      - name: kache stats
         if: always()
-        run: /home/alex/.local/bin/sccache --show-stats
+        run: /home/alex/.local/bin/kache stats
 
   # Deterministic flaky-test reproduction (issue #2999).
   # Manual dispatch only: run on PRs touching test code when a flake is reported.
@@ -557,15 +508,8 @@ jobs:
     needs: [changes, rust-format]
     if: github.event_name == 'workflow_dispatch' && needs.changes.outputs.rust-changed == 'true' && needs.rust-format.result == 'success'
     env:
-      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
-      SCCACHE_BUCKET: rust-cache
-      SCCACHE_SERVER_PORT: "4231"
-      SCCACHE_ENDPOINT: http://172.26.0.1:8333
-      SCCACHE_S3_USE_SSL: "false"
-      SCCACHE_REGION: us-east-1
-      SCCACHE_S3_KEY_PREFIX: terraphim-ai
-      AWS_ACCESS_KEY_ID: any
-      AWS_SECRET_ACCESS_KEY: any
+      RUSTC_WRAPPER: /home/alex/.local/bin/kache
+      CARGO_INCREMENTAL: "0"
 
     steps:
       - name: Fix workspace permissions
@@ -597,11 +541,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-
-      - name: sccache start and zero stats
-        run: |
-          /home/alex/.local/bin/sccache --start-server || true
-          /home/alex/.local/bin/sccache --zero-stats
 
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
@@ -640,9 +579,9 @@ jobs:
             /home/alex/.local/bin/rch exec -- cargo nextest run --workspace --profile flaky-repro --lib --bins --features zlob
           fi
 
-      - name: sccache stats
+      - name: kache stats
         if: always()
-        run: /home/alex/.local/bin/sccache --show-stats
+        run: /home/alex/.local/bin/kache stats
 
   # Ranking regression gate (WIG-1 lead measure)
   ranking-regression-gate:
@@ -652,15 +591,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
     env:
-      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
-      SCCACHE_BUCKET: rust-cache
-      SCCACHE_SERVER_PORT: "4231"
-      SCCACHE_ENDPOINT: http://172.26.0.1:8333
-      SCCACHE_S3_USE_SSL: "false"
-      SCCACHE_REGION: us-east-1
-      SCCACHE_S3_KEY_PREFIX: terraphim-ai
-      AWS_ACCESS_KEY_ID: any
-      AWS_SECRET_ACCESS_KEY: any
+      RUSTC_WRAPPER: /home/alex/.local/bin/kache
+      CARGO_INCREMENTAL: "0"
 
     steps:
       - name: Fix workspace permissions
@@ -681,11 +613,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.0"
-
-      - name: sccache start and zero stats
-        run: |
-          /home/alex/.local/bin/sccache --start-server || true
-          /home/alex/.local/bin/sccache --zero-stats
 
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
@@ -714,9 +641,9 @@ jobs:
           # UPDATE_RANKING_SNAPSHOTS=1 and add "Ranking change ACK" to the PR.
           cargo nextest run -p terraphim_service --profile ci ranking_regression
 
-      - name: sccache stats
+      - name: kache stats
         if: always()
-        run: /home/alex/.local/bin/sccache --show-stats
+        run: /home/alex/.local/bin/kache stats
 
   # WASM build verification
   wasm-build:
@@ -726,15 +653,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
     env:
-      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
-      SCCACHE_BUCKET: rust-cache
-      SCCACHE_SERVER_PORT: "4231"
-      SCCACHE_ENDPOINT: http://172.26.0.1:8333
-      SCCACHE_S3_USE_SSL: "false"
-      SCCACHE_REGION: us-east-1
-      SCCACHE_S3_KEY_PREFIX: terraphim-ai-wasm
-      AWS_ACCESS_KEY_ID: any
-      AWS_SECRET_ACCESS_KEY: any
+      RUSTC_WRAPPER: /home/alex/.local/bin/kache
+      CARGO_INCREMENTAL: "0"
 
     steps:
       - name: Fix workspace permissions
@@ -762,12 +682,6 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      - name: sccache start and zero stats
-        run: |
-
-          /home/alex/.local/bin/sccache --start-server || true
-          /home/alex/.local/bin/sccache --zero-stats
-
       - name: Install wasm-pack
         run: |
           if ! command -v wasm-pack >/dev/null 2>&1; then
@@ -778,9 +692,9 @@ jobs:
         run: |
           /home/alex/.local/bin/rch exec -- ./scripts/build-wasm.sh web dev
 
-      - name: sccache stats
+      - name: kache stats
         if: always()
-        run: /home/alex/.local/bin/sccache --show-stats
+        run: /home/alex/.local/bin/kache stats
 
   # Security audit
   security-audit:

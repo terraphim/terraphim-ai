@@ -1,5 +1,5 @@
 ---
-Status: Accepted
+Status: Superseded
 Date: 2026-04-24
 Deciders: Alex Mikhalev
 Related: .docs/design-firecracker-ci-acceleration.md, plans/adf-flywheel-outstanding-actions.md
@@ -9,7 +9,19 @@ Related: .docs/design-firecracker-ci-acceleration.md, plans/adf-flywheel-outstan
 
 ## Status
 
-Accepted -- 2026-04-24.
+Accepted on 2026-04-24.
+
+## Superseded
+
+Superseded on 2026-08-31.
+
+The sccache/fcbr0 design has been superseded by the kache daemon wrapper.
+The endpoint at `http://172.26.0.1:8333` was never reachable: nothing listened
+on port 8333 on the fcbr0 bridge and no DNAT rule existed for it. Because
+sccache fails soft, CI jobs compiled fully uncached while still reporting
+success. The replacement routes `RUSTC_WRAPPER` through
+`/home/alex/.local/bin/kache`, a persistent systemd user service that already
+holds the S3 credentials and exposes `~/.cache/kache/daemon.sock`.
 
 ## Context
 
