@@ -186,6 +186,115 @@ shapes ranking.
 
 ---
 
+## OpenRouter / RLM fallback configuration
+
+By default `terraphim-grep` runs in search-only mode. To let the sufficiency
+judge fall back to an LLM when local retrievers do not have enough signal, you
+need a wired LLM client. The easiest way is OpenRouter.
+
+### 1. Build with the OpenRouter feature
+
+The default `cargo install terraphim_grep` does not include the OpenRouter
+adapter. Rebuild with the feature enabled:
+
+```bash
+cargo install terraphim_grep --features "code-search openrouter" --force
+```
+
+If you are building from the workspace:
+
+```bash
+cargo build -p terraphim_grep --features "code-search openrouter" --release
+```
+
+### 2. Provide credentials via environment variables
+
+`terraphim-grep` builds a minimal `Role` from these env vars when no
+`--role-config` is passed:
+
+```bash
+export OPENROUTER_API_KEY=<your-openrouter-key>
+export OPENROUTER_MODEL="qwen/qwen3-coder:free"   # optional; default is qwen/qwen3-coder:free
+```
+
+Then run with `--answer` (LLM answer when needed) or `--force-rlm` (always
+synthesise):
+
+```bash
+terraphim-grep "retry policy" --paths . \
+  --thesaurus .terraphim/thesaurus.json --answer --json
+```
+
+### 3. Provide credentials via role config
+
+For a persistent, project-level setup, drop a role JSON file into
+`.terraphim/`:
+
+```bash
+.terraphim/role-rust-engineer.json
+```
+
+The file must deserialise into a `terraphim_config::Role`. The fields that
+govern OpenRouter are:
+
+```json
+{
+  "name": "rust-engineer",
+  "llm_enabled": true,
+  "llm_api_key": "sk-or-v1-...",
+  "llm_model": "qwen/qwen3-coder:free",
+  "extra": {
+    "llm_provider": "openrouter"
+  }
+}
+```
+
+`llm_enabled` must be `true`, and both `llm_api_key` and `llm_model` must be
+set. Adding `"llm_provider": "openrouter"` in `extra` forces the
+`build_llm_from_role` path to try OpenRouter first; without it, OpenRouter is
+still tried as a fallback when `llm_enabled` + key/model are present.
+
+Auto-discovery works as follows:
+
+- `--role-config <path>` uses the exact file you pass.
+- Otherwise, if `.terraphim/role-<role>.json` exists, grep loads it
+  automatically (the role name is resolved from `--role` or the project
+  config, defaulting to `default`).
+- Otherwise, grep falls back to env vars.
+
+### 4. Rate limits and model choice
+
+OpenRouter's free tier is capped at 20 requests/min and 200 requests/day
+(1000/day after a $10 deposit). If you see:
+
+```
+RLM execution failed: Config error: Rate limit exceeded
+```
+
+...the fallback is working but the key/model has hit the limit. Options:
+
+- Switch to a free model with a higher quota, e.g.
+  `liquid/lfm-2.5-1.2b-instruct:free`.
+- Deposit credits to raise the daily cap.
+- Use a local Ollama instance instead (`OLLAMA_BASE_URL=http://localhost:11434`).
+
+If you have a small paid credit balance, the best "fast + cheap" combination
+validated with `terraphim-grep --answer` is:
+
+| Model | Price (prompt) | RLM latency | Quality |
+|---|---|---|---|
+| `amazon/nova-micro-v1` | ~$0.035 / M tokens | ~2 s | Good, real synthesis |
+| `mistralai/mistral-nemo` | ~$0.020 / M tokens | ~18 s | Good, but slower |
+| `meta-llama/llama-3.2-1b-instruct` | ~$0.027 / M tokens | ~1 s | Returns placeholder text for this task |
+
+Free models are cheapest but rate-limited; the small paid models above avoid
+the free-tier queue.
+
+When `terraphim_rlm` auto-configures OpenRouter directly, it also honours
+`RLM_OPENROUTER_MODEL` as a model override.
+
+---
+
 ## Gotchas checklist
 
 - [ ] Rebuilt with `--features code-search`? (Default install is useless for search.)
@@ -193,6 +302,7 @@ shapes ranking.
 - [ ] `search_latency_ms > 0`? (Zero = fff-search never ran.)
 - [ ] Global KG broken symlinks cleaned? (`find ~/.config/terraphim/kg -xtype l -delete`.)
 - [ ] Query terms lowercased in the thesaurus? (Aho-Corasick matching is case-sensitive on the keys.)
+- [ ] OpenRouter wired for RLM fallback? (`OPENROUTER_API_KEY` set or `.terraphim/role-<name>.json` has `llm_enabled` + `llm_api_key` + `llm_model`; run with `--answer` or `--force-rlm`.)
 
 ---
 
