@@ -616,12 +616,14 @@ N/A (this plan does not change runtime behaviour).
 
 ### 2.15 Open items
 
-| Item | Status | Owner |
-|------|--------|-------|
-| P0 routing fix reviewer | Unknown | `terraphim-ai #3291` is `status/in-review` but unassigned |
-| tinyclaw final review timeline | Unknown | Author of `terraphim-ai #3221` |
-| Generated artefact policy | Unknown | `terraphim-skills-server` maintainer |
-| Branch protection policy for force-push | Unknown | Per-repo admin |
+All four resolved by the owner on 2026-09-01 (see section 5.4).
+
+| Item | Status | Resolution |
+|------|--------|-----------|
+| P0 routing fix reviewer | **Resolved** | terraphim-agent (this session) is the reviewer for `#3291` |
+| tinyclaw final review timeline | **Resolved** | Run now, via pi-rust with `openai-codex/gpt-5.5` + structured-pr-review |
+| Generated artefact policy | **Resolved** | `terraphim-skills-server` is a valid product; PRs #4-6 go through normal review, not artefact audit |
+| Branch protection policy for force-push | **Resolved** | Force-push permitted, gated on disciplined-validation + disciplined-verification + structural-pr-review before each push |
 
 ### 2.16 Approval gates (per `disciplined-design` skill)
 
@@ -712,3 +714,26 @@ fixed before any batch execution, or automated steps will silently 401.
 | Start Batch 1 comments immediately | Section 2.16 approval gate is explicit and unmet. |
 | Agent edits `~/.profile` to fix the token | Secrets file; policy prohibits. Human action, 2 minutes. |
 | Separate resumption document | One artefact, one source of truth. |
+
+### 5.4 Owner decisions (2026-09-01, post-review)
+
+The owner resolved all four open questions from section 2.15:
+
+1. **`#3291` reviewer**: terraphim-agent (this session). Consequence: the
+   agent performs a structured PR review of `#3291` immediately, then
+   rebases and requests merge sign-off.
+2. **Force-push rebase**: permitted on PR branches. Gate: before every
+   force-push, run `disciplined-verification` and `disciplined-validation`
+   on the rebased branch, plus `structural-pr-review`. This unblocks the
+   "author must rebase" fallback in section 2.10 step 2 -- the agent may
+   now rebase directly.
+3. **tinyclaw `#3221` different-model structural review**: run now. Tooling:
+   pi-rust routed to `openai-codex/gpt-5.5` with the structured-pr-review
+   skill. If the review passes, `#3221` becomes a merge candidate and
+   `#3215`/`#3216`/`#3218` close as subsumed (per Cluster F).
+4. **`terraphim-skills-server`**: a valid product; the ~80-file deploy PRs
+   (`#4`-`#6`) are not anomalous. The section 2.10 step 7 "investigate"
+   action is downgraded to normal PR review.
+
+Also completed: `~/.profile` `GITEA_TOKEN` refreshed by the owner (section
+5.2 step 1). Execution of Batch 1 is therefore unblocked.
