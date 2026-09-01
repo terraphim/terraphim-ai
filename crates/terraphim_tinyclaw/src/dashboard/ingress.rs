@@ -62,11 +62,34 @@ pub async fn whatsapp_webhook(
                 .into_response();
         }
     };
+    // Attempt every message in the batch. A 2xx tells the provider the
+    // whole batch was delivered and forfeits its retry, so any dispatch
+    // failure must surface as a 5xx to trigger redelivery.
+    let total = messages.len();
+    let mut failed = 0usize;
+    let sender = state.bus.inbound_sender();
     for message in messages {
-        if let Err(err) = state.bus.inbound_sender().send(message).await {
-            log::warn!("WhatsApp webhook dispatch failed: {err}");
-            return StatusCode::ACCEPTED.into_response();
+        let message_id = message
+            .metadata
+            .get("message_id")
+            .cloned()
+            .unwrap_or_else(|| "<no id>".to_string());
+        if let Err(err) = sender.send(message).await {
+            failed += 1;
+            log::warn!("WhatsApp webhook dispatch failed for message {message_id}: {err}");
         }
+    }
+    if failed > 0 {
+        log::warn!("WhatsApp webhook batch: {failed}/{total} messages failed to dispatch");
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            axum::Json(json!({
+                "error": "inbound dispatch unavailable",
+                "failed": failed,
+                "total": total,
+            })),
+        )
+            .into_response();
     }
     StatusCode::ACCEPTED.into_response()
 }
@@ -105,6 +128,7 @@ pub async fn teams_webhook(
 
     if let Err(err) = state.bus.inbound_sender().send(message).await {
         log::warn!("Teams webhook dispatch failed: {err}");
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
     }
     StatusCode::ACCEPTED.into_response()
 }

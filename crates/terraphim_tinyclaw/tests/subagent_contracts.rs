@@ -176,7 +176,13 @@ async fn subagent_spawn_uses_temp_workdir_isolation() {
         "spawned process should write inside temp workdir"
     );
     let cwd = std::fs::read_to_string(marker).unwrap();
-    assert_eq!(cwd.trim(), tmp.path().to_string_lossy());
+    // `pwd` reports the canonical path (on macOS `/var` -> `/private/var`).
+    let expected = std::fs::canonicalize(tmp.path()).unwrap();
+    assert_eq!(
+        std::fs::canonicalize(cwd.trim()).unwrap(),
+        expected,
+        "pwd inside spawned agent should match the temp workdir"
+    );
 }
 
 #[tokio::test]

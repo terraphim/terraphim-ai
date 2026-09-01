@@ -70,6 +70,14 @@ const SCRUB_VARS: &[&str] = &[
     "DISCORD_BOT_TOKEN",
     "MATRIX_HOMESERVER_URL",
     "MATRIX_ACCESS_TOKEN",
+    // WhatsApp Cloud API / Microsoft Teams (webhook ingress channels)
+    "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_PHONE_NUMBER_ID",
+    "WHATSAPP_TEST_RECIPIENT",
+    "TEAMS_APP_ID",
+    "TEAMS_APP_PASSWORD",
+    "TEAMS_TEST_SERVICE_URL",
+    "TEAMS_TEST_CONVERSATION_ID",
     // Opt-in marker for live tests (NOT scrubbed, but documented)
     // "TERRAPHIM_TEST_LIVE" — see TESTING.md
 ];

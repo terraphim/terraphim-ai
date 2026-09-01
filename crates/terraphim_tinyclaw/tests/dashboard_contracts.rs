@@ -832,6 +832,109 @@ async fn contract_whatsapp_valid_signature_dispatches_allowed_message() {
     assert_eq!(msg.content, "hello whatsapp");
 }
 
+/// A Meta webhook batch carrying several messages. Shared by the
+/// batch-dispatch success and dispatch-failure contracts below.
+fn whatsapp_batch_body() -> &'static [u8] {
+    br#"{
+      "entry": [{
+        "changes": [{
+          "value": {
+            "contacts": [{"wa_id": "15551234567", "profile": {"name": "Alice"}}],
+            "messages": [
+              {"from":"15551234567","id":"wamid.1","type":"text","text":{"body":"first"}},
+              {"from":"15551234567","id":"wamid.2","type":"text","text":{"body":"second"}},
+              {"from":"15551234567","id":"wamid.3","type":"text","text":{"body":"third"}}
+            ]
+          }
+        }]
+      }]
+    }"#
+}
+
+#[tokio::test]
+async fn contract_whatsapp_batch_dispatches_every_message_on_success() {
+    common::scrub_env();
+    let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
+        whatsapp: Some(whatsapp_config()),
+        teams: None,
+        ..ChannelsConfig::default()
+    })
+    .await;
+    let body = whatsapp_batch_body();
+    let sig = whatsapp_sig("app-secret", body);
+
+    let (status, _body) = send_with_header(
+        app,
+        "POST",
+        "/webhooks/whatsapp",
+        body,
+        Some(("x-hub-signature-256", &sig)),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::ACCEPTED);
+    let mut contents = Vec::new();
+    for _ in 0..3 {
+        contents.push(recv_inbound(state.bus.clone()).await.content);
+    }
+    assert_eq!(contents, vec!["first", "second", "third"]);
+    assert_no_inbound(state.bus).await;
+}
+
+#[tokio::test]
+async fn contract_whatsapp_batch_returns_503_when_dispatch_fails() {
+    // The provider only redelivers on a non-2xx. When the inbound bus
+    // is closed (agent loop gone), a 202 would silently lose the batch.
+    common::scrub_env();
+    let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
+        whatsapp: Some(whatsapp_config()),
+        teams: None,
+        ..ChannelsConfig::default()
+    })
+    .await;
+    state.bus.inbound_rx.lock().await.close();
+    let body = whatsapp_batch_body();
+    let sig = whatsapp_sig("app-secret", body);
+
+    let (status, resp) = send_with_header(
+        app,
+        "POST",
+        "/webhooks/whatsapp",
+        body,
+        Some(("x-hub-signature-256", &sig)),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(resp["failed"], 3);
+    assert_eq!(resp["total"], 3);
+}
+
+#[tokio::test]
+async fn contract_whatsapp_bad_signature_still_rejected_when_dispatch_unavailable() {
+    // Signature verification stays fail-closed and runs before any
+    // dispatch attempt, regardless of bus state.
+    common::scrub_env();
+    let (state, app) = make_app_with_inbound_channels(ChannelsConfig {
+        whatsapp: Some(whatsapp_config()),
+        teams: None,
+        ..ChannelsConfig::default()
+    })
+    .await;
+    state.bus.inbound_rx.lock().await.close();
+
+    let (status, _body) = send_with_header(
+        app,
+        "POST",
+        "/webhooks/whatsapp",
+        whatsapp_batch_body(),
+        Some(("x-hub-signature-256", "sha256=bad")),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
 #[tokio::test]
 async fn contract_teams_rejects_missing_bearer_before_parse_dispatch() {
     common::scrub_env();
