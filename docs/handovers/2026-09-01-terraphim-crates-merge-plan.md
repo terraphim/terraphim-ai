@@ -770,3 +770,87 @@ Findings outside the plan's scope, for follow-up:
   pinned v1.21.3. Whoever bumps the pin will hit it.
 - The `pi` + `openai-codex/gpt-5.5` review route hung three times on a
   58-file PR; not currently usable as a merge gate.
+
+## 6. Outcomes (2026-09-02 00:05 BST, continuation session)
+
+### 6.1 Merged (five of six batch-1 PRs)
+
+Merge permission was available in the continuation session (no classifier
+block); `gtr merge-pull` with merge-commit style, exactly in plan order.
+
+| PR | Head (verified pre-merge) | Merge commit | Post-merge CI |
+|----|---------------------------|--------------|----------------|
+| terraphim-ai #3273 | `23fed69ca` | `033a38096` | `native-ci / build (push)` success |
+| terraphim-ai #3291 | `bc790c9a6` (matched review) | `1d9b8252a` | success |
+| terraphim-ai #3308 | `0a2a16624` | `49e1e8b69` | success |
+| terraphim-clients #84 | `70410ba82` (matched review) | `7eddb0f78` | success (2231-test runner gate green pre-merge) |
+| terraphim-ai #3221 | `c3877c403` (matched review) | `d77873787` | success |
+
+Notes:
+- After each terraphim-ai merge, remaining PRs were re-checked. #3308
+  transiently reported `mergeable: false` immediately after main moved; a
+  local `git merge-tree` test showed a clean merge and Gitea recomputed to
+  mergeable on next read. No rebases were needed and no reviewed head moved.
+- Closed as superseded after #3221 landed, per Cluster F and the handover:
+  #3215 (head `22d1ac471`), #3216 (head `96aa5800e`), #3218 (head
+  `1ea46863b`), each with a supersession comment citing the integrated
+  final #3221 and merge commit `d77873787`.
+
+### 6.2 Held: terraphim-kg-agents #5 (owner decision required)
+
+The handover listed #5 as merge-ready on the strength of the all-targets
+runner run 27009. The continuation session found an unresolved gate hold
+the handover did not record:
+
+- Contexts `adf/validation`, `adf/pr-reviewer`, `adf/verification` on head
+  `99b39cd09` are **failure** since 2026-08-17 ("gate result parse failed:
+  missing adf:gate-result block"; root cause dead model alias, "No models
+  match pattern k3").
+- The repo's `merge-coordinator` discipline has posted daily fail-closed
+  holds on the PR thread since 2026-08-19 ("holding, no merge"); 2026-08-25
+  re-dispatches returned BLOCKED (empty evidence payload). Last check
+  2026-08-27 10:09 CEST.
+
+#5 is the same test-gate fix already merged in three sibling repos, and the
+gate breakage is pipeline-side, but overriding a fail-closed review gate
+that another agent is actively enforcing was judged an owner call, not a
+batch action. Not merged.
+
+### 6.3 New blocking finding: ADF orchestrator is down on bigbox
+
+While preparing the #3291 post-merge acceptance smoke (its body: one
+exact-head smoke on terraphim-llm-proxy#38, only canonical project-scoped
+gate contexts, no generic OpenCode transcript, no `digital-twins` routing):
+
+- `adf-orchestrator.service` on bigbox is **inactive (dead)** since
+  2026-08-27 12:29:28 CEST (MainPID 0; last run terminated by SIGTERM after
+  ~14 h). This supersedes the token-stall theory as the primary pipeline
+  outage cause (incident #2691): no agent has run since the 27th.
+- The bigbox checkout `/data/projects/terraphim/terraphim-ai` is at
+  `23445b9e1` (#3290, 2026-08-26) -- six days behind main and missing all
+  five merges above, including the #3291 fix the smoke must exercise.
+- `/opt/ai-dark-factory/bin/` contains a rollback snapshot
+  `adf.rollback-20260829T230925Z-...`, suggesting a deploy/rollback cycle
+  on 2026-08-29 that ended without a restart.
+
+The service was stopped deliberately (clean SIGTERM), so the continuation
+session did not restart it or touch the checkout: restoring the
+orchestrator (pull main to `1d9b8252a` or later, rebuild, restart
+`adf-orchestrator.service`) is an owner decision. The #3291 acceptance
+smoke is blocked until that happens; the smoke procedure is the same
+single qualified-gate dispatch used in proxy PR comment `74130`, against
+exact head `d122ebc43008327a04d167f075107be7056dc57f`.
+
+### 6.4 Remaining work
+
+1. Owner: decide kg-agents #5 (override the stale ADF gate vs hold until
+   the orchestrator is restored and gates re-run cleanly).
+2. Owner/ops: restore the bigbox orchestrator from current main; then run
+   the #3291 acceptance smoke (section 6.3) and record the result on
+   terraphim-llm-proxy#38.
+3. Batch 2 unchanged (terraphim-ai #3112, clients #70-76 in strict order,
+   clients #22 after rebase), still gated on the clients-main divergence
+   decision (#146).
+4. Deferred items from section 5.5 (Teams `serviceUrl` claim, v1.21.3 pin
+   regression, service main red, `TERRAPHIM_DEFAULT_DATA_PATH`
+   precedence) remain open.
