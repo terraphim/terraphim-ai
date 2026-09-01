@@ -243,6 +243,63 @@ rg -n "color|behavior|optimize|utilize|organize" docs/architecture/terraphim-age
 
 ---
 
-*Prepared by terraphim-agent session on 2026-09-01 at 15:42 BST. This
-handover is committed to the docs branch and is intended to be merged
-alongside the three new docs.*
+## 5. Subsequent Updates (2026-09-01 16:14 BST)
+
+This section records follow-up work after the original handover was
+committed. Earlier items are preserved verbatim above.
+
+### What changed since the original handover
+
+- **PR #3310 (docs sweep) opened and mergeable.** Branch
+  `docs/terraphim-agent-sweep-2026-09-01` pushed to head `4dc00718d`;
+  the four new docs are committed. Pre-commit UBS and clippy passes are
+  recorded in the verification artefact list below.
+- **Issue #3311 opened** as the tracking ticket for the docs sweep.
+- **PR #146 (rustfmt reformat) state clarified.** The branch
+  `chore/terraphim-agent-fmt-2026-09-01` is 132 commits behind
+  `terraphim-clients` `main`, the mergeable flag is `false`, and
+  `cargo fmt --check -p terraphim_agent` on `main` is already clean
+  (subsequent rustfmt commits, notably `cffc48b`, brought the tree into
+  compliance). The rustfmt commit is therefore redundant. A non-destructive
+  close of PR #146 is the recommended next step; the rustfmt commit
+  `4d5d7b1` itself is preserved on the branch in case any tooling
+  expects it.
+- **PR #147 (changelog entry) opened and mergeable.** Fresh branch
+  `chore/hybrid-scoring-changelog-2026-09-01` cut from `main` at
+  `4625cdd6`; head `91b5f0b`. Single-file diff: 7 additions to
+  `crates/terraphim_agent/CHANGELOG.md` under `Unreleased -> Added`,
+  describing `LearningStore::query_relevant` graph-rank hybrid scoring
+  (`Refs #850`, commit `13c5a36`). `cargo fmt --check -p terraphim_agent`
+  is clean.
+- **`terraphim-ai` Gitea remotes confirmed token-free.** Both `origin`
+  and `gitea-private` URLs contain no embedded credentials; the
+  transient `/tmp/terraphim-git-askpass.sh` helper continues to work
+  against `op://Terraphim/gitea-token/credential`.
+
+### What still needs attention
+
+1. **Credential rotation.** Issue #3312 remains open. The
+   `op://TerraphimPlatform/gitea-mac-admin-token/credential` path still
+   does not resolve in the active account; rotation of the previously
+   exposed value (if active and considered sensitive) requires explicit
+   approval before action.
+2. **PR #146 close.** Recommended but not yet performed. Branch and
+   commits remain; the close is non-destructive.
+3. **PR #147 merge.** Leave for a reviewer; the changelog entry is
+   uncontroversial but the existing `Unreleased -> Changed` entries
+   (R2 update backend, self-update install path) are unrelated and
+   should not be batched.
+
+### Cross-references added in this update
+
+- Gitea PR: <https://git.terraphim.cloud/terraphim/terraphim-clients/pulls/147>
+- Gitea PR (rustfmt, pending close):
+  <https://git.terraphim.cloud/terraphim/terraphim-clients/pulls/146>
+- Gitea PR (docs sweep):
+  <https://git.terraphim.cloud/terraphim/terraphim-ai/pulls/3310>
+- Gitea issue (docs tracking): #3311
+- Gitea issue (credential rotation): #3312
+
+---
+
+*Section 5 added by terraphim-agent on 2026-09-01 at 16:14 BST.*
