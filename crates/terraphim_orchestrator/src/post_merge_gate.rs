@@ -250,6 +250,44 @@ pub fn classify_failure(outcome: &TestRunOutcome) -> FailureClassification {
     }
 }
 
+/// Detect a *runner-environment* failure signature so the caller can
+/// distinguish "the test harness did not start" from "tests ran and
+/// failed".
+///
+/// Per terraphim-ai#2558: when the runner environment is unavailable
+/// (`cargo test` exits ~instantly without producing any parseable test
+/// output and without printing a recognised harness/build error), the
+/// orchestrator MUST NOT push a revert. Reverting on an environment
+/// non-result would destroy legitimately merged work.
+///
+/// Heuristic — all three conditions must hold:
+/// 1. `wall_time < 1s` (instant-fail signature; real test failures or
+///    compile errors take longer).
+/// 2. `failing_tests.is_empty()` (no test names parsed from cargo
+///    output).
+/// 3. `kind == FailureKind::Unknown` (no harness-error marker matched
+///    either).
+///
+/// This is intentionally conservative: any of the three relaxing makes
+/// the function return `false`, so the dispatcher falls through to the
+/// existing revert path. We prefer missed reverts over false-positive
+/// reverts (the latter silently destroys merged work).
+pub fn is_environment_failure(
+    outcome: &TestRunOutcome,
+    classification: &FailureClassification,
+) -> bool {
+    if !matches!(classification.kind, FailureKind::Unknown) {
+        return false;
+    }
+    if !classification.failing_tests.is_empty() {
+        return false;
+    }
+    if outcome.wall_time >= Duration::from_secs(1) {
+        return false;
+    }
+    true
+}
+
 /// Parse failing test names from cargo test output.
 ///
 /// cargo test prints a `failures:` section listing each failing test path
@@ -560,6 +598,79 @@ test result: FAILED. 1 passed; 2 failed
         let c = classify_failure(&outcome);
         assert_eq!(c.kind, FailureKind::TestFailure);
         assert_eq!(c.failing_tests, vec!["mod::bar", "mod::baz"]);
+    }
+
+    /// Helper to build the environment-failure signature from #2558:
+    /// wall_time=0, zero parsed tests, kind=Unknown.
+    fn env_failure_outcome() -> TestRunOutcome {
+        TestRunOutcome {
+            passed: false,
+            exit_code: Some(101),
+            stdout_tail: String::new(),
+            stderr_tail: String::new(),
+            wall_time: Duration::from_secs(0),
+            timed_out: false,
+        }
+    }
+
+    fn unknown_classification() -> FailureClassification {
+        FailureClassification {
+            kind: FailureKind::Unknown,
+            failing_tests: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn is_environment_failure_true_for_zero_wall_no_tests_unknown_kind() {
+        let outcome = env_failure_outcome();
+        let c = unknown_classification();
+        assert!(is_environment_failure(&outcome, &c));
+    }
+
+    #[test]
+    fn is_environment_failure_false_when_wall_time_exceeds_one_second() {
+        let mut outcome = env_failure_outcome();
+        outcome.wall_time = Duration::from_millis(1500);
+        let c = unknown_classification();
+        assert!(!is_environment_failure(&outcome, &c));
+    }
+
+    #[test]
+    fn is_environment_failure_false_when_tests_parsed() {
+        let outcome = env_failure_outcome();
+        let mut c = unknown_classification();
+        c.failing_tests.push("mod::foo".to_string());
+        assert!(!is_environment_failure(&outcome, &c));
+    }
+
+    #[test]
+    fn is_environment_failure_false_when_kind_is_test_failure() {
+        let outcome = env_failure_outcome();
+        let c = FailureClassification {
+            kind: FailureKind::TestFailure,
+            failing_tests: Vec::new(),
+        };
+        assert!(!is_environment_failure(&outcome, &c));
+    }
+
+    #[test]
+    fn is_environment_failure_false_when_kind_is_harness_error() {
+        let outcome = env_failure_outcome();
+        let c = FailureClassification {
+            kind: FailureKind::HarnessError,
+            failing_tests: Vec::new(),
+        };
+        assert!(!is_environment_failure(&outcome, &c));
+    }
+
+    #[test]
+    fn is_environment_failure_false_when_kind_is_timeout() {
+        let outcome = env_failure_outcome();
+        let c = FailureClassification {
+            kind: FailureKind::Timeout,
+            failing_tests: Vec::new(),
+        };
+        assert!(!is_environment_failure(&outcome, &c));
     }
 
     #[test]

@@ -656,6 +656,34 @@ impl AgentOrchestrator {
             "post_merge_gate_failed"
         );
 
+        // terraphim-ai#2558: if the failure signature is indistinguishable
+        // from a runner-environment non-result (zero wall time, no parsed
+        // tests, Unknown kind), the gate MUST NOT push a revert or open a
+        // `[ADF] post-merge test gate reverted` issue. Emit an ops alert
+        // instead and return Ok(()) so the dispatcher continues draining.
+        if post_merge_gate::is_environment_failure(&outcome, &classification) {
+            warn!(
+                pr_number,
+                project = %project,
+                merge_sha = %merge_sha,
+                wall_time_secs = outcome.wall_time.as_secs_f64(),
+                stderr_tail_bytes = outcome.stderr_tail.len() as u32,
+                stdout_tail_bytes = outcome.stdout_tail.len() as u32,
+                "post_merge_gate_env_unavailable: skipping revert (terraphim-ai#2558)"
+            );
+            #[cfg(feature = "quickwit")]
+            if let Some(ref sink) = self.quickwit_sink {
+                let event = quickwit::OrchestratorEvent::PrAutoMergeEnvUnavailable {
+                    pr_number,
+                    project: project.clone(),
+                    merge_sha: merge_sha.clone(),
+                    wall_time_secs: outcome.wall_time.as_secs_f64(),
+                };
+                let _ = sink.emit_event(&project, event).await;
+            }
+            return Ok(());
+        }
+
         let revert = match post_merge_gate::revert_merge(runner, &cfg).await {
             Ok(r) => r,
             Err(e) => {
