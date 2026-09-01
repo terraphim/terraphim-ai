@@ -1812,6 +1812,12 @@ fn push_pr_gate_agent(config: &mut OrchestratorConfig, name: &str, context: &str
     );
 }
 
+/// `active_agents` key for a PR gate agent spawned in the `alpha` fixture
+/// project (gate agents are stored under `project/agent`).
+fn gate_key(agent: &str) -> String {
+    crate::pr_handlers_impl::pr_gate_agent_key("alpha", agent)
+}
+
 fn write_executable_script(tmp: &TempDir, name: &str, body: &str) -> std::path::PathBuf {
     let script_path = tmp.path().join(name);
     std::fs::write(&script_path, body).unwrap();
@@ -1836,7 +1842,7 @@ async fn reviewpr_dispatch_routes_via_routing_engine() {
 
     let managed = orch
         .active_agents
-        .get("pr-reviewer")
+        .get(&gate_key("pr-reviewer"))
         .expect("pr-reviewer must be registered in active_agents after routing");
     assert!(
         !managed.session_id.is_empty(),
@@ -1916,7 +1922,7 @@ async fn handle_review_pr_binds_dispatch_id_when_evidence_available() {
 
     let managed = orch
         .active_agents
-        .get("pr-reviewer")
+        .get(&gate_key("pr-reviewer"))
         .expect("authoritative evidence must still produce a spawn");
     let meta = managed
         .gate_meta
@@ -1944,7 +1950,11 @@ async fn poll_mention_canonical_gate_never_receives_bare_task() {
     let (config, _tmp) = review_pr_config("echo");
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
-    let route = orch.route_poll_mention_pr_gate("pr-reviewer", 7).await;
+    let def = orch.config.agents[0].clone();
+    assert_eq!(def.name, "pr-reviewer");
+    let route = orch
+        .route_poll_mention_pr_gate(&def, 7, "chain".to_string(), 0, String::new())
+        .await;
 
     assert_ne!(
         route,
@@ -1993,7 +2003,16 @@ async fn poll_mention_non_canonical_agent_keeps_bare_spawn_path() {
     });
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
-    let route = orch.route_poll_mention_pr_gate("helper-bot", 7).await;
+    let helper = orch
+        .config
+        .agents
+        .iter()
+        .find(|a| a.name == "helper-bot")
+        .cloned()
+        .unwrap();
+    let route = orch
+        .route_poll_mention_pr_gate(&helper, 7, "chain".to_string(), 0, String::new())
+        .await;
 
     assert_eq!(
         route,
@@ -2182,7 +2201,7 @@ EOF
 
     let managed = orch
         .active_agents
-        .get("pr-validator")
+        .get(&gate_key("pr-validator"))
         .expect("mention must spawn PR gate agent");
     let meta = managed
         .gate_meta
@@ -2230,6 +2249,347 @@ EOF
     assert!(
         captured.comments.load(AOrdering::SeqCst) > 0,
         "canonical gate output should be posted back as a PR comment"
+    );
+}
+
+/// Composed regression for the cross-project gate routing incident
+/// (terraphim-llm-proxy#38 comment 74130): one comment carrying both a
+/// qualified `@adf:terraphim-llm-proxy/pr-validator` and a generic
+/// `@adf:pr-validator`, polled from the digital-twins repository, with
+/// `pr-validator` defined in both projects.
+///
+/// Drives the real polling loop (`poll_mentions`) against an in-process
+/// Gitea stand-in and asserts:
+/// - exactly one dispatch, bound to the explicitly named project;
+/// - pending and terminal statuses land on that project's repository only;
+/// - a concurrent `digital-twins/pr-validator` (webhook path) is neither
+///   starved by nor clobbered with the proxy gate, and its statuses land on
+///   the digital repository only.
+#[tokio::test]
+async fn poll_mention_qualified_gate_routes_single_dispatch_to_named_project() {
+    use axum::{
+        extract::{Path, Query, State},
+        http::StatusCode,
+        response::IntoResponse,
+        routing::{get, post},
+        Router,
+    };
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use tokio::net::TcpListener;
+
+    const PR: u64 = crate::tests_support::FIXTURE_PR_NUMBER;
+
+    #[derive(Default)]
+    struct Captured {
+        /// (owner/repo, status payload)
+        statuses: std::sync::Mutex<Vec<(String, serde_json::Value)>>,
+        /// owner/repo of every PR metadata fetch
+        pull_fetches: std::sync::Mutex<Vec<String>>,
+        /// owner/repo of every comment post
+        comments: std::sync::Mutex<Vec<String>>,
+    }
+
+    async fn comments_list(
+        Path((owner, repo)): Path<(String, String)>,
+        Query(_q): Query<HashMap<String, String>>,
+    ) -> impl IntoResponse {
+        // Only the digital-twins repository carries the incident comment.
+        if repo != "digital-repo" {
+            return (StatusCode::OK, "[]".to_string());
+        }
+        let body = serde_json::json!([{
+            "id": 74130,
+            "issue_url": format!("http://stub/api/v1/repos/{owner}/{repo}/issues/{PR}"),
+            "pull_request_url": "",
+            "user": { "login": "alice" },
+            "body": format!(
+                "@adf:terraphim-llm-proxy/pr-validator and @adf:pr-validator please validate PR #{PR}"
+            ),
+            "created_at": "2026-08-26T20:00:00Z",
+            "updated_at": "2026-08-26T20:00:00Z"
+        }]);
+        (StatusCode::OK, body.to_string())
+    }
+
+    async fn pull_get(
+        Path((owner, repo, pr)): Path<(String, String, u64)>,
+        State(captured): State<Arc<Captured>>,
+    ) -> impl IntoResponse {
+        captured
+            .pull_fetches
+            .lock()
+            .unwrap()
+            .push(format!("{owner}/{repo}"));
+        let body = serde_json::json!({
+            "number": pr,
+            "head": { "sha": pr_gate_fixture_head_sha(), "ref": "task/pr-gate" },
+            "user": { "login": "alice" },
+            "title": "route gates by project",
+            "additions": 12,
+            "deletions": 3
+        });
+        (StatusCode::OK, body.to_string())
+    }
+
+    async fn issue_get() -> impl IntoResponse {
+        (StatusCode::OK, r#"{"assignees":[]}"#)
+    }
+
+    async fn status_post(
+        Path((owner, repo, _sha)): Path<(String, String, String)>,
+        State(captured): State<Arc<Captured>>,
+        body: axum::body::Bytes,
+    ) -> impl IntoResponse {
+        let parsed = serde_json::from_slice::<serde_json::Value>(&body).unwrap();
+        captured
+            .statuses
+            .lock()
+            .unwrap()
+            .push((format!("{owner}/{repo}"), parsed));
+        StatusCode::CREATED
+    }
+
+    async fn comment_post(
+        Path((owner, repo, _issue)): Path<(String, String, u64)>,
+        State(captured): State<Arc<Captured>>,
+    ) -> impl IntoResponse {
+        captured
+            .comments
+            .lock()
+            .unwrap()
+            .push(format!("{owner}/{repo}"));
+        (StatusCode::CREATED, r#"{"id":1}"#)
+    }
+
+    let captured = Arc::new(Captured::default());
+    let app = Router::new()
+        .route(
+            "/api/v1/repos/{owner}/{repo}/issues/comments",
+            get(comments_list),
+        )
+        .route(
+            "/api/v1/repos/{owner}/{repo}/issues/{issue}",
+            get(issue_get),
+        )
+        .route(
+            "/api/v1/repos/{owner}/{repo}/issues/{issue}/comments",
+            post(comment_post),
+        )
+        .route("/api/v1/repos/{owner}/{repo}/pulls/{pr}", get(pull_get))
+        .route(
+            "/api/v1/repos/{owner}/{repo}/statuses/{sha}",
+            post(status_post),
+        )
+        .with_state(captured.clone());
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.ok();
+    });
+    let base_url = format!("http://{}", addr);
+
+    // Two real git fixtures so the evidence pack resolves for both projects.
+    let root = TempDir::new().unwrap();
+    let proxy_dir = root.path().join("proxy");
+    let digital_dir = root.path().join("digital");
+    std::fs::create_dir_all(&proxy_dir).unwrap();
+    std::fs::create_dir_all(&digital_dir).unwrap();
+    crate::tests_support::build_pr_gate_git_fixture(&proxy_dir);
+    crate::tests_support::build_pr_gate_git_fixture(&digital_dir);
+
+    // One gate script per project, each emitting a valid gate-result bound
+    // to its own project/context/dispatch id.
+    let gate_script = |project: &str, context: &str| {
+        let dispatch_id = crate::pr_gate_result::PrGateDispatchId::new(
+            project,
+            PR,
+            pr_gate_fixture_head_sha(),
+            "pr-validator",
+        );
+        let gate_result = serde_json::json!({
+            "schema_version": 1,
+            "agent": "pr-validator",
+            "context": context,
+            "pr_number": PR,
+            "head_sha": pr_gate_fixture_head_sha(),
+            "status": "pass",
+            "confidence": 5,
+            "blocking_findings": 0,
+            "summary": format!("{project} validation passed"),
+            "dispatch_id": dispatch_id.0,
+        });
+        write_executable_script(
+            &root,
+            &format!("{project}-gate.sh"),
+            &format!(
+                "#!/bin/sh\ncat <<'EOF'\nGate report\n<!-- adf:gate-result\n{}\n-->\nEOF\n",
+                serde_json::to_string_pretty(&gate_result).unwrap()
+            ),
+        )
+    };
+    let proxy_script = gate_script("terraphim-llm-proxy", "adf/proxy-validation");
+    let digital_script = gate_script("digital-twins", "adf/digital-validation");
+
+    let mut config = crate::pr_handlers_impl::duplicate_gate_config_for_tests();
+    config.working_dir = root.path().to_path_buf();
+    config.mentions = Some(crate::config::MentionConfig::default());
+    for project in &mut config.projects {
+        let dir = if project.id == "terraphim-llm-proxy" {
+            &proxy_dir
+        } else {
+            &digital_dir
+        };
+        project.working_dir = dir.clone();
+        let gitea = project.gitea.as_mut().expect("fixture project has gitea");
+        gitea.base_url = base_url.clone();
+    }
+    for agent in &mut config.agents {
+        agent.cli_tool = if agent.project.as_deref() == Some("terraphim-llm-proxy") {
+            proxy_script.to_str().unwrap().to_string()
+        } else {
+            digital_script.to_str().unwrap().to_string()
+        };
+    }
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    // Pre-seed cursors so polling does not touch persisted state and the
+    // stub comment is never considered already processed.
+    for project in ["terraphim-llm-proxy", "digital-twins"] {
+        orch.mention_cursors
+            .insert(project.to_string(), crate::mention::MentionCursor::now());
+    }
+
+    let proxy_key =
+        crate::pr_handlers_impl::pr_gate_agent_key("terraphim-llm-proxy", "pr-validator");
+    let digital_key = crate::pr_handlers_impl::pr_gate_agent_key("digital-twins", "pr-validator");
+
+    // Phase 1: the real polling loop over the incident comment.
+    orch.poll_mentions().await;
+
+    assert_eq!(
+        orch.active_agents.keys().cloned().collect::<Vec<_>>(),
+        vec![proxy_key.clone()],
+        "exactly one dispatch, bound to the explicitly named project"
+    );
+    let proxy_gate = orch.active_agents.get(&proxy_key).unwrap();
+    let meta = proxy_gate.gate_meta.as_ref().expect("gate meta attached");
+    assert_eq!(meta.project, "terraphim-llm-proxy");
+    assert_eq!(meta.context, "adf/proxy-validation");
+    assert_eq!(meta.pr_number, PR);
+    assert_eq!(proxy_gate.definition.task, "proxy validator");
+    assert!(proxy_gate.spawned_by_mention);
+    assert!(proxy_gate.mention_chain_id.is_some());
+    assert_eq!(
+        captured.pull_fetches.lock().unwrap().clone(),
+        vec!["proxy-owner/proxy-repo".to_string()],
+        "PR metadata must be fetched from the named project only"
+    );
+    {
+        let statuses = captured.statuses.lock().unwrap().clone();
+        assert_eq!(statuses.len(), 1, "one pending status: {statuses:?}");
+        assert_eq!(statuses[0].0, "proxy-owner/proxy-repo");
+        assert_eq!(statuses[0].1["state"], "pending");
+        assert_eq!(statuses[0].1["context"], "adf/proxy-validation");
+    }
+
+    // Phase 2: with the proxy gate still running, the same gate name in the
+    // other project must not be starved by the duplicate guard, and must
+    // keep its own slot and metadata.
+    orch.handle_webhook_dispatch(crate::webhook::WebhookDispatch::SpawnAgent {
+        agent_name: "pr-validator".to_string(),
+        detected_project: Some("digital-twins".to_string()),
+        issue_number: PR,
+        comment_id: 74131,
+        context: "please validate".to_string(),
+        synthetic_event: None,
+    })
+    .await;
+
+    let mut keys = orch.active_agents.keys().cloned().collect::<Vec<_>>();
+    keys.sort();
+    assert_eq!(
+        keys,
+        vec![digital_key.clone(), proxy_key.clone()],
+        "duplicate gate names in two projects must coexist"
+    );
+    let digital_gate = orch.active_agents.get(&digital_key).unwrap();
+    assert_eq!(digital_gate.definition.task, "digital validator");
+    assert_eq!(
+        digital_gate.gate_meta.as_ref().unwrap().project,
+        "digital-twins"
+    );
+    assert_eq!(
+        orch.active_agents
+            .get(&proxy_key)
+            .unwrap()
+            .gate_meta
+            .as_ref()
+            .unwrap()
+            .project,
+        "terraphim-llm-proxy",
+        "proxy gate must not be clobbered by the digital dispatch"
+    );
+
+    // Phase 3: both gates exit; each terminal status must land on its own
+    // project repository with its own context.
+    for _ in 0..200 {
+        orch.poll_agent_exits().await;
+        if orch.active_agents.is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert!(
+        orch.active_agents.is_empty(),
+        "both gates must be reaped: {:?}",
+        orch.active_agents.keys().collect::<Vec<_>>()
+    );
+
+    let statuses = captured.statuses.lock().unwrap().clone();
+    let by_repo = |repo: &str, state: &str, context: &str| {
+        statuses
+            .iter()
+            .filter(|(r, s)| r == repo && s["state"] == state && s["context"] == context)
+            .count()
+    };
+    assert_eq!(
+        by_repo("proxy-owner/proxy-repo", "pending", "adf/proxy-validation"),
+        1
+    );
+    assert_eq!(
+        by_repo("proxy-owner/proxy-repo", "success", "adf/proxy-validation"),
+        1,
+        "terminal proxy status must reach the proxy repository: {statuses:?}"
+    );
+    assert_eq!(
+        by_repo(
+            "digital-owner/digital-repo",
+            "pending",
+            "adf/digital-validation"
+        ),
+        1
+    );
+    assert_eq!(
+        by_repo(
+            "digital-owner/digital-repo",
+            "success",
+            "adf/digital-validation"
+        ),
+        1,
+        "terminal digital status must reach the digital repository: {statuses:?}"
+    );
+    assert!(
+        statuses
+            .iter()
+            .all(|(repo, s)| (repo == "proxy-owner/proxy-repo")
+                == (s["context"] == "adf/proxy-validation")),
+        "no status may cross project repositories: {statuses:?}"
+    );
+    let comments = captured.comments.lock().unwrap().clone();
+    assert!(
+        comments.iter().any(|r| r == "proxy-owner/proxy-repo")
+            && comments.iter().any(|r| r == "digital-owner/digital-repo"),
+        "each gate must post its report to its own repository: {comments:?}"
     );
 }
 
@@ -2388,7 +2748,7 @@ EOF
     .await;
 
     assert!(
-        orch.active_agents.contains_key("pr-validator"),
+        orch.active_agents.contains_key(&gate_key("pr-validator")),
         "unrelated global assignment must not suppress project-scoped gate"
     );
     assert_eq!(
@@ -2421,7 +2781,7 @@ async fn webhook_canonical_gate_without_dispatch_entry_fails_closed() {
     .await;
 
     assert!(
-        !orch.active_agents.contains_key("pr-validator"),
+        !orch.active_agents.contains_key(&gate_key("pr-validator")),
         "canonical gate without a project dispatch entry must fail closed"
     );
 }
@@ -2770,7 +3130,7 @@ async fn reviewpr_dispatch_rejects_banned_provider() {
     orch.handle_review_pr(review_pr_task()).await.unwrap();
 
     assert!(
-        !orch.active_agents.contains_key("pr-reviewer"),
+        !orch.active_agents.contains_key(&gate_key("pr-reviewer")),
         "banned provider must short-circuit before spawn"
     );
 }
@@ -2799,7 +3159,7 @@ async fn reviewpr_dispatch_sets_env_vars() {
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     orch.handle_review_pr(review_pr_task()).await.unwrap();
-    assert!(orch.active_agents.contains_key("pr-reviewer"));
+    assert!(orch.active_agents.contains_key(&gate_key("pr-reviewer")));
 
     // Poll for the script to exit and for the child process reaper to
     // drop it out of active_agents, then read the env dump it wrote.
@@ -2912,7 +3272,7 @@ async fn handle_review_pr_spawns_both_build_runner_and_pr_reviewer() {
     orch.handle_review_pr(review_pr_task()).await.unwrap();
 
     assert!(
-        orch.active_agents.contains_key("pr-reviewer"),
+        orch.active_agents.contains_key(&gate_key("pr-reviewer")),
         "pr-reviewer must be spawned; active_agents: {:?}",
         orch.active_agents.keys().collect::<Vec<_>>()
     );
@@ -3037,7 +3397,7 @@ async fn handle_review_pr_skips_missing_agents() {
     orch.handle_review_pr(review_pr_task()).await.unwrap();
 
     assert!(
-        orch.active_agents.contains_key("pr-reviewer"),
+        orch.active_agents.contains_key(&gate_key("pr-reviewer")),
         "pr-reviewer must still spawn even when build-runner is missing"
     );
     assert!(
@@ -3329,7 +3689,8 @@ async fn handle_review_pr_spawns_pr_spec_validator_when_configured() {
     orch.handle_review_pr(review_pr_task()).await.unwrap();
 
     assert!(
-        orch.active_agents.contains_key("pr-spec-validator"),
+        orch.active_agents
+            .contains_key(&gate_key("pr-spec-validator")),
         "pr-spec-validator must be spawned; active_agents: {:?}",
         orch.active_agents.keys().collect::<Vec<_>>()
     );
@@ -3338,7 +3699,10 @@ async fn handle_review_pr_spawns_pr_spec_validator_when_configured() {
     // scoping; the env wiring itself is exercised by the existing
     // `reviewpr_dispatch_sets_env_vars` test through the same
     // dispatch helper.
-    let managed = orch.active_agents.get("pr-spec-validator").unwrap();
+    let managed = orch
+        .active_agents
+        .get(&gate_key("pr-spec-validator"))
+        .unwrap();
     assert!(
         managed.session_id.starts_with("pr-spec-validator-"),
         "session id should be scoped to the agent, got: {}",
@@ -3532,7 +3896,9 @@ async fn handle_review_pr_spec_validator_skipped_does_not_post_pending() {
         "skipped pr-spec-validator must NOT post adf/spec pending; got: {contexts:?}"
     );
     assert!(
-        !orch.active_agents.contains_key("pr-spec-validator"),
+        !orch
+            .active_agents
+            .contains_key(&gate_key("pr-spec-validator")),
         "pr-spec-validator must not be in active_agents when subscription gate rejects"
     );
     // Sanity: the other two agents still spawned + posted.
@@ -3675,7 +4041,8 @@ async fn handle_review_pr_spawns_pr_test_guardian_when_configured() {
     orch.handle_review_pr(review_pr_task()).await.unwrap();
 
     assert!(
-        orch.active_agents.contains_key("pr-test-guardian"),
+        orch.active_agents
+            .contains_key(&gate_key("pr-test-guardian")),
         "pr-test-guardian must be spawned; active_agents: {:?}",
         orch.active_agents.keys().collect::<Vec<_>>()
     );
@@ -3684,7 +4051,10 @@ async fn handle_review_pr_spawns_pr_test_guardian_when_configured() {
     // scoping; the env wiring itself is exercised by the existing
     // `reviewpr_dispatch_sets_env_vars` test through the same dispatch
     // helper.
-    let managed = orch.active_agents.get("pr-test-guardian").unwrap();
+    let managed = orch
+        .active_agents
+        .get(&gate_key("pr-test-guardian"))
+        .unwrap();
     assert!(
         managed.session_id.starts_with("pr-test-guardian-"),
         "session id should be scoped to the agent, got: {}",
@@ -3879,7 +4249,9 @@ async fn handle_review_pr_test_guardian_skipped_does_not_post_pending() {
         "skipped pr-test-guardian must NOT post adf/test pending; got: {contexts:?}"
     );
     assert!(
-        !orch.active_agents.contains_key("pr-test-guardian"),
+        !orch
+            .active_agents
+            .contains_key(&gate_key("pr-test-guardian")),
         "pr-test-guardian must not be in active_agents when subscription gate rejects"
     );
     // Sanity: the other two agents still spawned + posted.
@@ -3956,12 +4328,13 @@ async fn handle_review_pr_spawns_pr_compliance_watchdog_when_configured() {
     orch.handle_review_pr(review_pr_task()).await.unwrap();
 
     assert!(
-        orch.active_agents.contains_key("pr-reviewer"),
+        orch.active_agents.contains_key(&gate_key("pr-reviewer")),
         "pr-reviewer must spawn alongside the new compliance agent; active_agents: {:?}",
         orch.active_agents.keys().collect::<Vec<_>>()
     );
     assert!(
-        orch.active_agents.contains_key("pr-compliance-watchdog"),
+        orch.active_agents
+            .contains_key(&gate_key("pr-compliance-watchdog")),
         "pr-compliance-watchdog must be spawned by the generic fan-out arm; active_agents: {:?}",
         orch.active_agents.keys().collect::<Vec<_>>()
     );
@@ -4170,7 +4543,9 @@ async fn handle_review_pr_compliance_watchdog_skipped_does_not_post_pending() {
         "skipped pr-compliance-watchdog must NOT post adf/compliance pending; got: {contexts:?}"
     );
     assert!(
-        !orch.active_agents.contains_key("pr-compliance-watchdog"),
+        !orch
+            .active_agents
+            .contains_key(&gate_key("pr-compliance-watchdog")),
         "pr-compliance-watchdog must not be in active_agents when subscription gate rejects"
     );
 }
@@ -4258,7 +4633,8 @@ async fn handle_review_pr_spawns_pr_security_sentinel_when_configured() {
     orch.handle_review_pr(review_pr_task()).await.unwrap();
 
     assert!(
-        orch.active_agents.contains_key("pr-security-sentinel"),
+        orch.active_agents
+            .contains_key(&gate_key("pr-security-sentinel")),
         "pr-security-sentinel must be spawned; active_agents: {:?}",
         orch.active_agents.keys().collect::<Vec<_>>()
     );
@@ -4267,7 +4643,10 @@ async fn handle_review_pr_spawns_pr_security_sentinel_when_configured() {
     // scoping; the env wiring itself is exercised by the existing
     // `reviewpr_dispatch_sets_env_vars` test through the same
     // dispatch helper.
-    let managed = orch.active_agents.get("pr-security-sentinel").unwrap();
+    let managed = orch
+        .active_agents
+        .get(&gate_key("pr-security-sentinel"))
+        .unwrap();
     assert!(
         managed.session_id.starts_with("pr-security-sentinel-"),
         "session id should be scoped to the agent, got: {}",
@@ -4462,7 +4841,9 @@ async fn handle_review_pr_security_sentinel_skipped_does_not_post_pending() {
         "skipped pr-security-sentinel must NOT post adf/security pending; got: {contexts:?}"
     );
     assert!(
-        !orch.active_agents.contains_key("pr-security-sentinel"),
+        !orch
+            .active_agents
+            .contains_key(&gate_key("pr-security-sentinel")),
         "pr-security-sentinel must not be in active_agents when subscription gate rejects"
     );
     // Sanity: the other two agents still spawned + posted.

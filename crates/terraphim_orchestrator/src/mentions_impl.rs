@@ -393,27 +393,19 @@ impl AgentOrchestrator {
                         // `def.task` spawn: route them through the
                         // authoritative mention funnel. Spawned/FailClosed
                         // consume the mention; only NotGate falls through.
-                        match self
-                            .route_poll_mention_pr_gate(&token.agent, comment.issue_number)
+                        if self
+                            .route_poll_mention_pr_gate(
+                                &def,
+                                comment.issue_number,
+                                chain_id.clone(),
+                                depth,
+                                parent_agent.clone(),
+                            )
                             .await
+                            != PollGateRoute::NotGate
                         {
-                            PollGateRoute::NotGate => {}
-                            route => {
-                                if route.spawned() {
-                                    if let Some(active) = self.active_agents.get_mut(&token.agent) {
-                                        active.spawned_by_mention = true;
-                                        active.mention_chain_id = Some(chain_id);
-                                        active.mention_depth = Some(depth);
-                                        active.mention_parent_agent = if parent_agent.is_empty() {
-                                            None
-                                        } else {
-                                            Some(parent_agent)
-                                        };
-                                    }
-                                }
-                                cursor.dispatches_this_tick += 1;
-                                continue;
-                            }
+                            cursor.dispatches_this_tick += 1;
+                            continue;
                         }
 
                         let mut mention_def = def.clone();
@@ -589,29 +581,19 @@ impl AgentOrchestrator {
                             // `def.task` spawn: route them through the
                             // authoritative mention funnel. Spawned/FailClosed
                             // consume the mention; only NotGate falls through.
-                            match self
-                                .route_poll_mention_pr_gate(&agent_name, issue_number)
+                            if self
+                                .route_poll_mention_pr_gate(
+                                    &def,
+                                    issue_number,
+                                    chain_id.clone(),
+                                    depth,
+                                    parent_agent.clone(),
+                                )
                                 .await
+                                != PollGateRoute::NotGate
                             {
-                                PollGateRoute::NotGate => {}
-                                route => {
-                                    if route.spawned() {
-                                        if let Some(agent) = self.active_agents.get_mut(&agent_name)
-                                        {
-                                            agent.spawned_by_mention = true;
-                                            agent.mention_chain_id = Some(chain_id);
-                                            agent.mention_depth = Some(depth);
-                                            agent.mention_parent_agent = if parent_agent.is_empty()
-                                            {
-                                                None
-                                            } else {
-                                                Some(parent_agent)
-                                            };
-                                        }
-                                    }
-                                    cursor.dispatches_this_tick += 1;
-                                    continue;
-                                }
+                                cursor.dispatches_this_tick += 1;
+                                continue;
                             }
 
                             let mut mention_def = def.clone();
@@ -735,30 +717,19 @@ impl AgentOrchestrator {
                                 // authoritative mention funnel. Spawned/
                                 // FailClosed consume the mention; only NotGate
                                 // falls through.
-                                match self
-                                    .route_poll_mention_pr_gate(&agent_name, issue_number)
+                                if self
+                                    .route_poll_mention_pr_gate(
+                                        &def,
+                                        issue_number,
+                                        chain_id.clone(),
+                                        depth,
+                                        parent_agent.clone(),
+                                    )
                                     .await
+                                    != PollGateRoute::NotGate
                                 {
-                                    PollGateRoute::NotGate => {}
-                                    route => {
-                                        if route.spawned() {
-                                            if let Some(agent) =
-                                                self.active_agents.get_mut(&agent_name)
-                                            {
-                                                agent.spawned_by_mention = true;
-                                                agent.mention_chain_id = Some(chain_id);
-                                                agent.mention_depth = Some(depth);
-                                                agent.mention_parent_agent =
-                                                    if parent_agent.is_empty() {
-                                                        None
-                                                    } else {
-                                                        Some(parent_agent)
-                                                    };
-                                            }
-                                        }
-                                        cursor.dispatches_this_tick += 1;
-                                        continue;
-                                    }
+                                    cursor.dispatches_this_tick += 1;
+                                    continue;
                                 }
 
                                 let mut mention_def = def.clone();
@@ -914,16 +885,25 @@ impl AgentOrchestrator {
     /// Canonical PR gate agents are not Gitea users in the global workflow
     /// repository, so mention dispatch for those gates must not consult or
     /// mutate global assignees. The active-agent map is still authoritative
-    /// for suppressing duplicate in-process dispatches.
-    pub(crate) fn should_skip_local_dispatch(&self, agent_name: &str, issue_number: u64) -> bool {
+    /// for suppressing duplicate in-process dispatches, keyed by
+    /// `project/agent` so a gate running for one project never blocks the
+    /// same gate name in another.
+    pub(crate) fn should_skip_local_dispatch(
+        &self,
+        project: &str,
+        agent_name: &str,
+        issue_number: u64,
+    ) -> bool {
         if issue_number == 0 {
             return false;
         }
-        if self.active_agents.contains_key(agent_name) {
+        let key = crate::pr_handlers_impl::pr_gate_agent_key(project, agent_name);
+        if self.active_agents.contains_key(&key) {
             warn!(
                 agent = %agent_name,
+                project,
                 issue = issue_number,
-                "skipping dispatch: agent already active (local guard)"
+                "skipping dispatch: PR gate already active for project (local guard)"
             );
             return true;
         }
@@ -942,7 +922,7 @@ impl AgentOrchestrator {
         _max_depth: u32,
     ) -> (String, u32, String) {
         if agent_names.iter().any(|n| n == comment_author) {
-            if let Some(active) = self.active_agents.get(comment_author) {
+            if let Some(active) = self.active_agent_by_name(comment_author) {
                 let parent_chain_id = active
                     .mention_chain_id
                     .clone()
@@ -975,14 +955,6 @@ pub(crate) enum PollGateRoute {
     FailClosed,
 }
 
-impl PollGateRoute {
-    /// Whether this route produced a spawn the caller should attribute
-    /// mention-chain metadata to.
-    pub(crate) fn spawned(&self) -> bool {
-        matches!(self, Self::Spawned)
-    }
-}
-
 impl AgentOrchestrator {
     /// Route a polled mention of a canonical PR gate agent
     /// (`pr-reviewer` / `pr-validator` / `pr-verifier`) through the
@@ -991,32 +963,45 @@ impl AgentOrchestrator {
     /// Canonical gate agents can never receive a bare `def.task` spawn:
     /// their spawn contract requires the orchestrator-assembled evidence
     /// pack, `PrGateMeta` binding, and fail-closed evidence check. Every
-    /// other agent name returns [`PollGateRoute::NotGate`] and keeps the
-    /// legacy bare mention spawn path.
+    /// other agent returns [`PollGateRoute::NotGate`] and keeps the legacy
+    /// bare mention spawn path.
+    ///
+    /// The project comes from the resolved definition (which the caller
+    /// already selected against the polling project), not from a bare-name
+    /// scan of the config, so duplicate gate names across projects route to
+    /// the project whose repository the comment was polled from.
     pub(crate) async fn route_poll_mention_pr_gate(
         &mut self,
-        agent_name: &str,
+        def: &config::AgentDefinition,
         issue_number: u64,
+        chain_id: String,
+        depth: u32,
+        parent_agent: String,
     ) -> PollGateRoute {
-        if !crate::pr_handlers_impl::is_canonical_pr_gate_agent(agent_name) {
+        if !crate::pr_handlers_impl::is_canonical_pr_gate_agent(&def.name) {
             return PollGateRoute::NotGate;
         }
-        let project = self
-            .config
-            .agents
-            .iter()
-            .find(|a| a.name == agent_name)
-            .and_then(|a| a.project.clone())
+        let project = def
+            .project
+            .clone()
             .unwrap_or_else(|| dispatcher::LEGACY_PROJECT_ID.to_string());
         match self
-            .dispatch_pr_gate_mention_for_issue(&project, agent_name, issue_number)
+            .dispatch_canonical_pr_gate_mention_from_comment(
+                &project,
+                &def.name,
+                issue_number,
+                chain_id,
+                depth,
+                parent_agent,
+            )
             .await
         {
             Ok(true) => PollGateRoute::Spawned,
             Ok(false) => PollGateRoute::FailClosed,
             Err(e) => {
                 warn!(
-                    agent = agent_name,
+                    agent = %def.name,
+                    project = %project,
                     issue = issue_number,
                     error = %e,
                     "poll PR gate mention failed closed"
