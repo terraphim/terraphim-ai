@@ -1,0 +1,54 @@
+# Merge-authoritative clippy lane.
+#
+# Sister workflow to native-ci.yml. Produces a SEPARATE commit-status
+# context (`native-clippy / lint (push|...`) so that clippy regressions
+# can fail the merge gate independently of fmt/build/test failures.
+#
+# Why a separate workflow (not a separate job in native-ci.yml):
+#   Per crates/terraphim_gitea_runner/src/workflow_payload.rs:121-130,
+#   the commit-status context is derived as
+#       {workflow_name} / {first_job_id} ({event_name})
+#   A separate job inside native-ci.yml would still produce the same
+#   `native-ci / build (...)` context, because the runner picks the
+#   first job by YAML order and aggregates all steps under one status.
+#   Splitting the workflow file is the only way to produce an independent
+#   branch-protection context.
+#
+# Triggers
+#   push               -> emits commit-status context `native-clippy / lint (push)`
+#   pull_request       -> emits commit-status context `native-clippy / lint (pull_request)`
+#   workflow_dispatch  -> emits `native-clippy / lint (workflow_dispatch)`; used
+#                         to re-verify an exact SHA without pushing.
+#
+# Branch protection will be updated (separate concern; tracked in
+# .docs/phase-D-prevent-recurrence-2026-09-01.md) to require both:
+#   - native-ci / build (pull_request)             [existing]
+#   - native-clippy / lint (pull_request)           [NEW — added by this workflow]
+#
+# Scope note: this workflow runs clippy only — it deliberately skips fmt,
+# build, and test because those are already covered by native-ci. Running
+# them twice would double the runner time without adding signal.
+#
+# Mirrors the explicit `cargo clippy --workspace --all-targets -- -D warnings`
+# command that terraphim-ai#2558 would have needed. Refs that don't
+# introduce clippy regressions are unaffected; refs that do will fail the
+# merge gate on this context alone without blocking on unrelated fmt
+# drift elsewhere in the diff.
+#
+# Added: 2026-09-01, Phase D of the merge-queue unblock effort
+# (Refs #3314 root cause; see .docs/phase-D-prevent-recurrence-2026-09-01.md)
+name: native-clippy
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  lint:
+    runs-on: terraphim-native
+    # Bound at the Gitea Actions level. Clippy alone is faster than the full
+    # build lane; 20 min is generous for a workspace of ~30 crates.
+    timeout-minutes: 20
+    steps:
+      # No TinyClaw hermeticity preflight here -- that preflight only matters
+      # for the full build/test lane. Clippy is a pure source-level analysis.
+      - run: cargo clippy --workspace --all-targets -- -D warnings
