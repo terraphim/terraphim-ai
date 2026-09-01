@@ -21,7 +21,7 @@ use std::time::Duration;
 use terraphim_types::score::OkapiBM25Scorer;
 use terraphim_types::{Document, DocumentType};
 use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
+use tokio::process::{Child, Command};
 use tokio::time::timeout;
 
 // ---------------------------------------------------------------------------
@@ -108,18 +108,7 @@ async fn run_agent_inner(
 ) -> Result<String, ToolError> {
     let output = if let Some(data) = stdin_data {
         // Spawn, pipe stdin, then collect output.
-        let mut command = Command::new(&config.binary);
-        command
-            .args(args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        if let Some(dir) = work_dir {
-            command.current_dir(dir);
-        }
-        let mut child = command
-            .spawn()
-            .map_err(|e| map_io_error(&config.binary, e))?;
+        let mut child = spawn_agent_child(config, args, true, work_dir).await?;
 
         // Write stdin then drop to send EOF.
         if let Some(mut stdin_handle) = child.stdin.take() {
@@ -140,18 +129,7 @@ async fn run_agent_inner(
                 message: format!("Failed to wait for process: {}", e),
             })?
     } else {
-        let mut command = Command::new(&config.binary);
-        command
-            .args(args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        if let Some(dir) = work_dir {
-            command.current_dir(dir);
-        }
-        command
-            .output()
-            .await
-            .map_err(|e| map_io_error(&config.binary, e))?
+        output_agent_command(config, args, work_dir).await?
     };
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -180,6 +158,69 @@ async fn run_agent_inner(
     }
 
     Ok(stdout)
+}
+
+fn is_text_file_busy(e: &std::io::Error) -> bool {
+    e.raw_os_error() == Some(26)
+}
+
+async fn spawn_agent_child(
+    config: &AgentMemoryConfig,
+    args: &[&str],
+    pipe_stdin: bool,
+    work_dir: Option<&std::path::Path>,
+) -> Result<Child, ToolError> {
+    let mut last_err = None;
+    for attempt in 0..4 {
+        let mut cmd = Command::new(&config.binary);
+        cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
+        if pipe_stdin {
+            cmd.stdin(Stdio::piped());
+        }
+        if let Some(dir) = work_dir {
+            cmd.current_dir(dir);
+        }
+        match cmd.spawn() {
+            Ok(child) => return Ok(child),
+            Err(e) if is_text_file_busy(&e) && attempt < 3 => {
+                last_err = Some(e);
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+            Err(e) => return Err(map_io_error(&config.binary, e)),
+        }
+    }
+    Err(map_io_error(
+        &config.binary,
+        last_err.expect("retry loop records ETXTBSY error"),
+    ))
+}
+
+async fn output_agent_command(
+    config: &AgentMemoryConfig,
+    args: &[&str],
+    work_dir: Option<&std::path::Path>,
+) -> Result<std::process::Output, ToolError> {
+    let mut last_err = None;
+    for attempt in 0..4 {
+        let mut cmd = Command::new(&config.binary);
+        cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
+        if let Some(dir) = work_dir {
+            cmd.current_dir(dir);
+        }
+        let result = cmd.output().await;
+        match result {
+            Ok(output) => return Ok(output),
+            Err(e) if is_text_file_busy(&e) && attempt < 3 => {
+                last_err = Some(e);
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+            Err(e) => return Err(map_io_error(&config.binary, e)),
+        }
+    }
+    Err(map_io_error(
+        &config.binary,
+        last_err.expect("retry loop records ETXTBSY error"),
+    ))
 }
 
 /// Map `io::Error` from `Command::spawn`/`Command::output` to `ToolError`.

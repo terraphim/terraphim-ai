@@ -11,6 +11,8 @@
 //! Option A: run the MCP server in-process alongside the agent loop,
 //! sharing the in-memory registry and the configured workspace.
 
+mod common;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_tinyclaw::bus::MessageBus;
@@ -21,6 +23,7 @@ use tokio::sync::Mutex;
 
 #[tokio::test]
 async fn in_process_mcp_shares_registry_with_agent_loop() {
+    common::scrub_env();
     // Simulate gateway-mode composition: one CommandRegistry Arc shared
     // between the agent loop side (which holds the registry's "writer"
     // side) and the MCP server side (which holds the same Arc).
@@ -60,6 +63,7 @@ async fn in_process_mcp_shares_registry_with_agent_loop() {
 
 #[tokio::test]
 async fn in_process_mcp_workspace_round_trips() {
+    common::scrub_env();
     // Verify the MCP server's `workspace()` accessor (for symmetry with
     // the agent loop's `workspace()`) returns the configured workspace.
     let dir = tempfile::tempdir().unwrap();

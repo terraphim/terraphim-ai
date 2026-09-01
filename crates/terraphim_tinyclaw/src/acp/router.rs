@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use super::AcpState;
 use super::handlers::{
@@ -51,6 +52,43 @@ pub async fn dispatch(state: &AcpState, req: JsonRpcRequest) -> JsonRpcResponse 
         }),
     };
     build_response(id, result)
+}
+
+/// Serve ACP JSON-RPC over newline-delimited stdio.
+///
+/// Each input line must contain one JSON-RPC request. Each output line is one
+/// JSON-RPC response. This is the production stdio adapter used by the
+/// TinyClaw CLI `acp` command.
+pub async fn serve_stdio(state: AcpState) -> anyhow::Result<()> {
+    let stdin = tokio::io::stdin();
+    let mut stdout = tokio::io::stdout();
+    let mut lines = BufReader::new(stdin).lines();
+
+    while let Some(line) = lines.next_line().await? {
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let response = match serde_json::from_str::<JsonRpcRequest>(&line) {
+            Ok(req) => dispatch(&state, req).await,
+            Err(e) => JsonRpcResponse {
+                jsonrpc: "2.0".into(),
+                result: None,
+                error: Some(AcpError {
+                    code: -32700,
+                    message: format!("parse error: {e}"),
+                }),
+                id: None,
+            },
+        };
+        stdout
+            .write_all(serde_json::to_string(&response)?.as_bytes())
+            .await?;
+        stdout.write_all(b"\n").await?;
+        stdout.flush().await?;
+    }
+
+    Ok(())
 }
 
 /// Build a JSON-RPC response from a result.

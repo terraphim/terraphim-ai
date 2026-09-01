@@ -50,8 +50,9 @@ pub struct Config {
 
     /// Scheduler configuration (#3147). **Default: disabled.**
     /// When `scheduler.enabled = true`, `ScheduleTool` (create/list/delete)
-    /// is registered for the agent loop; the `schedule` CLI subcommand
-    /// shares the same store.
+    /// is registered for the agent loop. Production scheduling writes
+    /// orchestrator include fragments and requires an explicit
+    /// `scheduler.cli_tool`.
     #[serde(default)]
     pub scheduler: SchedulerConfig,
 
@@ -124,6 +125,7 @@ impl Config {
         self.agent.validate()?;
         self.channels.validate()?;
         self.llm.validate()?;
+        self.scheduler.validate()?;
         Ok(())
     }
 
@@ -322,6 +324,11 @@ pub struct ChannelsConfig {
     // Note: matrix config disabled due to sqlite dependency conflict
     // #[cfg(feature = "matrix")]
     // pub matrix: Option<MatrixConfig>,
+    /// WhatsApp Cloud API channel configuration.
+    pub whatsapp: Option<WhatsAppConfig>,
+
+    /// Microsoft Teams Bot Framework channel configuration.
+    pub teams: Option<TeamsConfig>,
 }
 
 impl ChannelsConfig {
@@ -341,6 +348,14 @@ impl ChannelsConfig {
             cfg.validate()?;
         }
 
+        if let Some(ref cfg) = self.whatsapp {
+            cfg.validate()?;
+        }
+
+        if let Some(ref cfg) = self.teams {
+            cfg.validate()?;
+        }
+
         // Note: matrix validation disabled due to sqlite dependency conflict
         // #[cfg(feature = "matrix")]
         // if let Some(ref cfg) = self.matrix {
@@ -349,6 +364,177 @@ impl ChannelsConfig {
 
         Ok(())
     }
+}
+
+/// WhatsApp Cloud API channel configuration.
+#[derive(Clone, Deserialize, Serialize)]
+pub struct WhatsAppConfig {
+    /// Meta Graph API access token.
+    pub access_token: String,
+    /// WhatsApp Business phone number ID used in Cloud API send URLs.
+    pub phone_number_id: String,
+    /// Meta webhook verify token used for GET subscription challenge.
+    pub verify_token: String,
+    /// Meta app secret used for X-Hub-Signature-256 verification.
+    pub app_secret: String,
+    /// Graph API base URL. Defaults to https://graph.facebook.com.
+    #[serde(default = "default_whatsapp_graph_base_url")]
+    pub graph_base_url: String,
+    /// Graph API version path segment. Defaults to v20.0.
+    #[serde(default = "default_whatsapp_api_version")]
+    pub api_version: String,
+    /// List of allowed WhatsApp sender phone numbers. Must be non-empty.
+    pub allow_from: Vec<String>,
+}
+
+impl std::fmt::Debug for WhatsAppConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WhatsAppConfig")
+            .field("access_token", &"***REDACTED***")
+            .field("phone_number_id", &self.phone_number_id)
+            .field("verify_token", &"***REDACTED***")
+            .field("app_secret", &"***REDACTED***")
+            .field("graph_base_url", &self.graph_base_url)
+            .field("api_version", &self.api_version)
+            .field("allow_from", &self.allow_from)
+            .finish()
+    }
+}
+
+impl WhatsAppConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.access_token.trim().is_empty() {
+            anyhow::bail!("whatsapp.access_token cannot be empty");
+        }
+        if self.phone_number_id.trim().is_empty() {
+            anyhow::bail!("whatsapp.phone_number_id cannot be empty");
+        }
+        if self.verify_token.trim().is_empty() {
+            anyhow::bail!("whatsapp.verify_token cannot be empty");
+        }
+        if self.app_secret.trim().is_empty() {
+            anyhow::bail!("whatsapp.app_secret cannot be empty");
+        }
+        if self.graph_base_url.trim().is_empty() {
+            anyhow::bail!("whatsapp.graph_base_url cannot be empty");
+        }
+        if self.api_version.trim().is_empty() {
+            anyhow::bail!("whatsapp.api_version cannot be empty");
+        }
+        if self.allow_from.is_empty() {
+            anyhow::bail!("whatsapp.allow_from cannot be empty");
+        }
+        Ok(())
+    }
+
+    pub fn is_allowed(&self, sender_id: &str) -> bool {
+        crate::channel::is_sender_allowed(&self.allow_from, sender_id)
+    }
+}
+
+fn default_whatsapp_graph_base_url() -> String {
+    "https://graph.facebook.com".to_string()
+}
+
+fn default_whatsapp_api_version() -> String {
+    "v20.0".to_string()
+}
+
+/// Microsoft Teams Bot Framework channel configuration.
+#[derive(Clone, Deserialize, Serialize)]
+pub struct TeamsConfig {
+    /// Microsoft app/client ID for the bot.
+    pub app_id: String,
+    /// Microsoft app password/client secret for the bot.
+    pub app_password: String,
+    /// OAuth token endpoint for Bot Framework client credentials.
+    #[serde(default = "default_teams_token_url")]
+    pub token_url: String,
+    /// OAuth scope for Bot Framework API.
+    #[serde(default = "default_teams_scope")]
+    pub scope: String,
+    /// OpenID metadata endpoint for validating Bot Connector webhook JWTs.
+    #[serde(default = "default_teams_openid_metadata_url")]
+    pub openid_metadata_url: String,
+    /// Optional JWKS endpoint override for deterministic tests or private
+    /// Bot Connector-compatible deployments. Production should normally use
+    /// the `jwks_uri` discovered from `openid_metadata_url`.
+    #[serde(default)]
+    pub openid_jwks_url: Option<String>,
+    /// Expected issuer for Bot Connector webhook JWTs.
+    #[serde(default = "default_teams_jwt_issuer")]
+    pub jwt_issuer: String,
+    /// List of allowed Teams user IDs. Must be non-empty.
+    pub allow_from: Vec<String>,
+}
+
+impl std::fmt::Debug for TeamsConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TeamsConfig")
+            .field("app_id", &self.app_id)
+            .field("app_password", &"***REDACTED***")
+            .field("token_url", &self.token_url)
+            .field("scope", &self.scope)
+            .field("openid_metadata_url", &self.openid_metadata_url)
+            .field("openid_jwks_url", &self.openid_jwks_url)
+            .field("jwt_issuer", &self.jwt_issuer)
+            .field("allow_from", &self.allow_from)
+            .finish()
+    }
+}
+
+impl TeamsConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.app_id.trim().is_empty() {
+            anyhow::bail!("teams.app_id cannot be empty");
+        }
+        if self.app_password.trim().is_empty() {
+            anyhow::bail!("teams.app_password cannot be empty");
+        }
+        if self.token_url.trim().is_empty() {
+            anyhow::bail!("teams.token_url cannot be empty");
+        }
+        if self.scope.trim().is_empty() {
+            anyhow::bail!("teams.scope cannot be empty");
+        }
+        if self.openid_metadata_url.trim().is_empty() {
+            anyhow::bail!("teams.openid_metadata_url cannot be empty");
+        }
+        if self
+            .openid_jwks_url
+            .as_deref()
+            .is_some_and(|url| url.trim().is_empty())
+        {
+            anyhow::bail!("teams.openid_jwks_url cannot be empty when configured");
+        }
+        if self.jwt_issuer.trim().is_empty() {
+            anyhow::bail!("teams.jwt_issuer cannot be empty");
+        }
+        if self.allow_from.is_empty() {
+            anyhow::bail!("teams.allow_from cannot be empty");
+        }
+        Ok(())
+    }
+
+    pub fn is_allowed(&self, sender_id: &str) -> bool {
+        crate::channel::is_sender_allowed(&self.allow_from, sender_id)
+    }
+}
+
+fn default_teams_token_url() -> String {
+    "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token".to_string()
+}
+
+fn default_teams_scope() -> String {
+    "https://api.botframework.com/.default".to_string()
+}
+
+fn default_teams_openid_metadata_url() -> String {
+    "https://login.botframework.com/v1/.well-known/openidconfiguration".to_string()
+}
+
+fn default_teams_jwt_issuer() -> String {
+    "https://api.botframework.com".to_string()
 }
 
 /// Telegram channel configuration.
@@ -656,6 +842,106 @@ mod tests {
         // username + homeserver_url are not secrets; verify they render
         assert!(out.contains("@user:example.com"));
         assert!(out.contains("matrix.example.com"));
+    }
+
+    #[test]
+    fn whatsapp_config_debug_redacts_secrets() {
+        let cfg = WhatsAppConfig {
+            access_token: "wa-access-secret".into(),
+            phone_number_id: "phone-id".into(),
+            verify_token: "wa-verify-secret".into(),
+            app_secret: "wa-app-secret".into(),
+            graph_base_url: "https://graph.facebook.com".into(),
+            api_version: "v20.0".into(),
+            allow_from: vec!["15551234567".into()],
+        };
+        let out = format!("{cfg:?}");
+        assert!(!out.contains("wa-access-secret"));
+        assert!(!out.contains("wa-verify-secret"));
+        assert!(!out.contains("wa-app-secret"));
+        assert!(out.contains("phone-id"));
+    }
+
+    #[test]
+    fn teams_config_debug_redacts_secret() {
+        let cfg = TeamsConfig {
+            app_id: "app-id".into(),
+            app_password: "teams-password-secret".into(),
+            token_url: "https://login.microsoftonline.com/token".into(),
+            scope: "https://api.botframework.com/.default".into(),
+            openid_metadata_url:
+                "https://login.botframework.com/v1/.well-known/openidconfiguration".into(),
+            openid_jwks_url: None,
+            jwt_issuer: "https://api.botframework.com".into(),
+            allow_from: vec!["29:user".into()],
+        };
+        let out = format!("{cfg:?}");
+        assert!(out.contains("app-id"));
+        assert!(!out.contains("teams-password-secret"));
+    }
+
+    #[test]
+    fn channel_config_parses_whatsapp_and_teams_defaults() {
+        let toml = r#"
+[whatsapp]
+access_token = "token"
+phone_number_id = "phone-id"
+verify_token = "verify"
+app_secret = "secret"
+allow_from = ["15551234567"]
+
+[teams]
+app_id = "app-id"
+app_password = "password"
+allow_from = ["29:user"]
+"#;
+
+        let cfg: ChannelsConfig = toml::from_str(toml).unwrap();
+        let whatsapp = cfg.whatsapp.unwrap();
+        assert_eq!(whatsapp.graph_base_url, "https://graph.facebook.com");
+        assert_eq!(whatsapp.api_version, "v20.0");
+        assert!(whatsapp.validate().is_ok());
+
+        let teams = cfg.teams.unwrap();
+        assert_eq!(
+            teams.token_url,
+            "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token"
+        );
+        assert_eq!(teams.scope, "https://api.botframework.com/.default");
+        assert_eq!(
+            teams.openid_metadata_url,
+            "https://login.botframework.com/v1/.well-known/openidconfiguration"
+        );
+        assert_eq!(teams.openid_jwks_url, None);
+        assert_eq!(teams.jwt_issuer, "https://api.botframework.com");
+        assert!(teams.validate().is_ok());
+    }
+
+    #[test]
+    fn channel_config_rejects_empty_whatsapp_or_teams_allowlist() {
+        let whatsapp = WhatsAppConfig {
+            access_token: "token".into(),
+            phone_number_id: "phone-id".into(),
+            verify_token: "verify".into(),
+            app_secret: "secret".into(),
+            graph_base_url: "https://graph.facebook.com".into(),
+            api_version: "v20.0".into(),
+            allow_from: vec![],
+        };
+        assert!(whatsapp.validate().is_err());
+
+        let teams = TeamsConfig {
+            app_id: "app-id".into(),
+            app_password: "password".into(),
+            token_url: "https://login.microsoftonline.com/token".into(),
+            scope: "https://api.botframework.com/.default".into(),
+            openid_metadata_url:
+                "https://login.botframework.com/v1/.well-known/openidconfiguration".into(),
+            openid_jwks_url: None,
+            jwt_issuer: "https://api.botframework.com".into(),
+            allow_from: vec![],
+        };
+        assert!(teams.validate().is_err());
     }
 
     #[test]
@@ -1235,6 +1521,10 @@ pub struct SubagentConfig {
     /// Timeout for waiting on spawned agents in seconds.
     #[serde(default = "default_subagent_timeout")]
     pub timeout_secs: u64,
+
+    /// Maximum live subagents tracked by this TinyClaw process.
+    #[serde(default = "default_subagent_max_agents")]
+    pub max_agents: usize,
 }
 
 fn default_subagent_provider() -> String {
@@ -1245,6 +1535,10 @@ fn default_subagent_timeout() -> u64 {
     600
 }
 
+fn default_subagent_max_agents() -> usize {
+    4
+}
+
 impl Default for SubagentConfig {
     fn default() -> Self {
         Self {
@@ -1252,6 +1546,7 @@ impl Default for SubagentConfig {
             provider: default_subagent_provider(),
             model: None,
             timeout_secs: default_subagent_timeout(),
+            max_agents: default_subagent_max_agents(),
         }
     }
 }
@@ -1279,6 +1574,12 @@ pub struct BrowserConfig {
     /// Optional proxy URL (e.g. `http://proxy:8080`).
     #[serde(default)]
     pub proxy: Option<String>,
+
+    /// `terraphim-agent` binary used only to probe browser-native web
+    /// operation availability. Navigate/extract/api continue to use the
+    /// in-process reqwest backend.
+    #[serde(default = "default_browser_agent_binary")]
+    pub agent_binary: Option<String>,
 }
 
 fn default_browser_timeout() -> u64 {
@@ -1289,6 +1590,10 @@ fn default_browser_max_bytes() -> usize {
     512 * 1024
 }
 
+fn default_browser_agent_binary() -> Option<String> {
+    Some("terraphim-agent".to_string())
+}
+
 impl Default for BrowserConfig {
     fn default() -> Self {
         Self {
@@ -1296,6 +1601,7 @@ impl Default for BrowserConfig {
             timeout_secs: default_browser_timeout(),
             max_bytes: default_browser_max_bytes(),
             proxy: None,
+            agent_binary: default_browser_agent_binary(),
         }
     }
 }
@@ -1312,13 +1618,46 @@ pub struct SchedulerConfig {
     #[serde(default)]
     pub enabled: bool,
 
-    /// Storage key for the schedule job index document.
+    /// Deprecated local CronStore key retained for explicit test/local helpers.
     #[serde(default = "default_scheduler_store_key")]
     pub store_key: String,
+
+    /// Dedicated orchestrator include fragment written by TinyClaw schedule
+    /// commands.
+    ///
+    /// The file must be TinyClaw-owned: existing files need a disabled
+    /// `tinyclaw-schedule-fragment-marker` marker agent with owner/schema
+    /// capabilities. TinyClaw rejects unowned, mixed, or unknown-schema
+    /// fragments before mutation. The operator must include this file from the
+    /// base orchestrator config, e.g. `include = ["tinyclaw-schedules.toml"]`,
+    /// so the orchestrator reloads schedules after process restart.
+    #[serde(default)]
+    pub orchestrator_schedule_file: Option<PathBuf>,
+
+    /// CLI tool recorded on generated orchestrator scheduled agents.
+    ///
+    /// Required when `enabled = true` and `orchestrator_schedule_file` is set.
+    /// TinyClaw itself expects subcommands, while the orchestrator invokes
+    /// agent CLIs with the task as a positional prompt, so this cannot assume
+    /// `terraphim-tinyclaw` is a runnable default.
+    #[serde(default = "default_scheduler_cli_tool")]
+    pub cli_tool: String,
+
+    /// Optional orchestrator project id recorded on generated agents.
+    ///
+    /// Set this when `orchestrator_schedule_file` is included by a
+    /// multi-project orchestrator config. Leave unset for legacy
+    /// single-project configs.
+    #[serde(default)]
+    pub project: Option<String>,
 }
 
 fn default_scheduler_store_key() -> String {
     "tinyclaw_schedules".to_string()
+}
+
+fn default_scheduler_cli_tool() -> String {
+    String::new()
 }
 
 impl Default for SchedulerConfig {
@@ -1326,7 +1665,29 @@ impl Default for SchedulerConfig {
         Self {
             enabled: false,
             store_key: default_scheduler_store_key(),
+            orchestrator_schedule_file: None,
+            cli_tool: default_scheduler_cli_tool(),
+            project: None,
         }
+    }
+}
+
+impl SchedulerConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.enabled
+            && self.orchestrator_schedule_file.is_some()
+            && self.cli_tool.trim().is_empty()
+        {
+            anyhow::bail!(
+                "scheduler.cli_tool is required when scheduler.enabled = true and scheduler.orchestrator_schedule_file is set"
+            );
+        }
+        if let Some(project) = &self.project
+            && project.trim().is_empty()
+        {
+            anyhow::bail!("scheduler.project cannot be empty");
+        }
+        Ok(())
     }
 }
 
@@ -1806,16 +2167,19 @@ timeout_secs = 30
         let cfg = BrowserConfig::default();
         assert!(!cfg.enabled);
         assert_eq!(cfg.timeout_secs, 30);
+        assert_eq!(cfg.agent_binary.as_deref(), Some("terraphim-agent"));
 
         let toml = r#"
 enabled = true
 max_bytes = 1024
 proxy = "http://localhost:8080"
+agent_binary = "/opt/terraphim-agent"
 "#;
         let cfg: BrowserConfig = toml::from_str(toml).expect("parse");
         assert!(cfg.enabled);
         assert_eq!(cfg.max_bytes, 1024);
         assert_eq!(cfg.proxy.as_deref(), Some("http://localhost:8080"));
+        assert_eq!(cfg.agent_binary.as_deref(), Some("/opt/terraphim-agent"));
         assert_eq!(cfg.timeout_secs, 30);
     }
 
@@ -1824,13 +2188,51 @@ proxy = "http://localhost:8080"
         let cfg = SchedulerConfig::default();
         assert!(!cfg.enabled);
         assert_eq!(cfg.store_key, "tinyclaw_schedules");
+        assert!(cfg.orchestrator_schedule_file.is_none());
+        assert!(cfg.cli_tool.is_empty());
+        assert!(cfg.project.is_none());
 
         let toml = r#"
 enabled = true
 store_key = "custom_schedules"
+orchestrator_schedule_file = "/tmp/tinyclaw-schedules.toml"
+cli_tool = "codex"
+project = "tinyclaw"
 "#;
         let cfg: SchedulerConfig = toml::from_str(toml).expect("parse");
         assert!(cfg.enabled);
         assert_eq!(cfg.store_key, "custom_schedules");
+        assert_eq!(
+            cfg.orchestrator_schedule_file,
+            Some(PathBuf::from("/tmp/tinyclaw-schedules.toml"))
+        );
+        assert_eq!(cfg.cli_tool, "codex");
+        assert_eq!(cfg.project.as_deref(), Some("tinyclaw"));
+        cfg.validate().expect("valid scheduler config");
+    }
+
+    #[test]
+    fn scheduler_config_rejects_enabled_orchestrator_schedule_without_cli_tool() {
+        let toml = r#"
+enabled = true
+orchestrator_schedule_file = "/tmp/tinyclaw-schedules.toml"
+"#;
+        let cfg: SchedulerConfig = toml::from_str(toml).expect("parse");
+        let err = cfg
+            .validate()
+            .expect_err("enabled orchestrator scheduler must require explicit cli_tool");
+        let msg = err.to_string();
+        assert!(msg.contains("scheduler.cli_tool"), "got: {msg}");
+        assert!(msg.contains("required"), "got: {msg}");
+    }
+
+    #[test]
+    fn scheduler_config_rejects_blank_project() {
+        let toml = r#"
+project = "  "
+"#;
+        let cfg: SchedulerConfig = toml::from_str(toml).expect("parse");
+        let err = cfg.validate().expect_err("blank project must fail");
+        assert!(err.to_string().contains("scheduler.project"));
     }
 }

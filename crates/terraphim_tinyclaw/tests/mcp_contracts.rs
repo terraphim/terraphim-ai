@@ -6,15 +6,19 @@
 //! - Error cases return well-formed JSON, not exceptions
 //! - The conversation_id parsing rule (platform:id) is consistent
 
+mod common;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_tinyclaw::bus::MessageBus;
 use terraphim_tinyclaw::commands::CommandRegistry;
+use terraphim_tinyclaw::mcp::client::McpClient;
 use terraphim_tinyclaw::mcp::server::{TinyClawMcpServer, serve_mcp_stdio};
 use terraphim_tinyclaw::session::SessionManager;
 use tokio::sync::Mutex;
 
 fn make_server() -> TinyClawMcpServer {
+    common::scrub_env();
     let sessions = Arc::new(Mutex::new(SessionManager::new(PathBuf::from("/tmp"))));
     let bus = Arc::new(MessageBus::new());
     let commands = Arc::new(Mutex::new(CommandRegistry::new()));
@@ -289,6 +293,43 @@ async fn contract_events_wait_respects_timeout() {
         "events_wait returned too slow ({:?})",
         elapsed
     );
+}
+
+#[tokio::test]
+#[ignore]
+async fn live_tier_reference_mcp_connect_list_call() {
+    common::scrub_env();
+    if std::env::var("LIVE_TINYCLAW_MCP_REFERENCE").ok().as_deref() != Some("1") {
+        eprintln!(
+            "set LIVE_TINYCLAW_MCP_REFERENCE=1, TINYCLAW_MCP_REFERENCE_COMMAND, \
+             TINYCLAW_MCP_REFERENCE_TOOL, and optional TINYCLAW_MCP_REFERENCE_ARGS_JSON"
+        );
+        return;
+    }
+
+    let command =
+        std::env::var("TINYCLAW_MCP_REFERENCE_COMMAND").expect("TINYCLAW_MCP_REFERENCE_COMMAND");
+    let args_json =
+        std::env::var("TINYCLAW_MCP_REFERENCE_ARGS_JSON").unwrap_or_else(|_| "[]".to_string());
+    let args_vec: Vec<String> = serde_json::from_str(&args_json)
+        .expect("TINYCLAW_MCP_REFERENCE_ARGS_JSON must be a JSON string array");
+    let args_refs: Vec<&str> = args_vec.iter().map(String::as_str).collect();
+
+    let client = McpClient::connect(&command, &args_refs).await.unwrap();
+    let tools = client.list_tools().await.unwrap();
+    assert!(!tools.is_empty(), "reference server must expose tools");
+
+    let tool_name =
+        std::env::var("TINYCLAW_MCP_REFERENCE_TOOL").unwrap_or_else(|_| tools[0].name.to_string());
+    let args = std::env::var("TINYCLAW_MCP_REFERENCE_TOOL_ARGS_JSON")
+        .ok()
+        .map(|raw| serde_json::from_str(&raw).expect("tool args must be a JSON object"));
+    let result = client.call_tool(tool_name, args).await.unwrap();
+    assert!(
+        !result.content.is_empty(),
+        "reference call must return content"
+    );
+    client.disconnect().await.unwrap();
 }
 
 // --- permissions_list_open / permissions_respond contract -------------------

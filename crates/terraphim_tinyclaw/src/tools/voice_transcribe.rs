@@ -388,11 +388,11 @@ impl VoiceTranscribeTool {
 
             let mut text = String::new();
             for i in 0..num_segments {
-                if let Some(segment) = state.get_segment(i) {
-                    if let Ok(seg_text) = segment.to_str_lossy() {
-                        text.push_str(&seg_text);
-                        text.push(' ');
-                    }
+                if let Some(segment) = state.get_segment(i)
+                    && let Ok(seg_text) = segment.to_str_lossy()
+                {
+                    text.push_str(&seg_text);
+                    text.push(' ');
                 }
             }
 
@@ -551,6 +551,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg(not(feature = "voice"))]
     #[tokio::test]
     async fn test_voice_feature_disabled_message() {
         let tool = VoiceTranscribeTool::new();
@@ -559,5 +560,13 @@ mod tests {
         assert!(result.is_ok());
         let text = result.unwrap();
         assert!(text.contains("voice feature"));
+    }
+
+    #[cfg(feature = "voice")]
+    #[tokio::test]
+    async fn test_voice_feature_enabled_missing_audio_errors_cleanly() {
+        let tool = VoiceTranscribeTool::new();
+        let result = tool.transcribe(Path::new("/dev/null")).await;
+        assert!(result.is_err());
     }
 }

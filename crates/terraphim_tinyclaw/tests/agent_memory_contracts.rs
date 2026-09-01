@@ -21,7 +21,12 @@ use terraphim_tinyclaw::tools::{Tool, ToolError, ToolRegistry};
 /// Returns the path to the shim binary.
 fn write_shim(dir: &std::path::Path, script: &str) -> std::path::PathBuf {
     let shim_path = dir.join("terraphim-agent");
-    std::fs::write(&shim_path, script).expect("write shim");
+    {
+        use std::io::Write;
+        let mut file = std::fs::File::create(&shim_path).expect("create shim");
+        file.write_all(script.as_bytes()).expect("write shim");
+        file.sync_all().expect("sync shim");
+    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

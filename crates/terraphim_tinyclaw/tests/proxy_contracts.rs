@@ -8,6 +8,8 @@
 //! sibling `terraphim-llm-proxy` crate but it's not published to any
 //! registry and its path-only dep pulls in the whole monorepo.
 
+mod common;
+
 use axum::Json;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -15,6 +17,7 @@ use serde_json::{Value, json};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use terraphim_tinyclaw::bus::MessageBus;
 use terraphim_tinyclaw::proxy::{ProxyState, router};
 use tower::ServiceExt;
 
@@ -24,6 +27,7 @@ async fn send(
     path: &str,
     body: Option<Value>,
 ) -> (StatusCode, Value) {
+    common::scrub_env();
     let mut builder = Request::builder().method(method).uri(path);
     let body = match body {
         Some(v) => {
@@ -133,6 +137,28 @@ async fn contract_chat_completions_stream_returns_501() {
     assert_eq!(status, StatusCode::NOT_IMPLEMENTED);
     assert!(body["error"].is_object());
     assert!(body["error"]["code"].is_string());
+}
+
+#[tokio::test]
+async fn contract_chat_completions_keeps_response_semantics_when_bus_is_closed() {
+    let bus = Arc::new(MessageBus::new());
+    bus.inbound_rx.lock().await.close();
+    let app = router(ProxyState::default().with_agent_bus(bus));
+
+    let (status, body) = send(
+        app,
+        "POST",
+        "/v1/chat/completions",
+        Some(json!({
+            "model": "tinyclaw-default",
+            "messages": [{"role": "user", "content": "closed-bus-probe"}]
+        })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    let content = body["choices"][0]["message"]["content"].as_str().unwrap();
+    assert!(content.contains("closed-bus-probe"), "got: {content}");
 }
 
 // --- /v1/health -----------------------------------------------------------

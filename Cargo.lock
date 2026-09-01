@@ -2603,6 +2603,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "fs4"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3930,6 +3940,21 @@ dependencies = [
  "serde",
  "serde_json",
  "uuid-simd",
+]
+
+[[package]]
+name = "jsonwebtoken"
+version = "9.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a87cc7a48537badeae96744432de36f4be2b4a34a05a5ef32e9dd8a1c169dde"
+dependencies = [
+ "base64 0.22.1",
+ "js-sys",
+ "pem",
+ "ring",
+ "serde",
+ "serde_json",
+ "simple_asn1",
 ]
 
 [[package]]
@@ -5262,6 +5287,16 @@ checksum = "112d82ceb8c5bf524d9af484d4e4970c9fd5a0cc15ba14ad93dccd28873b0629"
 dependencies = [
  "digest 0.11.3",
  "hmac 0.13.0",
+]
+
+[[package]]
+name = "pem"
+version = "3.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d30c53c26bc5b31a98cd02d20f25a7c8567146caf63ed593a9d87b2775291be"
+dependencies = [
+ "base64 0.22.1",
+ "serde_core",
 ]
 
 [[package]]
@@ -7568,6 +7603,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
+name = "simple_asn1"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d585997b0ac10be3c5ee635f1bab02d512760d14b7c468801ac8a01d9ae5f1d"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "thiserror 2.0.20",
+ "time",
+]
+
+[[package]]
 name = "siphasher"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8744,7 +8791,7 @@ dependencies = [
  "terraphim_agent_messaging 1.19.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "terraphim_agent_supervisor 1.19.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "terraphim_automata",
- "terraphim_rolegraph 1.20.2",
+ "terraphim_rolegraph 1.20.4",
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
@@ -9185,7 +9232,7 @@ dependencies = [
  "terraphim_automata",
  "terraphim_config",
  "terraphim_persistence",
- "terraphim_rolegraph 1.20.2",
+ "terraphim_rolegraph 1.20.4",
  "terraphim_service",
  "terraphim_types",
  "terraphim_usage 1.20.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -9655,9 +9702,12 @@ dependencies = [
  "dirs 5.0.1",
  "env_home",
  "env_logger",
+ "fs2",
+ "futures-util",
  "haystack_jmap",
  "hmac 0.12.1",
  "hound",
+ "jsonwebtoken",
  "log",
  "opendal",
  "parking_lot 0.12.5",
@@ -9665,6 +9715,7 @@ dependencies = [
  "reqwest 0.12.28",
  "reqwest-eventsource",
  "rmcp",
+ "rsa",
  "schemars 1.2.2",
  "serde",
  "serde_json",
@@ -9677,6 +9728,7 @@ dependencies = [
  "tempfile",
  "terraphim_engine_events",
  "terraphim_mcp_search 0.1.3 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
+ "terraphim_orchestrator 1.21.0 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
  "terraphim_persistence",
  "terraphim_rlm",
  "terraphim_spawner 1.21.0",

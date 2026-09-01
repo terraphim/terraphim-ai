@@ -3,6 +3,7 @@
 
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_mcp_search::{SkillEntry, mcp_search_skills};
@@ -19,6 +20,7 @@ use terraphim_tinyclaw::credentials::{
 use terraphim_tinyclaw::session::SessionManager;
 use terraphim_tinyclaw::skills::{Skill, SkillExecutor};
 use terraphim_tinyclaw::tools::{ParityConfig, create_default_registry_with_parity};
+use terraphim_tinyclaw::tui::TuiSurface;
 
 /// Routing decision for the session memory backend (#3227 review P1).
 ///
@@ -116,6 +118,20 @@ enum Commands {
     },
     /// Run as gateway server with all enabled channels.
     Gateway,
+    /// Run the local terminal UI surface.
+    Tui,
+    /// Run OpenAI-compatible proxy server attached to the shared agent loop.
+    Proxy {
+        /// Address to bind.
+        #[arg(long, default_value = "127.0.0.1:3456")]
+        addr: SocketAddr,
+    },
+    /// Run ACP JSON-RPC stdio server attached to the shared agent loop.
+    Acp {
+        /// Run in server mode (default).
+        #[arg(long, default_value_t = true)]
+        serve: bool,
+    },
     /// Manage skills (workflows).
     Skill {
         #[command(subcommand)]
@@ -245,13 +261,25 @@ async fn main() -> anyhow::Result<()> {
             log::info!("Starting in gateway mode");
             run_gateway_mode(config).await?;
         }
+        Commands::Tui => {
+            log::info!("Starting in TUI mode");
+            run_tui_mode(config).await?;
+        }
+        Commands::Proxy { addr } => {
+            log::info!("Starting proxy mode on {addr}");
+            run_proxy_mode(config, addr).await?;
+        }
+        Commands::Acp { serve } => {
+            log::info!("Starting ACP server mode");
+            run_acp_mode(config, serve).await?;
+        }
         Commands::Skill { command } => {
             log::info!("Executing skill command");
-            run_skill_command(command).await?;
+            run_skill_command(command, &config.scheduler).await?;
         }
         Commands::Schedule { command } => {
             log::info!("Executing schedule command");
-            run_schedule_command(command).await?;
+            run_schedule_command(command, &config.scheduler).await?;
         }
         Commands::Mcp { serve } => {
             log::info!("Starting MCP server mode");
@@ -284,7 +312,9 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
 
     // Create session manager (wrapped in Arc<Mutex> for sharing)
     let sessions_dir = config.agent.workspace.join("sessions");
-    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(
+        sessions_dir.clone(),
+    )));
 
     // Create tool registry with session manager + Hermes-parity tools
     // (sandbox / subagent / browser / scheduler, each gated by config).
@@ -348,6 +378,151 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     Ok(())
 }
 
+async fn spawn_agent_loop(
+    config: &Config,
+    bus: Arc<MessageBus>,
+    system_prompt: String,
+) -> anyhow::Result<tokio::task::JoinHandle<()>> {
+    let sessions_dir = config.agent.workspace.join("sessions");
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(
+        sessions_dir.clone(),
+    )));
+    let web_tools_config = config.tools.web.as_ref();
+    let memory_config = if config.memory.enabled {
+        Some(&config.memory)
+    } else {
+        None
+    };
+    let tools = Arc::new(
+        create_default_registry_with_parity(
+            Some(sessions.clone()),
+            web_tools_config,
+            memory_config,
+            ParityConfig {
+                sandbox: Some(&config.sandbox),
+                subagent: Some(&config.subagent),
+                browser: Some(&config.browser),
+                scheduler: Some(&config.scheduler),
+                homeassistant: Some(&config.homeassistant),
+                vision: Some(&config.vision),
+                image_gen: Some(&config.image_gen),
+                tts: Some(&config.tts),
+                moa: Some(&config.moa),
+                rl: Some(&config.rl),
+            },
+        )
+        .await,
+    );
+    let router = build_router(config)?;
+    let agent = ToolCallingLoop::new(
+        &config.agent,
+        router,
+        tools,
+        sessions,
+        system_prompt,
+        memory_config,
+    );
+
+    Ok(tokio::spawn(async move {
+        if let Err(e) = agent.run(bus).await {
+            log::error!("Agent loop error: {}", e);
+        }
+    }))
+}
+
+async fn load_default_system_prompt(config: &Config) -> String {
+    if let Ok(content) = tokio::fs::read_to_string(&config.agent.system_prompt_path()).await {
+        content
+    } else {
+        "You are TinyClaw, a helpful AI assistant.".to_string()
+    }
+}
+
+async fn run_tui_mode(config: Config) -> anyhow::Result<()> {
+    use std::io::{self, Write};
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
+    println!("TinyClaw TUI Mode");
+    println!("=================");
+
+    let bus = Arc::new(MessageBus::new());
+    let _agent_handle = spawn_agent_loop(
+        &config,
+        bus.clone(),
+        load_default_system_prompt(&config).await,
+    )
+    .await?;
+
+    let outbound_bus = bus.clone();
+    tokio::spawn(async move {
+        let mut outbound_rx = outbound_bus.outbound_rx.lock().await;
+        while let Some(msg) = outbound_rx.recv().await {
+            println!("\n[{}]: {}\n", msg.channel, msg.content);
+            print!("> ");
+            let _ = io::stdout().flush();
+        }
+    });
+
+    let surface = TuiSurface::new();
+    let stdin = tokio::io::stdin();
+    let reader = BufReader::new(stdin);
+    let mut lines = reader.lines();
+
+    println!("Type your messages and press Enter. Use /quit or /exit to exit.");
+    print!("> ");
+    io::stdout().flush()?;
+
+    while let Some(line) = lines.next_line().await? {
+        let input = line.trim();
+        if input == "/quit" || input == "/exit" {
+            break;
+        }
+        if !input.is_empty() {
+            surface.submit(bus.clone(), input).await?;
+        }
+        print!("> ");
+        io::stdout().flush()?;
+    }
+
+    Ok(())
+}
+
+async fn run_proxy_mode(config: Config, addr: SocketAddr) -> anyhow::Result<()> {
+    println!("TinyClaw Proxy Mode");
+    println!("===================");
+
+    let bus = Arc::new(MessageBus::new());
+    let _agent_handle = spawn_agent_loop(
+        &config,
+        bus.clone(),
+        load_default_system_prompt(&config).await,
+    )
+    .await?;
+    let state = terraphim_tinyclaw::proxy::ProxyState::from_env().with_agent_bus(bus);
+    let bound = terraphim_tinyclaw::proxy::serve(state, addr).await?;
+    println!("Proxy listening on http://{bound}");
+
+    tokio::signal::ctrl_c().await?;
+    Ok(())
+}
+
+async fn run_acp_mode(config: Config, serve: bool) -> anyhow::Result<()> {
+    if !serve {
+        anyhow::bail!("ACP client mode is not implemented; use --serve");
+    }
+
+    let bus = Arc::new(MessageBus::new());
+    let _agent_handle = spawn_agent_loop(
+        &config,
+        bus.clone(),
+        load_default_system_prompt(&config).await,
+    )
+    .await?;
+    let sessions_dir = config.agent.workspace.join("acp-sessions");
+    let state = terraphim_tinyclaw::acp::AcpState::with_bus(sessions_dir, bus);
+    terraphim_tinyclaw::acp::router::serve_stdio(state).await
+}
+
 async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     println!("TinyClaw Gateway Mode");
     println!("=====================");
@@ -365,7 +540,9 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
 
     // Create session manager (wrapped in Arc<Mutex> for sharing)
     let sessions_dir = config.agent.workspace.join("sessions");
-    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(
+        sessions_dir.clone(),
+    )));
 
     // Create tool registry with session manager
     let web_tools_config = config.tools.web.as_ref();
@@ -403,6 +580,7 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     // (P1#4 fix) shares the same in-memory sessions Arc between the
     // agent loop and the MCP server.
     let sessions_for_mcp = sessions.clone();
+    let sessions_for_dashboard = sessions.clone();
 
     // Create agent loop
     let backend = select_session_backend(&config, sessions).await;
@@ -481,6 +659,20 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
             }
         }
     });
+
+    if let Ok(addr) = std::env::var("TINYCLAW_DASHBOARD_ADDR")
+        && !addr.trim().is_empty()
+    {
+        let addr: SocketAddr = addr.parse()?;
+        let dashboard_state =
+            terraphim_tinyclaw::dashboard::DashboardState::new_in_memory(sessions_dir)
+                .await
+                .with_runtime(bus.clone(), sessions_for_dashboard)
+                .with_inbound_channels(config.channels.clone())
+                .with_fire_token(std::env::var("TINYCLAW_FIRE_TOKEN").ok());
+        let bound = terraphim_tinyclaw::dashboard::serve(dashboard_state, addr).await?;
+        log::info!("Dashboard and webhook ingress listening on http://{bound}");
+    }
 
     // Wait for shutdown signal
     match tokio::signal::ctrl_c().await {
@@ -619,7 +811,10 @@ fn build_router(config: &Config) -> anyhow::Result<HybridLlmRouter> {
     ))
 }
 
-async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
+async fn run_skill_command(
+    command: SkillCommands,
+    scheduler_cfg: &terraphim_tinyclaw::config::SchedulerConfig,
+) -> anyhow::Result<()> {
     let executor = SkillExecutor::with_default_storage()
         .map_err(|e| anyhow::anyhow!("Failed to initialize skill executor: {}", e))?;
 
@@ -712,6 +907,21 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
             let skill = executor
                 .load_skill(&name)
                 .map_err(|e| anyhow::anyhow!("Failed to load skill: {}", e))?;
+            let executor = if skill_uses_schedule(&skill) && scheduler_cfg.enabled {
+                match terraphim_tinyclaw::tools::scheduler::ScheduleTool::from_config(scheduler_cfg)
+                    .await
+                {
+                    Ok(scheduler) => executor.with_scheduler_tool(std::sync::Arc::new(scheduler)),
+                    Err(err) => {
+                        log::warn!(
+                            "scheduler is enabled but unavailable for scheduled skill steps: {err}"
+                        );
+                        executor
+                    }
+                }
+            } else {
+                executor
+            };
 
             // Parse inputs
             let mut input_map = HashMap::new();
@@ -753,6 +963,10 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
                         log.output.chars().take(50).collect::<String>()
                     );
                 }
+            }
+
+            if let terraphim_tinyclaw::skills::SkillStatus::Failed { step, error } = result.status {
+                anyhow::bail!("skill failed at step {}: {}", step + 1, error);
             }
         }
 
@@ -853,20 +1067,27 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn skill_uses_schedule(skill: &Skill) -> bool {
+    skill
+        .steps
+        .iter()
+        .any(|step| matches!(step, terraphim_tinyclaw::skills::SkillStep::Schedule { .. }))
+}
+
 /// Execute a schedule subcommand (Hermes parity cron surface, #3147).
 ///
-/// Persists via `terraphim_persistence::DeviceStorage` (same store type
-/// as the dashboard cron CRUD); shares helpers with `ScheduleTool` so the
-/// CLI and the agent-loop tool cannot drift.
-async fn run_schedule_command(command: ScheduleCommands) -> anyhow::Result<()> {
-    use terraphim_tinyclaw::cron::CronStore;
+/// Persists via the configured `terraphim_orchestrator` include fragment;
+/// shares helpers with `ScheduleTool` so the CLI and agent-loop tool cannot
+/// drift.
+async fn run_schedule_command(
+    command: ScheduleCommands,
+    cfg: &terraphim_tinyclaw::config::SchedulerConfig,
+) -> anyhow::Result<()> {
     use terraphim_tinyclaw::tools::scheduler::ScheduleTool;
 
-    let storage = terraphim_persistence::DeviceStorage::arc_instance()
+    let tool = ScheduleTool::from_config(cfg)
         .await
-        .map_err(|e| anyhow::anyhow!("Device storage unavailable: {e}"))?;
-    let store = CronStore::new(storage, "tinyclaw_schedules");
-    let tool = ScheduleTool::new(store);
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     match command {
         ScheduleCommands::Create {
@@ -892,8 +1113,8 @@ async fn run_schedule_command(command: ScheduleCommands) -> anyhow::Result<()> {
                 println!("Schedules ({} total):", jobs.len());
                 for job in jobs {
                     println!(
-                        "  • {} - {} | state={:?} | enabled={} | next={:?}",
-                        job.id, job.prompt, job.state, job.enabled, job.next_run_at
+                        "  • {} - {} | schedule={} | state={} | enabled={} | next={:?}",
+                        job.id, job.prompt, job.schedule, job.state, job.enabled, job.next_run_at
                     );
                 }
             }
@@ -972,5 +1193,105 @@ mod backend_gate_tests {
         config.memory.backend = "sqlite".to_string();
         config.memory.allow_sqlite_backend = true;
         assert_eq!(choose_session_backend(&config), SessionBackendChoice::Jsonl);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, MutexGuard};
+    use terraphim_tinyclaw::config::SchedulerConfig;
+    use terraphim_tinyclaw::skills::{Skill, SkillInput, SkillStep};
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    struct EnvGuard {
+        _lock: MutexGuard<'static, ()>,
+        previous_xdg_config_home: Option<String>,
+    }
+
+    impl EnvGuard {
+        fn set_xdg_config_home(path: &std::path::Path) -> Self {
+            let lock = ENV_LOCK
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let previous_xdg_config_home = std::env::var("XDG_CONFIG_HOME").ok();
+            unsafe {
+                std::env::set_var("XDG_CONFIG_HOME", path);
+            }
+            Self {
+                _lock: lock,
+                previous_xdg_config_home,
+            }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            unsafe {
+                if let Some(previous) = &self.previous_xdg_config_home {
+                    std::env::set_var("XDG_CONFIG_HOME", previous);
+                } else {
+                    std::env::remove_var("XDG_CONFIG_HOME");
+                }
+            }
+        }
+    }
+
+    fn enabled_scheduler_without_backend() -> SchedulerConfig {
+        SchedulerConfig {
+            enabled: true,
+            cli_tool: "echo".to_string(),
+            ..SchedulerConfig::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn skill_list_does_not_construct_unavailable_scheduler() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let _env = EnvGuard::set_xdg_config_home(temp.path());
+
+        run_skill_command(SkillCommands::List, &enabled_scheduler_without_backend())
+            .await
+            .expect("skill list must not require scheduler backend");
+    }
+
+    #[tokio::test]
+    async fn skill_run_schedule_step_fails_when_scheduler_step_runs() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let _env = EnvGuard::set_xdg_config_home(temp.path());
+        let executor = SkillExecutor::with_default_storage().expect("skill executor");
+        executor
+            .save_skill(&Skill {
+                name: "scheduled-skill".to_string(),
+                version: "1.0.0".to_string(),
+                description: "Contains a schedule step".to_string(),
+                author: None,
+                steps: vec![SkillStep::Schedule {
+                    cron: "0 9 * * *".to_string(),
+                    skill: "daily-report".to_string(),
+                    inputs: serde_json::json!({}),
+                }],
+                inputs: vec![SkillInput {
+                    name: "message".to_string(),
+                    description: "unused".to_string(),
+                    required: false,
+                    default: Some("hello".to_string()),
+                }],
+            })
+            .expect("save skill");
+
+        let err = run_skill_command(
+            SkillCommands::Run {
+                name: "scheduled-skill".to_string(),
+                inputs: Vec::new(),
+            },
+            &enabled_scheduler_without_backend(),
+        )
+        .await
+        .expect_err("schedule step should fail clearly when scheduler is unavailable");
+        let msg = err.to_string();
+        assert!(msg.contains("skill failed at step 1"), "got: {msg}");
+        assert!(msg.contains("scheduler not configured"), "got: {msg}");
     }
 }

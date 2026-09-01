@@ -334,6 +334,90 @@ See the [examples/](examples/) directory for:
 - Example skills (code review, documentation, security scan)
 - Deployment scripts
 
+### Hermes-Parity Tools
+
+Enable parity tools in `tinyclaw.toml`:
+
+```toml
+[memory]
+enabled = true
+binary = "terraphim-agent"
+role = "Project Engineer"
+
+[sandbox]
+enabled = true
+backend = "local" # or "docker" with local fallback
+timeout_secs = 120
+max_output_bytes = 65536
+
+[subagent]
+enabled = true
+provider = "codex"
+timeout_secs = 300
+
+[browser]
+enabled = true
+timeout_secs = 30
+max_bytes = 524288
+
+[scheduler]
+enabled = true
+orchestrator_schedule_file = "tinyclaw-schedules.toml"
+cli_tool = "codex"
+project = "tinyclaw"
+```
+
+Example chat requests:
+
+```text
+remember my default Rust test runner is cargo nextest
+how should I run tests?
+spawn a subagent to run cargo test in crates/terraphim_tinyclaw
+run python print(1+1) in a local sandbox
+schedule daily-report every day at 09:00
+browse https://example.com and extract the heading
+```
+
+`browser` currently supports HTTP-backed `navigate`, `extract`, and `api`
+operations only. Real browser-engine operations (`click`, `type`, and
+`screenshot`) return `BackendUnavailable` until `terraphim-agent
+web_operations` or another real browser backend is wired; do not use README
+examples as evidence that #3148 is closed.
+
+Gateway mode can expose the dashboard/webhook HTTP router by setting
+`TINYCLAW_DASHBOARD_ADDR` (for example `127.0.0.1:3457`) before starting
+`terraphim-tinyclaw gateway`. The router includes production-wired
+`/webhooks/whatsapp` and `/webhooks/teams` ingress. WhatsApp GET
+verification uses the configured verify token and POST dispatch requires
+`X-Hub-Signature-256` HMAC verification before parsing. Teams ingress
+cryptographically validates the Bot Framework RS256 JWT against Microsoft
+OpenID/JWKS metadata, including issuer, bot-app audience, validity window, and
+the activity `serviceUrl`, before parsing or dispatching the activity.
+
+CLI surfaces:
+
+```bash
+terraphim-tinyclaw agent
+terraphim-tinyclaw tui
+terraphim-tinyclaw gateway
+terraphim-tinyclaw proxy --addr 127.0.0.1:3456
+terraphim-tinyclaw acp --serve
+terraphim-tinyclaw schedule create "daily-report" "0 9 * * *" --skill daily-report
+terraphim-tinyclaw mcp --serve
+```
+
+Current parity blockers: #3148 remains blocked for `terraphim-agent
+web_operations` browser automation; #3165 remains blocked for
+WhatsApp/Teams live-tier scope. #3147 is implemented end-to-end
+(orchestrator-backed scheduler with fragment-ownership validation) and
+the production CLI / dashboard surfaces both wire it; the remaining
+work for #3147 is operational (pointing a real orchestrator at the
+generated `tinyclaw-schedules.toml` include fragment) rather than code.
+
+Live-tier interoperability tests are opt-in and ignored by default. Set the
+documented `LIVE_TINYCLAW_*` env flags in the relevant tests for MCP, GitHub,
+Linear, or Slack when real credentials/reference servers are available.
+
 ## Troubleshooting
 
 ### Bot Not Responding

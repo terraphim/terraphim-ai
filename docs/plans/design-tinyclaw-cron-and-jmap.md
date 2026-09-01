@@ -9,8 +9,11 @@ Date: 2026-08-12. Discipline: `disciplined-design`. Research: `research-tinyclaw
    terraphim-private. Zero behaviour change to the email channel (only the
    constructor signature + search limit).
 2. **#3147**: give users (human CLI + agent loop + skills) a scheduling
-   surface over the existing `CronStore`, without new dependencies and
-   without coupling to the down orchestrator.
+   surface backed by `terraphim_orchestrator`'s production cron contract:
+   scheduled work is persisted as `[[agents]]` entries with `schedule`
+   fields in an orchestrator include fragment, validated by
+   `terraphim_orchestrator::is_cron_schedule_valid`, and reloaded by
+   `OrchestratorConfig::from_file` after process restart.
 
 ## #3198 — jmap relocation
 
@@ -62,22 +65,64 @@ Tests: struct literals unchanged (field-identical). Add one test for
 
 ## #3147 — scheduling surface
 
+### Requirement to architecture mapping
+
+| Requirement | Architecture | Verification |
+|---|---|---|
+| Create/list/delete from CLI and agent tool | `ScheduleTool` keeps the existing JSON/CLI operation surface but delegates production persistence to `OrchestratorScheduleStore` | `scheduler_contracts.rs` create/list/delete over a temp orchestrator fragment |
+| Persist through `terraphim_orchestrator` | A TinyClaw-owned include fragment stores one orchestrator `[[agents]]` record per schedule (`layer = "Core"`, `schedule = "<cron>"`, `task = "<prompt>"`, `skill_chain = [...]`) | Reload with `terraphim_orchestrator::OrchestratorConfig::from_file` using a fresh base config and fresh store instance |
+| Validate cron with orchestrator | `create_job` calls `terraphim_orchestrator::is_cron_schedule_valid`; non-cron TinyClaw-only formats now fail clearly in production mode | Invalid cron contract test asserts `InvalidArguments` |
+| Durable process-restart behavior | State is plain TOML on disk, not in `CronStore`; the orchestrator process reads it on startup via `include = ["tinyclaw-schedules.toml"]` | Restart UAT test constructs a fresh `OrchestratorScheduleStore` and reloads the base orchestrator config |
+| Orchestrator unavailable or not configured | Production `ScheduleTool::from_config` fails fast if `scheduler.orchestrator_schedule_file` is unset; no silent local fallback | Registry/config test asserts disabled/unconfigured behavior |
+
+### Orchestrator API finding
+
+`terraphim_orchestrator` exposes `is_cron_schedule_valid`,
+`AgentDefinition.schedule`, `TimeScheduler`, and `OrchestratorConfig::from_file`.
+It does not expose a create/list/delete scheduler service or `to_file`
+mutation API. The legitimate durable API is therefore the orchestrator's
+configuration model: write an include fragment containing scheduled `Core`
+agents and let the orchestrator load it on startup/restart.
+
 ### Components
 
 1. **`ScheduleTool`** (`src/tools/scheduler.rs`, registered as `"schedule"`):
 
    - `create {prompt, schedule, skills?, deliver?, model?}` →
-     `Schedule::parse` (rejects invalid cron with clear message) → build
-     `CronJob::new(prompt, schedule)` + optional fields → store. Returns
+     `terraphim_orchestrator::is_cron_schedule_valid` (rejects invalid cron
+     with clear message) → build an orchestrator `[[agents]]` record in the
+     configured include fragment. Returns
      `{op, id, schedule, status: "created"}`.
-   - `list` → `CronStore::load_all` → `{op, count, jobs:[…]}`.
+   - `list` → read the include fragment → `{op, count, jobs:[…]}`.
    - `delete {id}` → remove by id → `{op, id, status: "deleted"}`.
-   - Store key `"tinyclaw_schedules"`; `DeviceStorage::arc_instance()` at
-     construction (`with_storage(storage, key)` builder for tests;
-     `from_config` uses `arc_instance()` with graceful degradation).
+   - Production config requires a dedicated TinyClaw-owned include fragment
+     whose durable marker is an orchestrator-compatible disabled agent:
+     ```toml
+     [[agents]]
+     name = "tinyclaw-schedule-fragment-marker"
+     layer = "Core"
+     cli_tool = "tinyclaw-scheduler-marker"
+     task = "TinyClaw scheduler fragment ownership marker"
+     schedule = "0 0 1 1 *"
+     capabilities = [
+       "tinyclaw-schedule-fragment-owner:terraphim_tinyclaw.scheduler",
+       "tinyclaw-schedule-fragment-schema:1",
+     ]
+     enabled = false
+     ```
+     Existing unmarked fragments, fragments containing non-TinyClaw agents,
+     and owned fragments containing unknown future fields are rejected before
+     mutation so TinyClaw never rewrites operator-managed TOML through its
+     reduced scheduler schema.
+   - Production config also requires
+     `scheduler.orchestrator_schedule_file = ".../tinyclaw-schedules.toml"`
+     and an explicit `scheduler.cli_tool` that accepts the task as a
+     positional prompt;
+     the operator must include this file from the orchestrator base config.
+     `CronStore` remains only for explicit local/test construction.
    - Registered in `create_default_registry_with_parity` when
      `[scheduler] enabled = true` (config section `SchedulerConfig { enabled,
-     store_key }`).
+     store_key, orchestrator_schedule_file, cli_tool }`).
 
 2. **CLI** (`main.rs`):
 
@@ -137,12 +182,12 @@ Tests: struct literals unchanged (field-identical). Add one test for
 
 | #3147 criterion | How met |
 |---|---|
-| "schedule `daily-report` skill every day at 09:00" → schedule ID | `schedule create --prompt … --schedule "0 9 * * *"` returns `{id}` |
+| "schedule `daily-report` skill every day at 09:00" → schedule ID | `schedule create --prompt … --schedule "0 9 * * *"` writes an orchestrator `Core` agent and returns `{id}` |
 | `schedule list` shows active schedules | `ScheduleTool list` + CLI |
 | `schedule delete <id>` removes | `delete` |
-| Invalid cron rejected with clear message | `Schedule::parse` error |
-| Integration test create/list/delete | `scheduler_contracts.rs` |
-| Orchestrator not running: fails fast | n/a — we persist locally (documented deviation) |
+| Invalid cron rejected with clear message | `terraphim_orchestrator::is_cron_schedule_valid` gate |
+| Integration test create/list/delete | `scheduler_contracts.rs` with temp orchestrator include fragment |
+| Orchestrator not running: fails fast | `from_config` requires an orchestrator schedule fragment path; generated TOML is reload-validated |
 | Duplicate name / timezone | cron is UTC; no names in v1 (id-based), documented |
 
 | #3198 criterion | How met |
