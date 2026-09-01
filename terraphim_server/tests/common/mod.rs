@@ -24,6 +24,7 @@ pub const READY_PROBE_INTERVAL: Duration = Duration::from_millis(250);
 /// 120 attempts at 250ms = a ≈30s wall-clock worst case. This is strictly
 /// more generous than every prior private copy (5s / 5s / 5s / 30s) so it
 /// cannot regress any test while tolerating contended CI runners.
+#[allow(dead_code)]
 pub const READY_PROBE_MAX_ATTEMPTS: u32 = 120;
 
 /// Poll `GET /health` on `address` until it responds HTTP 200.
@@ -36,6 +37,7 @@ pub const READY_PROBE_MAX_ATTEMPTS: u32 = 120;
 /// Use this at the top of every integration test that starts the server,
 /// instead of a fixed `sleep`, so startup timing can never race the
 /// assertions. This is the contract requested by issue #2998.
+#[allow(dead_code)]
 pub async fn wait_for_server_ready(address: SocketAddr) {
     wait_for_server_ready_with_budget(address, READY_PROBE_MAX_ATTEMPTS, READY_PROBE_INTERVAL).await
 }
