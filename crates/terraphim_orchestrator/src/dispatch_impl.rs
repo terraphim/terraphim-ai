@@ -154,22 +154,18 @@ impl AgentOrchestrator {
                             );
                             return;
                         }
-                        if self.should_skip_local_dispatch(&agent_name, issue_number) {
-                            return;
-                        }
                         match self
-                            .dispatch_pr_gate_mention_for_issue(project, &agent_name, issue_number)
+                            .dispatch_canonical_pr_gate_mention_from_comment(
+                                project,
+                                &agent_name,
+                                issue_number,
+                                chain_id,
+                                depth,
+                                parent_agent,
+                            )
                             .await
                         {
-                            Ok(true) => {
-                                if let Some(agent) = self.active_agents.get_mut(&agent_name) {
-                                    agent.spawned_by_mention = true;
-                                    agent.mention_chain_id = Some(chain_id);
-                                    agent.mention_depth = Some(depth);
-                                    agent.mention_parent_agent = None;
-                                }
-                            }
-                            Ok(false) => {}
+                            Ok(true) | Ok(false) => {}
                             Err(e) => {
                                 warn!(
                                     agent = %agent_name,

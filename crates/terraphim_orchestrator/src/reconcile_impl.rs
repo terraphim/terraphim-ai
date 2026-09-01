@@ -451,6 +451,8 @@ impl AgentOrchestrator {
                         }
                     }
                     self.post_terminal_commit_status(
+                        &meta.project,
+                        &meta.agent_name,
                         &meta.head_sha,
                         &meta.context,
                         terraphim_tracker::StatusState::Failure,
@@ -661,7 +663,7 @@ impl AgentOrchestrator {
 
             let record = AgentRunRecord {
                 run_id: uuid::Uuid::new_v4(),
-                agent_name: name.clone(),
+                agent_name: def.name.clone(),
                 started_at: chrono::Utc::now()
                     - chrono::Duration::milliseconds((wall_time_secs * 1000.0) as i64),
                 ended_at: chrono::Utc::now(),
@@ -919,7 +921,7 @@ impl AgentOrchestrator {
                     if let Err(e) = poster
                         .post_agent_output_for_project(
                             &project,
-                            name,
+                            &def.name,
                             issue,
                             &output_lines,
                             exit_code,
@@ -941,7 +943,7 @@ impl AgentOrchestrator {
             // written by the background drain task, then rename to final path.
             {
                 let _ = std::fs::create_dir_all(&self.agent_log_dir);
-                let filename = agent_log_file_name(name, AgentLogKind::Final);
+                let filename = agent_log_file_name(&def.name, AgentLogKind::Final);
                 let final_path = self.agent_log_dir.join(&filename);
 
                 if let Some(ref tmp_path) = agent_tmp_path {
@@ -950,7 +952,7 @@ impl AgentOrchestrator {
                     let body = std::fs::read_to_string(tmp_path).unwrap_or_default();
                     let header = format!(
                         "# agent: {}\n# exit_code: {:?}\n# exit_class: {}\n# wall_time: {:.1}s\n# model: {}\n\n",
-                        name,
+                        def.name,
                         status.code(),
                         record.exit_class,
                         record.wall_time_secs,
@@ -969,7 +971,7 @@ impl AgentOrchestrator {
                     let mut content = String::with_capacity(output_lines.len() * 120);
                     content.push_str(&format!(
                         "# agent: {}\n# exit_code: {:?}\n# exit_class: {}\n# wall_time: {:.1}s\n# model: {}\n\n",
-                        name,
+                        def.name,
                         status.code(),
                         record.exit_class,
                         record.wall_time_secs,
@@ -1000,7 +1002,7 @@ impl AgentOrchestrator {
                         .clone()
                         .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
                     level: level.into(),
-                    agent_name: name.clone(),
+                    agent_name: def.name.clone(),
                     layer: format!("{:?}", def.layer),
                     source: "orchestrator".into(),
                     message: format!("agent exited: {}", record.exit_class),
@@ -1039,7 +1041,12 @@ impl AgentOrchestrator {
 
             // Post terminal commit status if this agent was dispatched with one.
             let mut status_override: Option<(terraphim_tracker::StatusState, String)> = None;
-            if let Some((ref head_sha, ref context)) = commit_status_post {
+            if let Some(crate::CommitStatusPost {
+                ref project,
+                ref head_sha,
+                ref context,
+            }) = commit_status_post
+            {
                 if let Some(ref meta) = gate_meta {
                     if meta.context == *context && meta.head_sha == *head_sha {
                         let (drain_lines, drain_cli) = drained_outputs
@@ -1076,8 +1083,15 @@ impl AgentOrchestrator {
                     };
                     (state, description)
                 };
-                self.post_terminal_commit_status(head_sha, context, state, &description)
-                    .await;
+                self.post_terminal_commit_status(
+                    project,
+                    &def.name,
+                    head_sha,
+                    context,
+                    state,
+                    &description,
+                )
+                .await;
             }
 
             // Disarm worktree guard on success so it doesn't conflict with

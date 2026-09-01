@@ -12,13 +12,24 @@ use tracing::{debug, info, warn};
 use crate::config;
 use crate::{
     agent_key, build_spawn_context_for_agent, control_plane, dispatcher, pr_dispatch,
-    pr_gate_context, pr_gate_prompt, AgentOrchestrator, ManagedAgent, OrchestratorError,
+    pr_gate_context, pr_gate_prompt, AgentOrchestrator, CommitStatusPost, ManagedAgent,
+    OrchestratorError,
 };
 
 const CANONICAL_PR_GATE_AGENTS: [&str; 3] = ["pr-verifier", "pr-validator", "pr-reviewer"];
 
 pub(crate) fn is_canonical_pr_gate_agent(agent_name: &str) -> bool {
     CANONICAL_PR_GATE_AGENTS.contains(&agent_name)
+}
+
+/// `active_agents` key for a PR gate agent.
+///
+/// Gate names such as `pr-validator` are legitimately reused across
+/// projects, so the in-process identity must carry the project: otherwise
+/// one project's running gate starves the other's duplicate guard, receives
+/// its mention-chain metadata, and is removed on the wrong exit.
+pub(crate) fn pr_gate_agent_key(project: &str, agent_name: &str) -> String {
+    format!("{project}/{agent_name}")
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -43,6 +54,105 @@ struct GiteaPullRefForGateMention {
 #[derive(Debug, serde::Deserialize)]
 struct GiteaPullUserForGateMention {
     login: String,
+}
+
+fn valid_pr_gate_mention_request(
+    project: &str,
+    agent_name: &str,
+    issue_number: u64,
+    req: &pr_dispatch::ReviewPrRequest,
+) -> bool {
+    if req.project != project {
+        warn!(
+            expected_project = project,
+            actual_project = %req.project,
+            agent = %agent_name,
+            issue = issue_number,
+            "PR gate mention rejected: project mismatch"
+        );
+        return false;
+    }
+    if req.pr_number != issue_number || req.head_sha.trim().is_empty() {
+        warn!(
+            project,
+            agent = %agent_name,
+            issue = issue_number,
+            pr_number = req.pr_number,
+            head_sha = %req.head_sha,
+            "PR gate mention rejected: PR number/head mismatch"
+        );
+        return false;
+    }
+    true
+}
+
+#[cfg(test)]
+pub(crate) fn duplicate_gate_config_for_tests() -> crate::OrchestratorConfig {
+    let mut config = crate::OrchestratorConfig::from_toml(
+        r#"
+working_dir = "/tmp/adf-root"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp"
+
+[[projects]]
+id = "terraphim-llm-proxy"
+working_dir = "/tmp/proxy"
+[projects.gitea]
+base_url = "http://127.0.0.1:1"
+token = "proxy-token"
+owner = "proxy-owner"
+repo = "proxy-repo"
+
+[[projects]]
+id = "digital-twins"
+working_dir = "/tmp/digital"
+[projects.gitea]
+base_url = "http://127.0.0.1:1"
+token = "digital-token"
+owner = "digital-owner"
+repo = "digital-repo"
+
+[[agents]]
+name = "pr-validator"
+layer = "Growth"
+cli_tool = "echo"
+task = "proxy validator"
+model = "sonnet"
+project = "terraphim-llm-proxy"
+
+[[agents]]
+name = "pr-validator"
+layer = "Growth"
+cli_tool = "echo"
+task = "digital validator"
+model = "sonnet"
+project = "digital-twins"
+"#,
+    )
+    .expect("test config parses");
+    config.pr_dispatch_per_project.insert(
+        "terraphim-llm-proxy".to_string(),
+        config::PrDispatchConfig {
+            agents_on_pr_open: vec![config::PrDispatchEntry {
+                name: "pr-validator".to_string(),
+                context: "adf/proxy-validation".to_string(),
+            }],
+        },
+    );
+    config.pr_dispatch_per_project.insert(
+        "digital-twins".to_string(),
+        config::PrDispatchConfig {
+            agents_on_pr_open: vec![config::PrDispatchEntry {
+                name: "pr-validator".to_string(),
+                context: "adf/digital-validation".to_string(),
+            }],
+        },
+    );
+    config
 }
 
 impl AgentOrchestrator {
@@ -123,6 +233,7 @@ impl AgentOrchestrator {
                     &head_sha,
                     pr_number,
                     &project,
+                    &entry.name,
                     &entry.context,
                     &format!("{} dispatched", entry.name),
                 )
@@ -175,25 +286,7 @@ impl AgentOrchestrator {
             return Ok(false);
         };
 
-        if req.project != project {
-            warn!(
-                expected_project = project,
-                actual_project = %req.project,
-                agent = %agent_name,
-                issue = issue_number,
-                "PR gate mention rejected: project mismatch"
-            );
-            return Ok(false);
-        }
-        if req.pr_number != issue_number || req.head_sha.trim().is_empty() {
-            warn!(
-                project,
-                agent = %agent_name,
-                issue = issue_number,
-                pr_number = req.pr_number,
-                head_sha = %req.head_sha,
-                "PR gate mention rejected: PR number/head mismatch"
-            );
+        if !valid_pr_gate_mention_request(project, agent_name, issue_number, &req) {
             return Ok(false);
         }
 
@@ -205,10 +298,51 @@ impl AgentOrchestrator {
                 &req.head_sha,
                 req.pr_number,
                 project,
+                agent_name,
                 &entry.context,
                 &format!("{agent_name} dispatched by mention"),
             )
             .await;
+        }
+        Ok(spawned)
+    }
+
+    /// Single funnel for every comment-triggered canonical PR gate mention
+    /// (webhook and polling, qualified and generic). Applies the
+    /// project-scoped duplicate guard, dispatches through
+    /// [`Self::dispatch_pr_gate_mention_for_issue`], and stamps the
+    /// mention-chain metadata onto the agent stored under its
+    /// [`pr_gate_agent_key`].
+    pub(crate) async fn dispatch_canonical_pr_gate_mention_from_comment(
+        &mut self,
+        project: &str,
+        agent_name: &str,
+        issue_number: u64,
+        chain_id: String,
+        depth: u32,
+        parent_agent: String,
+    ) -> Result<bool, OrchestratorError> {
+        if self.should_skip_local_dispatch(project, agent_name, issue_number) {
+            return Ok(false);
+        }
+
+        let spawned = self
+            .dispatch_pr_gate_mention_for_issue(project, agent_name, issue_number)
+            .await?;
+        if spawned {
+            if let Some(agent) = self
+                .active_agents
+                .get_mut(&pr_gate_agent_key(project, agent_name))
+            {
+                agent.spawned_by_mention = true;
+                agent.mention_chain_id = Some(chain_id);
+                agent.mention_depth = Some(depth);
+                agent.mention_parent_agent = if parent_agent.is_empty() {
+                    None
+                } else {
+                    Some(parent_agent)
+                };
+            }
         }
         Ok(spawned)
     }
@@ -525,7 +659,7 @@ impl AgentOrchestrator {
             .unwrap_or(0);
 
         self.active_agents.insert(
-            def.name.clone(),
+            pr_gate_agent_key(&project, &def.name),
             ManagedAgent {
                 definition: def.clone(),
                 handle,
@@ -545,7 +679,11 @@ impl AgentOrchestrator {
                 mention_depth: None,
                 mention_parent_agent: None,
                 concurrency_permit: None,
-                commit_status_post: Some((head_sha.clone(), commit_status_context.to_string())),
+                commit_status_post: Some(CommitStatusPost {
+                    project: project.clone(),
+                    head_sha: head_sha.clone(),
+                    context: commit_status_context.to_string(),
+                }),
                 gate_meta: Some(gate_meta),
                 output_tmp_path,
             },
@@ -745,7 +883,11 @@ impl AgentOrchestrator {
                 mention_depth: None,
                 mention_parent_agent: None,
                 concurrency_permit: None,
-                commit_status_post: Some((head_sha.clone(), commit_status_context.to_string())),
+                commit_status_post: Some(CommitStatusPost {
+                    project: project.clone(),
+                    head_sha: head_sha.clone(),
+                    context: commit_status_context.to_string(),
+                }),
                 gate_meta: None,
                 output_tmp_path,
             },
@@ -778,20 +920,19 @@ impl AgentOrchestrator {
         head_sha: &str,
         pr_number: u64,
         project: &str,
+        agent_name: &str,
         context: &str,
         description: &str,
     ) {
-        let tracker = match self.get_or_init_pre_check_tracker() {
-            Some(t) => t,
-            None => {
-                debug!(
-                    pr_number,
-                    project,
-                    context,
-                    "ReviewPr: no workflow tracker configured; skipping pending status"
-                );
-                return;
-            }
+        let Some(tracker) = self.commit_status_tracker(project, agent_name) else {
+            debug!(
+                pr_number,
+                project,
+                agent = agent_name,
+                context,
+                "ReviewPr: no project tracker configured; skipping pending status"
+            );
+            return;
         };
         let owner = tracker.owner().to_string();
         let repo = tracker.repo().to_string();
@@ -828,22 +969,27 @@ impl AgentOrchestrator {
 
     /// Post a terminal (success/failure) commit status for an agent that
     /// exited. Best-effort: logs on failure but does not propagate errors.
+    ///
+    /// Resolves the tracker exactly like the pending status did, so the
+    /// terminal state lands on the same project repository and context.
     pub(crate) async fn post_terminal_commit_status(
         &mut self,
+        project: &str,
+        agent_name: &str,
         head_sha: &str,
         context: &str,
         state: terraphim_tracker::StatusState,
         description: &str,
     ) {
-        let tracker = match self.get_or_init_pre_check_tracker() {
-            Some(t) => t,
-            None => {
-                debug!(
-                    head_sha,
-                    context, "post_terminal_commit_status: no workflow tracker; skipping"
-                );
-                return;
-            }
+        let Some(tracker) = self.commit_status_tracker(project, agent_name) else {
+            debug!(
+                project,
+                agent = agent_name,
+                head_sha,
+                context,
+                "post_terminal_commit_status: no project tracker; skipping"
+            );
+            return;
         };
         let owner = tracker.owner().to_string();
         let repo = tracker.repo().to_string();
@@ -852,17 +998,46 @@ impl AgentOrchestrator {
             .await
         {
             Ok(()) => {
-                info!(head_sha, context, "posted terminal commit status");
+                info!(
+                    project,
+                    owner, repo, head_sha, context, "posted terminal commit status"
+                );
             }
             Err(e) => {
                 warn!(
                     error = %e,
+                    project,
+                    owner,
+                    repo,
                     head_sha,
                     context,
                     "failed to post terminal commit status"
                 );
             }
         }
+    }
+
+    /// Tracker used for both pending and terminal commit statuses of a
+    /// `(project, agent)` pair.
+    ///
+    /// With an [`OutputPoster`] configured the project's tracker is
+    /// authoritative (per-agent token when one exists, otherwise the project
+    /// default); a project the poster does not know is skipped rather than
+    /// silently redirected to the workflow-global tracker. The workflow
+    /// tracker is only used when no poster exists at all (legacy
+    /// single-project deployments and unit tests).
+    fn commit_status_tracker(
+        &mut self,
+        project: &str,
+        agent_name: &str,
+    ) -> Option<&terraphim_tracker::GiteaTracker> {
+        if self.output_poster.is_some() {
+            return self
+                .output_poster
+                .as_ref()
+                .and_then(|poster| poster.tracker_for(project, agent_name));
+        }
+        self.get_or_init_pre_check_tracker()
     }
 
     /// Handle a `DispatchTask::Push` dispatch (Phase 3 — ADF replaces Gitea
@@ -1069,7 +1244,11 @@ impl AgentOrchestrator {
                 mention_depth: None,
                 mention_parent_agent: None,
                 concurrency_permit: None,
-                commit_status_post: Some((after_sha.clone(), "adf/build".to_string())),
+                commit_status_post: Some(CommitStatusPost {
+                    project: project.clone(),
+                    head_sha: after_sha.clone(),
+                    context: "adf/build".to_string(),
+                }),
                 gate_meta: None,
                 output_tmp_path,
             },
@@ -1079,6 +1258,7 @@ impl AgentOrchestrator {
             &after_sha,
             0,
             &project,
+            &def.name,
             "adf/build",
             "build-runner dispatched",
         )
@@ -1093,5 +1273,83 @@ impl AgentOrchestrator {
         );
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::AgentOrchestrator;
+
+    #[test]
+    fn qualified_gate_uses_project_definition_and_status_tracker() {
+        let orchestrator =
+            AgentOrchestrator::new(super::duplicate_gate_config_for_tests()).unwrap();
+
+        let proxy_entry = orchestrator
+            .pr_gate_dispatch_entry("terraphim-llm-proxy", "pr-validator")
+            .expect("proxy pr-validator gate entry");
+        assert_eq!(proxy_entry.context, "adf/proxy-validation");
+
+        let digital_entry = orchestrator
+            .pr_gate_dispatch_entry("digital-twins", "pr-validator")
+            .expect("digital pr-validator gate entry");
+        assert_eq!(digital_entry.context, "adf/digital-validation");
+
+        let proxy_def = orchestrator
+            .agent_registry
+            .lookup_project("terraphim-llm-proxy", "pr-validator")
+            .expect("proxy agent");
+        assert_eq!(proxy_def.definition.task, "proxy validator");
+
+        let poster = orchestrator.output_poster.as_ref().expect("output poster");
+        let tracker = poster
+            .tracker_for("terraphim-llm-proxy", "adf/proxy-validation")
+            .expect("proxy tracker");
+        assert_eq!(tracker.owner(), "proxy-owner");
+        assert_eq!(tracker.repo(), "proxy-repo");
+    }
+
+    #[test]
+    fn pr_gate_request_validation_rejects_wrong_project_or_head() {
+        let req = crate::pr_dispatch::ReviewPrRequest {
+            pr_number: 38,
+            project: "digital-twins".to_string(),
+            head_sha: "abc123".to_string(),
+            head_ref: "feature".to_string(),
+            author_login: "alice".to_string(),
+            title: "test".to_string(),
+            diff_loc: 10,
+        };
+
+        assert!(!super::valid_pr_gate_mention_request(
+            "terraphim-llm-proxy",
+            "pr-validator",
+            38,
+            &req
+        ));
+
+        let empty_head = crate::pr_dispatch::ReviewPrRequest {
+            project: "terraphim-llm-proxy".to_string(),
+            head_sha: " ".to_string(),
+            ..req.clone()
+        };
+        assert!(!super::valid_pr_gate_mention_request(
+            "terraphim-llm-proxy",
+            "pr-validator",
+            38,
+            &empty_head
+        ));
+
+        let wrong_issue = crate::pr_dispatch::ReviewPrRequest {
+            project: "terraphim-llm-proxy".to_string(),
+            head_sha: "abc123".to_string(),
+            ..req
+        };
+        assert!(!super::valid_pr_gate_mention_request(
+            "terraphim-llm-proxy",
+            "pr-validator",
+            39,
+            &wrong_issue
+        ));
     }
 }

@@ -183,6 +183,18 @@ pub struct AgentStatus {
     pub api_calls_remaining: HashMap<String, Option<u32>>,
 }
 
+/// Terminal commit status an agent must post when it exits.
+///
+/// `project` selects the Gitea tracker (owner/repo/token) the status is
+/// posted through; without it a project-scoped gate would fall back to the
+/// workflow-global tracker and leave the project PR pending forever.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CommitStatusPost {
+    pub(crate) project: String,
+    pub(crate) head_sha: String,
+    pub(crate) context: String,
+}
+
 /// Runtime state for a managed agent.
 struct ManagedAgent {
     definition: AgentDefinition,
@@ -201,8 +213,7 @@ struct ManagedAgent {
     #[allow(dead_code)]
     concurrency_permit: Option<concurrency::AgentPermit>,
     /// When set, post a terminal commit status on agent exit.
-    /// Tuple of (head_sha, context).
-    commit_status_post: Option<(String, String)>,
+    commit_status_post: Option<CommitStatusPost>,
     /// When set, derive the terminal commit status from a parsed
     /// `adf:gate-result` block in the agent's drain log instead of the
     /// process exit code. Populated for PR gate agents only.
@@ -240,6 +251,10 @@ pub struct AgentOrchestrator {
     nightwatch: NightwatchMonitor,
     scheduler: TimeScheduler,
     compound_workflow: CompoundReviewWorkflow,
+    /// Running agents keyed by their in-process identity: the bare agent
+    /// name for ordinary agents, and `project/agent`
+    /// ([`pr_handlers_impl::pr_gate_agent_key`]) for PR gate agents so the
+    /// same gate name in two projects never shares a slot.
     active_agents: HashMap<String, ManagedAgent>,
     rate_limiter: RateLimitTracker,
     shutdown_requested: bool,
@@ -2045,6 +2060,19 @@ impl AgentOrchestrator {
     #[doc(hidden)]
     pub fn is_agent_active(&self, name: &str) -> bool {
         self.active_agents.contains_key(name)
+    }
+
+    /// Look up a running agent by its bare definition name, regardless of
+    /// whether it is stored under that name or a project-qualified key.
+    /// When several projects run the same gate name concurrently the first
+    /// match wins, so callers needing project precision must use the
+    /// qualified key directly.
+    pub(crate) fn active_agent_by_name(&self, name: &str) -> Option<&ManagedAgent> {
+        self.active_agents.get(name).or_else(|| {
+            self.active_agents
+                .values()
+                .find(|managed| managed.definition.name == name)
+        })
     }
 
     /// Test helper: remove an agent from active_agents so it can be re-spawned.
