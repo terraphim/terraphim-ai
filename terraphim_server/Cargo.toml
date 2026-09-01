@@ -93,6 +93,9 @@ tokio = { workspace = true }
 reqwest = { workspace = true }
 axum-test = "21"
 futures-util = "0.3"
+# Config parity test: parse twin default TOMLs into JSON tables for comparison.
+toml = "0.8"
+serde_json = { workspace = true }
 
 [dev-dependencies.tempfile]
 workspace = true
