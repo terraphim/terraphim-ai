@@ -42,17 +42,16 @@
      and the injection pattern, is recorded in the SharedLearning file
      `terraphim-agent-learning-59d131a15119-1788275158000.md`.
 
-4. **`terraphim-ai` origin URL re-written to use the `oauth2:TOKEN@host`
-   HTTPS pattern**
-   - The URL was written as `https://oauth2:<TOKEN>@git.terraphim.cloud/terraphim/terraphim-ai.git`
-     with the credential supplied by `op inject`; the token itself is not
-     recorded in this handover.
-   - Avoids the `git fetch` "could not read Password" failure that the
-     bare-token form triggers because git parses the userinfo as
-     `user:password`.
-   - The rewrite was generated from a template referencing
-     `op://Terraphim/gitea-token/credential`, so the token does not appear
-     in shell history.
+4. **`terraphim-ai` Gitea remotes use token-free URLs**
+   - The `origin` and `gitea-private` remote URLs contain no embedded
+     credentials. Authentication is supplied transiently through a
+     temporary `GIT_ASKPASS` helper backed by `op inject`; no token is
+     stored in `.git/config`.
+   - A read-only `git ls-remote` check against the documentation branch
+     succeeded with that helper, confirming that the token-free remote
+     configuration remains usable.
+   - Keep the remote URL and helper pattern aligned with the canonical
+     `op://Terraphim/gitea-token/credential` reference.
 
 5. **Downstream docs sweep on `terraphim-ai`** (in progress at this
    handover)
