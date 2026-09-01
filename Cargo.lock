@@ -9504,6 +9504,7 @@ dependencies = [
  "terraphim_types",
  "terraphim_update 1.21.3",
  "tokio",
+ "toml 0.8.23",
  "tower-http 0.6.11",
  "ulid",
  "urlencoding",
