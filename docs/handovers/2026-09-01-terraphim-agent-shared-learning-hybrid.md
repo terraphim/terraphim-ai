@@ -27,26 +27,32 @@
      `chore/drop-unused-sessions-patch` and `fix/clippy-needless-borrow-1.97`
      branches deleted; remote branches already gone server-side.
 
-3. **Gitea token refreshed via 1Password**
-   - `op read "op://Terraphim/gitea-token/credential"` returned
-     `f1acffbe46aeaa0cd66b8af17626b02093033cb0`.
-   - `curl GET /api/v1/user` with that token returned 200 authenticated as
-     `root` (Alex, `alex@metracortex.engineer`, `is_admin=true`).
-   - `op://TerraphimPlatform/gitea-mac-admin-token/credential` was reported
-     as a "valid gitea token" by the user; the path does not resolve in the
-     `op` CLI (no `TerraphimPlatform` vault), so only
-     `op://Terraphim/gitea-token` is operative in this context. Flagged
-     for follow-up.
+3. **Gitea token reference canonicalised via 1Password**
+   - `op://Terraphim/gitea-token/credential` is the working reference in
+     the active 1Password account. The resolved value is intentionally not
+     recorded in this handover.
+   - The credential was supplied through `op inject` and verified with
+     `GET /api/v1/user`, which returned 200 authenticated as `root` (Alex,
+     `alex@metracortex.engineer`, `is_admin=true`).
+   - `op://TerraphimPlatform/gitea-mac-admin-token/credential` does not
+     resolve because no `TerraphimPlatform` vault is accessible in this
+     account. The alternate path remains unverified and must not be used in
+     automation until its account and exact vault/item names are confirmed.
+   - The safe canonicalisation, including the eight accessible vault names
+     and the injection pattern, is recorded in the SharedLearning file
+     `terraphim-agent-learning-59d131a15119-1788274688947.md`.
 
 4. **`terraphim-ai` origin URL re-written to use the `oauth2:TOKEN@host`
    HTTPS pattern**
-   - `https://oauth2:f1acffbe46aeaa0cd66b8af17626b02093033cb0@git.terraphim.cloud/terraphim/terraphim-ai.git`
+   - The URL was written as `https://oauth2:<TOKEN>@git.terraphim.cloud/terraphim/terraphim-ai.git`
+     with the credential supplied by `op inject`; the token itself is not
+     recorded in this handover.
    - Avoids the `git fetch` "could not read Password" failure that the
      bare-token form triggers because git parses the userinfo as
      `user:password`.
-   - The rewrite was generated with `op inject -f` from a template that
-     referenced `op://Terraphim/gitea-token/credential`, so the token does
-     not appear in shell history.
+   - The rewrite was generated from a template referencing
+     `op://Terraphim/gitea-token/credential`, so the token does not appear
+     in shell history.
 
 5. **Downstream docs sweep on `terraphim-ai`** (in progress at this
    handover)
@@ -102,14 +108,16 @@
 
 ### What's blocked / needs follow-up
 
-1. **`op://TerraphimPlatform/gitea-mac-admin-token/credential` does not
-   resolve.** Only `op://Terraphim/gitea-token` works. The user reported
-   the former as a "valid gitea token"; either the vault name is wrong
-   (likely intended: `Terraphim Platform` with a space) or the credential
-   lives in a different account that this shell cannot access. The
-   current session proceeded with the path that did resolve; a follow-up
-   ticket should reconcile the two paths so future sessions do not have
-   to guess.
+1. **Gitea token reference canonicalised, with one alternate path still
+   unresolved.** The working reference is
+   `op://Terraphim/gitea-token/credential`; the former
+   `op://TerraphimPlatform/gitea-mac-admin-token/credential` path does not
+   resolve in the active account. The eight accessible vaults contain no
+   matching mac-admin item. The canonical path and safe injection pattern
+   are documented in the SharedLearning record, while the alternate account
+   or vault name still requires confirmation. The previously resolved value
+   should be rotated if it is considered sensitive and was ever recorded
+   outside the approved secret store.
 2. **Untracked edits in `terraphim-clients` worktree.** Four files have
    modifications that pre-date this session and are unrelated to the
    hybrid-scoring work. They are not blocking the docs sweep but should
@@ -221,10 +229,10 @@ rg -n "color|behavior|optimize|utilize|organize" docs/architecture/terraphim-age
    "Docs: terraphim_agent architecture, example, and handover sweep".
    Body summarises the three artefacts and points to this handover. Cross
    the PR and issue with `gtr comment` so future search hits both.
-5. **Reconcile the Gitea token path** in a follow-up ticket. The two
-   paths (`op://TerraphimPlatform/...` and `op://Terraphim/...`) should
-   resolve to a single canonical credential so agent onboarding does not
-   have to guess.
+5. **Rotate the previously exposed Gitea credential if required, then
+   confirm the alternate 1Password account or exact vault/item names.** Use
+   only the canonical `op://Terraphim/gitea-token/credential` reference in
+   automation until that confirmation is available.
 6. **Review and commit the untracked edits** in `terraphim-clients` from
    `crates/terraphim_agent/src/{client,learnings/capture,main}.rs` and
    `tests/kg_ranking_integration_test.rs`. They pre-date this session
