@@ -737,3 +737,36 @@ The owner resolved all four open questions from section 2.15:
 
 Also completed: `~/.profile` `GITEA_TOKEN` refreshed by the owner (section
 5.2 step 1). Execution of Batch 1 is therefore unblocked.
+
+### 5.5 Execution log (2026-09-01 evening)
+
+Executed with four parallel subagents (remediation, tinyclaw fixes,
+test-gate reconciliation, supersede verification) plus direct review.
+
+| PR | Outcome | Evidence |
+|----|---------|----------|
+| terraphim-ai #3273 | Reviewed, **merge-ready** | Precedence agent_end > message_end > legacy verified; regression tests from real drain logs |
+| terraphim-ai #3308 | Reviewed, **merge-ready** | Mechanical CI env swap across 12 jobs; ADR superseded |
+| terraphim-ai #3291 | Remediated, round-3 **GO** | Head bc790c9a6; gate agents keyed `project/agent`; terminal statuses project-scoped via `CommitStatusPost`; composed poll-loop test with negative check; 911 lib tests |
+| terraphim-ai #3221 | Rebased + fixed, **merge-ready** (Codex pass never completed) | Head c3877c403; WhatsApp 503-on-dispatch-failure; scrub list widened; 0 failures across 23 test binaries; seam review clean |
+| terraphim-clients #84 | Rebased + provisioning fixed, runner **green**, **GO** | Head 70410ba; run 29594: 2231 passed / 0 failed; #142-#144 cherry-picked from GitHub main; P2 on `TERRAPHIM_DEFAULT_DATA_PATH` precedence recorded |
+| terraphim-kg-agents #5 | **merge-ready** | On top of main; runner run 27009 green |
+| terraphim-service #12 | **Hold** | service main itself red (runner registry config, haystack_jmap clippy, 12 fixture-dependent tests) |
+| terraphim-ai #3159 | **Closed -- declined** (plan correction) | Not superseded by clients #84; terraphim-ai keeps `--lib` deliberately (ae065496e, Refs #3222, ledger says Justified) |
+| terraphim-agents #117 #118 #135 | **Closed -- superseded** | Main fmt/clippy clean on same toolchain; fix landed via e1742d3 (PR #139) |
+| terraphim-clients #146 | **Open -- owner decision** | Not a fmt PR: GitHub main + 1 commit; GitHub/Gitea mains diverged 2026-08-10; 17 commits (hybrid scoring etc.) only on GitHub |
+
+Blocker: `gtr merge-pull` and the Gitea MCP `merge_pull` are denied by the
+Claude Code permission classifier in this session. All merge-ready PRs
+await either an owner-run merge or an explicit `Bash(gtr merge-pull:*)`
+allow rule.
+
+Findings outside the plan's scope, for follow-up:
+- tinyclaw Teams JWT claims struct requires camelCase `serviceUrl`; Bot
+  Framework issues `serviceurl`. Out of scope by owner decision; unfiled.
+- Against a `terraphim_server` built from current terraphim-ai main, two
+  kg_ranking tests and `test_end_to_end_server_workflow` in terraphim-clients
+  fail ("connection closed before message completed"); they pass on the
+  pinned v1.21.3. Whoever bumps the pin will hit it.
+- The `pi` + `openai-codex/gpt-5.5` review route hung three times on a
+  58-file PR; not currently usable as a merge gate.
