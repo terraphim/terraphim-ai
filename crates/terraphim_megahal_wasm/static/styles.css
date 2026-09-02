@@ -242,3 +242,47 @@ button:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Watch-me-learn demo */
+
+.learn-stats {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.stat {
+  background: var(--bg);
+  border: 1px solid var(--panel-edge);
+  border-radius: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat strong {
+  color: var(--accent);
+}
+
+.stat.pulse strong {
+  animation: stat-pulse 0.9s ease-out;
+}
+
+@keyframes stat-pulse {
+  0% { color: var(--bot); transform: scale(1.25); }
+  100% { color: var(--accent); transform: scale(1); }
+}
+
+mark.learned {
+  background: rgba(158, 230, 184, 0.25);
+  color: var(--bot);
+  padding: 0 0.2em;
+  border-radius: 0.25em;
+}
+
+.system-line {
+  color: var(--muted);
+  font-size: 0.82rem;
+  align-self: center;
+}

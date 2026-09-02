@@ -87,6 +87,22 @@ impl MegahalBrain {
             .unwrap_or(false)
     }
 
+    fn hal_stats(&self) -> terraphim_megahal::BrainStats {
+        self.hal.stats()
+    }
+
+    /// Distinct strings known (vocabulary size) -- the learning meter.
+    #[wasm_bindgen(js_name = vocabularyWords)]
+    pub fn vocabulary_words(&self) -> u32 {
+        self.hal.stats().vocabulary as u32
+    }
+
+    /// Distinct observed contexts (learned patterns) -- the learning meter.
+    #[wasm_bindgen(js_name = learnedPatterns)]
+    pub fn learned_patterns(&self) -> u32 {
+        self.hal.stats().patterns as u32
+    }
+
     /// Names of the embedded personalities for the selector.
     pub fn list_personalities() -> Vec<JsValue> {
         MegaHal::personality_names()
@@ -424,6 +440,187 @@ pub fn demo_main() -> Result<(), JsValue> {
     // Keep the closures alive for the page lifetime.
     std::mem::forget((send, send_enter, train, switch, save_local, load_local));
     wire_brain_lab()?;
+    wire_learning_demo()?;
+    Ok(())
+}
+
+/// Escape HTML-significant characters in decoded reply text.
+fn escape_html(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn default_rng() -> terraphim_sooth::DefaultRng {
+    rand_core::SeedableRng::seed_from_u64(42)
+}
+
+/// "Watch me learn": a guided loop that makes training visible. Type a
+/// nonsense word, teach three templated sentences about it (counters pulse
+/// as vocabulary and patterns grow), then ask -- the reply highlights the
+/// words it absorbed from the lesson.
+fn wire_learning_demo() -> Result<(), JsValue> {
+    let document = document();
+    let log = document.get_element_by_id("learn-log").expect("#learn-log");
+    let topic_input = document
+        .get_element_by_id("learn-topic")
+        .expect("#learn-topic")
+        .dyn_into::<web_sys::HtmlInputElement>()?;
+    let stat_words = document
+        .get_element_by_id("stat-words")
+        .expect("#stat-words");
+    let stat_patterns = document
+        .get_element_by_id("stat-patterns")
+        .expect("#stat-patterns");
+    let status = document
+        .get_element_by_id("learn-status")
+        .expect("#learn-status");
+
+    let brain = std::rc::Rc::new(std::cell::RefCell::new(MegahalBrain::new("default")));
+    let taught: std::rc::Rc<std::cell::RefCell<std::collections::BTreeSet<String>>> =
+        std::rc::Rc::new(std::cell::RefCell::new(std::collections::BTreeSet::new()));
+
+    // Render both meters from the live brain.
+    let render_stats = {
+        let brain = brain.clone();
+        let stat_words = stat_words.clone();
+        let stat_patterns = stat_patterns.clone();
+        move || {
+            let stats = brain.borrow().hal_stats();
+            stat_words.set_inner_html(&format!(
+                "words known: <strong>{}</strong>",
+                stats.vocabulary
+            ));
+            stat_patterns.set_inner_html(&format!(
+                "patterns learned: <strong>{}</strong>",
+                stats.patterns
+            ));
+            for el in [&stat_words, &stat_patterns] {
+                el.set_class_name("stat pulse");
+            }
+        }
+    };
+    // Show the fresh-brain baseline immediately (no pulse).
+    {
+        let stats = brain.borrow().hal_stats();
+        stat_words.set_inner_html(&format!(
+            "words known: <strong>{}</strong>",
+            stats.vocabulary
+        ));
+        stat_patterns.set_inner_html(&format!(
+            "patterns learned: <strong>{}</strong>",
+            stats.patterns
+        ));
+    }
+
+    // Teach: three templated sentences about the given nonsense word.
+    let teach = {
+        let brain = brain.clone();
+        let taught = taught.clone();
+        let document = document.clone();
+        let topic_input = topic_input.clone();
+        let log = log.clone();
+        let status = status.clone();
+        let render_stats = render_stats.clone();
+        Closure::<dyn FnMut()>::new(move || {
+            let topic = topic_input.value().trim().to_string();
+            if topic.is_empty() {
+                status.set_text_content(Some("type a nonsense word first"));
+                return;
+            }
+            let topic_display = escape_html(&topic);
+            let sentences = [
+                format!("{topic} is a glowing space jellyfish that sings to Rust code."),
+                format!("A {topic} dances through the knowledge graph at night."),
+                format!("Every {topic} dreams of becoming a search engine."),
+            ];
+            let joined = sentences.join("\n");
+            let before = brain.borrow().hal_stats();
+            brain.borrow_mut().learn(&joined);
+            let after = brain.borrow().hal_stats();
+            // Record the taught norms for reply highlighting.
+            for word in joined.split(|c: char| !c.is_alphanumeric()) {
+                if !word.is_empty() {
+                    taught.borrow_mut().insert(word.to_uppercase());
+                }
+            }
+            render_stats();
+            let delta_words = after.vocabulary.saturating_sub(before.vocabulary);
+            let delta_patterns = after.patterns.saturating_sub(before.patterns);
+            let line = document.create_element("div").expect("div");
+            line.set_class_name("system-line");
+            line.set_text_content(Some(&format!(
+                "taught 3 sentences about {topic_display}: +{delta_words} words, +{delta_patterns} patterns"
+            )));
+            log.append_child(&line).expect("append");
+            log.set_scroll_top(log.scroll_height());
+            status.set_text_content(Some(&format!("now ask me about {topic_display}")));
+        })
+    };
+
+    // Ask: reply with taught words highlighted.
+    let ask = {
+        let brain = brain.clone();
+        let taught = taught.clone();
+        let document = document.clone();
+        let topic_input = topic_input.clone();
+        let log = log.clone();
+        let status = status.clone();
+        Closure::<dyn FnMut()>::new(move || {
+            let topic = topic_input.value().trim().to_string();
+            let question = if topic.is_empty() {
+                "What is that?".to_string()
+            } else {
+                format!("Tell me about {topic}.")
+            };
+            let reply = brain.borrow_mut().reply(&question);
+            let ms = brain.borrow().last_reply_ms();
+            status.set_text_content(Some(&format!("replied in {ms:.1} ms")));
+            append_chat(&log, "you:", &escape_html(&question), "chat-line chat-you");
+
+            let doc = document.clone();
+            let line = doc.create_element("div").expect("div");
+            line.set_class_name("chat-line chat-bot");
+            let speaker = doc.create_element("span").expect("span");
+            speaker.set_text_content(Some("megahal: "));
+            line.append_child(&speaker).expect("append");
+            for word in reply.split_inclusive(|c: char| !c.is_alphanumeric()) {
+                let split = word
+                    .find(|c: char| !c.is_alphanumeric())
+                    .unwrap_or(word.len());
+                let (core, tail) = word.split_at(split);
+                if !core.is_empty() && taught.borrow().contains(&core.to_uppercase()) {
+                    let mark = doc.create_element("mark").expect("mark");
+                    mark.set_class_name("learned");
+                    mark.set_text_content(Some(core));
+                    line.append_child(&mark).expect("append");
+                } else if !core.is_empty() {
+                    let span = doc.create_element("span").expect("span");
+                    span.set_text_content(Some(core));
+                    line.append_child(&span).expect("append");
+                }
+                if !tail.is_empty() {
+                    let tail_span = doc.create_element("span").expect("span");
+                    tail_span.set_text_content(Some(&escape_html(tail)));
+                    line.append_child(&tail_span).expect("append");
+                }
+            }
+            log.append_child(&line).expect("append");
+            log.set_scroll_top(log.scroll_height());
+        })
+    };
+
+    for (id, closure) in [("learn-teach", &teach), ("learn-ask", &ask)] {
+        if let Some(element) = document.get_element_by_id(id) {
+            let target: &web_sys::EventTarget = element
+                .dyn_ref()
+                .unwrap_or_else(|| panic!("{id} is an EventTarget"));
+            target
+                .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
+                .expect("learning demo control wires up");
+        }
+    }
+    std::mem::forget((teach, ask));
     Ok(())
 }
 

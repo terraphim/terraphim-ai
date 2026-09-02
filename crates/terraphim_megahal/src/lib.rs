@@ -126,6 +126,15 @@ pub struct MegaHalState {
 /// Brain format version tag.
 pub const BRAIN_VERSION: &str = "MHRS1";
 
+/// Live learning counters (see [`MegaHal::stats`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BrainStats {
+    /// Distinct strings in the dictionary (words and separators).
+    pub vocabulary: usize,
+    /// Distinct observed contexts (the brain map size).
+    pub patterns: usize,
+}
+
 /// The versioned on-disk document ([`MegaHal::save`] output).
 #[derive(Serialize, Deserialize)]
 struct BrainFile<'a> {
@@ -336,6 +345,16 @@ impl MegaHal {
         }
 
         reply.unwrap_or_else(|| error_reply.to_string())
+    }
+
+    /// Live learning counters: distinct strings known (vocabulary) and
+    /// distinct contexts observed (patterns). Both grow as the brain learns,
+    /// which drives the demo's "watch me learn" meters.
+    pub fn stats(&self) -> BrainStats {
+        BrainStats {
+            vocabulary: self.dictionary.len(),
+            patterns: self.brain.len(),
+        }
     }
 
     /// Snapshot the brain state (the unit of persistence).

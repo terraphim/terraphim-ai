@@ -98,6 +98,26 @@
         </div>
       </section>
 
+      <section id="learning-demo" class="lab">
+        <h2>Watch me learn</h2>
+        <p class="lab-intro">
+          Type a nonsense word, teach MegaHAL three sentences about it, then
+          ask about it. The counters below are the brain growing in real
+          time, and the words you taught light up inside its replies.
+        </p>
+        <div class="learn-stats">
+          <span id="stat-words" class="stat">words known: <strong>0</strong></span>
+          <span id="stat-patterns" class="stat">patterns learned: <strong>0</strong></span>
+          <span id="learn-status" class="status" role="status"></span>
+        </div>
+        <div class="composer">
+          <input id="learn-topic" type="text" placeholder="Type a nonsense word, e.g. blorptastic" autocomplete="off" />
+          <button id="learn-teach" type="button">Teach it</button>
+          <button id="learn-ask" type="button">Ask about it</button>
+        </div>
+        <div id="learn-log" class="chat-log lab-log" aria-live="polite"></div>
+      </section>
+
       <footer class="footnote">
         <p>
           MegaHAL is a 1998 Markov chatterbot, not an LLM: it recombines

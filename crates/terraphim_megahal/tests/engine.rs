@@ -193,3 +193,25 @@ fn transcript_replies_trace_to_the_trained_corpus() {
         );
     }
 }
+
+#[test]
+fn stats_grow_as_the_brain_learns() {
+    let mut hal = MegaHal::blank();
+    let before = hal.stats();
+    assert_eq!(
+        before,
+        terraphim_megahal::BrainStats {
+            vocabulary: 3,
+            patterns: 0
+        }
+    );
+    hal.learn("Zephyr wheels rumble across the quartz plains.");
+    let after = hal.stats();
+    assert!(after.vocabulary > before.vocabulary, "vocabulary must grow");
+    assert!(after.patterns > before.patterns, "patterns must grow");
+    let grown = terraphim_megahal::BrainStats {
+        vocabulary: after.vocabulary,
+        patterns: after.patterns,
+    };
+    assert_eq!(hal.stats(), grown, "stats are stable between learns");
+}
