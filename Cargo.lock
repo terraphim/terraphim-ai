@@ -1113,6 +1113,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8744,7 +8754,7 @@ dependencies = [
  "terraphim_agent_messaging 1.19.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "terraphim_agent_supervisor 1.19.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "terraphim_automata",
- "terraphim_rolegraph 1.20.2",
+ "terraphim_rolegraph 1.20.4",
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
@@ -9130,6 +9140,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_megahal_wasm"
+version = "1.21.3"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "rand_core 0.10.1",
+ "serde",
+ "serde_json",
+ "terraphim_megahal",
+ "terraphim_sooth",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "web-sys",
+]
+
+[[package]]
 name = "terraphim_merge_coordinator"
 version = "1.21.3"
 dependencies = [
@@ -9202,7 +9228,7 @@ dependencies = [
  "terraphim_automata",
  "terraphim_config",
  "terraphim_persistence",
- "terraphim_rolegraph 1.20.2",
+ "terraphim_rolegraph 1.20.4",
  "terraphim_service",
  "terraphim_types",
  "terraphim_usage 1.20.3 (registry+https://github.com/rust-lang/crates.io-index)",

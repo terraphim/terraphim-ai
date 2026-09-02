@@ -1,0 +1,21 @@
+# Cloudflare Pages deployment for the MegaHAL Wasm demo
+#
+# The demo is a static Trunk build (`dist/`); Pages serves it as-is.
+# Deployment is a human step (DNS/publish): either connect the repo in the
+# Cloudflare Pages dashboard with the settings below, or run
+# `npx wrangler pages deploy dist` from this directory.
+
+name = "terraphim-megahal-demo"
+pages_build_output_dir = "dist"
+
+[vars]
+# Nothing secret here: the demo is fully client-side.
+
+# Build settings for the Cloudflare Pages dashboard:
+#
+#   Build command:        trunk build --release --cargo-profile release-lto
+#   Build output dir:     dist
+#   Root directory:       crates/terraphim_megahal_wasm
+#   Rust toolchain:       stable + `rustup target add wasm32-unknown-unknown`
+#   System dependencies:  trunk (`cargo install trunk --locked`),
+#                         wasm-opt (provided by trunk automatically)

@@ -1,0 +1,75 @@
+name: Megahal Wasm Demo CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/terraphim_megahal*/**"
+      - ".github/workflows/ci-megahal-wasm.yml"
+  pull_request:
+    paths:
+      - "crates/terraphim_megahal*/**"
+      - ".github/workflows/ci-megahal-wasm.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Binary size budget: gzipped wasm must stay below 500 KB (issue #3263).
+  WASM_GZIP_BUDGET_BYTES: 512000
+
+jobs:
+  wasm-tests:
+    name: Headless wasm tests
+    runs-on: [self-hosted, bigbox]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install wasm-pack
+        run: |
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            cargo install wasm-pack --locked
+          fi
+          wasm-pack --version
+
+      - name: Headless wasm-bindgen tests (Chrome)
+        working-directory: crates/terraphim_megahal_wasm
+        run: wasm-pack test --headless --chrome
+
+      - name: Core crate wasm32 check
+        working-directory: crates/terraphim_megahal
+        run: cargo check --target wasm32-unknown-unknown
+
+  size-budget:
+    name: Wasm size budget (< 500 KB gzipped)
+    runs-on: [self-hosted, bigbox]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install trunk
+        run: |
+          if ! command -v trunk >/dev/null 2>&1; then
+            cargo install trunk --locked
+          fi
+          trunk --version
+
+      - name: Build demo (release-lto)
+        working-directory: crates/terraphim_megahal_wasm
+        run: trunk build --release --cargo-profile release-lto
+
+      - name: Enforce gzipped size budget
+        working-directory: crates/terraphim_megahal_wasm
+        run: |
+          WASM=$(ls dist/*.wasm | head -1)
+          SIZE=$(gzip -9 -c "$WASM" | wc -c | tr -d ' ')
+          echo "gzipped wasm: $SIZE bytes (budget $WASM_GZIP_BUDGET_BYTES)"
+          if [ "$SIZE" -gt "$WASM_GZIP_BUDGET_BYTES" ]; then
+            echo "::error::wasm bundle exceeds the 500 KB gzipped budget"
+            exit 1
+          fi
+
+      - name: Upload demo artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: megahal-demo-dist
+          path: crates/terraphim_megahal_wasm/dist/
+          retention-days: 7

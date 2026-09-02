@@ -1,0 +1,8 @@
+[build]
+target = "index.html"
+dist = "dist"
+default-target = "wasm32-unknown-unknown"
+
+[serve]
+address = "127.0.0.1"
+port = 8090
