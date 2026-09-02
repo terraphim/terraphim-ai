@@ -30,7 +30,9 @@ automata = ["dep:terraphim_automata", "dep:terraphim_types"]
 persistence = ["dep:terraphim_persistence", "dep:async-trait"]
 
 [dependencies]
-terraphim_sooth = { path = "../terraphim_sooth" }
+# path for the workspace; version+registry so the crate publishes to the
+# internal terraphim registry.
+terraphim_sooth = { path = "../terraphim_sooth", version = "1.21.3", registry = "terraphim" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
