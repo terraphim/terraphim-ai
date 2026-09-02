@@ -147,6 +147,37 @@ impl Predictor {
         None
     }
 
+    /// Positional selection mirroring the upstream C kernel's
+    /// `sooth_predictor_select`: scan the context's statistics in ascending
+    /// symbol order, subtracting each count from `limit`; return the symbol
+    /// where the cumulative count first reaches `limit`.
+    ///
+    /// `limit` must be in `1..=count(context)`; `None` is returned for an
+    /// unknown context or an out-of-range `limit` (upstream returns its
+    /// configured error event in those cases -- `terraphim_megahal` maps
+    /// `None` to its own zero "error symbol").
+    ///
+    /// This is the building block MegaHAL uses: the engine draws
+    /// `limit = rng_below(count) + 1` itself and delegates here, keeping the
+    /// RNG consumption pattern (and therefore conformance with the Ruby gem)
+    /// under the engine's control rather than the predictor's.
+    pub fn select_limit(&self, context: Context, limit: u32) -> Option<u32> {
+        let counts = self.table.get(&context)?;
+        let total: u32 = counts.values().sum();
+        if limit == 0 || limit > total {
+            return None;
+        }
+        let mut remaining = limit;
+        for (&symbol, &count) in counts.iter() {
+            if remaining > count {
+                remaining -= count;
+                continue;
+            }
+            return Some(symbol);
+        }
+        None
+    }
+
     /// Information content, in bits, of observing `symbol` in `context`:
     /// `-log2(P(symbol | context))`.
     ///
@@ -374,6 +405,33 @@ mod tests {
     }
 
     #[test]
+    fn select_limit_matches_upstream_cumulative_scan() {
+        // Statistics sorted by symbol ascending: 3 x3, 7 x1 (total 4).
+        let mut predictor = Predictor::new();
+        for _ in 0..3 {
+            predictor.observe((0, 0), 3);
+        }
+        predictor.observe((0, 0), 7);
+
+        // Upstream: cumulative scan in ascending symbol order.
+        assert_eq!(predictor.select_limit((0, 0), 1), Some(3));
+        assert_eq!(predictor.select_limit((0, 0), 3), Some(3));
+        assert_eq!(predictor.select_limit((0, 0), 4), Some(7));
+
+        // limit == count deterministically returns the highest symbol
+        // (the quirk MegaHAL's seed model relies on).
+        assert_eq!(
+            predictor.select_limit((0, 0), predictor.count((0, 0))),
+            Some(7)
+        );
+
+        // Error cases (upstream returns its error event).
+        assert_eq!(predictor.select_limit((0, 0), 0), None);
+        assert_eq!(predictor.select_limit((0, 0), 5), None);
+        assert_eq!(predictor.select_limit((9, 9), 1), None);
+    }
+
+    #[test]
     fn clear_resets_all_state() {
         let mut predictor = Predictor::new();
         predictor.observe((0, 0), 1);
@@ -437,5 +495,16 @@ mod wasm_tests {
         let json = serde_json::to_string(&predictor).unwrap();
         let restored: Predictor = serde_json::from_str(&json).unwrap();
         assert_eq!(predictor, restored);
+    }
+
+    #[wasm_bindgen_test]
+    fn select_limit_works_on_wasm32() {
+        let mut predictor = Predictor::new();
+        predictor.observe((0, 0), 5);
+        predictor.observe((0, 0), 5);
+        predictor.observe((0, 0), 9);
+        assert_eq!(predictor.select_limit((0, 0), 1), Some(5));
+        assert_eq!(predictor.select_limit((0, 0), 3), Some(9));
+        assert_eq!(predictor.select_limit((0, 0), 4), None);
     }
 }
