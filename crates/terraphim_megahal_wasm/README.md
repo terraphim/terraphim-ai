@@ -36,8 +36,17 @@ budget (measured ~6 ms worst on a default brain; gate at 50 ms).
 
 ## Deployment
 
-Cloudflare Pages configuration lives in `wrangler.toml`; publishing is a
-human step (dashboard connect or `npx wrangler pages deploy dist`).
+Live: **https://terraphim-megahal-demo.pages.dev** (Cloudflare Pages,
+zestic.ai account, deployed with `wrangler pages deploy dist --branch main`).
+
+Re-deploy after a rebuild:
+
+```console
+trunk build --release --cargo-profile release-lto
+wrangler pages deploy dist --project-name terraphim-megahal-demo --branch main
+```
+
+Cloudflare Pages configuration lives in `wrangler.toml`.
 
 ## Binary size budget
 

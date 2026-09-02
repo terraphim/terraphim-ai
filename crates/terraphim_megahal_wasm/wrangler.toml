@@ -1,9 +1,8 @@
 # Cloudflare Pages deployment for the MegaHAL Wasm demo
 #
 # The demo is a static Trunk build (`dist/`); Pages serves it as-is.
-# Deployment is a human step (DNS/publish): either connect the repo in the
-# Cloudflare Pages dashboard with the settings below, or run
-# `npx wrangler pages deploy dist` from this directory.
+# Deployed 2026-09-02: https://terraphim-megahal-demo.pages.dev
+# Re-deploy: `wrangler pages deploy dist --branch main` from this directory.
 
 name = "terraphim-megahal-demo"
 pages_build_output_dir = "dist"
