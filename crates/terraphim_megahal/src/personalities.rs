@@ -9,6 +9,11 @@
 /// The `:default` personality corpus (always embedded).
 pub const DEFAULT: &str = include_str!("personalities_data/default.txt");
 
+/// Terraphim-authored corpus teaching the engine that Rust is a computer
+/// language (not upstream; hand-written, one sentence per line). Always
+/// embedded so the demo can showcase a domain persona.
+pub const RUST: &str = include_str!("personalities_data/rust.txt");
+
 /// All non-default personality corpora, gated behind the `personalities`
 /// feature.
 #[cfg(feature = "personalities")]
@@ -30,7 +35,7 @@ pub mod extra {
 /// `personalities` feature only `default` is available.
 pub fn available() -> Vec<(&'static str, &'static str)> {
     #[allow(unused_mut)] // mut is used only with the `personalities` feature
-    let mut list = vec![("default", DEFAULT)];
+    let mut list = vec![("default", DEFAULT), ("rust", RUST)];
     #[cfg(feature = "personalities")]
     {
         list.extend([

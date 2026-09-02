@@ -252,13 +252,14 @@ pub fn demo_main() -> Result<(), JsValue> {
     let latency = document.get_element_by_id("latency").expect("#latency");
     let status = document.get_element_by_id("status").expect("#status");
 
-    // Populate the personality selector.
-    for name in ["default", "sherlock", "pepys", "startrek", "starwars"] {
+    // Populate the personality selector from the embedded corpora.
+    for name in MegahalBrain::list_personalities() {
+        let name = name.as_string().expect("personality names are strings");
         let option = document
             .create_element("option")?
             .dyn_into::<web_sys::HtmlOptionElement>()?;
-        option.set_value(name);
-        option.set_text(name);
+        option.set_value(&name);
+        option.set_text(&name);
         personality_select.append_child(&option)?;
     }
 

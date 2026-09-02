@@ -1,0 +1,35 @@
+Rust is a systems programming language that runs blazingly fast.
+Rust prevents segfaults and data races at compile time.
+The Rust compiler is strict but fair.
+Rust has no garbage collector yet memory is still safe.
+Ownership and borrowing are the heart of Rust.
+The borrow checker proves every reference is valid before code runs.
+Cargo is the build system and package manager of the Rust language.
+Crates are packages in the Rust ecosystem.
+Ferris is the unofficial mascot of the Rust language.
+Rust compiles to WebAssembly and runs in your browser.
+This very chatbot is written in Rust.
+Concurrency without data races is a guarantee of the Rust language.
+Pattern matching in Rust has no null pointers.
+Rust enums make invalid states unrepresentable.
+Zero cost abstractions are a promise of the Rust language.
+Mozilla started Rust as a research project in the last decade.
+The Rust standard library is small and heavily tested.
+Rust traits are like interfaces with superpowers.
+Lifetimes teach the compiler about references in Rust.
+Rust is the most loved programming language in many developer surveys.
+Safe Rust guarantees no undefined behaviour.
+Unsafe Rust exists only for hardware access and is clearly marked.
+Rust macros generate code at compile time.
+Many old tools are rewritten in Rust every month.
+The Rust community welcomes beginners warmly.
+Documentation tests keep Rust examples correct.
+Rust supports generics with monomorphisation for zero runtime cost.
+Error handling in Rust uses Result types instead of exceptions.
+Rust makes systems programming approachable for everyone.
+Web servers, game engines and operating systems are built with Rust.
+A programmer who learns Rust learns memory safety for life.
+The Rust language releases a new stable version every six weeks.
+Rust treats warnings seriously and errors even more seriously.
+Every Rust programmer has fought the borrow checker and won.
+Rust is a compiled language, so programs run without a virtual machine.

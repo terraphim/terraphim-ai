@@ -103,6 +103,7 @@ fn every_reply_word_traces_to_the_trained_corpus() {
 }
 
 #[test]
+#[cfg(feature = "personalities")]
 fn personality_switch_changes_the_brain_and_the_text() {
     // Same seed, same input, three different brains -> three different
     // replies, each from its own personality's corpus.
@@ -121,6 +122,7 @@ fn personality_switch_changes_the_brain_and_the_text() {
 }
 
 #[test]
+#[cfg(feature = "personalities")]
 fn themed_input_seeds_from_the_matching_corpus() {
     // "Picard" appears in the Star Trek corpus; a startrek brain seeded on
     // that keyword draws its reply from that corpus. The default brain does
@@ -243,5 +245,50 @@ fn more_training_grows_the_vocabulary_in_replies() {
     assert!(
         !before || upper.is_empty(),
         "no exclusive vocabulary before training"
+    );
+}
+
+#[test]
+fn rust_persona_recognises_rust_as_a_computer_language() {
+    // The `rust` persona is trained on a corpus that teaches the engine
+    // Rust is a programming language. Asked about Rust, every reply word
+    // must trace to that corpus, and language vocabulary must appear.
+    let corpus = include_str!("../src/personalities_data/rust.txt").to_uppercase();
+    assert!(corpus.contains("PROGRAMMING LANGUAGE"));
+
+    let mut hal = MegaHal::blank();
+    hal.load_personality("rust").expect("rust persona embedded");
+    let mut rng = DefaultRng::seed_from_u64(64);
+
+    let language_words = ["LANGUAGE", "PROGRAMMING", "COMPUTER", "COMPILER", "CODE"];
+    let mut saw_language_word = false;
+    for input in [
+        "What is Rust?",
+        "Tell me about Rust.",
+        "Is Rust a programming language?",
+        "Why do you like Rust?",
+    ] {
+        let reply = reply_with_seed(&mut hal, input, 64);
+        assert!(!reply.is_empty());
+        let upper = reply.to_uppercase();
+        for word in upper.split_whitespace() {
+            let norm = word
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_uppercase();
+            if norm.is_empty() {
+                continue;
+            }
+            assert!(
+                corpus.contains(&norm),
+                "rust-persona reply word {word:?} is outside the rust corpus"
+            );
+        }
+        if language_words.iter().any(|w| upper.contains(w)) {
+            saw_language_word = true;
+        }
+    }
+    assert!(
+        saw_language_word,
+        "asking about Rust must surface language vocabulary across the seeded conversation"
     );
 }
