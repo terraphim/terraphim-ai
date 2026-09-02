@@ -531,12 +531,33 @@ terraphim-agent cache stats --verbose
 
 ---
 
-## 🎯 Choose Your Path
+## Terraphim Agent subsystems
 
-### 🔬 For Beginners
-1. Start with [Quick Start Tutorial](agent-workflows/1-prompt-chaining/)
-2. Try [Basic Search Examples](#basic-search)
-3. Explore [First AI Chat](#basic-ai-chat)
+Working examples for the `terraphim_agent` library and binary. These pages
+sit alongside the architecture explainer in `docs/architecture/` and the
+session handovers in `docs/handovers/`.
+
+### [Shared learning end-to-end](terraphim-agent-shared-learning.md)
+**Learn**: Capture a failed command, promote it to a cross-agent
+`SharedLearning`, attach a `RoleGraph` for hybrid scoring, and surface the
+learning to a second agent.
+**Time**: 20 minutes
+**Skills**: Rust, `terraphim_agent` library, `terraphim_rolegraph`, hybrid
+scoring, trust-level promotion.
+**Pairs with**:
+[`docs/architecture/terraphim-agent.md`](../architecture/terraphim-agent.md)
+and the
+[2026-09-01 hybrid-scoring handover](../handovers/2026-09-01-terraphim-agent-shared-learning-hybrid.md).
+
+### [Hybrid scoring reference](terraphim-agent-shared-learning.md#6-hybrid-scoring-the-2026-09-refactor)
+The same page documents the hybrid scorer (weighted mean of node rank +
+edge rank + document rank with thesaurus term expansion) and its BM25
+fallback. Use it as a reference when integrating `terraphim_rolegraph` into
+your own agent binary.
+
+---
+
+## 🎯 Choose Your Path
 
 ### 👨‍💻 For Developers
 1. Set up [IDE Integration](claude-code-hooks/)

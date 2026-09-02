@@ -6,18 +6,37 @@
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::{Value, json};
+use std::fs;
 use std::net::SocketAddr;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use terraphim_tinyclaw::tools::browser::BrowserTool;
 use terraphim_tinyclaw::tools::{Tool, ToolError};
 
 fn make_browser() -> BrowserTool {
+    make_browser_with_agent_binary(None)
+}
+
+fn make_browser_with_agent_binary(agent_binary: Option<String>) -> BrowserTool {
     let cfg = terraphim_tinyclaw::config::BrowserConfig {
         enabled: true,
         timeout_secs: 10,
         max_bytes: 512 * 1024,
         proxy: None,
+        agent_binary,
     };
     BrowserTool::from_config(&cfg).expect("browser tool builds")
+}
+
+fn write_executable(path: &Path, body: &str) {
+    fs::write(path, body).unwrap();
+    #[cfg(unix)]
+    {
+        let mut perms = fs::metadata(path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(path, perms).unwrap();
+    }
 }
 
 /// Spin up a local HTTP server; returns its base URL.
@@ -111,6 +130,85 @@ async fn browser_click_type_screenshot_unavailable() {
             matches!(err, ToolError::BackendUnavailable { .. }),
             "{op} should be BackendUnavailable, got: {err:?}"
         );
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn browser_native_ops_probe_agent_capability_and_fail_closed_when_disabled() {
+    let temp = tempfile::tempdir().unwrap();
+    let shim = temp.path().join("terraphim-agent");
+    write_executable(
+        &shim,
+        r#"#!/bin/sh
+if [ "$*" = "--robot --format json robot capabilities" ]; then
+  printf '%s\n' '{"features":{"web_operations":false},"commands":["robot"]}'
+  exit 0
+fi
+echo "unexpected args: $*" >&2
+exit 2
+"#,
+    );
+
+    let tool = make_browser_with_agent_binary(Some(shim.display().to_string()));
+    let err = tool
+        .execute(json!({"op": "screenshot", "url": "http://example.test"}))
+        .await
+        .expect_err("disabled web_operations must fail closed");
+
+    match err {
+        ToolError::BackendUnavailable { message, .. } => {
+            assert!(
+                message.contains("web_operations=false"),
+                "message should contain capability evidence, got: {message}"
+            );
+        }
+        other => panic!("expected BackendUnavailable, got {other:?}"),
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn browser_native_ops_reject_placeholder_agent_web_protocol() {
+    let temp = tempfile::tempdir().unwrap();
+    let shim = temp.path().join("terraphim-agent");
+    write_executable(
+        &shim,
+        r#"#!/bin/sh
+case "$*" in
+  "--robot --format json robot capabilities")
+    printf '%s\n' '{"features":{"web_operations":true},"commands":["robot","web"]}'
+    exit 0
+    ;;
+  "--help")
+    printf '%s\n' 'Commands:'
+    printf '%s\n' '  web  Web operations'
+    exit 0
+    ;;
+  "web screenshot http://example.test")
+    printf '%s\n' 'Web screenshot functionality is not yet implemented.'
+    exit 0
+    ;;
+esac
+echo "unexpected args: $*" >&2
+exit 2
+"#,
+    );
+
+    let tool = make_browser_with_agent_binary(Some(shim.display().to_string()));
+    let err = tool
+        .execute(json!({"op": "screenshot", "url": "http://example.test"}))
+        .await
+        .expect_err("placeholder output must not be accepted as screenshot success");
+
+    match err {
+        ToolError::BackendUnavailable { message, .. } => {
+            assert!(
+                message.contains("placeholder-only") || message.contains("no verified"),
+                "message should contain protocol evidence, got: {message}"
+            );
+        }
+        other => panic!("expected BackendUnavailable, got {other:?}"),
     }
 }
 

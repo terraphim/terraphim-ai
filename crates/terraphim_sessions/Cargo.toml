@@ -2,6 +2,7 @@
 name = "terraphim_sessions"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 description = "Session management for AI coding assistant history - search across Claude Code, Cursor, Aider sessions"
 license = "Apache-2.0"
 authors = ["Terraphim Contributors"]
@@ -88,3 +89,15 @@ terraphim_types = { version = "1.21.0", registry = "terraphim", optional = true 
 tempfile = { workspace = true }
 
 tokio-test = "0.4"
+
+# NFR benchmark: proves the G1 "<100ms / 10K sessions" and F4 "<10ms BM25"
+# performance claims (issue #3014). Mirrors the criterion 0.8 precedent in
+# terraphim_tinyclaw.
+criterion = "0.8"
+
+[[bench]]
+name = "search_nfr"
+# search_sessions() is gated by the search-index feature (lib.rs), so the bench
+# target requires it to compile.
+required-features = ["search-index"]
+harness = false

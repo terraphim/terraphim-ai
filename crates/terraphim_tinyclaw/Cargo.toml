@@ -57,6 +57,7 @@ regex = "1"
 
 # Concurrency
 parking_lot = "0.12"
+fs2 = "0.4"
 
 # CLI
 clap = { version = "4", features = ["derive"] }
@@ -87,6 +88,13 @@ terraphim_mcp_search = { version = "0.1.3", registry = "terraphim" }
 # `client` + `transport-child-process` for stdio client.
 rmcp = { version = "0.9.1", features = ["server", "transport-io", "client", "transport-child-process", "macros"] }
 schemars = "1"
+
+# `futures::StreamExt` is used by `BrowserTool` to stream-bounded HTTP
+# response bodies; the alternative (`resp.bytes()`) trusts Content-Length
+# and can buffer gigabytes. Already in the transitive tree via `axum`,
+# pinned here so the browser tool's body cap doesn't depend on a future
+# axum version bump.
+futures-util = { version = "0.3", default-features = false, features = ["io"] }
 
 # Wave 3 of Hermes parity arc: cron scheduler with persistence.
 # Uses `cron = "0.13"` for cron expression parsing (instead of a hand-rolled
@@ -121,6 +129,7 @@ haystack_jmap = { version = "1.20.2", registry = "terraphim" }
 # Wave 4 (Phase B) GitHub channel — HMAC-SHA256 webhook verification.
 hmac = "0.12"
 sha2 = "0.10"
+jsonwebtoken = "9"
 
 # Wave 5 (Phase E) Hermes parity tools — sandbox, subagents, browser.
 # terraphim_rlm: sandboxed execution (Local/Docker backends). Not a
@@ -136,10 +145,54 @@ terraphim_spawner = { path = "../terraphim_spawner" }
 terraphim_engine_events = { path = "../terraphim_engine_events" }
 # Provider/ProviderType/Capability types used by the subagent tool.
 terraphim_types = { version = "1.20.2", registry = "terraphim" }
+terraphim_orchestrator = { version = "1.20.2", registry = "terraphim" }
 
 # Wave 5 (Phase C1) dashboard: axum-based HTTP server (Hermes parity).
 axum = { version = "0.8", features = ["macros"] }
 tower = "0.5"
+
+# MCP (Model Context Protocol) client + server for the 9-tool channel bridge
+# (Wave 2 of Hermes parity arc). `server` + `transport-io` for stdio server;
+# `client` + `transport-child-process` for stdio client.
+
+# Wave 3 of Hermes parity arc: cron scheduler with persistence.
+# Uses `cron = "0.13"` for cron expression parsing (instead of a hand-rolled
+# parser) and `terraphim_persistence` for job storage.
+
+# Direct dep for opendal::ErrorKind matching in cron/store.rs.
+# Was transitive via terraphim_persistence; made direct so the typed
+# enum comparison is stable across opendal version bumps.
+
+# Wave 5 (Phase C2) OpenAI-compatible HTTP proxy — TinyClaw provides its own
+# minimal proxy here. Rather than depending on the sibling `terraphim-llm-proxy`
+# crate (0.1.12) as a git dep (blocked: its `claude_code_agents` git submodule is
+# registered in HEAD but missing from `.gitmodules`, so it is unfetchable from a
+# fresh clone), TinyClaw forwards to the DEPLOYED proxy instance when
+# `TERRAPHIM_LLM_PROXY_URL` is set (bigbox: http://100.106.66.7:3456,
+# `PROXY_API_KEY` via `TERRAPHIM_LLM_PROXY_API_KEY`). Without the env var the
+# proxy stays a hermetic echo stub so tests remain self-contained.
+# See ADR-0010 for the full investigation notes (2026-08-08) and the deployed-
+# leverage resolution (2026-08-11).
+
+# Wave 4 (Phase B) Email channel — `haystack_jmap` from the terraphim
+# registry (moved out of terraphim-private into the terraphim-service
+# crates repo, #3198). Brings in `haystack_core` + `terraphim_types`
+# from the same registry. Lib name is `haystack_jmap` (was `jmap_client`
+# in the private copy); API: `JMAPClient::new(token, session_url)`,
+# `search_emails(query, limit)`.
+
+# Wave 4 (Phase B) GitHub channel — HMAC-SHA256 webhook verification.
+
+# Wave 5 (Phase E) Hermes parity tools — sandbox, subagents, browser.
+# terraphim_rlm: sandboxed execution (Local/Docker backends). Not a
+# workspace member (firecracker-excluded) — path dep, minimal features:
+# llm (LLM bridge), kg-validation (validator types), docker-backend.
+# Sessions are in-memory (DashMap) so a CLI bridge cannot hold them;
+# the crate must be called in-process (see research-tinyclaw-parity-tools).
+# terraphim_spawner: subagent pool + handles. Tiny standalone crate.
+# Provider/ProviderType/Capability types used by the subagent tool.
+
+# Wave 5 (Phase C1) dashboard: axum-based HTTP server (Hermes parity).
 
 [features]
 default = ["telegram"]
@@ -154,6 +207,7 @@ tokio-test = "0.4"
 tower = { version = "0.5", features = ["util"] }
 reqwest = { workspace = true }
 tempfile = { workspace = true }
+rsa = { version = "0.9", features = ["pem"] }
 
 criterion = { version = "0.8", features = ["async_tokio"] }
 

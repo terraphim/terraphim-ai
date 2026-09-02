@@ -1,0 +1,94 @@
+[
+  {
+    "model": "deepseek/deepseek-v4-flash",
+    "prompt_price": "0.00000009",
+    "completion_price": "0.00000018",
+    "context_length": 1048576,
+    "rlm_latency_ms": 5648,
+    "search_latency_ms": 5731,
+    "wall_ms": 5763.3,
+    "sufficiency": "RlmSynthesis",
+    "answer_text": null,
+    "confidence": null
+  },
+  {
+    "model": "amazon/nova-micro-v1",
+    "prompt_price": "0.000000035",
+    "completion_price": "0.00000014",
+    "context_length": 128000,
+    "rlm_latency_ms": 10961,
+    "search_latency_ms": 11049,
+    "wall_ms": 11064.7,
+    "sufficiency": "RlmSynthesis",
+    "answer_text": "The provided context shows multiple instances of an `async fn main()` function with a return type of `Result<(), Box<dyn std::error::Error>>`. This indicates that the `main` function in various modules (such as `rlm.rs`, `lib.rs`, and `executor/mod.rs`) is asynchronous and designed to handle potential errors by returning a `Result`. The presence of `Box<dyn std::error::Error>` suggests that the function can return any type that implements the `Error` trait, allowing for flexible error handling. Additionally, there is one instance of `main.rs` where the `main` function is defined without specifying the return type explicitly, which might be an oversight or a different implementation detail.",
+    "confidence": 0.95
+  },
+  {
+    "model": "amazon/nova-lite-v1",
+    "prompt_price": "0.00000006",
+    "completion_price": "0.00000024",
+    "context_length": 300000,
+    "rlm_latency_ms": 1603,
+    "search_latency_ms": 1772,
+    "wall_ms": 1794.4,
+    "sufficiency": "RlmSynthesis",
+    "answer_text": null,
+    "confidence": null
+  },
+  {
+    "model": "mistralai/mistral-nemo",
+    "prompt_price": "0.00000002",
+    "completion_price": "0.00000003",
+    "context_length": 131072,
+    "rlm_latency_ms": 31390,
+    "search_latency_ms": 31430,
+    "wall_ms": 31444.8,
+    "sufficiency": "RlmSynthesis",
+    "answer_text": "The function `main` is defined multiple times in your Rust codebase. It's declared as `async` and returns a `Result` with an error type of `Box<dyn std::error::Error>`. Here are the locations where it's defined:",
+    "confidence": 0.95
+  },
+  {
+    "model": "meta-llama/llama-3.2-1b-instruct",
+    "prompt_price": "0.000000027",
+    "completion_price": "0.000000201",
+    "context_length": 131072,
+    "rlm_latency_ms": 1805,
+    "search_latency_ms": 1887,
+    "wall_ms": 1905.5,
+    "sufficiency": "RlmSynthesis",
+    "answer_text": null,
+    "confidence": null
+  },
+  {
+    "model": "meta-llama/llama-3.2-3b-instruct",
+    "prompt_price": "0.00000005",
+    "completion_price": "0.00000033",
+    "context_length": 131072,
+    "rlm_latency_ms": 2444,
+    "search_latency_ms": 2520,
+    "wall_ms": 2550.4,
+    "sufficiency": "RlmSynthesis",
+    "answer_text": null,
+    "confidence": null
+  },
+  {
+    "model": "google/gemma-3-4b-it",
+    "prompt_price": "0.00000005",
+    "completion_price": "0.0000001",
+    "context_length": 131072,
+    "rlm_latency_ms": 12330,
+    "search_latency_ms": 12368,
+    "wall_ms": 12386.6,
+    "sufficiency": "RlmSynthesis",
+    "answer_text": null,
+    "confidence": null
+  },
+  {
+    "model": "qwen/qwen3-coder:free",
+    "prompt_price": "0",
+    "completion_price": "0",
+    "context_length": 1048576,
+    "error": "    RLM execution failed: Config error: Rate limit exceeded",
+    "wall_ms": 543.0
+  }
+]

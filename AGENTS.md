@@ -231,13 +231,15 @@ UBS stands for "Ultimate Bug Scanner": **The AI Coding Agent's Secret Weapon: Fl
 
 **Commands:**
 ```bash
-ubs file.ts file2.py                    # Specific files (< 1s) — USE THIS
+ubs --staged --fail-on-warning .     # Pre-commit (changed files only) — RECOMMENDED; avoids copying the tree to /tmp
+ubs --diff                            # Scan the unstaged diff (fast, no /tmp copy)
+ubs file.ts file2.py                    # Specific files (< 1s)
 ubs $(git diff --name-only --cached)    # Staged files — before commit
 ubs --only=js,python src/               # Language filter (3-5x faster)
 ubs --ci --fail-on-warning .            # CI mode — before PR
 ubs --help                              # Full command reference
 ubs sessions --entries 1                # Tail the latest install session log
-ubs .                                   # Whole project (ignores things like .venv and node_modules automatically)
+ubs .                                   # Whole project — AVOID on large repos: v5.x copies the tree to /tmp before scanning (see #3149)
 ```
 
 **Output Format:**
@@ -257,7 +259,7 @@ Parse: `file:line:col` → location | 💡 → how to fix | Exit 0/1 → pass/fa
 5. Re-run `ubs <file>` → exit 0
 6. Commit
 
-**Speed Critical:** Scope to changed files. `ubs src/file.ts` (< 1s) vs `ubs .` (30s). Never full scan for small edits.
+**Speed Critical:** Scope to changed files. Prefer `ubs --staged` / `ubs --diff` (no /tmp copy). `ubs file.ts` (< 1s) vs `ubs .` (slow + copies tree to /tmp on v5.x). Never full scan for small edits.
 
 **Bug Severity:**
 - **Critical** (always fix): Null safety, XSS/injection, async/await, memory leaks

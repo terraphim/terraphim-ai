@@ -1,0 +1,380 @@
+# Terraphim AI component manifest -- canonical machine-readable registry.
+#
+# Authoritative for: component identity, ownership boundaries, dependency source
+# sensitivity, agent policy, and compatible skills. This manifest is planning and
+# routing metadata; it does not activate ADF agents by itself.
+#
+# Conventions:
+#   - paths are repo-relative, forward slashes.
+#   - secrets are op:// references only; values never appear here.
+#   - status: active | excluded | experimental | parked | governance.
+#   - agent_policy values must be defined in .agent/POLICIES.md.
+
+project:
+  name: terraphim-ai
+  version: 1.21.0
+  description: Terraphim AI search, knowledge graph, agent orchestration, and automation workspace.
+  shape: polyrepo-consumer
+  tracker:
+    kind: gitea
+    endpoint: https://git.terraphim.cloud
+    owner: terraphim
+    repo: terraphim-ai
+  cargo_registries:
+    crates_io:
+      source: crates.io
+      protocol: sparse
+    terraphim:
+      source: sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/
+      credential_env: CARGO_REGISTRIES_TERRAPHIM_TOKEN
+      token_source: GITEA_TOKEN
+
+agent_policies:
+  production-code-pairing:
+    description: Human approval required for runtime, deployment, CI, merge, registry, or security-sensitive components.
+    pairing_required: true
+    auto_mode_forbidden: true
+    push_gate: human_approval
+  auto-mode-ok:
+    description: Agents may implement after Gitea issue selection when CI and local quality gates pass.
+    pairing_required: false
+    auto_mode_forbidden: false
+    push_gate: ci_green
+  human-review-only:
+    description: Agents may analyse, document, or propose changes but must not merge or auto-activate changes.
+    pairing_required: true
+    auto_mode_forbidden: true
+    push_gate: human_approval
+    paths_only: true
+  event-only:
+    description: Agents may only run from orchestrator events such as push, PR, webhook, or explicit mention dispatch.
+    pairing_required: false
+    auto_mode_forbidden: true
+    push_gate: orchestrator_event
+
+components:
+  server-runtime:
+    status: active
+    source_paths:
+      - terraphim_server
+      - terraphim_ai_nodejs
+    source_of_truth_for:
+      - Terraphim server runtime and public API behaviour
+      - Node integration crate
+    consumes:
+      - registry-and-polyrepo
+      - search-and-kg
+    dependency_sources:
+      - local
+      - terraphim-registry
+      - crates.io
+    agent_policy: production-code-pairing
+    skills_compatible:
+      - rust-development
+      - backend-architecture
+      - testing
+      - security-audit
+
+  sandbox-runtime:
+    status: active
+    source_paths:
+      - terraphim_firecracker
+      - crates/terraphim_rlm
+    source_of_truth_for:
+      - Firecracker-backed sandbox execution
+      - Recursive language model runtime support
+    consumes:
+      - registry-and-polyrepo
+    dependency_sources:
+      - local
+      - terraphim-registry
+      - crates.io
+    agent_policy: production-code-pairing
+    skills_compatible:
+      - rust-development
+      - security-audit
+      - terraphim-rlm
+
+  adf-orchestration:
+    status: active
+    source_paths:
+      - .terraphim
+      - crates/terraphim_orchestrator
+      - scripts/adf-setup
+      - adf-orchestrator.service
+      - adf-orchestrator.sh
+      - deploy-adf-orchestrator.sh
+      - systemd
+    source_of_truth_for:
+      - Repository-local ADF configuration and setup templates
+      - Orchestrator source snapshot used for tests and planning
+    consumes:
+      - gitea-automation
+      - registry-and-polyrepo
+    dependency_sources:
+      - local-excluded
+      - terraphim-registry
+      - gitea
+    agent_policy: production-code-pairing
+    skills_compatible:
+      - adf-orchestrate
+      - devops
+      - gitea-pagerank-workflow
+
+  gitea-automation:
+    status: active
+    source_paths:
+      - crates/terraphim_gitea_runner
+      - crates/terraphim_github_runner
+      - crates/terraphim_github_runner_server
+      - crates/terraphim_merge_coordinator
+    source_of_truth_for:
+      - Native Gitea runner and Gitea-compatible CI automation
+      - Merge coordination and PR status workflows
+    consumes:
+      - registry-and-polyrepo
+    dependency_sources:
+      - local
+      - local-excluded
+      - terraphim-registry
+      - gitea
+    agent_policy: production-code-pairing
+    skills_compatible:
+      - rust-development
+      - gitea-pagerank-workflow
+      - testing
+
+  registry-and-polyrepo:
+    status: governance
+    source_paths:
+      - Cargo.toml
+      - Cargo.lock
+      - .cargo/config.toml
+      - crates/haystack_atlassian/Cargo.toml
+      - crates/haystack_discourse/Cargo.toml
+      - crates/terraphim_agent_application/Cargo.toml
+      - crates/terraphim_automata_py/Cargo.toml
+      - crates/terraphim_github_runner/Cargo.toml
+      - crates/terraphim_github_runner_server/Cargo.toml
+      - crates/terraphim_lsp/Cargo.toml
+      - crates/terraphim_rlm/Cargo.toml
+      - crates/terraphim_rolegraph_py/Cargo.toml
+      - crates/terraphim_sessions/Cargo.toml
+      - crates/terraphim_spawner/Cargo.toml
+      - crates/terraphim_symphony/Cargo.toml
+      - crates/terraphim_tinyclaw/Cargo.toml
+      - crates/terraphim_validation/Cargo.toml
+      - crates/terraphim_weather_report/Cargo.toml
+    source_of_truth_for:
+      - Workspace membership and excluded crate boundaries
+      - Private terraphim Cargo registry consumption
+      - Polyrepo extraction dependency edges
+    consumes: []
+    dependency_sources:
+      - terraphim-registry
+      - gitea
+      - crates.io
+      - git
+      - local
+    agent_policy: human-review-only
+    skills_compatible:
+      - rust-development
+      - security-audit
+      - requirements-traceability
+
+  search-and-kg:
+    status: active
+    source_paths:
+      - .terraphim/kg
+      - crates/terraphim_lsp
+      - crates/terraphim_mcp_search
+      - crates/terraphim_sessions
+    source_of_truth_for:
+      - Knowledge graph search support
+      - MCP search integration
+      - Session search and history tooling
+    consumes:
+      - registry-and-polyrepo
+    dependency_sources:
+      - local
+      - terraphim-registry
+      - crates.io
+    agent_policy: auto-mode-ok
+    guardrails:
+      - Registry-sensitive dependency changes escalate to registry-and-polyrepo.
+    skills_compatible:
+      - rust-development
+      - local-knowledge
+      - session-search
+
+  validation-and-quality:
+    status: active
+    source_paths:
+      - crates/terraphim_dsm
+      - crates/terraphim_eval_check
+      - crates/terraphim_validation
+      - validation-config.toml
+      - config/validation-config.toml
+    source_of_truth_for:
+      - Evaluation checks
+      - Validation tooling
+      - Structural and quality analysis helpers
+    consumes:
+      - registry-and-polyrepo
+    dependency_sources:
+      - local
+      - terraphim-registry
+      - crates.io
+    agent_policy: auto-mode-ok
+    skills_compatible:
+      - testing
+      - quality-gate
+      - requirements-traceability
+
+  desktop-and-extensions:
+    status: active
+    source_paths:
+      - desktop
+      - browser_extensions
+      - vs-code-terraphim-it
+    source_of_truth_for:
+      - Desktop UI and Tauri workflows
+      - Browser extension and VS Code integration artefacts
+    consumes:
+      - server-runtime
+      - search-and-kg
+    dependency_sources:
+      - local
+      - crates.io
+      - npm
+    agent_policy: production-code-pairing
+    skills_compatible:
+      - frontend
+      - cross-platform
+      - testing
+      - visual-testing
+
+  workspace-tooling:
+    status: active
+    source_paths:
+      - crates/terraphim_spawner
+      - crates/terraphim_tinyclaw
+      - crates/terraphim_update
+      - crates/terraphim_weather_report
+      - crates/terraphim_workspace
+    source_of_truth_for:
+      - Supporting CLI/runtime tooling
+      - Update and reporting helpers
+    consumes:
+      - registry-and-polyrepo
+    dependency_sources:
+      - local
+      - terraphim-registry
+      - crates.io
+    agent_policy: auto-mode-ok
+    skills_compatible:
+      - rust-development
+      - testing
+
+  experimental-and-parked:
+    status: experimental
+    source_paths:
+      - crates/terraphim_agent_application
+      - crates/terraphim_automata_py
+      - crates/terraphim_build_args
+      - crates/terraphim_rolegraph_py
+      - crates/terraphim_symphony
+      - lab/parking-lot
+    source_of_truth_for:
+      - Experimental, parked, or separately built code
+    consumes:
+      - registry-and-polyrepo
+    dependency_sources:
+      - local-excluded
+      - terraphim-registry
+      - crates.io
+    agent_policy: human-review-only
+    skills_compatible:
+      - rust-development
+      - documentation
+
+  documentation-and-governance:
+    status: governance
+    source_paths:
+      - .docs
+      - docs
+      - AGENTS.md
+      - manifest.yaml
+      - .agent
+    source_of_truth_for:
+      - Repository governance
+      - Agent operating rules
+      - Design, research, validation, and handover artefacts
+    consumes: []
+    dependency_sources:
+      - local
+    agent_policy: human-review-only
+    skills_compatible:
+      - documentation
+      - architecture-decision-record
+      - requirements-traceability
+
+dependency_source_inventory:
+  generated_from: cargo metadata --format-version 1
+  last_observed:
+    crates_io: 930
+    local_path: 17
+    terraphim_registry: 14
+    git: 2
+  terraphim_registry_packages:
+    - terraphim-markdown-parser@1.20.2
+    - terraphim_agent_evolution@1.20.2
+    - terraphim_automata@1.20.2
+    - terraphim_config@1.20.2
+    - terraphim_mcp_search@0.1.0
+    - terraphim_orchestrator@1.20.2
+    - terraphim_persistence@1.20.2
+    - terraphim_rolegraph@1.20.2
+    - terraphim_router@1.20.2
+    - terraphim_service@1.20.5
+    - terraphim_settings@1.20.2
+    - terraphim_spawner@1.21.0
+    - terraphim_tracker@1.20.2
+    - terraphim_types@1.20.2
+  git_packages:
+    - rustls-webpki@0.103.12
+    - self_update@0.42.0
+
+proposed_agents:
+  build-runner:
+    dispatch: push-or-pr-event
+    policy: event-only
+    template: scripts/adf-setup/agents/build-runner.toml
+  pr-reviewer:
+    dispatch: pr-event
+    policy: event-only
+    template: scripts/adf-setup/agents/pr-reviewer.toml
+  merge-coordinator:
+    dispatch: pr-event-or-comment
+    policy: production-code-pairing
+    template: scripts/adf-setup/agents/merge-coordinator.toml
+  repo-steward:
+    dispatch: scheduled
+    policy: human-review-only
+    template: scripts/adf-setup/agents/repo-steward.toml
+  runtime-guardian:
+    dispatch: scheduled-or-event
+    policy: production-code-pairing
+    template: scripts/adf-setup/agents/runtime-guardian.toml
+  registry-steward:
+    dispatch: scheduled-or-manual
+    policy: human-review-only
+    template: scripts/adf-setup/disabled-agents/registry-steward.toml
+  gitea-runner-steward:
+    dispatch: scheduled-or-manual
+    policy: production-code-pairing
+    template: scripts/adf-setup/disabled-agents/gitea-runner-steward.toml
+  product-development:
+    dispatch: scheduled
+    policy: human-review-only
+    template: scripts/adf-setup/agents/product-development.toml

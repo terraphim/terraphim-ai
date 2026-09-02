@@ -151,6 +151,35 @@ jobs:
           path: desktop/dist
           retention-days: 1
 
+  # Workspace crate-manifest completeness gate (#3062)
+  # Lightweight, parallel-first: catches missing Cargo.toml before any build
+  # job runs. No Rust toolchain needed — pure TOML existence verification.
+  crate-manifests:
+    name: Crate Manifest Gate
+    runs-on: [self-hosted, bigbox]
+    timeout-minutes: 1
+    needs: changes
+    if: needs.changes.outputs.rust-changed == 'true'
+
+    steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify every workspace member has a Cargo.toml
+        run: ./scripts/check-crate-manifests.sh
+
+
   # Rust formatting (quick check — no sccache needed)
   # Optimal stack: bigbox + sccache+SeaweedFS + rch dispatch.
   # See .docs/walkthrough-ci-build-pipeline.md.
@@ -830,12 +859,50 @@ jobs:
           # Failures include advisory ID and affected crate name.
           cargo audit --deny warnings
 
+
+  # Supply-chain guard: fail if the unmaintained `atty` crate is reintroduced
+  # (issue #3072). Complements security-audit: cargo-audit is advisory-dependent
+  # and deny.toml previously *ignored* atty's RUSTSEC entries. This guard is
+  # advisory-independent and runs in ~1s once cargo is warm.
+  atty-guard:
+    name: Atty Reintroduction Guard
+    runs-on: [self-hosted, bigbox]
+    timeout-minutes: 2
+    needs: changes
+    if: needs.changes.outputs.rust-changed == 'true'
+
+    steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Disk cleanup
+        run: |
+          sudo rm -rf ~/.rustup/tmp/* 2>/dev/null || true
+          df -h
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run atty reintroduction guard
+        run: ./scripts/check-no-atty.sh
+
   # Job summary
   pr-summary:
     name: PR Validation Summary
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 1
-    needs: [changes, build-frontend, rust-format, rustdoc, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build, ranking-regression-gate, security-audit]
+    needs: [changes, build-frontend, rust-format, rustdoc, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build, ranking-regression-gate, security-audit, atty-guard]
     if: always()
 
     steps:
@@ -862,6 +929,7 @@ jobs:
           echo "| WASM Build | ${{ needs.wasm-build.result || 'skipped' }} | WebAssembly compilation |" >> $GITHUB_STEP_SUMMARY
           echo "| Ranking Regression Gate | ${{ needs.ranking-regression-gate.result || 'skipped' }} | Kendall-tau snapshot gate (WIG-1) |" >> $GITHUB_STEP_SUMMARY
           echo "| Security Audit | ${{ needs.security-audit.result || 'skipped' }} | cargo audit -- blocks on unacknowledged RUSTSEC advisories |" >> $GITHUB_STEP_SUMMARY
+          echo "| Atty Guard | ${{ needs.atty-guard.result || 'skipped' }} | cargo tree -i atty -- blocks reintroduction of removed unmaintained crate (#3072) |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [[ "${{ needs.rust-format.result }}" == "failure" ]] || \
@@ -870,7 +938,8 @@ jobs:
              [[ "${{ needs.rust-compile.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.ranking-regression-gate.result }}" == "failure" ]] || \
-             [[ "${{ needs.security-audit.result }}" == "failure" ]]; then
+             [[ "${{ needs.security-audit.result }}" == "failure" ]] || \
+             [[ "${{ needs.atty-guard.result }}" == "failure" ]]; then
             echo "❌ **PR Validation Failed** - Please fix the failing checks before merging." >> $GITHUB_STEP_SUMMARY
             exit 1
           else

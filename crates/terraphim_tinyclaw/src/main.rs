@@ -18,75 +18,7 @@ use terraphim_tinyclaw::credentials::{
 };
 use terraphim_tinyclaw::session::SessionManager;
 use terraphim_tinyclaw::skills::{Skill, SkillExecutor};
-use terraphim_tinyclaw::tools::{ParityConfig, create_default_registry_with_parity};
-
-/// Routing decision for the session memory backend (#3227 review P1).
-///
-/// Pure decision function, kept separate from `select_session_backend`
-/// so the sqlite gate can be unit-tested without opening a database.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SessionBackendChoice {
-    /// Default jsonl persistence over the shared `SessionManager`.
-    Jsonl,
-    /// Opt-in sqlite persistence via `DeviceStorage`.
-    Sqlite,
-}
-
-/// Decide which session backend to use, applying the
-/// `memory.allow_sqlite_backend` safety gate (#3227 review P1).
-///
-/// The sqlite path persists session state through `DeviceStorage` while
-/// session tools still read the jsonl `SessionManager` — a known
-/// split-brain. Unless the user explicitly sets
-/// `memory.allow_sqlite_backend = true`, a requested
-/// `backend = "sqlite"` is rejected here with a prominent warning and
-/// routed to jsonl instead of silently splitting session state.
-fn choose_session_backend(config: &Config) -> SessionBackendChoice {
-    if !config.memory.enabled || config.memory.backend != "sqlite" {
-        return SessionBackendChoice::Jsonl;
-    }
-    if !config.memory.allow_sqlite_backend {
-        log::warn!(
-            "memory.allow_sqlite_backend is false; sqlite backend requested but disabled \
-             (split-brain session state with session tools is unsupported). Falling back to \
-             jsonl. Set memory.allow_sqlite_backend = true to enable sqlite."
-        );
-        return SessionBackendChoice::Jsonl;
-    }
-    SessionBackendChoice::Sqlite
-}
-
-/// Select the session memory backend for the agent loop (#3227, T4).
-///
-/// `memory.backend = "sqlite"` (with `memory.enabled = true` AND the
-/// explicit opt-in `memory.allow_sqlite_backend = true`) routes
-/// session persistence through `SqliteBackend` on the shared
-/// `DeviceStorage`. Any other value — a disabled sqlite gate, or a
-/// `DeviceStorage` initialisation failure — falls back to the default
-/// `JsonlBackend` over the shared `SessionManager`, preserving the
-/// existing on-disk layout so legacy session files keep loading.
-async fn select_session_backend(
-    config: &Config,
-    sessions: Arc<tokio::sync::Mutex<SessionManager>>,
-) -> terraphim_tinyclaw::memory::SharedBackend {
-    use terraphim_tinyclaw::memory::jsonl::JsonlBackend;
-    use terraphim_tinyclaw::memory::sqlite::SqliteBackend;
-
-    if choose_session_backend(config) == SessionBackendChoice::Sqlite {
-        match terraphim_persistence::DeviceStorage::arc_instance().await {
-            Ok(storage) => {
-                log::info!("Session memory backend: sqlite (DeviceStorage)");
-                return Arc::new(SqliteBackend::new(storage, "tinyclaw"));
-            }
-            Err(e) => {
-                log::warn!(
-                    "DeviceStorage init failed ({e}); falling back to jsonl session backend"
-                );
-            }
-        }
-    }
-    Arc::new(JsonlBackend::from_shared(sessions))
-}
+use terraphim_tinyclaw::tools::create_default_registry_with_parity;
 
 /// Multi-channel AI assistant powered by Terraphim.
 #[derive(Parser, Debug)]
@@ -299,18 +231,10 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
             Some(sessions.clone()),
             web_tools_config,
             memory_config,
-            ParityConfig {
-                sandbox: Some(&config.sandbox),
-                subagent: Some(&config.subagent),
-                browser: Some(&config.browser),
-                scheduler: Some(&config.scheduler),
-                homeassistant: Some(&config.homeassistant),
-                vision: Some(&config.vision),
-                image_gen: Some(&config.image_gen),
-                tts: Some(&config.tts),
-                moa: Some(&config.moa),
-                rl: Some(&config.rl),
-            },
+            Some(&config.sandbox),
+            Some(&config.subagent),
+            Some(&config.browser),
+            Some(&config.scheduler),
         )
         .await,
     );
@@ -319,16 +243,14 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     let router = build_router(&config)?;
 
     // Create agent loop
-    let backend = select_session_backend(&config, sessions).await;
-    let agent = ToolCallingLoop::with_backend(
+    let agent = ToolCallingLoop::new(
         &config.agent,
         router,
         tools,
-        backend,
+        sessions,
         system_prompt,
         memory_config,
-    )
-    .with_evolution_config(&config.evolution);
+    );
 
     // Spawn agent loop in background
     let bus_clone = bus.clone();
@@ -379,18 +301,10 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
             Some(sessions.clone()),
             web_tools_config,
             memory_config_gw,
-            ParityConfig {
-                sandbox: Some(&config.sandbox),
-                subagent: Some(&config.subagent),
-                browser: Some(&config.browser),
-                scheduler: Some(&config.scheduler),
-                homeassistant: Some(&config.homeassistant),
-                vision: Some(&config.vision),
-                image_gen: Some(&config.image_gen),
-                tts: Some(&config.tts),
-                moa: Some(&config.moa),
-                rl: Some(&config.rl),
-            },
+            Some(&config.sandbox),
+            Some(&config.subagent),
+            Some(&config.browser),
+            Some(&config.scheduler),
         )
         .await,
     );
@@ -398,23 +312,15 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     // Create hybrid LLM router
     let router = build_router(&config)?;
 
-    // Clone for the MCP server (in-process, alongside the agent loop)
-    // BEFORE select_session_backend consumes the original. Option A
-    // (P1#4 fix) shares the same in-memory sessions Arc between the
-    // agent loop and the MCP server.
-    let sessions_for_mcp = sessions.clone();
-
     // Create agent loop
-    let backend = select_session_backend(&config, sessions).await;
-    let agent = ToolCallingLoop::with_backend(
+    let agent = ToolCallingLoop::new(
         &config.agent,
         router,
         tools,
-        backend,
+        sessions,
         system_prompt,
         memory_config_gw,
-    )
-    .with_evolution_config(&config.evolution);
+    );
 
     // Create channel manager and register enabled channels
     let mut channel_manager = ChannelManager::new();
@@ -429,44 +335,11 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     let bus_clone = bus.clone();
     channel_manager.start_all(bus_clone).await?;
 
-    // **P1#4 fix — option A**: capture the agent's shared state BEFORE
-    // moving it into the spawn below, so we can pass the SAME registry
-    // and workspace to the in-process MCP server.
-    let agent_commands = agent.commands_arc();
-    let agent_workspace = agent.workspace().to_path_buf();
-
     // Start agent loop
     let bus_clone = bus.clone();
     tokio::spawn(async move {
         if let Err(e) = agent.run(bus_clone).await {
             log::error!("Agent loop error: {}", e);
-        }
-    });
-
-    // Run the MCP server in-process alongside the agent loop, sharing the
-    // agent's `Arc<Mutex<CommandRegistry>>` and workspace. The MCP server
-    // runs on stdio (the binary's stdin/stdout); an attached MCP client
-    // sees the agent's authoritative registry and the same `audit.jsonl`
-    // / `pending.jsonl` directory.
-    //
-    // This replaces the previous topology where `Commands::Mcp` spawned a
-    // separate process with a private `CommandRegistry::with_defaults()`
-    // and `std::env::current_dir()` as the workspace — the r9 review
-    // surfaced that this split brain made evolution apply a dead end
-    // in production. With option A both processes share an in-memory
-    // registry (the MCP server is in the same OS process as the agent
-    // loop), and the workspace is the configured one.
-    let bus_for_mcp = bus.clone();
-    let mcp_handle = tokio::spawn(async move {
-        if let Err(e) = terraphim_tinyclaw::mcp::server::serve_mcp_stdio(
-            sessions_for_mcp,
-            bus_for_mcp,
-            agent_commands,
-            agent_workspace,
-        )
-        .await
-        {
-            log::error!("MCP server error: {}", e);
         }
     });
 
@@ -492,22 +365,10 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
         }
     }
 
-    // P1#4: stop the in-process MCP server.
-    mcp_handle.abort();
-
     Ok(())
 }
 
-/// Run in MCP-server-only mode (9-tool channel bridge over stdio).
-///
-/// **P1#4 fix**: this mode does *not* share a registry with the agent
-/// loop (by definition — there is no agent loop running). Evolution
-/// apply (`permissions_respond` with disposition `AllowOnce`) is
-/// therefore unsupported in this topology: behaviour commands are
-/// applied via `write_validated_command_section`, which would write to
-/// a registry the agent never reads. For the production wiring, use
-/// `run_gateway_mode` (option A: MCP server in-process alongside the
-/// agent loop) so the registry is shared.
+/// Run in MCP server mode (9-tool channel bridge over stdio).
 async fn run_mcp_mode(config: Config, serve: bool) -> anyhow::Result<()> {
     if !serve {
         anyhow::bail!("MCP client mode is not yet implemented; use --serve");
@@ -519,15 +380,8 @@ async fn run_mcp_mode(config: Config, serve: bool) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    println!("TinyClaw MCP Server (standalone, no agent loop — evolution apply is unsupported)");
-    println!("================================================================");
-
-    log::warn!(
-        "run_mcp_mode now constructs an empty CommandRegistry locally; this mode is \
-         retained for forward-compatibility with separate MCP deployments. For the \
-         P1#4-fixed wiring (in-process MCP alongside agent loop), use \
-         run_gateway_mode instead."
-    );
+    println!("TinyClaw MCP Server");
+    println!("===================");
 
     // Create message bus
     let bus = Arc::new(MessageBus::new());
@@ -536,15 +390,8 @@ async fn run_mcp_mode(config: Config, serve: bool) -> anyhow::Result<()> {
     let sessions_dir = config.agent.workspace.join("sessions");
     let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
 
-    // Standalone: empty registry + workspace. The agent loop is not running,
-    // so evolution apply has no shared state to consume.
-    let commands = Arc::new(tokio::sync::Mutex::new(
-        terraphim_tinyclaw::commands::CommandRegistry::new(),
-    ));
-    let workspace = config.agent.workspace.clone();
-
-    log::info!("Starting MCP server on stdio (standalone)");
-    terraphim_tinyclaw::mcp::server::serve_mcp_stdio(sessions, bus, commands, workspace).await?;
+    log::info!("Starting MCP server on stdio");
+    terraphim_tinyclaw::mcp::server::serve_mcp_stdio(sessions, bus).await?;
 
     Ok(())
 }
@@ -912,65 +759,4 @@ async fn run_schedule_command(command: ScheduleCommands) -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod backend_gate_tests {
-    //! Routing-decision tests for the sqlite safety gate (#3227 review
-    //! P1). These exercise `choose_session_backend` only — the pure
-    //! decision function — so no sqlite database is ever opened.
-
-    use super::*;
-
-    /// Default config routes to jsonl even when nothing memory-related
-    /// is configured.
-    #[test]
-    fn default_config_routes_to_jsonl() {
-        let config = Config::default();
-        assert_eq!(choose_session_backend(&config), SessionBackendChoice::Jsonl);
-    }
-
-    /// Gate closed: `backend = "sqlite"` + `allow_sqlite_backend = false`
-    /// (the default) must fall back to jsonl instead of silently
-    /// splitting session state between DeviceStorage and the jsonl
-    /// SessionManager.
-    #[test]
-    fn sqlite_requested_but_gate_closed_falls_back_to_jsonl() {
-        let mut config = Config::default();
-        config.memory.enabled = true;
-        config.memory.backend = "sqlite".to_string();
-        // allow_sqlite_backend defaults to false.
-        assert!(!config.memory.allow_sqlite_backend);
-        assert_eq!(choose_session_backend(&config), SessionBackendChoice::Jsonl);
-    }
-
-    /// Gate open: explicit opt-in (`allow_sqlite_backend = true`) with
-    /// `backend = "sqlite"` routes to sqlite.
-    ///
-    /// NOTE: the sqlite path still has the split-brain caveat — the
-    /// agent loop persists via DeviceStorage while session tools read
-    /// the jsonl SessionManager. The gate only prevents *silent*
-    /// default-to-sqlite; enabling it is a deliberate acceptance of
-    /// that caveat (#3227 review P1).
-    #[test]
-    fn sqlite_requested_and_gate_open_routes_to_sqlite() {
-        let mut config = Config::default();
-        config.memory.enabled = true;
-        config.memory.backend = "sqlite".to_string();
-        config.memory.allow_sqlite_backend = true;
-        assert_eq!(
-            choose_session_backend(&config),
-            SessionBackendChoice::Sqlite
-        );
-    }
-
-    /// Memory disabled: sqlite is never selected regardless of flags.
-    #[test]
-    fn memory_disabled_always_routes_to_jsonl() {
-        let mut config = Config::default();
-        config.memory.enabled = false;
-        config.memory.backend = "sqlite".to_string();
-        config.memory.allow_sqlite_backend = true;
-        assert_eq!(choose_session_backend(&config), SessionBackendChoice::Jsonl);
-    }
 }

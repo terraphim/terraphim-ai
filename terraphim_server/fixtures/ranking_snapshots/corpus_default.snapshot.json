@@ -1,0 +1,89 @@
+{
+  "corpus": "corpus_default",
+  "snapshots": [
+    {
+      "query": "rust",
+      "scorer": "BM25",
+      "top_n": 5,
+      "expected_ids": [
+        "rust_testing",
+        "rust_async",
+        "rust_ownership",
+        "rust_cargo",
+        "automata_regex"
+      ]
+    },
+    {
+      "query": "search engine",
+      "scorer": "BM25",
+      "top_n": 5,
+      "expected_ids": [
+        "search_indexing",
+        "search_fuzzy",
+        "graph_traversal",
+        "automata_regex",
+        "search_ranking"
+      ]
+    },
+    {
+      "query": "automata theory",
+      "scorer": "BM25",
+      "top_n": 5,
+      "expected_ids": [
+        "automata_fsm",
+        "automata_regex",
+        "rust_ownership",
+        "rust_async",
+        "rust_testing"
+      ]
+    },
+    {
+      "query": "graph database",
+      "scorer": "BM25",
+      "top_n": 5,
+      "expected_ids": [
+        "graph_model",
+        "graph_knowledge",
+        "graph_traversal",
+        "rust_ownership",
+        "rust_async"
+      ]
+    },
+    {
+      "query": "kubernetes container",
+      "scorer": "BM25",
+      "top_n": 5,
+      "expected_ids": [
+        "k8s_deploy",
+        "k8s_network",
+        "rust_ownership",
+        "rust_async",
+        "rust_testing"
+      ]
+    },
+    {
+      "query": "observability monitoring",
+      "scorer": "BM25",
+      "top_n": 5,
+      "expected_ids": [
+        "observability_logs",
+        "observability_metrics",
+        "rust_ownership",
+        "rust_async",
+        "rust_testing"
+      ]
+    },
+    {
+      "query": "ranking bm25",
+      "scorer": "BM25",
+      "top_n": 5,
+      "expected_ids": [
+        "search_ranking",
+        "search_indexing",
+        "search_fuzzy",
+        "rust_ownership",
+        "rust_async"
+      ]
+    }
+  ]
+}

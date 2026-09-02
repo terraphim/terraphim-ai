@@ -1,0 +1,52 @@
+# registry-steward agent template -- disabled by default
+#
+# This template is intentionally outside scripts/adf-setup/agents/ so existing
+# setup globs cannot activate it accidentally. Move into the active agent set
+# only after manifest validation and human review.
+
+[[agents]]
+name = "registry-steward"
+layer = "Growth"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Ferrox"
+terraphim_role = "Rust Engineer"
+skill_chain = [
+  "rust-development",
+  "requirements-traceability",
+  "security-audit",
+]
+schedule = "45 2 * * *"
+max_cpu_seconds = 1200
+grace_period_secs = 30
+capabilities = [
+  "cargo-registry-audit",
+  "dependency-source-inventory",
+  "polyrepo-boundary-review",
+]
+project = "terraphim"
+task = '''
+source ~/.profile
+cd "$GITEA_WORKING_DIR"
+
+You are the registry-steward for terraphim-ai. Produce analysis only unless a
+Gitea issue explicitly authorises implementation.
+
+Required checks:
+1. Run `cargo metadata --format-version 1` and summarise dependency sources:
+   local/path, terraphim registry, crates.io, and git.
+2. Compare private registry packages against `manifest.yaml`.
+3. Detect crate names that exist both as local packages and registry packages.
+4. Flag any new direct `registry = "terraphim"` dependency that is not covered
+   by `registry-and-polyrepo` in `manifest.yaml`.
+5. Do not publish crates, edit Cargo files, or update Cargo.lock.
+
+Post findings to the relevant Gitea issue or write a local report if no issue
+context is provided.
+'''
+
+[agents.pre_check]
+kind = "shell"
+script = """test -f manifest.yaml && grep -q 'registry-and-polyrepo:' manifest.yaml && cargo metadata --format-version 1 --no-deps >/dev/null"""
+timeout_secs = 30

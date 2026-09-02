@@ -168,6 +168,18 @@ async fn new_with_timeout_sets_request_timeout() {
 
 /// A fast server + quick poll_interval: `run_forever` should call FetchTask
 /// multiple times within a short window, demonstrating the normal loop works.
+///
+/// Determinism note (#3117): the original test asserted `calls >= 5` inside a
+/// 120ms window with a 10ms `poll_interval`. Each iteration is a real HTTP
+/// roundtrip to an in-process axum server plus the 10ms sleep, so a realistic
+/// ~12-15ms/iteration budget left no slack for scheduler jitter or concurrent
+/// test load — a single missed 10ms budget dropped the count to 4 and failed
+/// the assertion. This mirrors the sibling `poll_timeout_does_not_hang_forever`
+/// pattern: a generous window (600ms) and a low threshold (`>= 3`) that proves
+/// the loop is polling *repeatedly* while leaving ~16x headroom under load. The
+/// production `run_forever` loop is unchanged (verified correct: it is
+/// `loop { poll_once + sleep(poll_interval) }`); only the test assertion was
+/// timing-coupled.
 #[tokio::test(flavor = "multi_thread")]
 async fn run_forever_polls_repeatedly_on_no_task() {
     let shared: Shared = Arc::new(Mutex::new(Counters::default()));
@@ -189,11 +201,14 @@ async fn run_forever_polls_repeatedly_on_no_task() {
     );
     let st = runner_state();
 
-    let _ = tokio::time::timeout(Duration::from_millis(120), poller.run_forever(&st)).await;
+    // Generous window so scheduler jitter / concurrent test load cannot drop the
+    // count below threshold. The theoretical max is ~50 polls (600ms / 12ms); we
+    // assert `>= 3` so even a pathological ~200ms/iteration under load still passes.
+    let _ = tokio::time::timeout(Duration::from_millis(600), poller.run_forever(&st)).await;
 
     let calls = shared.lock().unwrap().fetch_calls;
     assert!(
-        calls >= 5,
-        "at least 5 FetchTask polls in 120ms with 10ms interval (got {calls})"
+        calls >= 3,
+        "at least 3 FetchTask polls in 600ms with 10ms interval (got {calls})"
     );
 }

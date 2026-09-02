@@ -54,51 +54,6 @@ pub struct Config {
     /// shares the same store.
     #[serde(default)]
     pub scheduler: SchedulerConfig,
-
-    /// Home Assistant configuration. **Default: disabled.**
-    /// When `homeassistant.enabled = true`, the four HA tools
-    /// (ha_list_entities / ha_get_state / ha_list_services / ha_call_service)
-    /// are registered over the HA REST API.
-    #[serde(default)]
-    pub homeassistant: HomeAssistantConfig,
-
-    /// Vision configuration. **Default: disabled.**
-    /// When `vision.enabled = true`, the `vision_analyze` tool registers and
-    /// sends multimodal chat-completion requests to an OpenAI-compatible
-    /// vision model endpoint.
-    #[serde(default)]
-    pub vision: VisionConfig,
-
-    /// Image generation configuration. **Default: disabled.**
-    /// When `image_gen.enabled = true`, the `image_generate` tool registers
-    /// against an OpenAI-compatible image endpoint (DALL-E style).
-    #[serde(default)]
-    pub image_gen: ImageGenConfig,
-
-    /// Text-to-speech configuration. **Default: disabled.**
-    /// When `tts.enabled = true`, the `text_to_speech` tool registers.
-    #[serde(default)]
-    pub tts: TtsConfig,
-
-    /// Mixture-of-Agents configuration. **Default: disabled.**
-    /// When `moa.enabled = true`, the `mixture_of_agents` tool registers.
-    #[serde(default)]
-    pub moa: MoaConfig,
-
-    /// RL training configuration. **Default: disabled.**
-    /// When `rl.enabled = true`, the `rl_check_status` tool registers to poll
-    /// a rollout server's status endpoint.
-    #[serde(default)]
-    pub rl: RlConfig,
-
-    /// Post-turn evolution trigger configuration (#3228, T2). **Default:
-    /// disabled.** When `evolution.enabled = true`, each completed turn is
-    /// evaluated by deterministic heuristics (ported from AutoClaw's
-    /// `evaluatePostTurn`) and admitted turns invoke a proposer subagent
-    /// whose only legal outputs are `NOTHING_TO_SAVE` or an `evo.propose`
-    /// payload (TACP spec 5.1).
-    #[serde(default)]
-    pub evolution: crate::agent::evo_trigger::EvolutionConfig,
 }
 
 impl Config {
@@ -1111,28 +1066,6 @@ pub struct MemoryConfig {
     /// prompt per request. Prevents token-budget overflow.
     #[serde(default = "default_max_context_chars")]
     pub max_context_chars: usize,
-
-    /// Session memory backend for the agent loop: `"jsonl"` (default;
-    /// per-session JSON-line files, preserving the existing on-disk
-    /// layout) or `"sqlite"` (keyed JSON via
-    /// `terraphim_persistence::DeviceStorage`). Unknown values fall back
-    /// to `"jsonl"`.
-    #[serde(default = "default_memory_backend")]
-    pub backend: String,
-
-    /// Explicit opt-in for the `"sqlite"` session backend. **Default:
-    /// `false`.**
-    ///
-    /// The sqlite path currently persists session state through
-    /// `DeviceStorage` while session *tools* (session_history,
-    /// session_send, …) still read the jsonl `SessionManager` — a known
-    /// split-brain session state (#3227 review P1). When this flag is
-    /// `false`, a requested `backend = "sqlite"` is rejected with a
-    /// warning and the loop falls back to jsonl, so the split-brain can
-    /// only occur when a user deliberately opts in. Set to `true` only
-    /// if you accept that caveat.
-    #[serde(default)]
-    pub allow_sqlite_backend: bool,
 }
 
 fn default_agent_binary() -> String {
@@ -1147,10 +1080,6 @@ fn default_max_context_chars() -> usize {
     4000
 }
 
-fn default_memory_backend() -> String {
-    "jsonl".to_string()
-}
-
 impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
@@ -1159,8 +1088,6 @@ impl Default for MemoryConfig {
             binary: default_agent_binary(),
             timeout_secs: default_memory_timeout(),
             max_context_chars: default_max_context_chars(),
-            backend: default_memory_backend(),
-            allow_sqlite_backend: false,
         }
     }
 }
@@ -1279,6 +1206,12 @@ pub struct BrowserConfig {
     /// Optional proxy URL (e.g. `http://proxy:8080`).
     #[serde(default)]
     pub proxy: Option<String>,
+
+    /// `terraphim-agent` binary used only to probe browser-native web
+    /// operation availability. Navigate/extract/api continue to use the
+    /// in-process reqwest backend.
+    #[serde(default = "default_browser_agent_binary")]
+    pub agent_binary: Option<String>,
 }
 
 fn default_browser_timeout() -> u64 {
@@ -1289,6 +1222,10 @@ fn default_browser_max_bytes() -> usize {
     512 * 1024
 }
 
+fn default_browser_agent_binary() -> Option<String> {
+    Some("terraphim-agent".to_string())
+}
+
 impl Default for BrowserConfig {
     fn default() -> Self {
         Self {
@@ -1296,6 +1233,7 @@ impl Default for BrowserConfig {
             timeout_secs: default_browser_timeout(),
             max_bytes: default_browser_max_bytes(),
             proxy: None,
+            agent_binary: default_browser_agent_binary(),
         }
     }
 }
@@ -1327,286 +1265,6 @@ impl Default for SchedulerConfig {
             enabled: false,
             store_key: default_scheduler_store_key(),
         }
-    }
-}
-
-/// Home Assistant configuration (Hermes parity).
-///
-/// **Default behaviour: disabled.** When `enabled = true` and `token` is set,
-/// the HA tools register and talk to the HA REST API.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct HomeAssistantConfig {
-    /// Master switch. `false` = no HA tools registered.
-    #[serde(default)]
-    pub enabled: bool,
-
-    /// Base URL of the Home Assistant instance.
-    #[serde(default = "default_hass_url")]
-    pub url: String,
-
-    /// Long-lived access token.
-    #[serde(default)]
-    pub token: String,
-}
-
-fn default_hass_url() -> String {
-    "http://homeassistant.local:8123".to_string()
-}
-
-impl Default for HomeAssistantConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            url: default_hass_url(),
-            token: String::new(),
-        }
-    }
-}
-
-impl HomeAssistantConfig {
-    /// Whether the HA tools are usable (enabled + token present).
-    pub fn available(&self) -> bool {
-        self.enabled && !self.token.is_empty()
-    }
-}
-
-/// Vision configuration (Hermes parity).
-///
-/// **Default behaviour: disabled.** OpenAI-compatible multimodal endpoint.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct VisionConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default = "default_vision_model")]
-    pub model: String,
-
-    #[serde(default = "default_vision_base_url")]
-    pub base_url: String,
-
-    #[serde(default)]
-    pub api_key: String,
-}
-
-fn default_vision_model() -> String {
-    "google/gemini-3-flash-preview".to_string()
-}
-
-fn default_vision_base_url() -> String {
-    "https://openrouter.ai/api/v1".to_string()
-}
-
-impl Default for VisionConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            model: default_vision_model(),
-            base_url: default_vision_base_url(),
-            api_key: String::new(),
-        }
-    }
-}
-
-impl VisionConfig {
-    pub fn available(&self) -> bool {
-        self.enabled && !self.api_key.is_empty()
-    }
-}
-
-/// Image generation configuration (Hermes parity).
-///
-/// **Default behaviour: disabled.** OpenAI-compatible image endpoint.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ImageGenConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default = "default_image_model")]
-    pub model: String,
-
-    #[serde(default = "default_image_base_url")]
-    pub base_url: String,
-
-    #[serde(default)]
-    pub api_key: String,
-
-    /// Enable the provider-side content safety checker. Defaults to true.
-    #[serde(default = "default_true")]
-    pub safety_checker: bool,
-}
-
-fn default_image_model() -> String {
-    "fal-ai/flux-2-pro".to_string()
-}
-
-fn default_image_base_url() -> String {
-    "https://fal.run".to_string()
-}
-
-fn default_true() -> bool {
-    true
-}
-
-impl Default for ImageGenConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            model: default_image_model(),
-            base_url: default_image_base_url(),
-            api_key: String::new(),
-            safety_checker: true,
-        }
-    }
-}
-
-impl ImageGenConfig {
-    pub fn available(&self) -> bool {
-        self.enabled && !self.api_key.is_empty()
-    }
-}
-
-/// Text-to-speech configuration (Hermes parity).
-///
-/// **Default behaviour: disabled.** Providers: `edge` (shells out to
-/// `edge-tts` CLI) and `openai` (OpenAI-compatible `/v1/audio/speech`).
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct TtsConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default = "default_tts_provider")]
-    pub provider: String,
-
-    #[serde(default)]
-    pub voice: String,
-
-    #[serde(default = "default_tts_base_url")]
-    pub base_url: String,
-
-    #[serde(default)]
-    pub api_key: String,
-
-    #[serde(default = "default_tts_output_dir")]
-    pub output_dir: String,
-}
-
-fn default_tts_provider() -> String {
-    "edge".to_string()
-}
-
-fn default_tts_base_url() -> String {
-    "https://api.openai.com/v1".to_string()
-}
-
-fn default_tts_output_dir() -> String {
-    "voice-memos".to_string()
-}
-
-impl Default for TtsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            provider: default_tts_provider(),
-            voice: String::new(),
-            base_url: default_tts_base_url(),
-            api_key: String::new(),
-            output_dir: default_tts_output_dir(),
-        }
-    }
-}
-
-impl TtsConfig {
-    pub fn available(&self) -> bool {
-        // Edge TTS needs no key; OpenAI provider needs a key.
-        if !self.enabled {
-            return false;
-        }
-        self.provider.to_lowercase() == "edge" || !self.api_key.is_empty()
-    }
-}
-
-/// Mixture-of-Agents configuration (Hermes parity).
-///
-/// **Default behaviour: disabled.** Ensemble of reference models + aggregator.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct MoaConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default)]
-    pub base_url: String,
-
-    #[serde(default)]
-    pub api_key: String,
-
-    #[serde(default = "default_moa_reference_models")]
-    pub reference_models: Vec<String>,
-
-    #[serde(default = "default_moa_aggregator_model")]
-    pub aggregator_model: String,
-}
-
-fn default_moa_reference_models() -> Vec<String> {
-    vec![
-        "openai/gpt-5.2-pro".to_string(),
-        "anthropic/claude-opus-4.5".to_string(),
-        "google/gemini-3-pro-preview".to_string(),
-    ]
-}
-
-fn default_moa_aggregator_model() -> String {
-    "anthropic/claude-opus-4.5".to_string()
-}
-
-impl Default for MoaConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            base_url: default_vision_base_url(),
-            api_key: String::new(),
-            reference_models: default_moa_reference_models(),
-            aggregator_model: default_moa_aggregator_model(),
-        }
-    }
-}
-
-impl MoaConfig {
-    pub fn available(&self) -> bool {
-        self.enabled && !self.api_key.is_empty() && !self.reference_models.is_empty()
-    }
-}
-
-/// RL training configuration (Hermes parity, partial).
-///
-/// **Default behaviour: disabled.** The full veRL training orchestration from
-/// Hermes `rl_training_tool.py` is a deliberate non-goal (deeply coupled to
-/// Python/ray/wandb). This config exposes a monitorable `rl_check_status` tool
-/// that polls a rollout server's status endpoint.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RlConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default = "default_rl_server_url")]
-    pub rollout_server_url: String,
-}
-
-fn default_rl_server_url() -> String {
-    "http://localhost:8000".to_string()
-}
-
-impl Default for RlConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            rollout_server_url: default_rl_server_url(),
-        }
-    }
-}
-
-impl RlConfig {
-    pub fn available(&self) -> bool {
-        self.enabled
     }
 }
 
@@ -1738,31 +1396,6 @@ enabled = true
         assert_eq!(cfg.binary, "terraphim-agent");
         assert_eq!(cfg.timeout_secs, 10);
     }
-
-    #[test]
-    fn memory_config_sqlite_gate_defaults_closed() {
-        // #3227 review P1: the sqlite backend must be opt-in so the
-        // split-brain session state can never be entered silently.
-        let cfg = MemoryConfig::default();
-        assert!(!cfg.allow_sqlite_backend);
-        assert_eq!(cfg.backend, "jsonl");
-
-        // Omitted from TOML → still false (serde default).
-        let cfg: MemoryConfig = toml::from_str("enabled = true\n").expect("parse");
-        assert!(!cfg.allow_sqlite_backend);
-    }
-
-    #[test]
-    fn memory_config_sqlite_gate_parses_explicit_opt_in() {
-        let toml = r#"
-enabled = true
-backend = "sqlite"
-allow_sqlite_backend = true
-"#;
-        let cfg: MemoryConfig = toml::from_str(toml).expect("parse");
-        assert_eq!(cfg.backend, "sqlite");
-        assert!(cfg.allow_sqlite_backend);
-    }
 }
 
 #[cfg(test)]
@@ -1806,16 +1439,19 @@ timeout_secs = 30
         let cfg = BrowserConfig::default();
         assert!(!cfg.enabled);
         assert_eq!(cfg.timeout_secs, 30);
+        assert_eq!(cfg.agent_binary.as_deref(), Some("terraphim-agent"));
 
         let toml = r#"
 enabled = true
 max_bytes = 1024
 proxy = "http://localhost:8080"
+agent_binary = "/opt/terraphim-agent"
 "#;
         let cfg: BrowserConfig = toml::from_str(toml).expect("parse");
         assert!(cfg.enabled);
         assert_eq!(cfg.max_bytes, 1024);
         assert_eq!(cfg.proxy.as_deref(), Some("http://localhost:8080"));
+        assert_eq!(cfg.agent_binary.as_deref(), Some("/opt/terraphim-agent"));
         assert_eq!(cfg.timeout_secs, 30);
     }
 

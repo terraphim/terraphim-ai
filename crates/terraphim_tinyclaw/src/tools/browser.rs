@@ -11,12 +11,18 @@
 //!
 //! Browser-native ops (click/type/screenshot) return
 //! `ToolError::BackendUnavailable` — they need a real browser engine that
-//! the deployed stack does not currently expose.
+//! the deployed stack does not currently expose. The tool probes
+//! `terraphim-agent` first and includes capability/protocol evidence in the
+//! error so placeholder CLI output is never reported as success.
 
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
 use serde_json::{Value, json};
+use std::process::Stdio;
 use std::time::Duration;
+use tokio::io::AsyncReadExt;
+use tokio::process::Command;
+use tokio::time::Instant;
 
 /// Configuration for the browser tool.
 #[derive(Debug, Clone)]
@@ -27,6 +33,8 @@ pub struct BrowserToolConfig {
     pub max_bytes: usize,
     /// Optional proxy URL.
     pub proxy: Option<String>,
+    /// Optional terraphim-agent binary used to probe browser-native backend availability.
+    pub agent_binary: Option<String>,
 }
 
 impl From<&crate::config::BrowserConfig> for BrowserToolConfig {
@@ -35,6 +43,7 @@ impl From<&crate::config::BrowserConfig> for BrowserToolConfig {
             timeout_secs: cfg.timeout_secs,
             max_bytes: cfg.max_bytes,
             proxy: cfg.proxy.clone(),
+            agent_binary: cfg.agent_binary.clone(),
         }
     }
 }
@@ -79,6 +88,190 @@ impl BrowserTool {
         }
         format!("{}… (truncated, {} bytes)", &s[..end], s.len())
     }
+
+    async fn browser_native_unavailable(&self, op: &str, _args: &Value) -> ToolError {
+        let evidence = match &self.config.agent_binary {
+            Some(binary) => probe_agent_web_operations(binary, self.config.timeout_secs, op).await,
+            None => {
+                "agent_binary is disabled; no terraphim-agent browser-native backend configured"
+                    .to_string()
+            }
+        };
+        ToolError::BackendUnavailable {
+            tool: "browser".to_string(),
+            message: format!(
+                "'{op}' requires a verified terraphim-agent web_operations backend; {evidence}. \
+                 TinyClaw will not simulate browser-native success. Use navigate/extract/api for \
+                 HTTP-backed operations."
+            ),
+        }
+    }
+}
+
+fn preview_output(bytes: &[u8]) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    collapsed.chars().take(240).collect()
+}
+
+async fn run_agent(
+    binary: &str,
+    args: &[&str],
+    timeout_secs: u64,
+) -> Result<std::process::Output, String> {
+    let mut child = Command::new(binary)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(|e| format!("failed to execute {binary}: {e}"))?;
+
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| format!("failed to capture stdout for {binary}"))?;
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| format!("failed to capture stderr for {binary}"))?;
+
+    let stdout_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        stdout.read_to_end(&mut buf).await.map(|_| buf)
+    });
+    let stderr_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        stderr.read_to_end(&mut buf).await.map(|_| buf)
+    });
+    let mut stdout_task = stdout_task;
+    let mut stderr_task = stderr_task;
+
+    let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+    let status = match tokio::time::timeout_at(deadline, child.wait()).await {
+        Ok(Ok(status)) => status,
+        Ok(Err(e)) => {
+            stdout_task.abort();
+            stderr_task.abort();
+            return Err(format!("failed to wait for {binary}: {e}"));
+        }
+        Err(_) => {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            stdout_task.abort();
+            stderr_task.abort();
+            return Err(format!(
+                "probe timed out after {timeout_secs}s; killed terraphim-agent subprocess; stdout/stderr readers aborted"
+            ));
+        }
+    };
+
+    let stdout = tokio::select! {
+        result = &mut stdout_task => {
+            result
+                .map_err(|e| format!("failed to join stdout reader for {binary}: {e}"))?
+                .map_err(|e| format!("failed to read stdout from {binary}: {e}"))?
+        }
+        _ = tokio::time::sleep_until(deadline) => {
+            stdout_task.abort();
+            stderr_task.abort();
+            if matches!(child.try_wait(), Ok(None)) {
+                let _ = child.kill().await;
+                let _ = child.wait().await;
+            }
+            return Err(format!(
+                "probe timed out after {timeout_secs}s; killed terraphim-agent subprocess if still running; stdout/stderr readers aborted"
+            ));
+        }
+    };
+    let stderr = tokio::select! {
+        result = &mut stderr_task => {
+            result
+                .map_err(|e| format!("failed to join stderr reader for {binary}: {e}"))?
+                .map_err(|e| format!("failed to read stderr from {binary}: {e}"))?
+        }
+        _ = tokio::time::sleep_until(deadline) => {
+            stdout_task.abort();
+            stderr_task.abort();
+            if matches!(child.try_wait(), Ok(None)) {
+                let _ = child.kill().await;
+                let _ = child.wait().await;
+            }
+            return Err(format!(
+                "probe timed out after {timeout_secs}s; killed terraphim-agent subprocess if still running; stdout/stderr readers aborted"
+            ));
+        }
+    };
+
+    Ok(std::process::Output {
+        status,
+        stdout,
+        stderr,
+    })
+}
+
+fn capabilities_web_enabled(stdout: &[u8]) -> Result<(bool, bool), String> {
+    let value: Value = serde_json::from_slice(stdout).map_err(|e| {
+        format!(
+            "capabilities output is not JSON: {e}; stdout='{}'",
+            preview_output(stdout)
+        )
+    })?;
+    let web_operations = value
+        .pointer("/features/web_operations")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let command_advertised = value
+        .get("commands")
+        .and_then(Value::as_array)
+        .map(|commands| commands.iter().any(|v| v.as_str() == Some("web")))
+        .unwrap_or(false);
+    Ok((web_operations, command_advertised))
+}
+
+async fn probe_agent_web_operations(binary: &str, timeout_secs: u64, op: &str) -> String {
+    let caps = match run_agent(
+        binary,
+        &["--robot", "--format", "json", "robot", "capabilities"],
+        timeout_secs,
+    )
+    .await
+    {
+        Ok(output) => output,
+        Err(e) => return e,
+    };
+    if !caps.status.success() {
+        return format!(
+            "capability probe failed with status {:?}; stderr='{}'",
+            caps.status.code(),
+            preview_output(&caps.stderr)
+        );
+    }
+    let (web_operations, web_command_advertised) = match capabilities_web_enabled(&caps.stdout) {
+        Ok(v) => v,
+        Err(e) => return e,
+    };
+    if !web_operations {
+        return "capability probe reports web_operations=false".to_string();
+    }
+
+    let help = match run_agent(binary, &["--help"], timeout_secs).await {
+        Ok(output) => output,
+        Err(e) => return e,
+    };
+    let help_mentions_web = preview_output(&help.stdout)
+        .split_whitespace()
+        .any(|word| word == "web");
+    if !web_command_advertised || !help.status.success() || !help_mentions_web {
+        return format!(
+            "capability probe reports web_operations=true, but no usable web subcommand is advertised (commands_has_web={web_command_advertised}, help_status={:?})",
+            help.status.code()
+        );
+    }
+
+    format!(
+        "agent reports web_operations=true and advertises web, but TinyClaw has no verified non-mutating JSON/result protocol for '{op}'"
+    )
 }
 
 /// Validate that a URL uses http/https (matches `web_fetch` behaviour;
@@ -341,18 +534,240 @@ impl Tool for BrowserTool {
                 })
                 .to_string())
             }
-            "click" | "type" | "screenshot" => Err(ToolError::BackendUnavailable {
-                tool: "browser".to_string(),
-                message: format!(
-                    "'{op}' requires a browser engine; the deployed terraphim-agent \
-                     build has web_operations disabled (feature 'repl-web'). \
-                     Use navigate/extract/api instead."
-                ),
-            }),
+            "click" | "type" | "screenshot" => {
+                Err(self.browser_native_unavailable(op, &args).await)
+            }
             other => Err(ToolError::InvalidArguments {
                 tool: "browser".to_string(),
                 message: format!("unknown op '{other}'"),
             }),
         }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use crate::config::BrowserConfig;
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::{Path, PathBuf};
+    use tempfile::TempDir;
+
+    fn write_shim(dir: &Path, body: &str) -> PathBuf {
+        let path = dir.join("terraphim-agent-shim");
+        fs::write(&path, body).expect("write shim");
+        let mut perms = fs::metadata(&path).expect("shim metadata").permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&path, perms).expect("chmod shim");
+        path
+    }
+
+    fn read_log(path: &Path) -> String {
+        fs::read_to_string(path).unwrap_or_default()
+    }
+
+    fn browser_with_agent(agent_binary: String, timeout_secs: u64) -> BrowserTool {
+        let cfg = BrowserConfig {
+            enabled: true,
+            timeout_secs,
+            max_bytes: 4096,
+            proxy: None,
+            agent_binary: Some(agent_binary),
+        };
+        BrowserTool::from_config(&cfg).expect("browser tool")
+    }
+
+    #[tokio::test]
+    async fn browser_native_probe_does_not_execute_requested_mutating_command() {
+        let temp = TempDir::new().expect("tempdir");
+        let log = temp.path().join("invocations.log");
+        let shim = write_shim(
+            temp.path(),
+            &format!(
+                r#"#!/bin/sh
+printf '%s\n' "$*" >> '{}'
+if [ "$*" = "--robot --format json robot capabilities" ]; then
+  printf '%s\n' '{{"features":{{"web_operations":true}},"commands":["web"]}}'
+  exit 0
+fi
+if [ "$*" = "--help" ]; then
+  printf '%s\n' 'Usage: terraphim-agent web'
+  exit 0
+fi
+printf '%s\n' 'mutating web command executed' >&2
+exit 23
+"#,
+                log.display()
+            ),
+        );
+        let tool = browser_with_agent(shim.display().to_string(), 2);
+
+        let err = tool
+            .execute(json!({
+                "op": "click",
+                "url": "https://example.com",
+                "selector": "#submit"
+            }))
+            .await
+            .expect_err("click should fail closed");
+
+        assert!(matches!(err, ToolError::BackendUnavailable { .. }));
+        let invocations = read_log(&log);
+        assert!(invocations.contains("--robot --format json robot capabilities"));
+        assert!(invocations.contains("--help"));
+        assert!(
+            !invocations.contains("web click"),
+            "probe executed requested mutating command: {invocations}"
+        );
+    }
+
+    #[tokio::test]
+    async fn browser_native_probe_timeout_is_bounded_and_reaps_hanging_child() {
+        let temp = TempDir::new().expect("tempdir");
+        let pid_file = temp.path().join("shim.pid");
+        let shim = write_shim(
+            temp.path(),
+            &format!(
+                r#"#!/bin/sh
+printf '%s\n' "$$" > '{}'
+exec sleep 30
+"#,
+                pid_file.display()
+            ),
+        );
+        let tool = browser_with_agent(shim.display().to_string(), 1);
+
+        let result = tokio::time::timeout(
+            Duration::from_secs(3),
+            tool.execute(json!({
+                "op": "screenshot",
+                "url": "https://example.com"
+            })),
+        )
+        .await
+        .expect("probe should be bounded by BrowserConfig timeout_secs");
+
+        assert!(matches!(result, Err(ToolError::BackendUnavailable { .. })));
+        let pid: u32 = fs::read_to_string(&pid_file)
+            .expect("pid file")
+            .trim()
+            .parse()
+            .expect("pid");
+        let status = std::process::Command::new("kill")
+            .arg("-0")
+            .arg(pid.to_string())
+            .status()
+            .expect("kill -0");
+        assert!(
+            !status.success(),
+            "hanging shim process {pid} is still alive"
+        );
+    }
+
+    #[tokio::test]
+    async fn browser_native_probe_timeout_is_bounded_when_descendant_inherits_pipes() {
+        let temp = TempDir::new().expect("tempdir");
+        let direct_pid_file = temp.path().join("direct.pid");
+        let descendant_pid_file = temp.path().join("descendant.pid");
+        let shim = write_shim(
+            temp.path(),
+            &format!(
+                r#"#!/bin/sh
+printf '%s\n' "$$" > '{}'
+sleep 30 &
+printf '%s\n' "$!" > '{}'
+exec sleep 30
+"#,
+                direct_pid_file.display(),
+                descendant_pid_file.display()
+            ),
+        );
+        let tool = browser_with_agent(shim.display().to_string(), 1);
+
+        let started = std::time::Instant::now();
+        let result = tokio::time::timeout(
+            Duration::from_secs(3),
+            tool.execute(json!({
+                "op": "screenshot",
+                "url": "https://example.com"
+            })),
+        )
+        .await;
+
+        if let Ok(pid_text) = fs::read_to_string(&descendant_pid_file)
+            && let Ok(pid) = pid_text.trim().parse::<u32>()
+        {
+            let _ = std::process::Command::new("kill")
+                .arg("-TERM")
+                .arg(pid.to_string())
+                .status();
+        }
+
+        let result = result.expect("probe should not wait indefinitely for inherited pipes");
+        assert!(matches!(result, Err(ToolError::BackendUnavailable { .. })));
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "probe exceeded independent timeout guard"
+        );
+
+        let direct_pid: u32 = fs::read_to_string(&direct_pid_file)
+            .expect("direct pid file")
+            .trim()
+            .parse()
+            .expect("direct pid");
+        let status = std::process::Command::new("kill")
+            .arg("-0")
+            .arg(direct_pid.to_string())
+            .status()
+            .expect("kill -0 direct child");
+        assert!(
+            !status.success(),
+            "direct shim process {direct_pid} is still alive"
+        );
+    }
+
+    #[tokio::test]
+    async fn browser_native_probe_timeout_after_child_exit_with_inherited_pipes() {
+        let temp = TempDir::new().expect("tempdir");
+        let descendant_pid_file = temp.path().join("descendant.pid");
+        let shim = write_shim(
+            temp.path(),
+            &format!(
+                r#"#!/bin/sh
+sleep 30 &
+printf '%s\n' "$!" > '{}'
+exit 0
+"#,
+                descendant_pid_file.display()
+            ),
+        );
+        let tool = browser_with_agent(shim.display().to_string(), 1);
+
+        let started = std::time::Instant::now();
+        let result = tokio::time::timeout(
+            Duration::from_secs(3),
+            tool.execute(json!({
+                "op": "screenshot",
+                "url": "https://example.com"
+            })),
+        )
+        .await;
+
+        if let Ok(pid_text) = fs::read_to_string(&descendant_pid_file)
+            && let Ok(pid) = pid_text.trim().parse::<u32>()
+        {
+            let _ = std::process::Command::new("kill")
+                .arg("-TERM")
+                .arg(pid.to_string())
+                .status();
+        }
+
+        let result = result.expect("probe should not wait indefinitely after direct child exits 0");
+        assert!(matches!(result, Err(ToolError::BackendUnavailable { .. })));
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "probe exceeded independent timeout guard"
+        );
     }
 }

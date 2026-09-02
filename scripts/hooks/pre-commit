@@ -276,9 +276,13 @@ UBS_CMD="$(find_ubs)" || {
   exit 0
 }
 
-# Run UBS on staged files only using --staged flag
-# Disable size check since --staged only scans staged files, not the whole directory
-if ! UBS_MAX_DIR_SIZE_MB=0 "$UBS_CMD" --staged --fail-on-warning . 2>&1 | tail -50; then
+# Run UBS on staged files only using --staged flag.
+# Disable size check since --staged only scans staged files, not the whole directory.
+# NOTE (#3149): output goes straight to the terminal (no `| tail` pipe) because
+# UBS v5.x uses bash here-docs for banner/usage output that hang when stdout is
+# captured to a pipe or file in this environment. Bounding via --staged (changed
+# files only) keeps the output size reasonable without a pipe.
+if ! UBS_MAX_DIR_SIZE_MB=0 "$UBS_CMD" --staged --fail-on-warning .; then
   print_status "FAIL" "Bug scanner found issues. Fix them or use: git commit --no-verify"
   exit 1
 fi

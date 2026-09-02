@@ -69,18 +69,11 @@ jobs:
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 30
     needs: [setup]
-    # Optimal stack: bigbox + sccache+SeaweedFS + rch dispatch.
-    # See .docs/walkthrough-ci-build-pipeline.md.
+    # rustc is routed through the kache daemon (systemd user service) which owns
+    # the S3 credentials. rch dispatch provides queue/slot accounting shared with
+    # ADF agents. See .docs/walkthrough-ci-build-pipeline.md.
     env:
-      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
-      SCCACHE_BUCKET: rust-cache
-      SCCACHE_SERVER_PORT: "4231"
-      SCCACHE_ENDPOINT: http://172.26.0.1:8333
-      SCCACHE_S3_USE_SSL: "false"
-      SCCACHE_REGION: us-east-1
-      SCCACHE_S3_KEY_PREFIX: terraphim-ai
-      AWS_ACCESS_KEY_ID: any
-      AWS_SECRET_ACCESS_KEY: any
+      RUSTC_WRAPPER: /home/alex/.local/bin/kache
       CARGO_INCREMENTAL: "0"
     steps:
       - name: Pre-checkout cleanup
@@ -150,17 +143,11 @@ jobs:
           restore-keys: |
             ${{ needs.setup.outputs.cache-key }}-cargo-lint-
 
-      - name: sccache start and zero stats
-        run: |
-
-          /home/alex/.local/bin/sccache --start-server || true
-          /home/alex/.local/bin/sccache --zero-stats
-
       - name: Run format and linting checks
         # rch exec dispatches the underlying cargo invocations through
         # rchd's queue, sharing slots with ADF agents.
         run: /home/alex/.local/bin/rch exec -- ./scripts/ci-check-format.sh
 
-      - name: sccache stats
+      - name: kache stats
         if: always()
-        run: /home/alex/.local/bin/sccache --show-stats
+        run: /home/alex/.local/bin/kache stats
