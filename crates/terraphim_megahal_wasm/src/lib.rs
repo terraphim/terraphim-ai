@@ -446,6 +446,17 @@ fn wire_brain_lab() -> Result<(), JsValue> {
         .get_element_by_id("lab-personality")
         .expect("#lab-personality")
         .dyn_into::<web_sys::HtmlSelectElement>()?;
+
+    // Populate the lab personality selector from the embedded corpora.
+    for name in MegahalBrain::list_personalities() {
+        let name = name.as_string().expect("personality names are strings");
+        let option = document
+            .create_element("option")?
+            .dyn_into::<web_sys::HtmlOptionElement>()?;
+        option.set_value(&name);
+        option.set_text(&name);
+        personality.append_child(&option)?;
+    }
     let latency_a = document.get_element_by_id("latency-a").expect("#latency-a");
     let latency_b = document.get_element_by_id("latency-b").expect("#latency-b");
     let status = document
