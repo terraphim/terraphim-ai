@@ -26,6 +26,8 @@ use terraphim_sooth::DefaultRng;
 const STORAGE_KEY: &str = "terraphim-megahal-brain";
 /// localStorage key for the Brain Lab's trainable second brain.
 const STORAGE_KEY_B: &str = "terraphim-megahal-brain-b";
+/// localStorage key remembering the chosen personality across reloads.
+const PERSONALITY_KEY: &str = "terraphim-megahal-personality";
 /// Default RNG seed when a brain is created fresh.
 const DEFAULT_SEED: u64 = 42;
 
@@ -263,8 +265,33 @@ pub fn demo_main() -> Result<(), JsValue> {
         personality_select.append_child(&option)?;
     }
 
-    // Restore any saved brain, else start on the default personality.
-    let brain = std::rc::Rc::new(std::cell::RefCell::new(MegahalBrain::new("default")));
+    // Restore any saved brain; otherwise honour a remembered personality
+    // (or start on the default one).
+    let remembered = window()
+        .local_storage()
+        .ok()
+        .flatten()
+        .and_then(|storage| storage.get_item(PERSONALITY_KEY).ok().flatten());
+    let start = remembered
+        .as_deref()
+        .filter(|name| !name.is_empty() && name != &"default".to_string());
+    let brain = std::rc::Rc::new(std::cell::RefCell::new(MegahalBrain::new(
+        start.unwrap_or("default"),
+    )));
+    if let Some(name) = start {
+        let length = personality_select.length();
+        for index in 0..length {
+            let matches = personality_select
+                .item(index)
+                .and_then(|o| o.dyn_into::<web_sys::HtmlOptionElement>().ok())
+                .map(|o| o.value() == name)
+                .unwrap_or(false);
+            if matches {
+                personality_select.set_selected_index(index as i32);
+                break;
+            }
+        }
+    }
     if MegahalBrain::has_local() {
         let result = brain.borrow_mut().load_local();
         let restored_message = match result {
@@ -273,7 +300,10 @@ pub fn demo_main() -> Result<(), JsValue> {
         };
         status.set_text_content(Some(&restored_message));
     } else {
-        status.set_text_content(Some("fresh default personality"));
+        status.set_text_content(Some(&format!(
+            "fresh {} personality",
+            start.unwrap_or("default")
+        )));
     }
 
     // Send: read the input, append it to the log, generate the reply. Shared
@@ -320,7 +350,8 @@ pub fn demo_main() -> Result<(), JsValue> {
         })
     };
 
-    // Personality switch: reset with the chosen personality.
+    // Personality switch: reset with the chosen personality and remember it
+    // across reloads.
     let switch = {
         let brain = brain.clone();
         let personality_select = personality_select.clone();
@@ -328,6 +359,11 @@ pub fn demo_main() -> Result<(), JsValue> {
         Closure::<dyn FnMut()>::new(move || {
             let name = personality_select.value();
             brain.borrow_mut().reset(&name, Some(42));
+            let _ = window()
+                .local_storage()
+                .ok()
+                .flatten()
+                .map(|storage| storage.set_item(PERSONALITY_KEY, &name));
             status.set_text_content(Some(&format!("switched to {name}")));
         })
     };

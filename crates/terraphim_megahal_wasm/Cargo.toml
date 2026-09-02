@@ -35,6 +35,7 @@ features = [
     "HtmlElement",
     "HtmlInputElement",
     "HtmlOptionElement",
+    "HtmlOptionsCollection",
     "HtmlSelectElement",
     "HtmlTextAreaElement",
     "Storage",
