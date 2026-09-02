@@ -43,6 +43,11 @@ mod keyword_data;
 mod personalities;
 mod segment;
 
+#[cfg(feature = "automata")]
+pub mod automata_bridge;
+#[cfg(feature = "persistence")]
+pub mod persist;
+
 pub use keyword::extract;
 pub use personalities::available as available_personalities;
 pub use segment::Decomposed;
@@ -99,21 +104,35 @@ pub enum MegahalError {
     NoSuchPersonality(String),
 }
 
-/// On-disk (JSON) representation of a brain.
+/// Portable brain state: everything needed to reconstruct a
+/// [`MegaHal`] (five predictor states, dictionary, brain mapping, learning
+/// flag), version-tagged on serialisation.
+///
+/// This is the unit of persistence: [`MegaHal::save`] embeds it in the
+/// `MHRS1` JSON document, and the `persistence` feature stores it through
+/// `terraphim_persistence` backends.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MegaHalState {
+    pub learning: bool,
+    pub dictionary: Vec<(String, u32)>,
+    pub brain: Vec<(Context, u32)>,
+    pub seed: Predictor,
+    pub fore: Predictor,
+    pub back: Predictor,
+    pub case: Predictor,
+    pub punc: Predictor,
+}
+
+/// Brain format version tag.
+pub const BRAIN_VERSION: &str = "MHRS1";
+
+/// The versioned on-disk document ([`MegaHal::save`] output).
 #[derive(Serialize, Deserialize)]
 struct BrainFile<'a> {
     version: &'a str,
-    learning: bool,
-    dictionary: Vec<(String, u32)>,
-    brain: Vec<(Context, u32)>,
-    seed: Predictor,
-    fore: Predictor,
-    back: Predictor,
-    case: Predictor,
-    punc: Predictor,
+    #[serde(flatten)]
+    state: MegaHalState,
 }
-
-const BRAIN_VERSION: &str = "MHRS1";
 
 impl Default for MegaHal {
     fn default() -> Self {
@@ -234,10 +253,34 @@ impl MegaHal {
         rng: &mut impl Rng,
         error_reply: &str,
     ) -> String {
+        self.reply_with_extra_keywords(input, rng, error_reply, &[])
+    }
+
+    /// Generate a reply as [`MegaHal::reply_with_error`], but inject
+    /// `extra_keywords` (normalised, upper-case words) into the keyword set
+    /// used for reply seeding, *in addition* to the words extracted from the
+    /// input itself.
+    ///
+    /// This is the injection point the `automata` feature uses to bias
+    /// replies towards knowledge-graph concepts. With an empty slice the
+    /// behaviour is identical to [`MegaHal::reply_with_error`], which is why
+    /// the Ruby conformance suite is unaffected by the hook.
+    pub fn reply_with_extra_keywords(
+        &mut self,
+        input: Option<&str>,
+        rng: &mut impl Rng,
+        error_reply: &str,
+        extra_keywords: &[String],
+    ) -> String {
         let stripped = input.map(str::trim);
         let decomposed = segment::decompose(stripped);
 
-        let keyword_words = keyword::extract(decomposed.norms.as_deref());
+        let mut keyword_words = keyword::extract(decomposed.norms.as_deref());
+        for extra in extra_keywords {
+            if !keyword_words.contains(extra) {
+                keyword_words.push(extra.clone());
+            }
+        }
         let keyword_symbols: Vec<u32> = keyword_words
             .iter()
             .filter_map(|word| self.dictionary.get(word).copied())
@@ -295,10 +338,9 @@ impl MegaHal {
         reply.unwrap_or_else(|| error_reply.to_string())
     }
 
-    /// Serialise the brain to the `MHRS1` JSON format.
-    pub fn save(&self) -> String {
-        let file = BrainFile {
-            version: BRAIN_VERSION,
+    /// Snapshot the brain state (the unit of persistence).
+    pub fn state(&self) -> MegaHalState {
+        MegaHalState {
             learning: self.learning,
             dictionary: self
                 .dictionary
@@ -311,6 +353,14 @@ impl MegaHal {
             back: self.back.clone(),
             case: self.case.clone(),
             punc: self.punc.clone(),
+        }
+    }
+
+    /// Serialise the brain to the `MHRS1` JSON format.
+    pub fn save(&self) -> String {
+        let file = BrainFile {
+            version: BRAIN_VERSION,
+            state: self.state(),
         };
         serde_json::to_string(&file).expect("brain serialisation cannot fail")
     }
@@ -325,20 +375,25 @@ impl MegaHal {
                 file.version
             )));
         }
-        self.learning = file.learning;
-        self.dictionary = file.dictionary.into_iter().collect();
+        self.apply_state(file.state);
+        Ok(())
+    }
+
+    /// Replace the brain state wholesale.
+    pub fn apply_state(&mut self, state: MegaHalState) {
+        self.learning = state.learning;
+        self.dictionary = state.dictionary.into_iter().collect();
         self.decode = self
             .dictionary
             .iter()
             .map(|(word, symbol)| (*symbol, word.clone()))
             .collect();
-        self.brain = file.brain.into_iter().collect();
-        self.seed = file.seed;
-        self.fore = file.fore;
-        self.back = file.back;
-        self.case = file.case;
-        self.punc = file.punc;
-        Ok(())
+        self.brain = state.brain.into_iter().collect();
+        self.seed = state.seed;
+        self.fore = state.fore;
+        self.back = state.back;
+        self.case = state.case;
+        self.punc = state.punc;
     }
 
     // -- internals ---------------------------------------------------------

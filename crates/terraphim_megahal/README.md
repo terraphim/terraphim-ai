@@ -69,6 +69,35 @@ behind the `personalities` feature:
 terraphim_megahal = { version = "...", features = ["personalities"] }
 ```
 
+## Terraphim integrations (feature-gated)
+
+**`persistence`** -- store the brain through `terraphim_persistence`
+profiles (memory, sqlite, redb, ...) via the `Persistable` trait:
+
+```rust
+use terraphim_megahal::persist::PersistedBrain;
+use terraphim_persistence::Persistable;
+
+let brain = PersistedBrain::from_state("my-brain", hal.state());
+brain.save().await?;
+let mut reloaded = PersistedBrain::new("my-brain".to_string());
+let reloaded = reloaded.load().await?;
+hal.apply_state(reloaded.state);
+```
+
+**`automata`** -- knowledge-graph keyword seeding through
+`terraphim_automata`: matched role-thesaurus concepts are injected into the
+reply seeding, so replies gravitate towards domain concepts:
+
+```rust
+let reply = hal.reply_with_thesaurus(Some("tell me about rust"), &mut rng, "...", &thesaurus);
+```
+
+Both features are additive: with them off (or with the plain
+[`MegaHal::reply`] path) the engine is byte-identical to the Ruby
+conformance contract. The Wasm persistence profile (localStorage/OPFS shim)
+is wired in the Phase 4 browser demo.
+
 ## Divergences from upstream
 
 - Brain files: upstream's zip+Ruby-Marshal format is not portable; this port

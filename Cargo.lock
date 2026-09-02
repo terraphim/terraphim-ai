@@ -9116,11 +9116,16 @@ dependencies = [
 name = "terraphim_megahal"
 version = "1.21.3"
 dependencies = [
+ "async-trait",
  "rand_core 0.10.1",
  "serde",
  "serde_json",
+ "terraphim_automata",
+ "terraphim_persistence",
  "terraphim_sooth",
+ "terraphim_types",
  "thiserror 1.0.69",
+ "tokio",
  "wasm-bindgen-test",
 ]
 

@@ -21,6 +21,13 @@ default = []
 # Embed the non-default upstream training corpora (Sherlock, Pepys, Star Trek,
 # ...) behind a feature flag; the :default corpus is always embedded.
 personalities = []
+# Knowledge-graph keyword seeding via terraphim_automata (Aho-Corasick
+# thesaurus matching over the input). Additive: default reply paths are
+# unchanged and the Ruby conformance suite passes with the feature off.
+automata = ["dep:terraphim_automata", "dep:terraphim_types"]
+# Brain save/load via terraphim_persistence profiles (memory, sqlite, redb,
+# ...). The MHRS1 JSON file functions remain the dependency-free fallback.
+persistence = ["dep:terraphim_persistence", "dep:async-trait"]
 
 [dependencies]
 terraphim_sooth = { path = "../terraphim_sooth" }
@@ -29,9 +36,16 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 # Seedable RNG injection (never OS entropy on the hot path, wasm32-safe).
 rand_core = { version = "0.10", default-features = false }
+# Resolved through the workspace's [patch.crates-io] onto the terraphim
+# registry (1.21.0 automata / =1.20.2 persistence).
+terraphim_automata = { version = "1.21.0", registry = "terraphim", optional = true }
+terraphim_persistence = { version = "=1.20.2", registry = "terraphim", optional = true }
+terraphim_types = { workspace = true, optional = true }
+async-trait = { version = "0.1", optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = "0.3"
