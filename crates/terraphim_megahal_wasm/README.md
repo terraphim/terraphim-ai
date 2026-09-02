@@ -23,6 +23,19 @@ trunk build --release --cargo-profile release-lto
 gzip -9 -c dist/*.wasm | wc -c   # must stay < 500 KB
 ```
 
+## Brain Lab
+
+The demo includes a **Brain Lab**: two brains share one seed and one input.
+Brain A stays on the default corpus; Brain B starts identical and diverges
+as you train it through the paste panel (or switch its personality,
+save/load it via localStorage). A live demonstration that training changes
+the generated text.
+
+A CLI demo video showing the same effect (train -> learned reply ->
+personality switch -> themed reply) lives in
+`crates/terraphim_megahal/docs/demo/` (regenerable via the committed VHS
+tape).
+
 ## Tests
 
 ```console
