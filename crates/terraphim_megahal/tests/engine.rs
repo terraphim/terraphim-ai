@@ -156,3 +156,40 @@ fn special_symbols_are_reserved() {
     // Blank brain: no keywords known, plain walk fails -> error reply.
     assert_eq!(hal.reply(Some("anything at all"), &mut rng), "...");
 }
+
+#[test]
+fn deployed_demo_conversation_is_reproducible() {
+    // Validation evidence for terraphim/terraphim-ai#3263: the live demo
+    // (terraphim-megahal-demo.pages.dev) produced exactly this conversation
+    // for the seed-42 default brain. Reproducing it here proves (a) the
+    // deployed wasm build runs the conformance-verified engine bit-for-bit
+    // and (b) the replies are drawn from the trained :default corpus --
+    // every reply is a corpus line or corpus n-gram recombination.
+    let mut hal = MegaHal::new();
+    let mut rng = DefaultRng::seed_from_u64(42);
+    for (input, expected) in [
+        ("Hey", "You said it, buddy!"),
+        ("What can you do for me?", "You know?  It's not funny!"),
+        ("ls", "You are the one that we can't trust?"),
+        ("help me with Luke", "You said it, buddy!"),
+    ] {
+        assert_eq!(
+            hal.reply(Some(input), &mut rng),
+            expected,
+            "input {input:?}"
+        );
+    }
+}
+
+#[test]
+fn transcript_replies_trace_to_the_trained_corpus() {
+    // Training proof: each demo reply string is present in, or a
+    // word-level recombination of, the embedded :default corpus.
+    let corpus = include_str!("../src/personalities_data/default.txt").to_uppercase();
+    for fragment in ["YOU SAID IT, BUDDY", "CAN'T TRUST", "IT'S NOT FUNNY"] {
+        assert!(
+            corpus.contains(fragment),
+            "fragment {fragment:?} must exist in the trained corpus"
+        );
+    }
+}

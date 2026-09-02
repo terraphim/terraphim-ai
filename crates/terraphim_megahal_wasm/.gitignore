@@ -1,1 +1,3 @@
 dist/
+# Re-include the Trunk entry point (a root *.html rule excludes it).
+!index.html
