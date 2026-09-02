@@ -132,19 +132,19 @@ pub fn build_channels_from_config(
     }
 
     {
-        use crate::channels::whatsapp::WhatsAppChannel;
-
-        if let Some(ref cfg) = config.whatsapp {
-            channels.push(Box::new(WhatsAppChannel::new(cfg.clone())));
-        }
+    // use crate::channels::whatsapp::WhatsAppChannel;
+    // 
+    // if let Some(ref cfg) = config.whatsapp {
+    // channels.push(Box::new(WhatsAppChannel::new(cfg.clone())));
+    // }
     }
 
     {
-        use crate::channels::teams::TeamsChannel;
-
-        if let Some(ref cfg) = config.teams {
-            channels.push(Box::new(TeamsChannel::new(cfg.clone())));
-        }
+    // use crate::channels::teams::TeamsChannel;
+    // 
+    // if let Some(ref cfg) = config.teams {
+    // channels.push(Box::new(TeamsChannel::new(cfg.clone())));
+    // }
     }
 
     // Note: matrix channel disabled due to sqlite dependency conflict

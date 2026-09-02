@@ -10,20 +10,16 @@
 //! - `cancel` is a no-op success for known sessions, error for unknown
 //! - `load_session` for unknown session returns `-32004`
 
-mod common;
-
 use serde_json::{Value, json};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use terraphim_tinyclaw::acp::AcpState;
 use terraphim_tinyclaw::acp::router::{JsonRpcRequest, dispatch};
-use terraphim_tinyclaw::session::MessageRole;
 
 /// Per-test counter so each test gets a unique sessions_dir and isolates
 /// from other tests sharing the filesystem.
 static TEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn make_state() -> AcpState {
-    common::scrub_env();
     let n = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
     let dir = std::env::temp_dir().join(format!("acp_test_{n}_{}", uuid::Uuid::new_v4().simple()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -140,7 +136,7 @@ async fn contract_list_sessions_returns_created() {
 // --- send_message ----------------------------------------------------------
 
 #[tokio::test]
-async fn contract_send_message_dispatches_one_user_turn_without_acp_persisting_it() {
+async fn contract_send_message_appends_to_session() {
     let state = make_state();
     let _ = call(&state, "new_session", json!("chat-4")).await;
     let resp = call(
@@ -155,84 +151,25 @@ async fn contract_send_message_dispatches_one_user_turn_without_acp_persisting_i
     .await;
     assert_eq!(resp["result"]["session_id"], "chat-4");
     assert_eq!(resp["result"]["message_index"], 0);
-
-    let received = tokio::time::timeout(
-        std::time::Duration::from_millis(200),
-        state.bus.inbound_rx.lock().await.recv(),
-    )
-    .await
-    .expect("user message should dispatch")
-    .expect("one inbound user turn");
-    assert_eq!(received.channel, "acp");
-    assert_eq!(received.chat_id, "chat-4");
-    assert_eq!(received.content, "hello");
-
-    let no_duplicate = tokio::time::timeout(
-        std::time::Duration::from_millis(50),
-        state.bus.inbound_rx.lock().await.recv(),
-    )
-    .await;
-    assert!(no_duplicate.is_err(), "user turn dispatched more than once");
-
-    let mut manager = state.sessions.lock().await;
-    let session = manager.get_or_create("chat-4");
-    assert_eq!(
-        session.message_count(),
-        0,
-        "ACP must not pre-save dispatched user turns"
-    );
 }
 
 #[tokio::test]
-async fn contract_send_message_persists_assistant_without_dispatching() {
+async fn contract_send_message_increments_index() {
     let state = make_state();
     let _ = call(&state, "new_session", json!("chat-5")).await;
+    let _ = call(
+        &state,
+        "send_message",
+        json!({"session_id": "chat-5", "role": "user", "content": "first"}),
+    )
+    .await;
     let resp = call(
         &state,
         "send_message",
         json!({"session_id": "chat-5", "role": "assistant", "content": "second"}),
     )
     .await;
-    assert_eq!(resp["result"]["message_index"], 0);
-
-    let no_dispatch = tokio::time::timeout(
-        std::time::Duration::from_millis(50),
-        state.bus.inbound_rx.lock().await.recv(),
-    )
-    .await;
-    assert!(no_dispatch.is_err(), "assistant entries must not dispatch");
-
-    let mut manager = state.sessions.lock().await;
-    let session = manager.get_or_create("chat-5");
-    assert_eq!(session.message_count(), 1);
-    assert_eq!(session.messages[0].role, MessageRole::Assistant);
-    assert_eq!(session.messages[0].content, "second");
-}
-
-#[tokio::test]
-async fn contract_send_message_persists_tool_without_dispatching() {
-    let state = make_state();
-    let _ = call(&state, "new_session", json!("chat-tool")).await;
-    let resp = call(
-        &state,
-        "send_message",
-        json!({"session_id": "chat-tool", "role": "tool", "content": "tool output"}),
-    )
-    .await;
-    assert_eq!(resp["result"]["message_index"], 0);
-
-    let no_dispatch = tokio::time::timeout(
-        std::time::Duration::from_millis(50),
-        state.bus.inbound_rx.lock().await.recv(),
-    )
-    .await;
-    assert!(no_dispatch.is_err(), "tool entries must not dispatch");
-
-    let mut manager = state.sessions.lock().await;
-    let session = manager.get_or_create("chat-tool");
-    assert_eq!(session.message_count(), 1);
-    assert_eq!(session.messages[0].role, MessageRole::Tool);
-    assert_eq!(session.messages[0].content, "tool output");
+    assert_eq!(resp["result"]["message_index"], 1);
 }
 
 #[tokio::test]

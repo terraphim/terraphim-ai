@@ -116,16 +116,14 @@ pub async fn handle_send_message(
     state: &AcpState,
     req: SendMessageRequest,
 ) -> Result<SendMessageResult, AcpError> {
-    let role = req.role.clone();
-    let content = req.content.clone();
-    let msg = match role.as_str() {
-        "user" => None,
-        "assistant" => Some(crate::session::ChatMessage::assistant(req.content)),
-        "tool" => Some(crate::session::ChatMessage::tool(req.content, "acp-tool")),
+    let msg = match req.role.as_str() {
+        "user" => crate::session::ChatMessage::user(req.content, "acp"),
+        "assistant" => crate::session::ChatMessage::assistant(req.content),
+        "tool" => crate::session::ChatMessage::tool(req.content, "acp-tool"),
         _ => {
             return Err(AcpError {
                 code: -32602,
-                message: format!("invalid role: {}", role),
+                message: format!("invalid role: {}", req.role),
             });
         }
     };
@@ -139,28 +137,14 @@ pub async fn handle_send_message(
     }
     let message_count = manager.get(&session_id).unwrap().message_count();
 
-    if let Some(msg) = msg {
-        let session = manager.get_or_create(&session_id);
-        session.add_message(msg);
-        let session_ref = manager.get(&session_id).unwrap();
-        manager.save(session_ref).map_err(|e| AcpError {
-            code: -32603,
-            message: format!("save failed: {e}"),
-        })?;
-    }
-    drop(manager);
-
-    if role == "user" {
-        crate::agent::entry::dispatch_to_agent_loop(
-            &state.bus,
-            crate::bus::InboundMessage::new("acp", "acp", session_id.clone(), content),
-        )
-        .await
-        .map_err(|e| AcpError {
-            code: -32603,
-            message: format!("agent dispatch failed: {e}"),
-        })?;
-    }
+    // Append + persist.
+    let session = manager.get_or_create(&session_id);
+    session.add_message(msg);
+    let session_ref = manager.get(&session_id).unwrap();
+    manager.save(session_ref).map_err(|e| AcpError {
+        code: -32603,
+        message: format!("save failed: {e}"),
+    })?;
 
     Ok(SendMessageResult {
         session_id,

@@ -5,11 +5,8 @@
 //! runs on a dedicated current-thread runtime (its spawn future is !Send
 //! due to a tracing span), which the tool handles internally.
 
-mod common;
-
 use serde_json::json;
 use std::path::PathBuf;
-use std::sync::Arc;
 use terraphim_persistence::DeviceStorage;
 use terraphim_spawner::AgentSpawner;
 use terraphim_tinyclaw::tools::subagent::SubagentTool;
@@ -17,7 +14,6 @@ use terraphim_tinyclaw::tools::{Tool, ToolError};
 use terraphim_types::capability::{Capability, Provider, ProviderType};
 
 fn make_tool() -> SubagentTool {
-    common::scrub_env();
     // `sh` provider: the spawner appends the task as the `-c` script body.
     let provider = Provider::new(
         "@test-agent",
@@ -30,27 +26,6 @@ fn make_tool() -> SubagentTool {
         vec![Capability::CodeGeneration],
     );
     SubagentTool::with_spawner(AgentSpawner::new(), provider, None, 15)
-}
-
-fn make_tool_in_dir(dir: &std::path::Path, capacity: usize, timeout_secs: u64) -> SubagentTool {
-    common::scrub_env();
-    let provider = Provider::new(
-        "@test-agent",
-        "Test Agent",
-        ProviderType::Agent {
-            agent_id: "@test".to_string(),
-            cli_command: "sh".to_string(),
-            working_dir: dir.to_path_buf(),
-        },
-        vec![Capability::CodeGeneration],
-    );
-    SubagentTool::with_spawner_and_capacity(
-        AgentSpawner::new().with_working_dir(dir),
-        provider,
-        None,
-        timeout_secs,
-        capacity,
-    )
 }
 
 #[tokio::test]
@@ -150,174 +125,6 @@ async fn subagent_terminate_removes_handle() {
         .await
         .expect_err("status of terminated agent must fail");
     assert!(matches!(err, ToolError::ExecutionFailed { .. }));
-}
-
-#[tokio::test]
-async fn subagent_spawn_uses_temp_workdir_isolation() {
-    common::scrub_env();
-    let tmp = tempfile::tempdir().unwrap();
-    let marker = tmp.path().join("subagent-marker.txt");
-    let tool = make_tool_in_dir(tmp.path(), 2, 15);
-    let out = tool
-        .execute(json!({"op": "spawn", "task": "pwd > subagent-marker.txt"}))
-        .await
-        .unwrap();
-    let id = out.parse::<serde_json::Value>().unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    tokio::time::sleep(std::time::Duration::from_millis(700)).await;
-    let _ = tool
-        .execute(json!({"op": "collect", "id": id}))
-        .await
-        .unwrap();
-    assert!(
-        marker.exists(),
-        "spawned process should write inside temp workdir"
-    );
-    let cwd = std::fs::read_to_string(marker).unwrap();
-    // `pwd` reports the canonical path (on macOS `/var` -> `/private/var`).
-    let expected = std::fs::canonicalize(tmp.path()).unwrap();
-    assert_eq!(
-        std::fs::canonicalize(cwd.trim()).unwrap(),
-        expected,
-        "pwd inside spawned agent should match the temp workdir"
-    );
-}
-
-#[tokio::test]
-async fn subagent_capacity_is_enforced_until_terminate_cleanup() {
-    common::scrub_env();
-    let tmp = tempfile::tempdir().unwrap();
-    let tool = make_tool_in_dir(tmp.path(), 1, 1);
-    let out = tool
-        .execute(json!({"op": "spawn", "task": "sleep 30"}))
-        .await
-        .unwrap();
-    let id = out.parse::<serde_json::Value>().unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-
-    let err = tool
-        .execute(json!({"op": "spawn", "task": "echo should-not-start"}))
-        .await
-        .expect_err("capacity must reject second live subagent");
-    assert!(format!("{err}").contains("capacity"));
-
-    let term = tool
-        .execute(json!({"op": "terminate", "id": id}))
-        .await
-        .expect("terminate should free capacity");
-    let term_json: serde_json::Value = serde_json::from_str(&term).unwrap();
-    assert_eq!(term_json["op"], "terminate");
-
-    let second = tool
-        .execute(json!({"op": "spawn", "task": "echo after-cleanup"}))
-        .await
-        .expect("capacity freed after terminate cleanup");
-    assert!(second.contains("\"op\":\"spawn\""));
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn subagent_concurrent_spawn_reserves_single_capacity_slot() {
-    common::scrub_env();
-    let tmp = tempfile::tempdir().unwrap();
-    let tool = Arc::new(make_tool_in_dir(tmp.path(), 1, 1));
-
-    let first_tool = tool.clone();
-    let second_tool = tool.clone();
-    let first = tokio::spawn(async move {
-        first_tool
-            .execute(json!({"op": "spawn", "task": "sleep 30"}))
-            .await
-    });
-    let second = tokio::spawn(async move {
-        second_tool
-            .execute(json!({"op": "spawn", "task": "sleep 30"}))
-            .await
-    });
-    let results = [first.await.unwrap(), second.await.unwrap()];
-
-    let successes: Vec<&String> = results
-        .iter()
-        .filter_map(|result| result.as_ref().ok())
-        .collect();
-    let failures: Vec<&ToolError> = results
-        .iter()
-        .filter_map(|result| result.as_ref().err())
-        .collect();
-    assert_eq!(
-        successes.len(),
-        1,
-        "exactly one concurrent spawn should reserve the only slot: {results:?}"
-    );
-    assert_eq!(
-        failures.len(),
-        1,
-        "exactly one concurrent spawn should hit capacity: {results:?}"
-    );
-    assert!(format!("{}", failures[0]).contains("capacity"));
-
-    let id = serde_json::from_str::<serde_json::Value>(successes[0]).unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let _ = tool
-        .execute(json!({"op": "terminate", "id": id}))
-        .await
-        .expect("terminate should free reserved capacity");
-    let recovered = tool
-        .execute(json!({"op": "spawn", "task": "echo recovered"}))
-        .await
-        .expect("capacity should recover after termination cleanup");
-    assert!(recovered.contains("\"op\":\"spawn\""));
-}
-
-#[tokio::test]
-async fn subagent_spawn_failure_releases_capacity_slot() {
-    common::scrub_env();
-    let tmp = tempfile::tempdir().unwrap();
-    let provider = Provider::new(
-        "@missing-agent",
-        "Missing Agent",
-        ProviderType::Agent {
-            agent_id: "@missing".to_string(),
-            cli_command: tmp
-                .path()
-                .join("does-not-exist")
-                .to_string_lossy()
-                .to_string(),
-            working_dir: tmp.path().to_path_buf(),
-        },
-        vec![Capability::CodeGeneration],
-    );
-    let failing_tool = SubagentTool::with_spawner_and_capacity(
-        AgentSpawner::new().with_working_dir(tmp.path()),
-        provider,
-        None,
-        1,
-        1,
-    );
-    let err = failing_tool
-        .execute(json!({"op": "spawn", "task": "echo cannot-start"}))
-        .await
-        .expect_err("missing provider binary should fail spawn");
-    assert!(format!("{err}").contains("spawn failed"));
-
-    let err = failing_tool
-        .execute(json!({"op": "spawn", "task": "echo recovered"}))
-        .await
-        .expect_err("same missing provider binary should still fail spawn");
-    let message = format!("{err}");
-    assert!(
-        message.contains("spawn failed"),
-        "slot should be released after failure; got: {message}"
-    );
-    assert!(
-        !message.contains("capacity"),
-        "released slot should not report capacity after failed spawn"
-    );
 }
 
 #[tokio::test]

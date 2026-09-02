@@ -1,8 +1,5 @@
 //! Tool-calling loop with hybrid LLM routing.
 
-use crate::agent::evo_trigger::{
-    self, EvolutionConfig, PostTurnSignals, ProposerOutput, TriggerState,
-};
 use crate::agent::execution_guard::{ExecutionGuard, GuardDecision};
 use crate::agent::proxy_client::{
     Message, ProxyClient, ProxyClientConfig, ProxyResponse, ToolDefinition,
@@ -11,12 +8,8 @@ use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::commands::CommandRegistry;
 use crate::config::{AgentConfig, DirectLlmConfig};
 use crate::credentials::{CredentialPool, CredentialSource, EnvVarSource, ProviderId};
-use crate::memory::{SharedBackend, jsonl::JsonlBackend};
 use crate::session::{ChatMessage, MessageRole, SessionManager};
-use crate::tools::agent_memory::{
-    AgentMemoryConfig, capture_failed_command, run_agent, should_ignore_command,
-};
-use crate::tools::approval;
+use crate::tools::agent_memory::{AgentMemoryConfig, run_agent};
 use crate::tools::{ToolError, ToolRegistry};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -28,17 +21,6 @@ use tokio_util::sync::CancellationToken;
 /// Minimum interval between `memory apply` subprocess runs. Prevents a
 /// subprocess spawn + full-store scan on every single turn (PR review P2).
 const MEMORY_APPLY_COOLDOWN: Duration = Duration::from_secs(30);
-
-/// Per-turn tool statistics gathered by the tool-calling loop and fed to
-/// the post-turn evolution trigger (#3228).
-#[derive(Debug, Clone, Copy, Default)]
-pub struct ToolLoopStats {
-    /// Tool calls executed during the turn.
-    pub tool_calls: u32,
-    /// Tool calls that failed during the turn (`Blocked` excluded: a
-    /// blocked command never ran, so there is no failure signal).
-    pub tool_errors: u32,
-}
 
 /// Configuration for the tool-calling loop.
 #[derive(Debug, Clone)]
@@ -449,10 +431,7 @@ pub struct ToolCallingLoop {
     router: HybridLlmRouter,
     guard: ExecutionGuard,
     tools: Arc<ToolRegistry>,
-    /// Session memory backend (#3227, T4). All session reads/writes in
-    /// the loop go through this trait object so the storage backend is
-    /// swappable (jsonl files by default; sqlite via `with_backend`).
-    backend: SharedBackend,
+    sessions: Arc<Mutex<SessionManager>>,
     commands: Arc<Mutex<CommandRegistry>>,
     system_prompt: String,
     shutdown: CancellationToken,
@@ -460,44 +439,13 @@ pub struct ToolCallingLoop {
     memory_enabled: bool,
     /// Shared config for the agent-memory subprocess bridge.
     memory_config: Option<Arc<AgentMemoryConfig>>,
-    /// Agent workspace directory. Failed-command learnings are captured
-    /// with this as the subprocess working directory so the learning
-    /// lands in `<workspace>/.terraphim/learnings` (#3225).
-    workspace: std::path::PathBuf,
     /// Last time `memory apply` ran (cooldown guard — avoids a subprocess
     /// spawn on every single turn).
     memory_last_apply: Arc<Mutex<std::time::Instant>>,
-    /// Post-turn evolution trigger configuration (#3228, T2). `None` keeps
-    /// the trigger fully inert (the default).
-    evolution_config: Option<EvolutionConfig>,
-    /// Cooldown bookkeeping for the evolution trigger.
-    evo_state: Arc<Mutex<TriggerState>>,
 }
 
 impl ToolCallingLoop {
-    /// Borrow the shared `Arc<Mutex<CommandRegistry>>` so an in-process
-    /// MCP server (gated on `serve_mcp_stdio(sessions, bus, commands, workspace)`)
-    /// can apply evolution-authored behaviour commands to the same registry
-    /// the agent loop executes from. Used by option-A (run MCP server
-    /// in-process alongside the agent loop) to fix P1#4 (split-brain
-    /// production wiring).
-    pub fn commands_arc(&self) -> Arc<Mutex<CommandRegistry>> {
-        Arc::clone(&self.commands)
-    }
-
-    /// Borrow the configured workspace directory. The evolution audit log
-    /// (`audit.jsonl`) and the pending evolution queue (`pending.jsonl`)
-    /// live under this directory.
-    pub fn workspace(&self) -> &std::path::Path {
-        &self.workspace
-    }
-
     /// Create a new tool-calling loop.
-    ///
-    /// The session manager is wrapped in a [`JsonlBackend`] so the loop
-    /// persists through the [`crate::memory::MemoryBackend`] trait while
-    /// sharing the same manager (mutex + cache + on-disk layout) with the
-    /// session tools.
     pub fn new(
         agent_config: &AgentConfig,
         router: HybridLlmRouter,
@@ -532,53 +480,6 @@ impl ToolCallingLoop {
         commands: CommandRegistry,
         memory_config: Option<&crate::config::MemoryConfig>,
     ) -> Self {
-        Self::with_backend_and_commands(
-            agent_config,
-            router,
-            tools,
-            Arc::new(JsonlBackend::from_shared(sessions)),
-            system_prompt,
-            commands,
-            memory_config,
-        )
-    }
-
-    /// Create with an explicit memory backend and default commands.
-    ///
-    /// Use this to select a non-default backend (e.g. `SqliteBackend`)
-    /// from configuration. The default [`Self::new`] path preserves the
-    /// legacy jsonl on-disk layout.
-    pub fn with_backend(
-        agent_config: &AgentConfig,
-        router: HybridLlmRouter,
-        tools: Arc<ToolRegistry>,
-        backend: SharedBackend,
-        system_prompt: String,
-        memory_config: Option<&crate::config::MemoryConfig>,
-    ) -> Self {
-        let mut commands = CommandRegistry::with_defaults();
-        let _ = commands.load_all();
-        Self::with_backend_and_commands(
-            agent_config,
-            router,
-            tools,
-            backend,
-            system_prompt,
-            commands,
-            memory_config,
-        )
-    }
-
-    /// Create with an explicit memory backend and command registry.
-    pub fn with_backend_and_commands(
-        agent_config: &AgentConfig,
-        router: HybridLlmRouter,
-        tools: Arc<ToolRegistry>,
-        backend: SharedBackend,
-        system_prompt: String,
-        commands: CommandRegistry,
-        memory_config: Option<&crate::config::MemoryConfig>,
-    ) -> Self {
         let (memory_enabled, mem_cfg_arc) = match memory_config {
             Some(cfg) if cfg.enabled => (true, Some(Arc::new(AgentMemoryConfig::from(cfg)))),
             _ => (false, None),
@@ -592,30 +493,14 @@ impl ToolCallingLoop {
             router,
             guard: ExecutionGuard::new(),
             tools,
-            backend,
+            sessions,
             commands: Arc::new(Mutex::new(commands)),
             system_prompt,
             shutdown: CancellationToken::new(),
             memory_enabled,
             memory_config: mem_cfg_arc,
-            workspace: agent_config.workspace.clone(),
-            memory_last_apply: Arc::new(Mutex::new(
-                std::time::Instant::now()
-                    .checked_sub(MEMORY_APPLY_COOLDOWN)
-                    .unwrap_or_else(std::time::Instant::now),
-            )),
-            evolution_config: None,
-            evo_state: Arc::new(Mutex::new(TriggerState::default())),
+            memory_last_apply: Arc::new(Mutex::new(std::time::Instant::now())),
         }
-    }
-
-    /// Enable the post-turn evolution trigger (#3228, T2). Additive builder
-    /// so existing constructors keep their signatures.
-    pub fn with_evolution_config(mut self, config: &EvolutionConfig) -> Self {
-        if config.enabled {
-            self.evolution_config = Some(config.clone());
-        }
-        self
     }
 
     /// Run the agent loop, consuming messages from the bus.
@@ -656,10 +541,13 @@ impl ToolCallingLoop {
         // Handle /reset command specially - it needs to clear the session
         if msg.content.trim() == "/reset" {
             let session_key = msg.session_key();
-            // Get session, clear it, then persist
-            let mut session = self.backend.get_or_create(&session_key).await;
+            let mut sessions_guard = self.sessions.lock().await;
+            // Get session, clear it, then save
+            let session = sessions_guard.get_or_create(&session_key);
             session.clear();
-            self.backend.persist(&session).await?;
+            let session_clone = session.clone();
+            sessions_guard.save(&session_clone)?;
+            drop(sessions_guard);
 
             let response = OutboundMessage::new(
                 &msg.channel,
@@ -678,7 +566,8 @@ impl ToolCallingLoop {
 
         // Get or create session
         let session_key = msg.session_key();
-        let mut session = self.backend.get_or_create(&session_key).await;
+        let mut sessions_guard = self.sessions.lock().await;
+        let session = sessions_guard.get_or_create(&session_key);
 
         // Add user message to session (augmented with media context if present)
         let user_msg = ChatMessage {
@@ -690,9 +579,11 @@ impl ToolCallingLoop {
         };
         session.add_message(user_msg.clone());
 
-        // Persist session with the new user message
+        // Save session before releasing lock
+        let session_clone = session.clone();
         let message_count = session.messages.len();
-        self.backend.persist(&session).await?;
+        sessions_guard.save(&session_clone)?;
+        drop(sessions_guard);
 
         // Check if we need compression using configured ratio
         let needs_compress = message_count > self.config.keep_last_messages * 2;
@@ -700,9 +591,10 @@ impl ToolCallingLoop {
             // Keep the last N messages, compress the rest
             let keep_count = self.config.keep_last_messages;
 
-            // Reload the session to read messages for compression
+            // Re-acquire lock to read messages for compression
             let messages_to_compress = {
-                let session = self.backend.get_or_create(&session_key).await;
+                let mut sessions_guard = self.sessions.lock().await;
+                let session = sessions_guard.get_or_create(&session_key);
                 if session.messages.len() > keep_count {
                     session.messages[..session.messages.len() - keep_count].to_vec()
                 } else {
@@ -715,14 +607,9 @@ impl ToolCallingLoop {
                 .compress(messages_to_compress, self.system_prompt.clone())
                 .await?;
 
-            // T4 (#3227): write the summary back to the agent-memory
-            // bridge so compression stops being lossy-and-lost. Fail-open:
-            // the session file remains the authoritative record.
-            self.capture_compression_summary(&session_key, &summary)
-                .await;
-
-            // Reload the session to record the summary and trim messages
-            let mut session = self.backend.get_or_create(&session_key).await;
+            // Re-acquire lock to update session
+            let mut sessions_guard = self.sessions.lock().await;
+            let session = sessions_guard.get_or_create(&session_key);
             session.set_summary(summary);
             // Keep only the recent messages
             let recent: Vec<_> = session
@@ -736,12 +623,15 @@ impl ToolCallingLoop {
                 .rev()
                 .collect();
             session.messages = recent;
-            self.backend.persist(&session).await?;
+            let session_clone = session.clone();
+            sessions_guard.save(&session_clone)?;
+            drop(sessions_guard);
         }
 
         // Build proxy messages from CURRENT session state (post-compression)
         let proxy_messages = {
-            let session = self.backend.get_or_create(&session_key).await;
+            let mut sessions_guard = self.sessions.lock().await;
+            let session = sessions_guard.get_or_create(&session_key);
             build_proxy_messages(&session.messages, session.summary.as_deref())
         };
 
@@ -812,25 +702,23 @@ impl ToolCallingLoop {
             .collect();
 
         // Call LLM with tool-calling loop
-        let (final_response, tool_stats) =
-            if self.router.tools_available() && !tool_definitions.is_empty() {
-                self.run_tool_loop_with_prompt(
-                    proxy_messages,
-                    tool_definitions,
-                    &effective_system_prompt,
-                )
+        let final_response = if self.router.tools_available() && !tool_definitions.is_empty() {
+            self.run_tool_loop_with_prompt(
+                proxy_messages,
+                tool_definitions,
+                &effective_system_prompt,
+            )
+            .await?
+        } else {
+            // Fallback to text-only mode
+            self.router
+                .text_only(proxy_messages, Some(effective_system_prompt))
                 .await?
-            } else {
-                // Fallback to text-only mode (no tools, so zeroed stats)
-                let text = self
-                    .router
-                    .text_only(proxy_messages, Some(effective_system_prompt))
-                    .await?;
-                (text, ToolLoopStats::default())
-            };
+        };
 
-        // Add assistant response to session
-        let mut session = self.backend.get_or_create(&session_key).await;
+        // Add assistant response to session (re-acquire lock)
+        let mut sessions_guard = self.sessions.lock().await;
+        let session = sessions_guard.get_or_create(&session_key);
 
         let assistant_msg = ChatMessage {
             role: MessageRole::Assistant,
@@ -841,256 +729,26 @@ impl ToolCallingLoop {
         };
         session.add_message(assistant_msg.clone());
 
-        // Persist session with the assistant response
-        self.backend.persist(&session).await?;
+        // Save session - clone to avoid borrow issues
+        let session_clone = session.clone();
+        sessions_guard.save(&session_clone)?;
+        drop(sessions_guard);
 
         // Send response
-        let outbound = OutboundMessage::new(&msg.channel, &msg.chat_id, &final_response);
+        let outbound = OutboundMessage::new(&msg.channel, &msg.chat_id, final_response);
         outbound_tx.send(outbound).await?;
-
-        // #3228 (T2): deterministic post-turn evolution trigger. Runs after
-        // the response is on the bus; gated on `evolution.enabled` and
-        // fail-open — it never breaks or blocks the turn.
-        self.maybe_emit_evolution_proposal(&msg, &final_response, &tool_stats)
-            .await;
 
         Ok(())
     }
 
-    /// Post-turn evolution trigger (#3228, T2): evaluate the turn's
-    /// deterministic signals and, when admitted, invoke the proposer
-    /// subagent under the two-legal-outputs contract (`NOTHING_TO_SAVE` or
-    /// a single `evo.propose` payload). A proposal is appended to the
-    /// workspace audit sink as a serialised [`EngineEvent`].
-    ///
-    /// The proposer is a separate LLM invocation with its own context —
-    /// the in-process equivalent of AutoClaw's spawned subagent; the
-    /// conversation history is not shared with it.
-    ///
-    /// Fail-open like the other agent-memory hooks: every failure mode is
-    /// a `warn` log, never an error surfaced to the turn.
-    async fn maybe_emit_evolution_proposal(
-        &self,
-        msg: &InboundMessage,
-        final_response: &str,
-        stats: &ToolLoopStats,
-    ) {
-        let Some(ref config) = self.evolution_config else {
-            return;
-        };
-
-        let signals = PostTurnSignals {
-            tool_calls: stats.tool_calls,
-            tool_errors: stats.tool_errors,
-            user_text: msg.content.clone(),
-            assistant_text: final_response.to_string(),
-        };
-
-        let hit = {
-            let mut state = self.evo_state.lock().await;
-            evo_trigger::evaluate_post_turn(&signals, config, &mut state)
-        };
-        let Some(hit) = hit else {
-            return;
-        };
-
-        log::info!(
-            "Evolution trigger admitted turn ({}); invoking proposer",
-            hit.evidence
-        );
-
-        let prompt = evo_trigger::build_proposer_prompt(&signals, &hit);
-        let raw = match self
-            .router
-            .text_only(vec![Message::user(prompt)], None)
-            .await
-        {
-            Ok(text) => text,
-            Err(e) => {
-                log::warn!("Evolution proposer invocation failed (non-fatal): {e}");
-                return;
-            }
-        };
-
-        let propose = match evo_trigger::parse_proposer_output(&raw) {
-            Ok(ProposerOutput::NothingToSave) => {
-                log::debug!("Evolution proposer: NOTHING_TO_SAVE");
-                return;
-            }
-            Ok(ProposerOutput::Proposal(p)) => *p,
-            Err(e) => {
-                log::warn!("Evolution proposer output rejected (non-fatal): {e}");
-                return;
-            }
-        };
-
-        // Record the attempt BEFORE the persist so the cooldown bounds
-        // proposer spend even when the JSONL sink fails — otherwise the
-        // cooldown restarts only on success and a persistent I/O error
-        // turns into a proposer retry storm.
-        self.evo_state.lock().await.record_proposal();
-
-        // Run the append on a blocking thread: `OpenOptions::append` plus a
-        // single `write_all` is line-atomic on POSIX for writes under
-        // PIPE_BUF (4KB), and `spawn_blocking` preserves exactly those
-        // std::fs semantics without blocking the async executor.
-        let workspace = self.workspace.clone();
-        let propose_for_write = propose.clone();
-        let persist = tokio::task::spawn_blocking(move || {
-            evo_trigger::append_proposal(&workspace, &propose_for_write)
-        })
-        .await;
-        match persist {
-            Ok(Ok(path)) => {
-                log::info!(
-                    "evo.propose emitted: signature={} sink={}",
-                    propose.signature,
-                    path.display()
-                );
-                let request_id = format!("evo:{}", propose.signature);
-                // Persist the pending evolution request to the cross-process
-                // JSONL queue under the workspace. The MCP server (separate
-                // OS process) reads from this file. We deliberately do NOT
-                // also self-mint an `EvolutionApprove` here — the
-                // `permissions_respond` handler constructs the approval at
-                // decision time from the persisted proposal + the operator's
-                // disposition. (#3229 P1#2, r8–r9.)
-                if let Err(e) =
-                    approval::submit_pending_evolution(&self.workspace, &request_id, &propose)
-                {
-                    log::warn!("failed to persist pending evolution {}: {}", request_id, e);
-                }
-            }
-            Ok(Err(e)) => log::warn!("Failed to persist evo.propose (non-fatal): {e}"),
-            Err(e) => log::warn!("evo.propose persistence task failed (non-fatal): {e}"),
-        }
-    }
-
-    /// Write a compression summary back to the agent-memory bridge
-    /// (`terraphim-agent memory capture`) with a provenance tag
-    /// (`session-compression:<session_key>`), so the knowledge condensed
-    /// out of the trimmed messages remains retrievable (#3227, T4).
-    ///
-    /// Fail-open and gated on `memory.enabled`: any bridge error is
-    /// logged and swallowed — the session file stays the authoritative
-    /// record. No-op when the memory bridge is disabled.
-    async fn capture_compression_summary(&self, session_key: &str, summary: &str) {
-        if !self.memory_enabled {
-            return;
-        }
-        let Some(ref mem_config) = self.memory_config else {
-            return;
-        };
-
-        let tag = format!("session-compression:{session_key}");
-        let stdin_json = serde_json::json!({
-            "content": summary,
-            "item_type": "Experience",
-            "importance": "Medium",
-        })
-        .to_string();
-
-        let mut cli_args = vec!["memory", "capture", "--provenance-tag", tag.as_str()];
-        let role_owned;
-        if let Some(ref role) = mem_config.role {
-            role_owned = role.clone();
-            cli_args.push("--role");
-            cli_args.push(&role_owned);
-        }
-
-        match run_agent(mem_config, &cli_args, Some(&stdin_json)).await {
-            Ok(_) => log::info!("Compression summary captured to memory bridge (tag: {tag})"),
-            Err(e) => {
-                log::warn!("Memory capture of compression summary failed (non-fatal): {e}")
-            }
-        }
-    }
-
-    /// Invariant failure capture (#3225): when an exec-class tool call
-    /// fails, capture the failed command as a learning via
-    /// `terraphim-agent learn capture` — no model involvement required.
-    ///
-    /// Semantics mirror terraphim-agent's PostToolUse hook:
-    /// - gated on `memory.enabled` (the memory bridge master switch);
-    /// - fail-open: a capture failure is a `warn` log, never an error
-    ///   surfaced to the turn;
-    /// - test-runner commands matching the ignore globs
-    ///   (`cargo test*`, `npm test*`, `pytest*`, `yarn test*`) are
-    ///   skipped client-side;
-    /// - secret redaction is delegated to `terraphim-agent`, which
-    ///   redacts before persisting;
-    /// - the subprocess timeout and 1 MiB output guard are enforced by
-    ///   the shared bridge in `tools::agent_memory`.
-    ///
-    /// `Blocked` errors are not captured: the command never ran, so
-    /// there is no failure to learn from.
-    async fn capture_tool_failure(&self, tool_call: &crate::tools::ToolCall, error: &ToolError) {
-        if !self.memory_enabled {
-            return;
-        }
-        let Some(ref mem_config) = self.memory_config else {
-            return;
-        };
-
-        // Exec-class tools only: a failed shell command is the learning
-        // signal. Other tools (web, filesystem, …) are out of scope.
-        if !matches!(
-            tool_call.name.as_str(),
-            "shell" | "exec" | "bash" | "sandbox"
-        ) {
-            return;
-        }
-
-        // A blocked command never executed; guard rejections are policy,
-        // not command failures.
-        if matches!(error, ToolError::Blocked { .. }) {
-            return;
-        }
-
-        let Some(command) = tool_call.arguments["command"].as_str() else {
-            return;
-        };
-
-        if should_ignore_command(command) {
-            log::debug!("Skipping learning capture for ignored command: {command}");
-            return;
-        }
-
-        let (exit_code, error_output) = match error {
-            ToolError::NonZeroExit {
-                exit_code, stderr, ..
-            } => (i64::from(*exit_code), stderr.clone()),
-            // Conventional timeout exit code (cf. GNU timeout(1)).
-            ToolError::Timeout { .. } => (124, error.to_string()),
-            other => (1, other.to_string()),
-        };
-
-        match capture_failed_command(
-            mem_config,
-            command,
-            &error_output,
-            exit_code,
-            Some(&self.workspace),
-        )
-        .await
-        {
-            Ok(_) => log::info!("Captured failed command as learning: {command}"),
-            Err(e) => log::warn!("Learning capture failed (non-fatal): {e}"),
-        }
-    }
-
     /// Run the iterative tool-calling loop with explicit system prompt.
-    ///
-    /// Returns the final response text together with per-turn tool
-    /// statistics consumed by the post-turn evolution trigger (#3228).
     async fn run_tool_loop_with_prompt(
         &self,
         mut messages: Vec<Message>,
         tools: Vec<ToolDefinition>,
         system_prompt: &str,
-    ) -> anyhow::Result<(String, ToolLoopStats)> {
+    ) -> anyhow::Result<String> {
         let prompt = system_prompt.to_string();
-        let mut stats = ToolLoopStats::default();
         for iteration in 0..self.config.max_iterations {
             log::debug!("Tool-calling iteration {}", iteration + 1);
 
@@ -1103,11 +761,7 @@ impl ToolCallingLoop {
                 Ok(resp) => resp,
                 Err(e) => {
                     log::warn!("Tool call failed: {}. Falling back to text-only.", e);
-                    let text = self
-                        .router
-                        .text_only(messages, Some(prompt.clone()))
-                        .await?;
-                    return Ok((text, stats));
+                    return self.router.text_only(messages, Some(prompt.clone())).await;
                 }
             };
 
@@ -1122,13 +776,12 @@ impl ToolCallingLoop {
             // Check if there are tool calls
             if response.tool_calls.is_empty() {
                 // No tool calls - return the content
-                return Ok((response.content.unwrap_or_default(), stats));
+                return Ok(response.content.unwrap_or_default());
             }
 
             // Execute each tool call
             for tool_call in &response.tool_calls {
                 log::info!("Executing tool: {}", tool_call.name);
-                stats.tool_calls += 1;
 
                 // Check with execution guard
                 let decision = self.guard.evaluate(&tool_call.name, &tool_call.arguments);
@@ -1140,9 +793,6 @@ impl ToolCallingLoop {
                             format!("Tool blocked: {}", reason)
                         }
                         Err(e) => {
-                            stats.tool_errors += 1;
-                            // #3225: failure capture is a loop invariant.
-                            self.capture_tool_failure(tool_call, &e).await;
                             format!("Tool execution error: {}", e)
                         }
                     },
@@ -1157,12 +807,7 @@ impl ToolCallingLoop {
                         );
                         match self.tools.execute(tool_call).await {
                             Ok(result) => result,
-                            Err(e) => {
-                                stats.tool_errors += 1;
-                                // #3225: failure capture is a loop invariant.
-                                self.capture_tool_failure(tool_call, &e).await;
-                                format!("Tool execution error: {}", e)
-                            }
+                            Err(e) => format!("Tool execution error: {}", e),
                         }
                     }
                 };
@@ -1179,13 +824,10 @@ impl ToolCallingLoop {
 
         // Max iterations reached
         log::warn!("Max iterations ({}) reached", self.config.max_iterations);
-        Ok((
-            format!(
-                "I've reached the maximum number of tool calls ({}). \
-                 The task may be too complex. Please try breaking it into smaller steps.",
-                self.config.max_iterations
-            ),
-            stats,
+        Ok(format!(
+            "I've reached the maximum number of tool calls ({}). \
+             The task may be too complex. Please try breaking it into smaller steps.",
+            self.config.max_iterations
         ))
     }
 

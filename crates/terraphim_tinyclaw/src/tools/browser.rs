@@ -4,8 +4,7 @@
 //! source but is gated behind `#[cfg(feature = "repl-web")]`, and the
 //! deployed `terraphim-agent` binary reports `web_operations: false`; the
 //! crate has no Cargo.toml in this workspace and is not on the registry.
-//! So this implementation provides HTTP-backed operations natively over
-//! reqwest:
+//! So v1 implements browser operations natively over reqwest:
 //! - `navigate` — GET a URL, return status + title + text preview
 //! - `extract` — GET a URL, return visible text (lightweight stripping)
 //! - `api` — arbitrary HTTP request (method/url/headers/body)
@@ -18,13 +17,11 @@
 
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
-use futures_util::StreamExt;
 use serde_json::{Value, json};
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
-use tokio::sync::Mutex;
 use tokio::time::Instant;
 
 /// Configuration for the browser tool.
@@ -55,13 +52,6 @@ impl From<&crate::config::BrowserConfig> for BrowserToolConfig {
 pub struct BrowserTool {
     client: reqwest::Client,
     config: BrowserToolConfig,
-    session: Mutex<BrowserSession>,
-}
-
-#[derive(Debug, Default)]
-struct BrowserSession {
-    current_url: Option<String>,
-    html: Option<String>,
 }
 
 impl BrowserTool {
@@ -83,11 +73,7 @@ impl BrowserTool {
             tool: "browser".to_string(),
             message: format!("failed to build HTTP client: {e}"),
         })?;
-        Ok(Self {
-            client,
-            config,
-            session: Mutex::new(BrowserSession::default()),
-        })
+        Ok(Self { client, config })
     }
 
     /// Bound a body to max_bytes on a char boundary.
@@ -288,83 +274,6 @@ async fn probe_agent_web_operations(binary: &str, timeout_secs: u64, op: &str) -
     )
 }
 
-struct FetchedPage {
-    status: u16,
-    content_type: String,
-    bytes_len: usize,
-    body: String,
-}
-
-/// Streaming body read bounded to `max_bytes + 1` bytes.
-///
-/// We never trust Content-Length: servers can lie, omit it, or use
-/// chunked transfer encoding without any advertised size. We pull
-/// chunks from `resp.bytes_stream()` and stop as soon as the running
-/// total exceeds `max_bytes`. The single over-budget byte is what
-/// distinguishes "exactly at the cap" from "over the cap".
-///
-/// On overflow the caller must NOT use the partial buffer — the
-/// returned `Err` short-circuits before any payload reaches
-/// downstream code.
-async fn read_capped_body(
-    resp: reqwest::Response,
-    max_bytes: usize,
-    tool: &str,
-) -> Result<Vec<u8>, ToolError> {
-    let mut stream = resp.bytes_stream();
-    let mut buf = Vec::with_capacity(max_bytes.saturating_add(1).min(64 * 1024));
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| ToolError::ExecutionFailed {
-            tool: tool.to_string(),
-            message: format!("read body failed: {e}"),
-        })?;
-        if buf.len().saturating_add(chunk.len()) > max_bytes {
-            // Stop draining — connection will be dropped when `resp` is
-            // consumed at end of scope.
-            return Err(ToolError::ExecutionFailed {
-                tool: tool.to_string(),
-                message: format!(
-                    "response too large (> {} bytes); refusing to buffer unbounded body",
-                    max_bytes
-                ),
-            });
-        }
-        buf.extend_from_slice(&chunk);
-    }
-    Ok(buf)
-}
-
-impl BrowserTool {
-    async fn fetch_page(&self, url: &str) -> Result<FetchedPage, ToolError> {
-        validate_http_url(url)?;
-        let resp = self
-            .client
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| ToolError::ExecutionFailed {
-                tool: "browser".to_string(),
-                message: format!("GET {url} failed: {e}"),
-            })?;
-        let status = resp.status().as_u16();
-        let content_type = resp
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-        let bytes = read_capped_body(resp, self.config.max_bytes, "browser").await?;
-        let bytes_len = bytes.len();
-        let text = String::from_utf8_lossy(&bytes).to_string();
-        Ok(FetchedPage {
-            status,
-            content_type,
-            bytes_len,
-            body: self.bound(&text),
-        })
-    }
-}
-
 /// Validate that a URL uses http/https (matches `web_fetch` behaviour;
 /// reqwest rejects other schemes anyway, but fail with a clear message).
 fn validate_http_url(url: &str) -> Result<(), ToolError> {
@@ -440,24 +349,6 @@ fn html_to_text(html: &str) -> String {
     }
 }
 
-fn require_current_html(session: &BrowserSession) -> Result<(&str, &str), ToolError> {
-    let url = session
-        .current_url
-        .as_deref()
-        .ok_or_else(|| ToolError::InvalidArguments {
-            tool: "browser".to_string(),
-            message: "navigate before using browser session operations".to_string(),
-        })?;
-    let html = session
-        .html
-        .as_deref()
-        .ok_or_else(|| ToolError::InvalidArguments {
-            tool: "browser".to_string(),
-            message: "current page has no captured HTML".to_string(),
-        })?;
-    Ok((url, html))
-}
-
 #[async_trait]
 impl Tool for BrowserTool {
     fn name(&self) -> &str {
@@ -465,9 +356,9 @@ impl Tool for BrowserTool {
     }
 
     fn description(&self) -> &str {
-        "HTTP web operations. Supported: navigate {url}, extract {url}, \
-         api {method, url, headers?, body?}. Browser-engine ops \
-         click/type/screenshot return BackendUnavailable."
+        "Web/browser operations over HTTP. Operations: navigate {url}, \
+         extract {url}, api {method, url, headers?, body?}. Browser-native \
+         ops (click/type/screenshot) are unavailable in this build."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -482,9 +373,7 @@ impl Tool for BrowserTool {
                 "url": { "type": "string", "description": "Target URL" },
                 "method": { "type": "string", "description": "HTTP method (api)" },
                 "headers": { "type": "object", "description": "Extra headers (api)" },
-                "body": { "type": "string", "description": "Request body (api)" },
-                "selector": { "type": "string", "description": "CSS selector for click/type" },
-                "text": { "type": "string", "description": "Text to type" }
+                "body": { "type": "string", "description": "Request body (api)" }
             },
             "required": ["op"]
         })
@@ -507,28 +396,68 @@ impl Tool for BrowserTool {
                         message: format!("{op} requires 'url'"),
                     }
                 })?;
-                let page = self.fetch_page(url).await?;
+                validate_http_url(url)?;
+                let resp =
+                    self.client
+                        .get(url)
+                        .send()
+                        .await
+                        .map_err(|e| ToolError::ExecutionFailed {
+                            tool: "browser".to_string(),
+                            message: format!("GET {url} failed: {e}"),
+                        })?;
+                let status = resp.status().as_u16();
+                let content_type = resp
+                    .headers()
+                    .get(reqwest::header::CONTENT_TYPE)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("")
+                    .to_string();
+                // Reject oversized responses up front via content-length.
+                if let Some(len) = resp
+                    .headers()
+                    .get(reqwest::header::CONTENT_LENGTH)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| v.parse::<usize>().ok())
+                    && len > self.config.max_bytes
+                {
+                    return Ok(json!({
+                        "op": op,
+                        "url": url,
+                        "status": status,
+                        "content_type": content_type,
+                        "error": format!(
+                            "response too large ({len} bytes > {})",
+                            self.config.max_bytes
+                        ),
+                        "bytes": len,
+                    })
+                    .to_string());
+                }
+                let bytes = resp.bytes().await.map_err(|e| ToolError::ExecutionFailed {
+                    tool: "browser".to_string(),
+                    message: format!("read body failed: {e}"),
+                })?;
+                let text = String::from_utf8_lossy(&bytes).to_string();
+                let body = self.bound(&text);
 
                 if op == "navigate" {
-                    let mut session = self.session.lock().await;
-                    session.current_url = Some(url.to_string());
-                    session.html = Some(page.body.clone());
                     Ok(json!({
                         "op": "navigate",
                         "url": url,
-                        "status": page.status,
-                        "content_type": page.content_type,
-                        "title": extract_title(&page.body),
-                        "preview": html_to_text(&page.body).chars().take(400).collect::<String>(),
-                        "bytes": page.bytes_len,
+                        "status": status,
+                        "content_type": content_type,
+                        "title": extract_title(&body),
+                        "preview": html_to_text(&body).chars().take(400).collect::<String>(),
+                        "bytes": bytes.len(),
                     })
                     .to_string())
                 } else {
                     Ok(json!({
                         "op": "extract",
                         "url": url,
-                        "status": page.status,
-                        "text": html_to_text(&page.body).chars().take(4000).collect::<String>(),
+                        "status": status,
+                        "text": html_to_text(&body).chars().take(4000).collect::<String>(),
                     })
                     .to_string())
                 }
@@ -570,27 +499,30 @@ impl Tool for BrowserTool {
                     message: format!("{method} {url} failed: {e}"),
                 })?;
                 let status = resp.status().as_u16();
-                let advertised_len = resp
+                if let Some(len) = resp
                     .headers()
                     .get(reqwest::header::CONTENT_LENGTH)
                     .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<usize>().ok());
-                let bytes = match read_capped_body(resp, self.config.max_bytes, "browser").await {
-                    Ok(bytes) => bytes,
-                    Err(ToolError::ExecutionFailed { message, .. }) => {
-                        let bytes = advertised_len.unwrap_or(0);
-                        return Ok(json!({
-                            "op": "api",
-                            "method": method,
-                            "url": url,
-                            "status": status,
-                            "error": message,
-                            "bytes": bytes,
-                        })
-                        .to_string());
-                    }
-                    Err(other) => return Err(other),
-                };
+                    .and_then(|v| v.parse::<usize>().ok())
+                    && len > self.config.max_bytes
+                {
+                    return Ok(json!({
+                        "op": "api",
+                        "method": method,
+                        "url": url,
+                        "status": status,
+                        "error": format!(
+                            "response too large ({len} bytes > {})",
+                            self.config.max_bytes
+                        ),
+                        "bytes": len,
+                    })
+                    .to_string());
+                }
+                let bytes = resp.bytes().await.map_err(|e| ToolError::ExecutionFailed {
+                    tool: "browser".to_string(),
+                    message: format!("read body failed: {e}"),
+                })?;
                 let text = String::from_utf8_lossy(&bytes).to_string();
                 Ok(json!({
                     "op": "api",
@@ -603,15 +535,7 @@ impl Tool for BrowserTool {
                 .to_string())
             }
             "click" | "type" | "screenshot" => {
-                // Without an explicit `url`, the op targets the current
-                // session page, so a navigate must have happened first.
-                let mut probe_args = args.clone();
-                if probe_args.get("url").and_then(Value::as_str).is_none() {
-                    let session = self.session.lock().await;
-                    let (url, _) = require_current_html(&session)?;
-                    probe_args["url"] = json!(url);
-                }
-                Err(self.browser_native_unavailable(op, &probe_args).await)
+                Err(self.browser_native_unavailable(op, &args).await)
             }
             other => Err(ToolError::InvalidArguments {
                 tool: "browser".to_string(),

@@ -26,7 +26,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::bus::MessageBus;
 use crate::session::SessionManager;
 
 /// Env var for the upstream proxy base URL (e.g. `http://100.106.66.7:3456`).
@@ -54,9 +53,6 @@ pub struct ProxyState {
     pub upstream: Option<Upstream>,
     /// Shared HTTP client (connection-pooled; used for upstream calls).
     pub client: reqwest::Client,
-    /// Optional shared agent-loop bus. When present, chat completions also
-    /// enqueue the latest user message into the normal TinyClaw loop.
-    pub bus: Option<Arc<MessageBus>>,
 }
 
 /// Model metadata exposed via `/v1/models`.
@@ -82,7 +78,6 @@ impl Default for ProxyState {
             )))),
             upstream: None,
             client: reqwest::Client::new(),
-            bus: None,
         }
     }
 }
@@ -97,12 +92,6 @@ impl ProxyState {
             }),
             ..Self::default()
         }
-    }
-
-    /// Attach the shared agent-loop bus used by gateway/TUI/dashboard/ACP.
-    pub fn with_agent_bus(mut self, bus: Arc<MessageBus>) -> Self {
-        self.bus = Some(bus);
-        self
     }
 
     /// Build state from the environment. Returns `None` when no upstream

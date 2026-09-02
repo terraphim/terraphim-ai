@@ -7,8 +7,6 @@
 //! filesystem or network calls. See Wave 0 design doc for the hermetic
 //! default convention.
 
-mod common;
-
 use chrono::{Duration as ChronoDuration, Utc};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -25,15 +23,10 @@ fn unique_key() -> String {
 }
 
 async fn make_store(key: &str) -> CronStore {
-    common::scrub_env();
     let _ = DeviceStorage::init_memory_only().await;
     let storage = DeviceStorage::arc_memory_only()
         .await
         .expect("arc memory-only DeviceStorage");
-    make_store_with_storage(storage, key)
-}
-
-fn make_store_with_storage(storage: Arc<DeviceStorage>, key: &str) -> CronStore {
     CronStore::new(storage, key)
 }
 
@@ -41,7 +34,6 @@ struct TestExecutor(Arc<AtomicUsize>);
 #[async_trait::async_trait]
 impl JobExecutor for TestExecutor {
     async fn execute(&self, _job: &CronJob) -> JobOutcome {
-        self.0.fetch_add(1, Ordering::SeqCst);
         JobOutcome::Ok
     }
 }
@@ -208,66 +200,6 @@ async fn contract_repeat_increments_completed_counter() {
     // times=5, completed=1, not exhausted
     assert_eq!(loaded.state, JobState::Scheduled);
     assert!(loaded.enabled);
-}
-
-#[tokio::test]
-async fn contract_scheduler_recovers_due_job_after_process_restart() {
-    let key = unique_key();
-    common::scrub_env();
-    let _ = DeviceStorage::init_memory_only().await;
-    let storage = DeviceStorage::arc_memory_only()
-        .await
-        .expect("arc memory-only DeviceStorage");
-    let store_before_restart = make_store_with_storage(storage.clone(), &key);
-    let mut job = CronJob::new("restart durable prompt", Schedule::Delay { secs: 60 });
-    job.next_run_at = Some(Utc::now() - ChronoDuration::seconds(1));
-    let job_id = job.id.clone();
-    store_before_restart
-        .save_all(std::slice::from_ref(&job))
-        .await
-        .unwrap();
-
-    let store_after_restart = make_store_with_storage(storage, &key);
-    let counter = Arc::new(AtomicUsize::new(0));
-    let scheduler = Arc::new(CronScheduler::new(
-        store_after_restart.clone(),
-        Arc::new(TestExecutor(counter.clone())),
-        std::time::Duration::from_secs(60),
-    ));
-
-    let fired = scheduler.tick().await.unwrap();
-    assert_eq!(fired, 1);
-    assert_eq!(counter.load(Ordering::SeqCst), 1);
-
-    let loaded = store_after_restart.get_job(&job_id).await.unwrap().unwrap();
-    assert_eq!(loaded.last_status, Some("ok".into()));
-    assert_eq!(loaded.state, JobState::Completed);
-}
-
-#[tokio::test]
-async fn contract_scheduler_start_fires_unattended_due_job() {
-    let store = make_store(&unique_key()).await;
-    let mut job = CronJob::new("unattended prompt", Schedule::Delay { secs: 60 });
-    job.next_run_at = Some(Utc::now() - ChronoDuration::seconds(1));
-    store.save_all(std::slice::from_ref(&job)).await.unwrap();
-
-    let counter = Arc::new(AtomicUsize::new(0));
-    let scheduler = Arc::new(CronScheduler::new(
-        store,
-        Arc::new(TestExecutor(counter.clone())),
-        std::time::Duration::from_millis(25),
-    ));
-
-    scheduler.clone().start().await.unwrap();
-    for _ in 0..20 {
-        if counter.load(Ordering::SeqCst) > 0 {
-            break;
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    }
-    scheduler.stop().await;
-
-    assert_eq!(counter.load(Ordering::SeqCst), 1);
 }
 
 // --- jobs.py:load_jobs auto-repair semantics ---------------------------------

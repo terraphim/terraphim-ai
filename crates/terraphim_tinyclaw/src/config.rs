@@ -50,56 +50,10 @@ pub struct Config {
 
     /// Scheduler configuration (#3147). **Default: disabled.**
     /// When `scheduler.enabled = true`, `ScheduleTool` (create/list/delete)
-    /// is registered for the agent loop. Production scheduling writes
-    /// orchestrator include fragments and requires an explicit
-    /// `scheduler.cli_tool`.
+    /// is registered for the agent loop; the `schedule` CLI subcommand
+    /// shares the same store.
     #[serde(default)]
     pub scheduler: SchedulerConfig,
-
-    /// Home Assistant configuration. **Default: disabled.**
-    /// When `homeassistant.enabled = true`, the four HA tools
-    /// (ha_list_entities / ha_get_state / ha_list_services / ha_call_service)
-    /// are registered over the HA REST API.
-    #[serde(default)]
-    pub homeassistant: HomeAssistantConfig,
-
-    /// Vision configuration. **Default: disabled.**
-    /// When `vision.enabled = true`, the `vision_analyze` tool registers and
-    /// sends multimodal chat-completion requests to an OpenAI-compatible
-    /// vision model endpoint.
-    #[serde(default)]
-    pub vision: VisionConfig,
-
-    /// Image generation configuration. **Default: disabled.**
-    /// When `image_gen.enabled = true`, the `image_generate` tool registers
-    /// against an OpenAI-compatible image endpoint (DALL-E style).
-    #[serde(default)]
-    pub image_gen: ImageGenConfig,
-
-    /// Text-to-speech configuration. **Default: disabled.**
-    /// When `tts.enabled = true`, the `text_to_speech` tool registers.
-    #[serde(default)]
-    pub tts: TtsConfig,
-
-    /// Mixture-of-Agents configuration. **Default: disabled.**
-    /// When `moa.enabled = true`, the `mixture_of_agents` tool registers.
-    #[serde(default)]
-    pub moa: MoaConfig,
-
-    /// RL training configuration. **Default: disabled.**
-    /// When `rl.enabled = true`, the `rl_check_status` tool registers to poll
-    /// a rollout server's status endpoint.
-    #[serde(default)]
-    pub rl: RlConfig,
-
-    /// Post-turn evolution trigger configuration (#3228, T2). **Default:
-    /// disabled.** When `evolution.enabled = true`, each completed turn is
-    /// evaluated by deterministic heuristics (ported from AutoClaw's
-    /// `evaluatePostTurn`) and admitted turns invoke a proposer subagent
-    /// whose only legal outputs are `NOTHING_TO_SAVE` or an `evo.propose`
-    /// payload (TACP spec 5.1).
-    #[serde(default)]
-    pub evolution: crate::agent::evo_trigger::EvolutionConfig,
 }
 
 impl Config {
@@ -125,7 +79,6 @@ impl Config {
         self.agent.validate()?;
         self.channels.validate()?;
         self.llm.validate()?;
-        self.scheduler.validate()?;
         Ok(())
     }
 
@@ -324,11 +277,6 @@ pub struct ChannelsConfig {
     // Note: matrix config disabled due to sqlite dependency conflict
     // #[cfg(feature = "matrix")]
     // pub matrix: Option<MatrixConfig>,
-    /// WhatsApp Cloud API channel configuration.
-    pub whatsapp: Option<WhatsAppConfig>,
-
-    /// Microsoft Teams Bot Framework channel configuration.
-    pub teams: Option<TeamsConfig>,
 }
 
 impl ChannelsConfig {
@@ -348,14 +296,6 @@ impl ChannelsConfig {
             cfg.validate()?;
         }
 
-        if let Some(ref cfg) = self.whatsapp {
-            cfg.validate()?;
-        }
-
-        if let Some(ref cfg) = self.teams {
-            cfg.validate()?;
-        }
-
         // Note: matrix validation disabled due to sqlite dependency conflict
         // #[cfg(feature = "matrix")]
         // if let Some(ref cfg) = self.matrix {
@@ -364,177 +304,6 @@ impl ChannelsConfig {
 
         Ok(())
     }
-}
-
-/// WhatsApp Cloud API channel configuration.
-#[derive(Clone, Deserialize, Serialize)]
-pub struct WhatsAppConfig {
-    /// Meta Graph API access token.
-    pub access_token: String,
-    /// WhatsApp Business phone number ID used in Cloud API send URLs.
-    pub phone_number_id: String,
-    /// Meta webhook verify token used for GET subscription challenge.
-    pub verify_token: String,
-    /// Meta app secret used for X-Hub-Signature-256 verification.
-    pub app_secret: String,
-    /// Graph API base URL. Defaults to https://graph.facebook.com.
-    #[serde(default = "default_whatsapp_graph_base_url")]
-    pub graph_base_url: String,
-    /// Graph API version path segment. Defaults to v20.0.
-    #[serde(default = "default_whatsapp_api_version")]
-    pub api_version: String,
-    /// List of allowed WhatsApp sender phone numbers. Must be non-empty.
-    pub allow_from: Vec<String>,
-}
-
-impl std::fmt::Debug for WhatsAppConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WhatsAppConfig")
-            .field("access_token", &"***REDACTED***")
-            .field("phone_number_id", &self.phone_number_id)
-            .field("verify_token", &"***REDACTED***")
-            .field("app_secret", &"***REDACTED***")
-            .field("graph_base_url", &self.graph_base_url)
-            .field("api_version", &self.api_version)
-            .field("allow_from", &self.allow_from)
-            .finish()
-    }
-}
-
-impl WhatsAppConfig {
-    pub fn validate(&self) -> anyhow::Result<()> {
-        if self.access_token.trim().is_empty() {
-            anyhow::bail!("whatsapp.access_token cannot be empty");
-        }
-        if self.phone_number_id.trim().is_empty() {
-            anyhow::bail!("whatsapp.phone_number_id cannot be empty");
-        }
-        if self.verify_token.trim().is_empty() {
-            anyhow::bail!("whatsapp.verify_token cannot be empty");
-        }
-        if self.app_secret.trim().is_empty() {
-            anyhow::bail!("whatsapp.app_secret cannot be empty");
-        }
-        if self.graph_base_url.trim().is_empty() {
-            anyhow::bail!("whatsapp.graph_base_url cannot be empty");
-        }
-        if self.api_version.trim().is_empty() {
-            anyhow::bail!("whatsapp.api_version cannot be empty");
-        }
-        if self.allow_from.is_empty() {
-            anyhow::bail!("whatsapp.allow_from cannot be empty");
-        }
-        Ok(())
-    }
-
-    pub fn is_allowed(&self, sender_id: &str) -> bool {
-        crate::channel::is_sender_allowed(&self.allow_from, sender_id)
-    }
-}
-
-fn default_whatsapp_graph_base_url() -> String {
-    "https://graph.facebook.com".to_string()
-}
-
-fn default_whatsapp_api_version() -> String {
-    "v20.0".to_string()
-}
-
-/// Microsoft Teams Bot Framework channel configuration.
-#[derive(Clone, Deserialize, Serialize)]
-pub struct TeamsConfig {
-    /// Microsoft app/client ID for the bot.
-    pub app_id: String,
-    /// Microsoft app password/client secret for the bot.
-    pub app_password: String,
-    /// OAuth token endpoint for Bot Framework client credentials.
-    #[serde(default = "default_teams_token_url")]
-    pub token_url: String,
-    /// OAuth scope for Bot Framework API.
-    #[serde(default = "default_teams_scope")]
-    pub scope: String,
-    /// OpenID metadata endpoint for validating Bot Connector webhook JWTs.
-    #[serde(default = "default_teams_openid_metadata_url")]
-    pub openid_metadata_url: String,
-    /// Optional JWKS endpoint override for deterministic tests or private
-    /// Bot Connector-compatible deployments. Production should normally use
-    /// the `jwks_uri` discovered from `openid_metadata_url`.
-    #[serde(default)]
-    pub openid_jwks_url: Option<String>,
-    /// Expected issuer for Bot Connector webhook JWTs.
-    #[serde(default = "default_teams_jwt_issuer")]
-    pub jwt_issuer: String,
-    /// List of allowed Teams user IDs. Must be non-empty.
-    pub allow_from: Vec<String>,
-}
-
-impl std::fmt::Debug for TeamsConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TeamsConfig")
-            .field("app_id", &self.app_id)
-            .field("app_password", &"***REDACTED***")
-            .field("token_url", &self.token_url)
-            .field("scope", &self.scope)
-            .field("openid_metadata_url", &self.openid_metadata_url)
-            .field("openid_jwks_url", &self.openid_jwks_url)
-            .field("jwt_issuer", &self.jwt_issuer)
-            .field("allow_from", &self.allow_from)
-            .finish()
-    }
-}
-
-impl TeamsConfig {
-    pub fn validate(&self) -> anyhow::Result<()> {
-        if self.app_id.trim().is_empty() {
-            anyhow::bail!("teams.app_id cannot be empty");
-        }
-        if self.app_password.trim().is_empty() {
-            anyhow::bail!("teams.app_password cannot be empty");
-        }
-        if self.token_url.trim().is_empty() {
-            anyhow::bail!("teams.token_url cannot be empty");
-        }
-        if self.scope.trim().is_empty() {
-            anyhow::bail!("teams.scope cannot be empty");
-        }
-        if self.openid_metadata_url.trim().is_empty() {
-            anyhow::bail!("teams.openid_metadata_url cannot be empty");
-        }
-        if self
-            .openid_jwks_url
-            .as_deref()
-            .is_some_and(|url| url.trim().is_empty())
-        {
-            anyhow::bail!("teams.openid_jwks_url cannot be empty when configured");
-        }
-        if self.jwt_issuer.trim().is_empty() {
-            anyhow::bail!("teams.jwt_issuer cannot be empty");
-        }
-        if self.allow_from.is_empty() {
-            anyhow::bail!("teams.allow_from cannot be empty");
-        }
-        Ok(())
-    }
-
-    pub fn is_allowed(&self, sender_id: &str) -> bool {
-        crate::channel::is_sender_allowed(&self.allow_from, sender_id)
-    }
-}
-
-fn default_teams_token_url() -> String {
-    "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token".to_string()
-}
-
-fn default_teams_scope() -> String {
-    "https://api.botframework.com/.default".to_string()
-}
-
-fn default_teams_openid_metadata_url() -> String {
-    "https://login.botframework.com/v1/.well-known/openidconfiguration".to_string()
-}
-
-fn default_teams_jwt_issuer() -> String {
-    "https://api.botframework.com".to_string()
 }
 
 /// Telegram channel configuration.
@@ -845,106 +614,6 @@ mod tests {
     }
 
     #[test]
-    fn whatsapp_config_debug_redacts_secrets() {
-        let cfg = WhatsAppConfig {
-            access_token: "wa-access-secret".into(),
-            phone_number_id: "phone-id".into(),
-            verify_token: "wa-verify-secret".into(),
-            app_secret: "wa-app-secret".into(),
-            graph_base_url: "https://graph.facebook.com".into(),
-            api_version: "v20.0".into(),
-            allow_from: vec!["15551234567".into()],
-        };
-        let out = format!("{cfg:?}");
-        assert!(!out.contains("wa-access-secret"));
-        assert!(!out.contains("wa-verify-secret"));
-        assert!(!out.contains("wa-app-secret"));
-        assert!(out.contains("phone-id"));
-    }
-
-    #[test]
-    fn teams_config_debug_redacts_secret() {
-        let cfg = TeamsConfig {
-            app_id: "app-id".into(),
-            app_password: "teams-password-secret".into(),
-            token_url: "https://login.microsoftonline.com/token".into(),
-            scope: "https://api.botframework.com/.default".into(),
-            openid_metadata_url:
-                "https://login.botframework.com/v1/.well-known/openidconfiguration".into(),
-            openid_jwks_url: None,
-            jwt_issuer: "https://api.botframework.com".into(),
-            allow_from: vec!["29:user".into()],
-        };
-        let out = format!("{cfg:?}");
-        assert!(out.contains("app-id"));
-        assert!(!out.contains("teams-password-secret"));
-    }
-
-    #[test]
-    fn channel_config_parses_whatsapp_and_teams_defaults() {
-        let toml = r#"
-[whatsapp]
-access_token = "token"
-phone_number_id = "phone-id"
-verify_token = "verify"
-app_secret = "secret"
-allow_from = ["15551234567"]
-
-[teams]
-app_id = "app-id"
-app_password = "password"
-allow_from = ["29:user"]
-"#;
-
-        let cfg: ChannelsConfig = toml::from_str(toml).unwrap();
-        let whatsapp = cfg.whatsapp.unwrap();
-        assert_eq!(whatsapp.graph_base_url, "https://graph.facebook.com");
-        assert_eq!(whatsapp.api_version, "v20.0");
-        assert!(whatsapp.validate().is_ok());
-
-        let teams = cfg.teams.unwrap();
-        assert_eq!(
-            teams.token_url,
-            "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token"
-        );
-        assert_eq!(teams.scope, "https://api.botframework.com/.default");
-        assert_eq!(
-            teams.openid_metadata_url,
-            "https://login.botframework.com/v1/.well-known/openidconfiguration"
-        );
-        assert_eq!(teams.openid_jwks_url, None);
-        assert_eq!(teams.jwt_issuer, "https://api.botframework.com");
-        assert!(teams.validate().is_ok());
-    }
-
-    #[test]
-    fn channel_config_rejects_empty_whatsapp_or_teams_allowlist() {
-        let whatsapp = WhatsAppConfig {
-            access_token: "token".into(),
-            phone_number_id: "phone-id".into(),
-            verify_token: "verify".into(),
-            app_secret: "secret".into(),
-            graph_base_url: "https://graph.facebook.com".into(),
-            api_version: "v20.0".into(),
-            allow_from: vec![],
-        };
-        assert!(whatsapp.validate().is_err());
-
-        let teams = TeamsConfig {
-            app_id: "app-id".into(),
-            app_password: "password".into(),
-            token_url: "https://login.microsoftonline.com/token".into(),
-            scope: "https://api.botframework.com/.default".into(),
-            openid_metadata_url:
-                "https://login.botframework.com/v1/.well-known/openidconfiguration".into(),
-            openid_jwks_url: None,
-            jwt_issuer: "https://api.botframework.com".into(),
-            allow_from: vec![],
-        };
-        assert!(teams.validate().is_err());
-    }
-
-    #[test]
     fn test_config_from_toml() {
         let toml = r#"
 [agent]
@@ -1244,62 +913,6 @@ model = "llama3.2"
             "Redaction marker must appear in LlmConfig Debug output"
         );
     }
-
-    /// AC: "invalid provider falls back to default".
-    ///
-    /// NOTE ON FIDELITY: the codebase has NO provider-fallback logic. `provider`
-    /// is a free-form `String` (`DirectLlmConfig.provider`, config.rs:203) with no
-    /// validation against an allow-list and no fallback arm. The issue's premise
-    /// describes behaviour that does not exist; inventing it would be scope creep.
-    ///
-    /// What does exist and is untested: `DirectLlmConfig::default()` returns the
-    /// documented ollama/llama3.2 defaults, and an explicitly-configured provider
-    /// round-trips through TOML. These are the LLM-provider-selection invariants
-    /// this regression test locks in.
-    #[test]
-    fn test_direct_llm_config_defaults_to_ollama() {
-        let cfg = DirectLlmConfig::default();
-        assert_eq!(cfg.provider, "ollama", "default provider must be ollama");
-        assert_eq!(cfg.model, "llama3.2", "default model must be llama3.2");
-        assert_eq!(
-            cfg.base_url.as_deref(),
-            Some("http://127.0.0.1:11434"),
-            "default base_url must point at the local Ollama port"
-        );
-    }
-
-    /// AC: deserialisation honours an explicitly-set provider/model rather than
-    /// silently substituting the default — the silent-wrong-provider failure mode
-    /// the issue calls out. Deserialising `DirectLlmConfig` directly isolates the
-    /// provider-selection contract from the full `Config` plumbing.
-    #[test]
-    fn test_direct_llm_config_explicit_provider_round_trips_through_toml() {
-        let toml = r#"
-provider = "openai"
-model = "gpt-4o"
-base_url = "https://api.openai.com/v1"
-"#;
-        let cfg: DirectLlmConfig = toml::from_str(toml).unwrap();
-        assert_eq!(cfg.provider, "openai");
-        assert_eq!(cfg.model, "gpt-4o");
-        assert_eq!(cfg.base_url.as_deref(), Some("https://api.openai.com/v1"));
-        // Sanity: the default path is NOT taken when fields are explicit.
-        assert_ne!(cfg.provider, "ollama");
-    }
-
-    /// AC: `Config::default()` builds without panic and surfaces the default
-    /// agent workspace (".") so a missing config file degrades gracefully.
-    #[test]
-    fn test_config_default_builds_without_default_role() {
-        let cfg = Config::default();
-        assert_eq!(cfg.agent.workspace, PathBuf::from("."));
-        assert_eq!(cfg.agent.max_iterations, 20);
-        assert_eq!(cfg.agent.max_session_messages, 200);
-        assert!(
-            cfg.agent.default_role.is_none(),
-            "default_role must be opt-in"
-        );
-    }
 }
 
 // -----------------------------------------------------------------------------
@@ -1453,28 +1066,6 @@ pub struct MemoryConfig {
     /// prompt per request. Prevents token-budget overflow.
     #[serde(default = "default_max_context_chars")]
     pub max_context_chars: usize,
-
-    /// Session memory backend for the agent loop: `"jsonl"` (default;
-    /// per-session JSON-line files, preserving the existing on-disk
-    /// layout) or `"sqlite"` (keyed JSON via
-    /// `terraphim_persistence::DeviceStorage`). Unknown values fall back
-    /// to `"jsonl"`.
-    #[serde(default = "default_memory_backend")]
-    pub backend: String,
-
-    /// Explicit opt-in for the `"sqlite"` session backend. **Default:
-    /// `false`.**
-    ///
-    /// The sqlite path currently persists session state through
-    /// `DeviceStorage` while session *tools* (session_history,
-    /// session_send, …) still read the jsonl `SessionManager` — a known
-    /// split-brain session state (#3227 review P1). When this flag is
-    /// `false`, a requested `backend = "sqlite"` is rejected with a
-    /// warning and the loop falls back to jsonl, so the split-brain can
-    /// only occur when a user deliberately opts in. Set to `true` only
-    /// if you accept that caveat.
-    #[serde(default)]
-    pub allow_sqlite_backend: bool,
 }
 
 fn default_agent_binary() -> String {
@@ -1489,10 +1080,6 @@ fn default_max_context_chars() -> usize {
     4000
 }
 
-fn default_memory_backend() -> String {
-    "jsonl".to_string()
-}
-
 impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
@@ -1501,8 +1088,6 @@ impl Default for MemoryConfig {
             binary: default_agent_binary(),
             timeout_secs: default_memory_timeout(),
             max_context_chars: default_max_context_chars(),
-            backend: default_memory_backend(),
-            allow_sqlite_backend: false,
         }
     }
 }
@@ -1577,10 +1162,6 @@ pub struct SubagentConfig {
     /// Timeout for waiting on spawned agents in seconds.
     #[serde(default = "default_subagent_timeout")]
     pub timeout_secs: u64,
-
-    /// Maximum live subagents tracked by this TinyClaw process.
-    #[serde(default = "default_subagent_max_agents")]
-    pub max_agents: usize,
 }
 
 fn default_subagent_provider() -> String {
@@ -1591,10 +1172,6 @@ fn default_subagent_timeout() -> u64 {
     600
 }
 
-fn default_subagent_max_agents() -> usize {
-    4
-}
-
 impl Default for SubagentConfig {
     fn default() -> Self {
         Self {
@@ -1602,7 +1179,6 @@ impl Default for SubagentConfig {
             provider: default_subagent_provider(),
             model: None,
             timeout_secs: default_subagent_timeout(),
-            max_agents: default_subagent_max_agents(),
         }
     }
 }
@@ -1674,46 +1250,13 @@ pub struct SchedulerConfig {
     #[serde(default)]
     pub enabled: bool,
 
-    /// Deprecated local CronStore key retained for explicit test/local helpers.
+    /// Storage key for the schedule job index document.
     #[serde(default = "default_scheduler_store_key")]
     pub store_key: String,
-
-    /// Dedicated orchestrator include fragment written by TinyClaw schedule
-    /// commands.
-    ///
-    /// The file must be TinyClaw-owned: existing files need a disabled
-    /// `tinyclaw-schedule-fragment-marker` marker agent with owner/schema
-    /// capabilities. TinyClaw rejects unowned, mixed, or unknown-schema
-    /// fragments before mutation. The operator must include this file from the
-    /// base orchestrator config, e.g. `include = ["tinyclaw-schedules.toml"]`,
-    /// so the orchestrator reloads schedules after process restart.
-    #[serde(default)]
-    pub orchestrator_schedule_file: Option<PathBuf>,
-
-    /// CLI tool recorded on generated orchestrator scheduled agents.
-    ///
-    /// Required when `enabled = true` and `orchestrator_schedule_file` is set.
-    /// TinyClaw itself expects subcommands, while the orchestrator invokes
-    /// agent CLIs with the task as a positional prompt, so this cannot assume
-    /// `terraphim-tinyclaw` is a runnable default.
-    #[serde(default = "default_scheduler_cli_tool")]
-    pub cli_tool: String,
-
-    /// Optional orchestrator project id recorded on generated agents.
-    ///
-    /// Set this when `orchestrator_schedule_file` is included by a
-    /// multi-project orchestrator config. Leave unset for legacy
-    /// single-project configs.
-    #[serde(default)]
-    pub project: Option<String>,
 }
 
 fn default_scheduler_store_key() -> String {
     "tinyclaw_schedules".to_string()
-}
-
-fn default_scheduler_cli_tool() -> String {
-    String::new()
 }
 
 impl Default for SchedulerConfig {
@@ -1721,309 +1264,7 @@ impl Default for SchedulerConfig {
         Self {
             enabled: false,
             store_key: default_scheduler_store_key(),
-            orchestrator_schedule_file: None,
-            cli_tool: default_scheduler_cli_tool(),
-            project: None,
         }
-    }
-}
-
-impl SchedulerConfig {
-    pub fn validate(&self) -> anyhow::Result<()> {
-        if self.enabled
-            && self.orchestrator_schedule_file.is_some()
-            && self.cli_tool.trim().is_empty()
-        {
-            anyhow::bail!(
-                "scheduler.cli_tool is required when scheduler.enabled = true and scheduler.orchestrator_schedule_file is set"
-            );
-        }
-        if let Some(project) = &self.project
-            && project.trim().is_empty()
-        {
-            anyhow::bail!("scheduler.project cannot be empty");
-        }
-        Ok(())
-    }
-}
-
-/// Home Assistant configuration (Hermes parity).
-///
-/// **Default behaviour: disabled.** When `enabled = true` and `token` is set,
-/// the HA tools register and talk to the HA REST API.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct HomeAssistantConfig {
-    /// Master switch. `false` = no HA tools registered.
-    #[serde(default)]
-    pub enabled: bool,
-
-    /// Base URL of the Home Assistant instance.
-    #[serde(default = "default_hass_url")]
-    pub url: String,
-
-    /// Long-lived access token.
-    #[serde(default)]
-    pub token: String,
-}
-
-fn default_hass_url() -> String {
-    "http://homeassistant.local:8123".to_string()
-}
-
-impl Default for HomeAssistantConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            url: default_hass_url(),
-            token: String::new(),
-        }
-    }
-}
-
-impl HomeAssistantConfig {
-    /// Whether the HA tools are usable (enabled + token present).
-    pub fn available(&self) -> bool {
-        self.enabled && !self.token.is_empty()
-    }
-}
-
-/// Vision configuration (Hermes parity).
-///
-/// **Default behaviour: disabled.** OpenAI-compatible multimodal endpoint.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct VisionConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default = "default_vision_model")]
-    pub model: String,
-
-    #[serde(default = "default_vision_base_url")]
-    pub base_url: String,
-
-    #[serde(default)]
-    pub api_key: String,
-}
-
-fn default_vision_model() -> String {
-    "google/gemini-3-flash-preview".to_string()
-}
-
-fn default_vision_base_url() -> String {
-    "https://openrouter.ai/api/v1".to_string()
-}
-
-impl Default for VisionConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            model: default_vision_model(),
-            base_url: default_vision_base_url(),
-            api_key: String::new(),
-        }
-    }
-}
-
-impl VisionConfig {
-    pub fn available(&self) -> bool {
-        self.enabled && !self.api_key.is_empty()
-    }
-}
-
-/// Image generation configuration (Hermes parity).
-///
-/// **Default behaviour: disabled.** OpenAI-compatible image endpoint.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ImageGenConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default = "default_image_model")]
-    pub model: String,
-
-    #[serde(default = "default_image_base_url")]
-    pub base_url: String,
-
-    #[serde(default)]
-    pub api_key: String,
-
-    /// Enable the provider-side content safety checker. Defaults to true.
-    #[serde(default = "default_true")]
-    pub safety_checker: bool,
-}
-
-fn default_image_model() -> String {
-    "fal-ai/flux-2-pro".to_string()
-}
-
-fn default_image_base_url() -> String {
-    "https://fal.run".to_string()
-}
-
-fn default_true() -> bool {
-    true
-}
-
-impl Default for ImageGenConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            model: default_image_model(),
-            base_url: default_image_base_url(),
-            api_key: String::new(),
-            safety_checker: true,
-        }
-    }
-}
-
-impl ImageGenConfig {
-    pub fn available(&self) -> bool {
-        self.enabled && !self.api_key.is_empty()
-    }
-}
-
-/// Text-to-speech configuration (Hermes parity).
-///
-/// **Default behaviour: disabled.** Providers: `edge` (shells out to
-/// `edge-tts` CLI) and `openai` (OpenAI-compatible `/v1/audio/speech`).
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct TtsConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default = "default_tts_provider")]
-    pub provider: String,
-
-    #[serde(default)]
-    pub voice: String,
-
-    #[serde(default = "default_tts_base_url")]
-    pub base_url: String,
-
-    #[serde(default)]
-    pub api_key: String,
-
-    #[serde(default = "default_tts_output_dir")]
-    pub output_dir: String,
-}
-
-fn default_tts_provider() -> String {
-    "edge".to_string()
-}
-
-fn default_tts_base_url() -> String {
-    "https://api.openai.com/v1".to_string()
-}
-
-fn default_tts_output_dir() -> String {
-    "voice-memos".to_string()
-}
-
-impl Default for TtsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            provider: default_tts_provider(),
-            voice: String::new(),
-            base_url: default_tts_base_url(),
-            api_key: String::new(),
-            output_dir: default_tts_output_dir(),
-        }
-    }
-}
-
-impl TtsConfig {
-    pub fn available(&self) -> bool {
-        // Edge TTS needs no key; OpenAI provider needs a key.
-        if !self.enabled {
-            return false;
-        }
-        self.provider.to_lowercase() == "edge" || !self.api_key.is_empty()
-    }
-}
-
-/// Mixture-of-Agents configuration (Hermes parity).
-///
-/// **Default behaviour: disabled.** Ensemble of reference models + aggregator.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct MoaConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default)]
-    pub base_url: String,
-
-    #[serde(default)]
-    pub api_key: String,
-
-    #[serde(default = "default_moa_reference_models")]
-    pub reference_models: Vec<String>,
-
-    #[serde(default = "default_moa_aggregator_model")]
-    pub aggregator_model: String,
-}
-
-fn default_moa_reference_models() -> Vec<String> {
-    vec![
-        "openai/gpt-5.2-pro".to_string(),
-        "anthropic/claude-opus-4.5".to_string(),
-        "google/gemini-3-pro-preview".to_string(),
-    ]
-}
-
-fn default_moa_aggregator_model() -> String {
-    "anthropic/claude-opus-4.5".to_string()
-}
-
-impl Default for MoaConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            base_url: default_vision_base_url(),
-            api_key: String::new(),
-            reference_models: default_moa_reference_models(),
-            aggregator_model: default_moa_aggregator_model(),
-        }
-    }
-}
-
-impl MoaConfig {
-    pub fn available(&self) -> bool {
-        self.enabled && !self.api_key.is_empty() && !self.reference_models.is_empty()
-    }
-}
-
-/// RL training configuration (Hermes parity, partial).
-///
-/// **Default behaviour: disabled.** The full veRL training orchestration from
-/// Hermes `rl_training_tool.py` is a deliberate non-goal (deeply coupled to
-/// Python/ray/wandb). This config exposes a monitorable `rl_check_status` tool
-/// that polls a rollout server's status endpoint.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RlConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default = "default_rl_server_url")]
-    pub rollout_server_url: String,
-}
-
-fn default_rl_server_url() -> String {
-    "http://localhost:8000".to_string()
-}
-
-impl Default for RlConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            rollout_server_url: default_rl_server_url(),
-        }
-    }
-}
-
-impl RlConfig {
-    pub fn available(&self) -> bool {
-        self.enabled
     }
 }
 
@@ -2155,31 +1396,6 @@ enabled = true
         assert_eq!(cfg.binary, "terraphim-agent");
         assert_eq!(cfg.timeout_secs, 10);
     }
-
-    #[test]
-    fn memory_config_sqlite_gate_defaults_closed() {
-        // #3227 review P1: the sqlite backend must be opt-in so the
-        // split-brain session state can never be entered silently.
-        let cfg = MemoryConfig::default();
-        assert!(!cfg.allow_sqlite_backend);
-        assert_eq!(cfg.backend, "jsonl");
-
-        // Omitted from TOML → still false (serde default).
-        let cfg: MemoryConfig = toml::from_str("enabled = true\n").expect("parse");
-        assert!(!cfg.allow_sqlite_backend);
-    }
-
-    #[test]
-    fn memory_config_sqlite_gate_parses_explicit_opt_in() {
-        let toml = r#"
-enabled = true
-backend = "sqlite"
-allow_sqlite_backend = true
-"#;
-        let cfg: MemoryConfig = toml::from_str(toml).expect("parse");
-        assert_eq!(cfg.backend, "sqlite");
-        assert!(cfg.allow_sqlite_backend);
-    }
 }
 
 #[cfg(test)]
@@ -2244,51 +1460,13 @@ agent_binary = "/opt/terraphim-agent"
         let cfg = SchedulerConfig::default();
         assert!(!cfg.enabled);
         assert_eq!(cfg.store_key, "tinyclaw_schedules");
-        assert!(cfg.orchestrator_schedule_file.is_none());
-        assert!(cfg.cli_tool.is_empty());
-        assert!(cfg.project.is_none());
 
         let toml = r#"
 enabled = true
 store_key = "custom_schedules"
-orchestrator_schedule_file = "/tmp/tinyclaw-schedules.toml"
-cli_tool = "codex"
-project = "tinyclaw"
 "#;
         let cfg: SchedulerConfig = toml::from_str(toml).expect("parse");
         assert!(cfg.enabled);
         assert_eq!(cfg.store_key, "custom_schedules");
-        assert_eq!(
-            cfg.orchestrator_schedule_file,
-            Some(PathBuf::from("/tmp/tinyclaw-schedules.toml"))
-        );
-        assert_eq!(cfg.cli_tool, "codex");
-        assert_eq!(cfg.project.as_deref(), Some("tinyclaw"));
-        cfg.validate().expect("valid scheduler config");
-    }
-
-    #[test]
-    fn scheduler_config_rejects_enabled_orchestrator_schedule_without_cli_tool() {
-        let toml = r#"
-enabled = true
-orchestrator_schedule_file = "/tmp/tinyclaw-schedules.toml"
-"#;
-        let cfg: SchedulerConfig = toml::from_str(toml).expect("parse");
-        let err = cfg
-            .validate()
-            .expect_err("enabled orchestrator scheduler must require explicit cli_tool");
-        let msg = err.to_string();
-        assert!(msg.contains("scheduler.cli_tool"), "got: {msg}");
-        assert!(msg.contains("required"), "got: {msg}");
-    }
-
-    #[test]
-    fn scheduler_config_rejects_blank_project() {
-        let toml = r#"
-project = "  "
-"#;
-        let cfg: SchedulerConfig = toml::from_str(toml).expect("parse");
-        let err = cfg.validate().expect_err("blank project must fail");
-        assert!(err.to_string().contains("scheduler.project"));
     }
 }

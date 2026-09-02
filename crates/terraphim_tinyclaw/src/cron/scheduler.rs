@@ -182,13 +182,8 @@ impl CronScheduler {
 
     async fn run(self: Arc<Self>, notify: Arc<tokio::sync::Notify>, tick: Duration) {
         let mut interval = tokio::time::interval(tick);
+        // Don't fire immediately — wait for the first tick
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-        // Recovery tick: a restarted process must fire work that became due
-        // while no scheduler loop was running.
-        if let Err(e) = self.tick().await {
-            error!(error = %e, "cron recovery tick failed");
-        }
 
         loop {
             tokio::select! {
