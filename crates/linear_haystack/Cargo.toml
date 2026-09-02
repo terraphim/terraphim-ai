@@ -1,0 +1,50 @@
+[package]
+name        = "linear_haystack"
+version     = "0.1.0"
+edition.workspace     = true
+rust-version.workspace = true
+authors.workspace     = true
+description = "Linear (graphQL) haystack provider for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "linear", "haystack", "integration"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+haystack_core           = { version = "1.20.3", registry = "terraphim" }
+terraphim_types         = { version = "1.20.2", registry = "terraphim" }
+# terraphim-linear-auth is the shared API-key resolver. Originally a path dep
+# on ../../../terraphim-linear/crates/terraphim-linear-auth, but that crate
+# isn't always present in the runner's filesystem (FC VMs, container
+# rebuilds) and resolving it at workspace-load time breaks CI. Vendored
+# into the workspace at crates/terraphim-linear-auth and gated behind the
+# `linear` feature to keep the public API identical while letting default
+# builds succeed without the optional dep being present at all.
+#
+# With `--features linear` the from_auth() / From<AuthError> impls in
+# client.rs, lib.rs, error.rs, main.rs are compiled and the crate is a
+# real workspace member. Without the feature those code paths are cfg'd
+# out and the binary target uses a stub `main` that prints an error and
+# exits 1.
+terraphim-linear-auth   = { path = "../terraphim-linear-auth", optional = true }
+
+reqwest     = { workspace = true, features = ["json", "rustls-tls"] }
+tokio       = { workspace = true, features = ["full"] }
+serde       = { workspace = true, features = ["derive"] }
+serde_json  = { workspace = true }
+clap        = { version = "4.5", features = ["derive", "env"] }
+anyhow      = { workspace = true, features = ["std"] }
+thiserror   = { workspace = true }
+
+[features]
+# Default OFF so CI / non-Linear builds don't try to resolve the missing
+# terraphim-linear-auth crate. Enable with `--features linear` once
+# terraphim/terraphim-linear#14 lands.
+default = []
+linear  = ["dep:terraphim-linear-auth"]
+
+[dev-dependencies]
+wiremock = "0.6"
+tokio    = { workspace = true, features = ["full", "macros", "rt-multi-thread"] }

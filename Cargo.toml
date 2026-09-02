@@ -121,7 +121,7 @@ terraphim_persistence = { version = "=1.20.2", registry = "terraphim" }
 # crates.io hooks 1.20.4 still passes owned Thesaurus.clone() into
 # terraphim_automata 1.21.0 (which now takes &Thesaurus). Gitea
 # 1.21.0 borrows &self.thesaurus so the family compiles together.
-terraphim_hooks = { version = "1.21.0", registry = "terraphim" }
+terraphim_hooks = { version = "=1.21.13", registry = "terraphim" }
 # crates.io orchestrator 1.20.3 still passes owned Thesaurus into automata
 # 1.21.0; the Gitea 1.21.0 publish borrows &self.thesaurus and uses the
 # borrowed ConfigState/Role types so it can build alongside the rest of
