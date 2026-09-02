@@ -24,6 +24,8 @@ use terraphim_sooth::DefaultRng;
 
 /// localStorage key for the demo brain.
 const STORAGE_KEY: &str = "terraphim-megahal-brain";
+/// localStorage key for the Brain Lab's trainable second brain.
+const STORAGE_KEY_B: &str = "terraphim-megahal-brain-b";
 /// Default RNG seed when a brain is created fresh.
 const DEFAULT_SEED: u64 = 42;
 
@@ -64,6 +66,23 @@ impl MegahalBrain {
             seed: DEFAULT_SEED,
             last_reply_ms: 0.0,
         }
+    }
+
+    /// A second default-trained brain for the Brain Lab: identical to Brain
+    /// A at creation, so live training visibly diverges its replies.
+    #[wasm_bindgen(js_name = labBrain)]
+    pub fn lab_brain() -> MegahalBrain {
+        MegahalBrain::new("default")
+    }
+
+    /// Whether a saved brain exists in localStorage under `key`.
+    pub fn has_local_under(key: &str) -> bool {
+        window()
+            .local_storage()
+            .ok()
+            .flatten()
+            .map(|storage| storage.get_item(key).ok().flatten().is_some())
+            .unwrap_or(false)
     }
 
     /// Names of the embedded personalities for the selector.
@@ -162,19 +181,29 @@ impl MegahalBrain {
 
     /// Save the brain to localStorage under the demo key.
     pub fn save_local(&self) -> Result<(), JsValue> {
+        self.save_local_under(STORAGE_KEY)
+    }
+
+    /// Save the brain to localStorage under an explicit key.
+    pub fn save_local_under(&self, key: &str) -> Result<(), JsValue> {
         let storage = window()
             .local_storage()?
             .ok_or_else(|| JsValue::from_str("localStorage unavailable"))?;
-        storage.set_item(STORAGE_KEY, &String::from_utf8_lossy(&self.save()))
+        storage.set_item(key, &String::from_utf8_lossy(&self.save()))
     }
 
     /// Load the brain from localStorage (error when absent).
     pub fn load_local(&mut self) -> Result<(), JsValue> {
+        self.load_local_under(STORAGE_KEY)
+    }
+
+    /// Load the brain from localStorage under an explicit key.
+    pub fn load_local_under(&mut self, key: &str) -> Result<(), JsValue> {
         let storage = window()
             .local_storage()?
             .ok_or_else(|| JsValue::from_str("localStorage unavailable"))?;
         let raw = storage
-            .get_item(STORAGE_KEY)?
+            .get_item(key)?
             .ok_or_else(|| JsValue::from_str("no saved brain in localStorage"))?;
         self.load(raw.as_bytes())
     }
@@ -246,13 +275,14 @@ pub fn demo_main() -> Result<(), JsValue> {
         status.set_text_content(Some("fresh default personality"));
     }
 
-    // Send: read the input, append it to the log, generate the reply.
-    let send = {
+    // Send: read the input, append it to the log, generate the reply. Shared
+    // logic closure so the button click and the input's Enter key both work.
+    let send_logic: std::rc::Rc<dyn Fn()> = {
         let brain = brain.clone();
         let chat_log = chat_log.clone();
         let input = input.clone();
         let latency = latency.clone();
-        Closure::<dyn FnMut()>::new(move || {
+        std::rc::Rc::new(move || {
             let text = input.value();
             append_chat(&chat_log, "you:", &text, "chat-line chat-you");
             let reply = brain.borrow_mut().reply(&text);
@@ -260,6 +290,18 @@ pub fn demo_main() -> Result<(), JsValue> {
             latency.set_text_content(Some(&format!("{ms:.1} ms")));
             append_chat(&chat_log, "megahal:", &reply, "chat-line chat-bot");
             input.set_value("");
+        })
+    };
+    let send = {
+        let logic = send_logic.clone();
+        Closure::<dyn FnMut()>::new(move || logic())
+    };
+    let send_enter = {
+        let logic = send_logic.clone();
+        Closure::<dyn FnMut(web_sys::KeyboardEvent)>::new(move |event: web_sys::KeyboardEvent| {
+            if event.key() == "Enter" {
+                logic();
+            }
         })
     };
 
@@ -315,8 +357,15 @@ pub fn demo_main() -> Result<(), JsValue> {
         })
     };
 
-    // Wire every button by id (button-based send keeps the demo
-    // keyboard-agnostic and the wiring framework-free).
+    // Enter in the chat input sends, like the button.
+    {
+        let target: &web_sys::EventTarget = input.dyn_ref().expect("#chat-input is an EventTarget");
+        target
+            .add_event_listener_with_callback("keydown", send_enter.as_ref().unchecked_ref())
+            .expect("chat Enter wires up");
+    }
+
+    // Wire every button by id.
     for (id, closure) in [
         ("send-button", &send),
         ("train-button", &train),
@@ -336,6 +385,170 @@ pub fn demo_main() -> Result<(), JsValue> {
     let _ = &document;
 
     // Keep the closures alive for the page lifetime.
-    std::mem::forget((send, train, switch, save_local, load_local));
+    std::mem::forget((send, send_enter, train, switch, save_local, load_local));
+    wire_brain_lab()?;
+    Ok(())
+}
+
+/// Brain Lab: two brains share one seed and one input. Brain A is trained on
+/// the default personality; Brain B starts blank so training (or a
+/// personality switch) visibly changes its replies while Brain A stays put.
+fn wire_brain_lab() -> Result<(), JsValue> {
+    let document = document();
+    let log_a = document.get_element_by_id("log-a").expect("#log-a");
+    let log_b = document.get_element_by_id("log-b").expect("#log-b");
+    let input = document
+        .get_element_by_id("lab-input")
+        .expect("#lab-input")
+        .dyn_into::<web_sys::HtmlInputElement>()?;
+    let train_area = document
+        .get_element_by_id("lab-train-text")
+        .expect("#lab-train-text")
+        .dyn_into::<web_sys::HtmlTextAreaElement>()?;
+    let personality = document
+        .get_element_by_id("lab-personality")
+        .expect("#lab-personality")
+        .dyn_into::<web_sys::HtmlSelectElement>()?;
+    let latency_a = document.get_element_by_id("latency-a").expect("#latency-a");
+    let latency_b = document.get_element_by_id("latency-b").expect("#latency-b");
+    let status = document
+        .get_element_by_id("lab-status")
+        .expect("#lab-status");
+
+    let brain_a = std::rc::Rc::new(std::cell::RefCell::new(MegahalBrain::new("default")));
+    // Brain B starts identical to Brain A (same personality, same seed), so
+    // live training visibly diverges its replies from A's.
+    let brain_b = std::rc::Rc::new(std::cell::RefCell::new(MegahalBrain::lab_brain()));
+    if MegahalBrain::has_local_under(STORAGE_KEY_B) {
+        let result = brain_b.borrow_mut().load_local_under(STORAGE_KEY_B);
+        status.set_text_content(Some(match result {
+            Ok(()) => "Brain B restored from localStorage",
+            Err(_) => "Brain B: blank",
+        }));
+    } else {
+        status.set_text_content(Some(
+            "Both brains start identical -- train Brain B below and watch the replies diverge",
+        ));
+    }
+
+    // Ask both brains the same question with the same seed position. The
+    // logic lives in an Rc closure so both the button click and the input's
+    // Enter key can invoke it.
+    let ask_logic: std::rc::Rc<dyn Fn()> = {
+        let brain_a = brain_a.clone();
+        let brain_b = brain_b.clone();
+        let log_a = log_a.clone();
+        let log_b = log_b.clone();
+        let input = input.clone();
+        let latency_a = latency_a.clone();
+        let latency_b = latency_b.clone();
+        std::rc::Rc::new(move || {
+            let text = input.value();
+            append_chat(&log_a, "you:", &text, "chat-line chat-you");
+            append_chat(&log_b, "you:", &text, "chat-line chat-you");
+            let reply_a = brain_a.borrow_mut().reply(&text);
+            let ms_a = brain_a.borrow().last_reply_ms();
+            latency_a.set_text_content(Some(&format!("{ms_a:.1} ms")));
+            append_chat(&log_a, "brain A:", &reply_a, "chat-line chat-bot");
+            let reply_b = brain_b.borrow_mut().reply(&text);
+            let ms_b = brain_b.borrow().last_reply_ms();
+            latency_b.set_text_content(Some(&format!("{ms_b:.1} ms")));
+            append_chat(&log_b, "brain B:", &reply_b, "chat-line chat-bot");
+            input.set_value("");
+        })
+    };
+    let ask = {
+        let logic = ask_logic.clone();
+        Closure::<dyn FnMut()>::new(move || logic())
+    };
+    let ask_enter = {
+        let logic = ask_logic.clone();
+        Closure::<dyn FnMut(web_sys::KeyboardEvent)>::new(move |event: web_sys::KeyboardEvent| {
+            if event.key() == "Enter" {
+                logic();
+            }
+        })
+    };
+
+    // Train only Brain B on the pasted text.
+    let train = {
+        let brain_b = brain_b.clone();
+        let train_area = train_area.clone();
+        let status = status.clone();
+        Closure::<dyn FnMut()>::new(move || {
+            let text = train_area.value();
+            let lines = text.lines().filter(|line| !line.trim().is_empty()).count();
+            brain_b.borrow_mut().learn(&text);
+            status.set_text_content(Some(&format!("Brain B trained on {lines} lines")));
+            train_area.set_value("");
+        })
+    };
+
+    // Reset Brain B on a chosen personality.
+    let switch = {
+        let brain_b = brain_b.clone();
+        let personality = personality.clone();
+        let status = status.clone();
+        Closure::<dyn FnMut()>::new(move || {
+            let name = personality.value();
+            brain_b.borrow_mut().reset(&name, Some(42));
+            status.set_text_content(Some(&format!("Brain B reset on {name}")));
+        })
+    };
+
+    // Save/load Brain B.
+    let save = {
+        let brain_b = brain_b.clone();
+        let status = status.clone();
+        Closure::<dyn FnMut()>::new(move || {
+            let result = brain_b.borrow().save_local_under(STORAGE_KEY_B);
+            status.set_text_content(Some(match result {
+                Ok(()) => "Brain B saved",
+                Err(_) => "Brain B save failed",
+            }));
+        })
+    };
+    let load = {
+        let brain_b = brain_b.clone();
+        let status = status.clone();
+        Closure::<dyn FnMut()>::new(move || {
+            let result = brain_b.borrow_mut().load_local_under(STORAGE_KEY_B);
+            status.set_text_content(Some(match result {
+                Ok(()) => "Brain B loaded",
+                Err(_) => "no saved Brain B found",
+            }));
+        })
+    };
+
+    if let Some(element) = document.get_element_by_id("lab-send") {
+        let target: &web_sys::EventTarget = element.dyn_ref().expect("#lab-send is an EventTarget");
+        target
+            .add_event_listener_with_callback("click", ask.as_ref().unchecked_ref())
+            .expect("lab ask wires up");
+    }
+    // Enter in the lab input asks both brains, like the button.
+    {
+        let target: &web_sys::EventTarget = input.dyn_ref().expect("#lab-input is an EventTarget");
+        target
+            .add_event_listener_with_callback("keydown", ask_enter.as_ref().unchecked_ref())
+            .expect("lab Enter wires up");
+    }
+    for (id, closure) in [
+        ("lab-train", &train),
+        ("lab-switch", &switch),
+        ("lab-save", &save),
+        ("lab-load", &load),
+    ] {
+        if let Some(element) = document.get_element_by_id(id) {
+            let target: &web_sys::EventTarget = element
+                .dyn_ref()
+                .unwrap_or_else(|| panic!("{id} is an EventTarget"));
+            target
+                .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
+                .expect("lab control wires up");
+        }
+    }
+
+    std::mem::forget((ask, ask_enter, train, switch, save, load));
     Ok(())
 }

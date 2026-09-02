@@ -175,3 +175,70 @@ button:hover {
   color: var(--muted);
   font-size: 0.8rem;
 }
+
+/* Brain Lab: side-by-side comparison of two brains. */
+
+.lab {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 0.5rem;
+  padding: 0.9rem;
+}
+
+.lab h2 {
+  margin: 0 0 0.3rem;
+  font-size: 1.1rem;
+}
+
+.lab-intro {
+  margin: 0 0 0.7rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.lab-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.lab-brain h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.lab-tag {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.78rem;
+}
+
+.lab-log {
+  min-height: 10rem;
+  max-height: 16rem;
+}
+
+.lab-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.lab-controls textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.lab-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .lab-grid {
+    grid-template-columns: 1fr;
+  }
+}

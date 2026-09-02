@@ -60,6 +60,44 @@
         <button id="train-button" type="button">Train</button>
       </details>
 
+      <section id="brain-lab" class="lab">
+        <h2>Brain Lab -- watch training change the text</h2>
+        <p class="lab-intro">
+          Both brains share the same seed, start identical, and receive the
+          same input. Teach Brain B below, then ask both: Brain A keeps
+          answering from its original corpus while Brain B's replies absorb
+          what it learned.
+        </p>
+        <div class="lab-grid">
+          <div class="lab-brain">
+            <h3>Brain A <span class="lab-tag">default personality</span></h3>
+            <div id="log-a" class="chat-log lab-log" aria-live="polite"></div>
+            <span id="latency-a" class="latency">-- ms</span>
+          </div>
+          <div class="lab-brain">
+            <h3>Brain B <span class="lab-tag">starts identical -- train it</span></h3>
+            <div id="log-b" class="chat-log lab-log" aria-live="polite"></div>
+            <span id="latency-b" class="latency">-- ms</span>
+          </div>
+        </div>
+        <div class="composer">
+          <input id="lab-input" type="text" placeholder="Ask both brains the same question" autocomplete="off" />
+          <button id="lab-send" type="button">Ask both</button>
+        </div>
+        <div class="lab-controls">
+          <textarea id="lab-train-text" rows="4"
+            placeholder="Teach Brain B only: paste sentences here, one per line (e.g. &quot;Terraphim builds the fastest search engine in the galaxy.&quot;)"></textarea>
+          <div class="lab-buttons">
+            <button id="lab-train" type="button">Train Brain B</button>
+            <select id="lab-personality"><option value="">default</option><option value="sherlock">sherlock</option><option value="startrek">startrek</option><option value="starwars">starwars</option></select>
+            <button id="lab-switch" type="button">Reset B on personality</button>
+            <button id="lab-save" type="button">Save B</button>
+            <button id="lab-load" type="button">Load B</button>
+          </div>
+          <span id="lab-status" class="status" role="status"></span>
+        </div>
+      </section>
+
       <footer class="footnote">
         <p>
           MegaHAL is a 1998 Markov chatterbot, not an LLM: it recombines
