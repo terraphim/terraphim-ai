@@ -9310,6 +9310,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_platform_runtime"
+version = "1.21.3"
+dependencies = [
+ "async-trait",
+ "jiff",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "terraphim_rlm"
 version = "1.21.3"
 dependencies = [
@@ -9651,7 +9663,7 @@ dependencies = [
  "regex",
  "reqwest 0.12.28",
  "reqwest-eventsource",
- "rmcp",
+ "rmcp 0.9.1",
  "schemars 1.2.1",
  "serde",
  "serde_json",

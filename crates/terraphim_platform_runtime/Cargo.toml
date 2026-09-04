@@ -1,0 +1,23 @@
+[package]
+name = "terraphim_platform_runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors = ["Terraphim Team <team@terraphim.ai>"]
+description = "L1 vocabulary types and traits for the Terraphim agentic execution platform"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "platform", "runtime", "agents", "execution"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+jiff = { version = "0.2", features = ["serde"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
