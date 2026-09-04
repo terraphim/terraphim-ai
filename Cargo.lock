@@ -3056,6 +3056,13 @@ dependencies = [
 [[package]]
 name = "haystack_core"
 version = "1.20.3"
+dependencies = [
+ "terraphim_types 1.20.2",
+]
+
+[[package]]
+name = "haystack_core"
+version = "1.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae7488495f75998a1e9092623b1c5e2dfb7784132e336fbf370647ed2ec1f3d7"
 dependencies = [
@@ -3063,24 +3070,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "haystack_core"
-version = "1.20.3"
-source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
-checksum = "ae07088aaefd89fc2cbd6163cbcaf3346590dead245cb71e2c7f2cd6b80c89e7"
-dependencies = [
- "terraphim_types 1.20.2",
-]
-
-[[package]]
 name = "haystack_jmap"
 version = "1.20.2"
-source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
-checksum = "4f854d47e93374fedb663686cd6a77e71c29821ea0cccfe6cab4710dafcc2601"
 dependencies = [
  "anyhow",
  "clap",
  "env_logger",
- "haystack_core 1.20.3 (sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/)",
+ "haystack_core 1.20.3",
  "log",
  "reqwest 0.12.28",
  "serde",
@@ -9651,7 +9647,7 @@ dependencies = [
  "regex",
  "reqwest 0.12.28",
  "reqwest-eventsource",
- "rmcp",
+ "rmcp 0.9.1",
  "schemars 1.2.1",
  "serde",
  "serde_json",

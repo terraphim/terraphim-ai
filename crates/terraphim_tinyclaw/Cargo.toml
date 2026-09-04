@@ -109,13 +109,12 @@ opendal = "0.54"
 # See ADR-0010 for the full investigation notes (2026-08-08) and the deployed-
 # leverage resolution (2026-08-11).
 
-# Wave 4 (Phase B) Email channel — `haystack_jmap` from the terraphim
-# registry (moved out of terraphim-private into the terraphim-service
-# crates repo, #3198). Brings in `haystack_core` + `terraphim_types`
-# from the same registry. Lib name is `haystack_jmap` (was `jmap_client`
-# in the private copy); API: `JMAPClient::new(token, session_url)`,
+# Wave 4 (Phase B) Email channel — `haystack_jmap` from the
+# terraphim-service crates repo (moved out of terraphim-private, f6b6531 /
+# #3198). Brings in `haystack_core` + `terraphim_types` from the same
+# repo. API: `JMAPClient::new(token, session_url)`,
 # `search_emails(query, limit)`.
-haystack_jmap = { version = "1.20.2", registry = "terraphim" }
+haystack_jmap = { path = "../../../terraphim-service/crates/haystack_jmap" }
 
 # Wave 4 (Phase B) GitHub channel — HMAC-SHA256 webhook verification.
 hmac = "0.12"
