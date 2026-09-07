@@ -601,6 +601,42 @@ mod tests {
         assert!(result.is_err());
     }
 
+    /// Pins the verbatim rejection message of every unary command parser.
+    ///
+    /// These messages are hand-written per command and are observable output;
+    /// they must not drift into a keyword-derived template.
+    #[test]
+    fn test_empty_content_rejection_messages_are_verbatim() {
+        let parser = CommandParser::new();
+        let cases = [
+            ("RUN()", "RUN requires a command"),
+            ("CODE()", "CODE requires Python code"),
+            ("SNAPSHOT()", "SNAPSHOT requires a name"),
+            ("ROLLBACK()", "ROLLBACK requires a snapshot name"),
+            ("QUERY_LLM()", "QUERY_LLM requires a prompt"),
+        ];
+
+        for (input, expected) in cases {
+            match parser.parse_one(input) {
+                Err(RlmError::CommandParseFailed { message }) => {
+                    assert_eq!(message, expected, "wrong rejection message for {input}");
+                }
+                other => panic!("expected CommandParseFailed for {input}, got {other:?}"),
+            }
+        }
+    }
+
+    /// Pins the non-match path: a unary keyword parser must yield `Ok(None)`
+    /// and let the next parser in `parse` try, rather than erroring.
+    #[test]
+    fn test_unary_parsers_fall_through_on_non_match() {
+        let parser = CommandParser::new();
+        // `FINAL` is tried first and wins, proving the earlier unary parsers
+        // returned `Ok(None)` rather than consuming or rejecting the input.
+        let result = parser.parse_one("FINAL(done)").unwrap();
+        assert!(matches!(result, Command::Final(s) if s == "done"));
+    }
+
     #[test]
     fn test_unbalanced_parens_fails() {
         let parser = CommandParser::new();
