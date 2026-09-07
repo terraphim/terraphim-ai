@@ -1,7 +1,9 @@
 //! Trust-tier vocabulary for the Terraphim platform runtime.
 
 /// Discrete trust level assigned to a workspace, command, or artifact.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum TrustTier {
     /// Untrusted: requires the strongest isolation.
     L0,
