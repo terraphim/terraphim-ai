@@ -276,15 +276,21 @@ mod tests {
     impl FakeHome {
         fn new(dir: &std::path::Path) -> Self {
             let prev = std::env::var("HOME").ok();
-            std::env::set_var("HOME", dir);
+            // SAFETY: every construction site holds `HOME_LOCK`, so no other
+            // test thread reads or writes the environment concurrently.
+            unsafe { std::env::set_var("HOME", dir) };
             Self { prev }
         }
     }
     impl Drop for FakeHome {
         fn drop(&mut self) {
-            match &self.prev {
-                Some(v) => std::env::set_var("HOME", v),
-                None => std::env::remove_var("HOME"),
+            // SAFETY: the guard lives inside the `HOME_LOCK` critical section,
+            // so the restore is likewise serialised against other tests.
+            unsafe {
+                match &self.prev {
+                    Some(v) => std::env::set_var("HOME", v),
+                    None => std::env::remove_var("HOME"),
+                }
             }
         }
     }
