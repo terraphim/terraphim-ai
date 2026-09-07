@@ -39,13 +39,22 @@ terraphim_agent_supervisor = { version = "1.19.2", optional = true }
 # Local MCP search engine. Used by the mcp_search_tools tool to look up tools
 # from a caller-supplied corpus. Gated under the same `mcp` feature as rmcp
 # so it only compiles when MCP is enabled.
-terraphim_mcp_search = { path = "../terraphim_mcp_search", version = "0.1.0", optional = true }
+# `registry` is required for publishing: without it cargo resolves this against
+# crates.io, which carries an unrelated 0.2.0 that does not match `^0.1.0`.
+# The `terraphim` registry has 0.1.0-0.1.3; the local path (0.1.3) wins in-repo.
+terraphim_mcp_search = { path = "../terraphim_mcp_search", version = "0.1.0", registry = "terraphim", optional = true }
 
 # Firecracker-rust core for VM and snapshot management (private repo).
 # Uncomment when building with --features firecracker on a machine with
 # access to the private firecracker-rust repository.
 # fcctl-core = { path = "/home/alex/projects/terraphim/firecracker-rust/fcctl-core", optional = true }
-terraphim-firecracker = { path = "../../terraphim_firecracker", optional = true, package = "terraphim-firecracker" }
+# `version` and `registry` are required for `cargo publish`: cargo resolves
+# optional dependencies at package time regardless of whether the feature is in
+# `default`, and without `registry` it searches crates.io and fails. Note that
+# terraphim-firecracker is AGPL-3.0-or-later while this crate is MIT; it is an
+# optional dep and `firecracker` is not in `default`/`full`.
+# In-repo builds are unaffected: the path takes precedence over the registry.
+terraphim-firecracker = { path = "../../terraphim_firecracker", version = "1.21.3", registry = "terraphim", optional = true, package = "terraphim-firecracker" }
 
 # Async utilities
 tokio-util = "0.7"
