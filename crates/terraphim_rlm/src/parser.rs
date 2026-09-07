@@ -606,10 +606,23 @@ mod tests {
     #[test]
     fn test_unary_parsers_fall_through_on_non_match() {
         let parser = CommandParser::new();
-        // `FINAL` is tried first and wins, proving the earlier unary parsers
-        // returned `Ok(None)` rather than consuming or rejecting the input.
-        let result = parser.parse_one("FINAL(done)").unwrap();
-        assert!(matches!(result, Command::Final(s) if s == "done"));
+
+        // `QUERY_LLM_BATCHED` is dispatched *after* all five unary parsers,
+        // so reaching it proves each of them returned `Ok(None)` rather than
+        // consuming or rejecting the input.
+        //
+        // The subtle case is `QUERY_LLM` itself: stripping that prefix from
+        // `QUERY_LLM_BATCHED(...)` leaves `_BATCHED(...)`, which must fail the
+        // opening-paren guard. A prefix test that ignored the `(` would
+        // swallow this input and never reach the batched parser.
+        let result = parser.parse_one(r#"QUERY_LLM_BATCHED(["q1"])"#).unwrap();
+        match result {
+            Command::QueryLlmBatched(queries) => {
+                assert_eq!(queries.len(), 1);
+                assert_eq!(queries[0].prompt, "q1");
+            }
+            other => panic!("expected QueryLlmBatched, got {other:?}"),
+        }
     }
 
     #[test]
