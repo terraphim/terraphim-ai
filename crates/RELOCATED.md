@@ -41,6 +41,81 @@ newer — it contains `meta_coordinator`, `run_synthetic_with_findings`,
 `pr_review/extractor.rs`, and `pr_review/poster.rs` that the in-repo copy
 lacked.
 
+## terraphim_tinyclaw
+
+**Status**: Removed from this repo (Gitea #3362, 2026-09-07).
+
+**True home**: `terraphim-tinyclaw` polyrepo —
+<https://git.terraphim.cloud/terraphim/terraphim-tinyclaw>.
+
+**Extraction coordinates** (pinned so this deletion stays auditable after the
+destination repo moves on):
+
+| | |
+|---|---|
+| Source removal commit (this repo) | `313b6213d` |
+| Destination repo | <https://git.terraphim.cloud/terraphim/terraphim-tinyclaw> |
+| Destination commit at extraction | `e52631f` (crate made standalone) |
+| Destination root commit | `461361c4c` |
+| Extraction command | `git filter-repo --path crates/terraphim_tinyclaw --path-rename crates/terraphim_tinyclaw/:` |
+
+To verify the deleted source is recoverable:
+
+```bash
+git clone https://git.terraphim.cloud/terraphim/terraphim-tinyclaw
+cd terraphim-tinyclaw
+git checkout e52631f
+cargo check --lib --bins
+```
+
+Note that the destination has since advanced beyond the extraction commit: its
+`main` now carries `239bf3d`, which restores roughly 4,600 lines that a bad
+merge (`244c38b47` in this repo) had reverted before the extraction. Check out
+the pinned commit above to see the crate exactly as it left this repository,
+and `main` to see it repaired.
+
+**Why removed**: It was a member of this workspace only because
+`members = ["crates/*"]` is a glob and it was absent from `exclude` — not
+because anything here used it. Nothing in this workspace depended on it (the
+sole reference was a comment in the root `Cargo.toml`). Meanwhile four of its
+integration tests referenced five methods that do not exist in the crate
+(`JsonlBackend::from_shared`, `ToolCallingLoop::with_backend`,
+`AcpState::with_bus`, `ProxyState::with_agent_bus`,
+`TinyClawMcpServer::with_commands`), so
+`cargo check --workspace --all-targets` failed — and because the pre-commit
+hook runs exactly that, **no commit anywhere in this repo could pass the hook**.
+Verified that it was the sole blocker: `cargo check --workspace --all-targets
+--exclude terraphim_tinyclaw` exited 0.
+
+It also already behaved like a polyrepo crate: four dependencies via
+`registry = "terraphim"`, and a path dep reaching outside the repository
+(`../../../terraphim-service/crates/haystack_jmap`). That relative path
+additionally broke `cargo metadata` in every git worktree, blocking all cargo
+commands there for unrelated crates (#3365).
+
+**Extraction method**: `git filter-repo --path crates/terraphim_tinyclaw
+--path-rename crates/terraphim_tinyclaw/:` against a throwaway clone,
+preserving all 193 commits that touched the crate. (`git subtree split` walks
+all 4,238 repo commits and did not finish; filter-repo took under six seconds.)
+
+**Published to support the extraction** (its path deps had to become registry
+deps):
+
+| Crate | Version | Note |
+|---|---|---|
+| `terraphim_engine_events` | 0.1.0 | newly published |
+| `terraphim_rlm` | 1.21.3 | newly published |
+| `terraphim-firecracker` | 1.21.3 | newly published; required because cargo resolves optional deps at package time |
+| `terraphim_spawner` | 1.22.0 | already published |
+
+**Known outstanding**: `haystack_jmap` is still a path dep in the extracted
+repo (`../terraphim-service/crates/haystack_jmap`) because it is not published;
+publishing it requires publishing `haystack_core` first, both of which live in
+the `terraphim-service` repo. Building terraphim-tinyclaw therefore still
+requires a sibling checkout. The five missing APIs above travel with the crate
+and remain unfixed — extraction stopped them blocking this workspace, it did
+not repair them.
+
 ## Earlier extractions (already absent from this repo)
 
 These crates were extracted in earlier waves of #1910 and are listed only for
