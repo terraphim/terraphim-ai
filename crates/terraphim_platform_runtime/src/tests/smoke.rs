@@ -78,7 +78,12 @@ fn route_round_trips() {
 
 #[test]
 fn cache_kind_round_trips() {
-    for kind in [CacheKind::Auto, CacheKind::Kache, CacheKind::Sccache, CacheKind::None] {
+    for kind in [
+        CacheKind::Auto,
+        CacheKind::Kache,
+        CacheKind::Sccache,
+        CacheKind::None,
+    ] {
         assert_eq!(round_trip(&kind), kind);
     }
 }
@@ -186,7 +191,15 @@ async fn executor_backend_trait_object_is_safe() {
 
 #[test]
 fn error_variants_display() {
-    assert!(!PolicyError::Disallowed("rm -rf /".into()).to_string().is_empty());
-    assert!(!ValidatorError::Validation("bad".into()).to_string().is_empty());
+    assert!(
+        !PolicyError::Disallowed("rm -rf /".into())
+            .to_string()
+            .is_empty()
+    );
+    assert!(
+        !ValidatorError::Validation("bad".into())
+            .to_string()
+            .is_empty()
+    );
     assert!(!ExecutionError::Timeout.to_string().is_empty());
 }

@@ -184,22 +184,8 @@ impl CommandParser {
     /// - `RUN("command")`
     /// - `RUN('command')`
     fn try_parse_run(&self, input: &str) -> RlmResult<Option<Command>> {
-        let input = input.trim();
-
-        if !input.starts_with("RUN(") {
-            return Ok(None);
-        }
-
-        let content = extract_parens_content(input, "RUN")?;
-        let command = unquote_string(&content);
-
-        if command.is_empty() {
-            return Err(RlmError::CommandParseFailed {
-                message: "RUN requires a command".to_string(),
-            });
-        }
-
-        Ok(Some(Command::Run(BashCommand::new(command))))
+        Ok(parse_unary_content(input, "RUN", "RUN requires a command")?
+            .map(|command| Command::Run(BashCommand::new(command))))
     }
 
     /// Try parsing CODE command.
@@ -209,22 +195,10 @@ impl CommandParser {
     /// - `CODE("python_code")`
     /// - `CODE('''multiline code''')`
     fn try_parse_code(&self, input: &str) -> RlmResult<Option<Command>> {
-        let input = input.trim();
-
-        if !input.starts_with("CODE(") {
-            return Ok(None);
-        }
-
-        let content = extract_parens_content(input, "CODE")?;
-        let code = unquote_string(&content);
-
-        if code.is_empty() {
-            return Err(RlmError::CommandParseFailed {
-                message: "CODE requires Python code".to_string(),
-            });
-        }
-
-        Ok(Some(Command::Code(PythonCode::new(code))))
+        Ok(
+            parse_unary_content(input, "CODE", "CODE requires Python code")?
+                .map(|code| Command::Code(PythonCode::new(code))),
+        )
     }
 
     /// Try parsing bare code blocks (```python ... ```).
@@ -252,62 +226,26 @@ impl CommandParser {
 
     /// Try parsing SNAPSHOT command.
     fn try_parse_snapshot(&self, input: &str) -> RlmResult<Option<Command>> {
-        let input = input.trim();
-
-        if !input.starts_with("SNAPSHOT(") {
-            return Ok(None);
-        }
-
-        let content = extract_parens_content(input, "SNAPSHOT")?;
-        let name = unquote_string(&content);
-
-        if name.is_empty() {
-            return Err(RlmError::CommandParseFailed {
-                message: "SNAPSHOT requires a name".to_string(),
-            });
-        }
-
-        Ok(Some(Command::Snapshot(name)))
+        Ok(
+            parse_unary_content(input, "SNAPSHOT", "SNAPSHOT requires a name")?
+                .map(Command::Snapshot),
+        )
     }
 
     /// Try parsing ROLLBACK command.
     fn try_parse_rollback(&self, input: &str) -> RlmResult<Option<Command>> {
-        let input = input.trim();
-
-        if !input.starts_with("ROLLBACK(") {
-            return Ok(None);
-        }
-
-        let content = extract_parens_content(input, "ROLLBACK")?;
-        let name = unquote_string(&content);
-
-        if name.is_empty() {
-            return Err(RlmError::CommandParseFailed {
-                message: "ROLLBACK requires a snapshot name".to_string(),
-            });
-        }
-
-        Ok(Some(Command::Rollback(name)))
+        Ok(
+            parse_unary_content(input, "ROLLBACK", "ROLLBACK requires a snapshot name")?
+                .map(Command::Rollback),
+        )
     }
 
     /// Try parsing QUERY_LLM command.
     fn try_parse_query_llm(&self, input: &str) -> RlmResult<Option<Command>> {
-        let input = input.trim();
-
-        if !input.starts_with("QUERY_LLM(") {
-            return Ok(None);
-        }
-
-        let content = extract_parens_content(input, "QUERY_LLM")?;
-        let prompt = unquote_string(&content);
-
-        if prompt.is_empty() {
-            return Err(RlmError::CommandParseFailed {
-                message: "QUERY_LLM requires a prompt".to_string(),
-            });
-        }
-
-        Ok(Some(Command::QueryLlm(LlmQuery::new(prompt))))
+        Ok(
+            parse_unary_content(input, "QUERY_LLM", "QUERY_LLM requires a prompt")?
+                .map(|prompt| Command::QueryLlm(LlmQuery::new(prompt))),
+        )
     }
 
     /// Try parsing QUERY_LLM_BATCHED command.
@@ -335,6 +273,43 @@ impl CommandParser {
         let queries: Vec<LlmQuery> = prompts.into_iter().map(LlmQuery::new).collect();
         Ok(Some(Command::QueryLlmBatched(queries)))
     }
+}
+
+/// Parse the content of a unary `KEYWORD(...)` command.
+///
+/// Shared by every command whose payload is a single unquoted, non-empty
+/// string: `RUN`, `CODE`, `SNAPSHOT`, `ROLLBACK` and `QUERY_LLM`.
+///
+/// Returns `Ok(None)` when `input` is not this command, so the caller falls
+/// through to the next parser in [`CommandParser::parse`].
+///
+/// `empty_message` is passed in verbatim rather than derived from `keyword`:
+/// each command has a hand-written rejection message that is observable
+/// output, pinned by `test_empty_content_rejection_messages_are_verbatim`.
+fn parse_unary_content(
+    input: &str,
+    keyword: &str,
+    empty_message: &str,
+) -> RlmResult<Option<String>> {
+    let input = input.trim();
+
+    // Allocation-free prefix test: the original per-command parsers matched
+    // against a `KEYWORD(` string literal, so this must not `format!`.
+    match input.strip_prefix(keyword) {
+        Some(rest) if rest.starts_with('(') => {}
+        _ => return Ok(None),
+    }
+
+    let content = extract_parens_content(input, keyword)?;
+    let value = unquote_string(&content);
+
+    if value.is_empty() {
+        return Err(RlmError::CommandParseFailed {
+            message: empty_message.to_string(),
+        });
+    }
+
+    Ok(Some(value))
 }
 
 /// Extract content between parentheses for a command.
@@ -599,6 +574,55 @@ mod tests {
         let parser = CommandParser::new();
         let result = parser.parse_one("RUN()");
         assert!(result.is_err());
+    }
+
+    /// Pins the verbatim rejection message of every unary command parser.
+    ///
+    /// These messages are hand-written per command and are observable output;
+    /// they must not drift into a keyword-derived template.
+    #[test]
+    fn test_empty_content_rejection_messages_are_verbatim() {
+        let parser = CommandParser::new();
+        let cases = [
+            ("RUN()", "RUN requires a command"),
+            ("CODE()", "CODE requires Python code"),
+            ("SNAPSHOT()", "SNAPSHOT requires a name"),
+            ("ROLLBACK()", "ROLLBACK requires a snapshot name"),
+            ("QUERY_LLM()", "QUERY_LLM requires a prompt"),
+        ];
+
+        for (input, expected) in cases {
+            match parser.parse_one(input) {
+                Err(RlmError::CommandParseFailed { message }) => {
+                    assert_eq!(message, expected, "wrong rejection message for {input}");
+                }
+                other => panic!("expected CommandParseFailed for {input}, got {other:?}"),
+            }
+        }
+    }
+
+    /// Pins the non-match path: a unary keyword parser must yield `Ok(None)`
+    /// and let the next parser in `parse` try, rather than erroring.
+    #[test]
+    fn test_unary_parsers_fall_through_on_non_match() {
+        let parser = CommandParser::new();
+
+        // `QUERY_LLM_BATCHED` is dispatched *after* all five unary parsers,
+        // so reaching it proves each of them returned `Ok(None)` rather than
+        // consuming or rejecting the input.
+        //
+        // The subtle case is `QUERY_LLM` itself: stripping that prefix from
+        // `QUERY_LLM_BATCHED(...)` leaves `_BATCHED(...)`, which must fail the
+        // opening-paren guard. A prefix test that ignored the `(` would
+        // swallow this input and never reach the batched parser.
+        let result = parser.parse_one(r#"QUERY_LLM_BATCHED(["q1"])"#).unwrap();
+        match result {
+            Command::QueryLlmBatched(queries) => {
+                assert_eq!(queries.len(), 1);
+                assert_eq!(queries[0].prompt, "q1");
+            }
+            other => panic!("expected QueryLlmBatched, got {other:?}"),
+        }
     }
 
     #[test]
