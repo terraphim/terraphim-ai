@@ -46,8 +46,33 @@ lacked.
 **Status**: Removed from this repo (Gitea #3362, 2026-09-07).
 
 **True home**: `terraphim-tinyclaw` polyrepo —
-<https://git.terraphim.cloud/terraphim/terraphim-tinyclaw>, checked out locally
-at `/Users/alex/projects/terraphim/terraphim-tinyclaw`.
+<https://git.terraphim.cloud/terraphim/terraphim-tinyclaw>.
+
+**Extraction coordinates** (pinned so this deletion stays auditable after the
+destination repo moves on):
+
+| | |
+|---|---|
+| Source removal commit (this repo) | `313b6213d` |
+| Destination repo | <https://git.terraphim.cloud/terraphim/terraphim-tinyclaw> |
+| Destination commit at extraction | `e52631f` (crate made standalone) |
+| Destination root commit | `461361c4c` |
+| Extraction command | `git filter-repo --path crates/terraphim_tinyclaw --path-rename crates/terraphim_tinyclaw/:` |
+
+To verify the deleted source is recoverable:
+
+```bash
+git clone https://git.terraphim.cloud/terraphim/terraphim-tinyclaw
+cd terraphim-tinyclaw
+git checkout e52631f
+cargo check --lib --bins
+```
+
+Note that the destination has since advanced beyond the extraction commit: its
+`main` now carries `239bf3d`, which restores roughly 4,600 lines that a bad
+merge (`244c38b47` in this repo) had reverted before the extraction. Check out
+the pinned commit above to see the crate exactly as it left this repository,
+and `main` to see it repaired.
 
 **Why removed**: It was a member of this workspace only because
 `members = ["crates/*"]` is a glob and it was absent from `exclude` — not
