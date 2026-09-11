@@ -172,6 +172,18 @@ pub struct StepState {
     pub log_index: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub log_length: Option<i64>,
+    // started_at/stopped_at are optional step timestamps sent alongside the step's
+    // terminal state in the per-step UpdateTask request. They are independent
+    // from the task-level started_at/stopped_at on TaskState: a step can begin
+    // long after the task begins (after checkout or matrix dependencies) and
+    // end before the workflow as a whole does. Server-side, the Gitea actions
+    // runner handler merges these into the per-step row that drives the UI's
+    // step timeline; the fields are optional so older runner builds that
+    // don't fill them still serialize cleanly to the same wire shape.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stopped_at: Option<String>,
 }
 
 /// `UpdateTask` response.
