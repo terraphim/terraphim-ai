@@ -22,13 +22,6 @@ fn reply_with_seed(hal: &mut MegaHal, input: &str, seed: u64) -> String {
     hal.reply(Some(input), &mut rng)
 }
 
-/// A minimal, highly distinctive corpus: every reply word after training on
-/// it must come from THESE lines.
-const CORPUS_A: &str = "\
-The terraphim search engine indexes the knowledge graph.
-Terraphim builds search tools in Rust.
-";
-
 const CORPUS_B: &str = "\
 Wombats dig burrows under the outback stars.
 A puzzle box hides the wombat treasure.
@@ -258,7 +251,6 @@ fn rust_persona_recognises_rust_as_a_computer_language() {
 
     let mut hal = MegaHal::blank();
     hal.load_personality("rust").expect("rust persona embedded");
-    let mut rng = DefaultRng::seed_from_u64(64);
 
     let language_words = ["LANGUAGE", "PROGRAMMING", "COMPUTER", "COMPILER", "CODE"];
     let mut saw_language_word = false;
