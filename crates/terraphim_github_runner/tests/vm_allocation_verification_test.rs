@@ -216,6 +216,7 @@ fn create_test_workflow(name: &str, step_count: usize) -> ParsedWorkflow {
             working_dir: "/workspace".to_string(),
             continue_on_error: false,
             timeout_seconds: 300,
+            source_index: i,
         })
         .collect();
 
@@ -227,6 +228,7 @@ fn create_test_workflow(name: &str, step_count: usize) -> ParsedWorkflow {
         steps,
         cleanup_commands: vec![format!("echo 'Cleanup for {}'", name)],
         cache_paths: vec![],
+        total_source_steps: step_count,
     }
 }
 

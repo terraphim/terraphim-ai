@@ -227,12 +227,14 @@ mod tests {
         ParsedWorkflow {
             steps: cmds
                 .iter()
-                .map(|c| WorkflowStep {
+                .enumerate()
+                .map(|(i, c)| WorkflowStep {
                     name: c.to_string(),
                     command: c.to_string(),
                     working_dir: "/workspace".to_string(),
                     continue_on_error: false,
                     timeout_seconds: 300,
+                    source_index: i,
                 })
                 .collect(),
             ..ParsedWorkflow::default()

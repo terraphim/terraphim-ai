@@ -61,6 +61,31 @@ pub struct ParsedWorkflow {
     pub cleanup_commands: Vec<String>,
     /// Paths to cache
     pub cache_paths: Vec<String>,
+    /// Number of step entries in the original YAML, including the ones this
+    /// parser dropped (`uses:` steps and blank `run:` steps).
+    ///
+    /// Together with [`WorkflowStep::source_index`] this lets a caller account
+    /// for every row the server can show: after a stop-on-failure the result is
+    /// only a prefix, and the genuinely-unexecuted source tail is
+    /// `total_source_steps - (last executed source_index + 1)`. Zero means
+    /// "unknown" (a hand-built or legacy payload), in which case the caller
+    /// must not attempt tail accounting.
+    #[serde(default)]
+    pub total_source_steps: usize,
+}
+
+impl ParsedWorkflow {
+    /// The source ordinals of the executable steps, in execution order.
+    pub fn source_steps(&self) -> Vec<usize> {
+        self.steps.iter().map(|s| s.source_index).collect()
+    }
+
+    /// Total step entries in the original YAML, including the ones this parser
+    /// dropped (`uses:` and blank `run:` steps). Mirrors the
+    /// [`Self::total_source_steps`] field; named for call-site readability.
+    pub fn total_source_steps(&self) -> usize {
+        self.total_source_steps
+    }
 }
 
 impl Default for ParsedWorkflow {
@@ -73,6 +98,10 @@ impl Default for ParsedWorkflow {
             steps: Vec::new(),
             cleanup_commands: Vec::new(),
             cache_paths: Vec::new(),
+            // Zero means "unknown": a hand-built or legacy payload that did not
+            // track the YAML ordinal. Callers must not attempt tail accounting
+            // when this is zero.
+            total_source_steps: 0,
         }
     }
 }
@@ -93,6 +122,15 @@ pub struct WorkflowStep {
     /// Timeout in seconds
     #[serde(default = "default_timeout")]
     pub timeout_seconds: u64,
+    /// Ordinal of this step in the *original* YAML `steps:` array.
+    ///
+    /// Gitea numbers its log rows by the source ordinal, but the parser drops
+    /// `uses:` steps and blank `run:` steps, so a step's position inside
+    /// [`ParsedWorkflow::steps`] is not the server's index. This field carries
+    /// the mapping explicitly; callers must never infer it from
+    /// `steps.iter().enumerate()` (Refs #101, terraphim/gitea#96).
+    #[serde(default)]
+    pub source_index: usize,
 }
 
 fn default_working_dir() -> String {
@@ -158,6 +196,7 @@ pub fn parse_single_workflow_yaml(yaml: &str) -> Result<ParsedWorkflow> {
         name: &mut Option<String>,
         run: &mut Option<String>,
         uses: &mut bool,
+        source_index: usize,
     ) {
         if !*uses && let Some(cmd) = run.take() {
             let cmd = cmd.trim_end().to_string();
@@ -171,6 +210,7 @@ pub fn parse_single_workflow_yaml(yaml: &str) -> Result<ParsedWorkflow> {
                     working_dir: default_working_dir(),
                     continue_on_error: false,
                     timeout_seconds: default_timeout(),
+                    source_index,
                 });
             }
         }
@@ -179,6 +219,17 @@ pub fn parse_single_workflow_yaml(yaml: &str) -> Result<ParsedWorkflow> {
         *uses = false;
     }
 
+    // Ordinal of the step *currently being assembled*. The first step gets 0,
+    // the second gets 1, and so on -- matching the original YAML position
+    // even for entries this parser drops (`uses:` steps, blank `run:` steps).
+    // Gitea numbers its log rows by that position, so a filtered vector can
+    // never recover the index itself (Refs #101).
+    let mut current_source_index: usize = 0;
+    let mut total_source_steps: usize = 0;
+    // True once we have started consuming the first step. The very first
+    // `- ` does not flush (there is no prior step), but every later `- `
+    // flushes the step that started immediately before it.
+    let mut step_in_progress = false;
     for raw in yaml.lines() {
         // If collecting a block scalar, consume more-indented (or blank) lines.
         if let Some(key_indent) = block_key_indent {
@@ -198,9 +249,27 @@ pub fn parse_single_workflow_yaml(yaml: &str) -> Result<ParsedWorkflow> {
             continue;
         }
 
-        // A new list item under steps flushes the previous step.
+        // A new list item under steps flushes the previous step with the
+        // ordinal it was assigned when its own `- ` was first seen. After the
+        // flush the new step takes the next ordinal.
         if trimmed.starts_with("- ") {
-            push_step(&mut steps, &mut cur_name, &mut cur_run, &mut cur_uses);
+            if step_in_progress {
+                push_step(
+                    &mut steps,
+                    &mut cur_name,
+                    &mut cur_run,
+                    &mut cur_uses,
+                    current_source_index,
+                );
+                current_source_index += 1;
+                total_source_steps += 1;
+            } else {
+                // First `- `: the new step takes the *current* ordinal (which
+                // starts at 0) and we will only bump it when the next `- `
+                // flushes this one.
+                total_source_steps += 1;
+                step_in_progress = true;
+            }
         }
         let body = trimmed.strip_prefix("- ").unwrap_or(trimmed);
 
@@ -223,11 +292,21 @@ pub fn parse_single_workflow_yaml(yaml: &str) -> Result<ParsedWorkflow> {
         }
     }
 
-    // Flush a trailing block scalar and the final step.
+    // Flush a trailing block scalar and the final step. The last step's
+    // ordinal is whatever `current_source_index` was set to when its `- `
+    // line was processed.
     if block_key_indent.is_some() {
         cur_run = Some(block_lines.join("\n"));
     }
-    push_step(&mut steps, &mut cur_name, &mut cur_run, &mut cur_uses);
+    if step_in_progress {
+        push_step(
+            &mut steps,
+            &mut cur_name,
+            &mut cur_run,
+            &mut cur_uses,
+            current_source_index,
+        );
+    }
 
     if steps.is_empty() {
         return Err(GitHubRunnerError::WorkflowParsing(
@@ -235,6 +314,7 @@ pub fn parse_single_workflow_yaml(yaml: &str) -> Result<ParsedWorkflow> {
         ));
     }
     wf.steps = steps;
+    wf.total_source_steps = total_source_steps;
     Ok(wf)
 }
 
@@ -267,6 +347,104 @@ mod payload_tests {
     #[test]
     fn empty_workflow_errors() {
         assert!(parse_single_workflow_yaml("name: empty\njobs: {}\n").is_err());
+    }
+
+    // --- Source-index preservation (Refs #101, terraphim/gitea#96) ---------
+    //
+    // Gitea numbers log rows by the *original* YAML step ordinal. The parser
+    // drops `uses:` steps and blank `run:` steps, so enumerating the filtered
+    // vector yields indices that no longer match the server. These fixtures
+    // demonstrate that defect and pin the mapping contract S3 relies on.
+
+    /// `[uses: actions/checkout, run: A, run: B]` must carry source indices
+    /// [1, 2] -- not the filtered-vector positions [0, 1].
+    #[test]
+    fn uses_step_shifts_source_indices_of_executable_steps() {
+        let yaml = "jobs:\n  j:\n    steps:\n      - uses: actions/checkout@v4\n      - name: A\n        run: echo A\n      - name: B\n        run: echo B\n";
+        let wf = parse_single_workflow_yaml(yaml).unwrap();
+        assert_eq!(wf.steps.len(), 2, "uses: step stays dropped");
+        assert_eq!(
+            wf.source_steps(),
+            vec![1, 2],
+            "executable steps keep their original YAML ordinals"
+        );
+        assert_eq!(wf.total_source_steps(), 3, "three step entries in the YAML");
+    }
+
+    /// Duplicate step names must not be used to correlate rows; identity is the
+    /// source ordinal, which stays distinct.
+    #[test]
+    fn duplicate_names_keep_distinct_source_indices() {
+        let yaml = "jobs:\n  j:\n    steps:\n      - name: Test\n        run: echo one\n      - name: Test\n        run: echo two\n";
+        let wf = parse_single_workflow_yaml(yaml).unwrap();
+        assert_eq!(wf.source_steps(), vec![0, 1]);
+        assert_eq!(wf.steps[0].name, wf.steps[1].name, "names do collide");
+        assert_ne!(wf.steps[0].source_index, wf.steps[1].source_index);
+    }
+
+    /// A blank `run:` is dropped but still consumes a source ordinal, so every
+    /// later step shifts by one.
+    #[test]
+    fn blank_run_step_is_dropped_but_still_counts() {
+        let yaml = "jobs:\n  j:\n    steps:\n      - name: Blank\n        run: |\n      - name: Real\n        run: echo real\n";
+        let wf = parse_single_workflow_yaml(yaml).unwrap();
+        assert_eq!(wf.steps.len(), 1, "blank run step is not executable");
+        assert_eq!(wf.source_steps(), vec![1]);
+        assert_eq!(wf.total_source_steps(), 2);
+    }
+
+    /// Leading non-step entries (`uses:` before the first `run:`) plus a mix of
+    /// unsupported entries: the unexecuted *source tail* must be derivable from
+    /// `total_source_steps()` minus the executed prefix (S3 marks it skipped).
+    #[test]
+    fn total_source_steps_supports_unexecuted_tail_accounting() {
+        let yaml = "jobs:\n  j:\n    steps:\n      \
+                    - uses: actions/checkout@v4\n      \
+                    - name: Blank\n        run: |\n      \
+                    - name: A\n        run: echo A\n      \
+                    - name: B\n        run: echo B\n      \
+                    - uses: actions/upload-artifact@v4\n";
+        let wf = parse_single_workflow_yaml(yaml).unwrap();
+        assert_eq!(
+            wf.source_steps(),
+            vec![2, 3],
+            "blank run dropped, uses dropped"
+        );
+        assert_eq!(wf.total_source_steps(), 5);
+        // Executed prefix [A, B] covers source ordinals 2 and 3; source ordinals
+        // 0 and 1 were dropped at compile time and 4 is the unexecuted tail.
+        let reported: Vec<usize> = wf.steps.iter().take(1).map(|s| s.source_index).collect();
+        assert_eq!(
+            reported,
+            vec![2],
+            "prefix-only results report their own rows"
+        );
+        assert_eq!(
+            wf.total_source_steps() - wf.source_steps()[wf.source_steps().len() - 1] - 1,
+            1,
+            "one genuinely-unexecuted source tail step after the last executable one"
+        );
+    }
+
+    /// Step-ordinal fields survive serialisation round-trips (the plan payload
+    /// crosses a process boundary in some routes).
+    #[test]
+    fn source_index_survives_serde_round_trip() {
+        let yaml = "jobs:\n  j:\n    steps:\n      - uses: actions/checkout@v4\n      - name: A\n        run: echo A\n";
+        let wf = parse_single_workflow_yaml(yaml).unwrap();
+        let json = serde_json::to_string(&wf).unwrap();
+        let back: ParsedWorkflow = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.source_steps(), vec![1]);
+        assert_eq!(back.total_source_steps(), 2);
+    }
+
+    /// Older persisted payloads have no `source_index` key; defaulting must keep
+    /// them decodable rather than failing the whole workflow.
+    #[test]
+    fn missing_source_index_deserialises_to_zero() {
+        let step: WorkflowStep =
+            serde_json::from_str(r#"{"name": "x", "command": "echo x"}"#).unwrap();
+        assert_eq!(step.source_index, 0);
     }
 
     #[test]
@@ -400,6 +578,7 @@ impl WorkflowParser {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: false,
                     timeout_seconds: 60,
+                    source_index: 0,
                 },
                 WorkflowStep {
                     name: "Format check".to_string(),
@@ -407,6 +586,7 @@ impl WorkflowParser {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: false,
                     timeout_seconds: 120,
+                    source_index: 1,
                 },
                 WorkflowStep {
                     name: "Clippy".to_string(),
@@ -414,6 +594,7 @@ impl WorkflowParser {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: false,
                     timeout_seconds: 300,
+                    source_index: 2,
                 },
                 WorkflowStep {
                     name: "Build".to_string(),
@@ -421,6 +602,7 @@ impl WorkflowParser {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: false,
                     timeout_seconds: 600,
+                    source_index: 3,
                 },
                 WorkflowStep {
                     name: "Test".to_string(),
@@ -428,6 +610,7 @@ impl WorkflowParser {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: false,
                     timeout_seconds: 600,
+                    source_index: 4,
                 },
             ],
             cleanup_commands: vec![
@@ -466,6 +649,7 @@ impl WorkflowParser {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: false,
                     timeout_seconds: 60,
+                    source_index: 0,
                 },
                 WorkflowStep {
                     name: "Show info".to_string(),
@@ -473,6 +657,7 @@ impl WorkflowParser {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: false,
                     timeout_seconds: 30,
+                    source_index: 1,
                 },
             ],
             cleanup_commands: vec![],

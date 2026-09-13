@@ -261,6 +261,10 @@ pub fn parse_workflow_yaml_simple(workflow_path: &Path) -> Result<ParsedWorkflow
                         working_dir: "/workspace".to_string(),
                         continue_on_error: false,
                         timeout_seconds: 300,
+                        // This rewriter has already dropped the `uses:` steps it
+                        // cannot run, so ordinals are positional from zero and do
+                        // not track the server's YAML row indices (Refs #101).
+                        source_index: steps.len(),
                     });
 
                     step_name.clear();

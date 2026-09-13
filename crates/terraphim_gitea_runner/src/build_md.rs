@@ -41,6 +41,9 @@ pub fn parse_build_md(contents: &str) -> Result<ParsedWorkflow> {
                 working_dir: "/workspace".to_string(),
                 continue_on_error: false,
                 timeout_seconds: 1800,
+                // A BUILD.md plan has no Gitea YAML counterpart, so its steps are
+                // numbered positionally from zero (Refs #101).
+                source_index: steps.len(),
             });
         }
     }

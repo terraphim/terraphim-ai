@@ -6,6 +6,7 @@ use crate::logs::LogStreamer;
 use crate::policy::PolicyPlanner;
 use crate::state::RunnerState;
 use crate::status::{SingleStatusWriter, StatusState};
+use crate::task_journal::TaskJournal;
 use crate::types::{Task, TaskState, UpdateTaskRequest, result};
 use crate::{Result, RunnerError, workflow_payload};
 use std::collections::BTreeMap;
@@ -226,6 +227,17 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
         }
     }
 
+    /// Directory under which per-task journals are kept.
+    ///
+    /// One runner, one journal root: a second process cannot legally use the
+    /// same root because journals are append-only and a racing restart would
+    /// truncate committed history. The directory lives under `checkout_dir`
+    /// for the same reason -- it is per-runner, already private, and survives
+    /// across runs.
+    fn journal_root(&self) -> std::path::PathBuf {
+        self.checkout_dir.join(".terraphim-journal")
+    }
+
     /// Run `task` to completion; returns whether it succeeded.
     ///
     /// # Terminal-lifecycle ownership (Refs #3222)
@@ -242,8 +254,37 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
         let mut terminalized = false;
         // Owned here so a repair path can append to the *same* log stream: a
         // fresh streamer would restart at row index 0 and overwrite rows the
-        // server already acked.
-        let mut logs = LogStreamer::new(task.id);
+        // server already acked. The redactor runs every line at `add_line` time
+        // so secret material never reaches the wire (Refs #101); the journal
+        // makes the same guarantee across a process restart.
+        let mut logs = LogStreamer::new(task.id).with_redactor({
+            let state = state.clone();
+            let task = task.clone();
+            move |line: &str| redact(line, &state, &task)
+        });
+        if let Ok(journal) = TaskJournal::open(
+            &self.journal_root(),
+            task.id,
+            crate::task_journal::JournalMeta {
+                runner_uuid: state.uuid.clone(),
+                repository: workflow_payload::repository(&task),
+                sha: workflow_payload::head_sha(&task),
+                ..Default::default()
+            },
+        ) {
+            logs = logs.with_journal(journal);
+        } else {
+            // Losing the journal does not lose the running stream -- rows still
+            // buffer and ack in memory -- but it drops restart durability, which
+            // is exactly what #101 adds. Surface it loudly rather than letting a
+            // full or unwritable journal root degrade silently.
+            log::error!(
+                "task {}: could not open log journal at {}; restart durability is \
+                 disabled for this task (delivery continues from the in-memory buffer)",
+                task.id,
+                self.journal_root().display()
+            );
+        }
         match self
             .run_claimed(state, &task, &mut logs, &mut terminalized)
             .await

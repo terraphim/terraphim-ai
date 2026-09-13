@@ -35,6 +35,7 @@ pub mod policy;
 pub mod poller;
 pub mod state;
 pub mod status;
+pub mod task_journal;
 pub mod task_worker;
 pub mod taxonomy_policy;
 pub mod types;

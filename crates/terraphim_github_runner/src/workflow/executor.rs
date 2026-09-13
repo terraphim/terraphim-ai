@@ -640,6 +640,7 @@ mod tests {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: false,
                     timeout_seconds: 300,
+                    source_index: 0,
                 },
                 WorkflowStep {
                     name: "Test".to_string(),
@@ -647,10 +648,12 @@ mod tests {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: false,
                     timeout_seconds: 300,
+                    source_index: 0,
                 },
             ],
             cleanup_commands: vec!["echo cleanup".to_string()],
             cache_paths: vec![],
+            total_source_steps: 2,
         }
     }
 
@@ -735,6 +738,7 @@ mod tests {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: true,
                     timeout_seconds: 300,
+                    source_index: 0,
                 },
                 WorkflowStep {
                     name: "Test".to_string(),
@@ -742,6 +746,7 @@ mod tests {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: true, // Continue even if this fails
                     timeout_seconds: 300,
+                    source_index: 0,
                 },
                 WorkflowStep {
                     name: "Deploy".to_string(),
@@ -749,10 +754,12 @@ mod tests {
                     working_dir: "/workspace".to_string(),
                     continue_on_error: false,
                     timeout_seconds: 300,
+                    source_index: 0,
                 },
             ],
             cleanup_commands: vec![],
             cache_paths: vec![],
+            total_source_steps: 0,
         };
 
         let context = WorkflowContext::new(create_test_event());
@@ -793,9 +800,11 @@ mod tests {
                 working_dir: "/workspace".to_string(),
                 continue_on_error: false,
                 timeout_seconds: 300,
+                source_index: 0,
             }],
             cleanup_commands: vec![],
             cache_paths: vec![],
+            total_source_steps: 0,
         };
 
         let context = WorkflowContext::new(create_test_event());
@@ -894,5 +903,50 @@ mod tests {
             duration: Duration::from_millis(100),
         };
         assert!(!failed_result.success());
+    }
+
+    /// Stop-on-failure returns a result *prefix*, so the caller cannot tell from
+    /// `WorkflowResult.steps` alone which source rows exist. Parsing a workflow
+    /// whose first executable step fails must still expose the correct source
+    /// indices and the full YAML step count (Refs #101, terraphim/gitea#96).
+    #[tokio::test]
+    async fn failing_first_step_keeps_source_indices_and_total_count() {
+        let session_manager = Arc::new(SessionManager::new(SessionManagerConfig::default()));
+        let mock_executor = Arc::new(MockCommandExecutor::with_failures(vec![
+            "echo A".to_string(),
+        ]));
+        let executor = WorkflowExecutor::with_executor(
+            mock_executor,
+            session_manager,
+            WorkflowExecutorConfig {
+                snapshot_on_success: false,
+                auto_rollback: false,
+                stop_on_failure: true,
+                ..Default::default()
+            },
+        );
+
+        // checkout (dropped) -> A (fails) -> B (never executed)
+        let yaml = "jobs:\n  j:\n    steps:\n      - uses: actions/checkout@v4\n      - name: A\n        run: echo A\n      - name: B\n        run: echo B\n";
+        let workflow = crate::workflow::parser::parse_single_workflow_yaml(yaml).unwrap();
+        assert_eq!(workflow.source_steps(), vec![1, 2]);
+        assert_eq!(workflow.total_source_steps(), 3);
+
+        let context = WorkflowContext::new(create_test_event());
+        let result = executor
+            .execute_workflow(&workflow, &context)
+            .await
+            .unwrap();
+
+        assert!(!result.success, "first step failed so the job failed");
+        assert_eq!(
+            result.steps.len(),
+            1,
+            "stop-on-failure yields a prefix only"
+        );
+        // The data S3 needs to paint the right rows: the failed row is source
+        // ordinal 1, and ordinals 0 and 2 were not executed by this loop.
+        assert_eq!(workflow.steps[0].source_index, 1);
+        assert_eq!(workflow.total_source_steps(), 3);
     }
 }

@@ -197,7 +197,7 @@ pub struct UpdateLogRequest {
 }
 
 /// A single log row.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogRow {
     /// RFC3339 timestamp.
@@ -209,7 +209,17 @@ pub struct LogRow {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateLogResponse {
-    /// Server's last acknowledged row index.
+    /// Authoritative committed row count from the server.
+    ///
+    /// `AckIndex` is `task.LogLength` after the request has been processed: a
+    /// *count* of rows the server has committed, **not** a last-row index. For
+    /// a batch covering `[start, end)` sent while the server has committed
+    /// `acked` rows, full accept returns `end`, no progress returns `start`,
+    /// partial accept returns a value in `(start, end]`, and `ack < start` /
+    /// `ack > end` are protocol violations. A re-sent finalise of a zero-row
+    /// log answers `0` forever, which is why sealing is tracked as explicit
+    /// state and never inferred from a cursor equality
+    /// (Refs #96, #101).
     #[serde(default, deserialize_with = "de_i64")]
     pub ack_index: i64,
 }

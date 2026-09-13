@@ -48,6 +48,7 @@ fn create_test_workflow() -> ParsedWorkflow {
                 working_dir: "/workspace".to_string(),
                 continue_on_error: false,
                 timeout_seconds: 60,
+                source_index: 0,
             },
             WorkflowStep {
                 name: "Run Tests".to_string(),
@@ -55,10 +56,12 @@ fn create_test_workflow() -> ParsedWorkflow {
                 working_dir: "/workspace".to_string(),
                 continue_on_error: false,
                 timeout_seconds: 60,
+                source_index: 0,
             },
         ],
         cleanup_commands: vec!["echo 'Cleanup complete'".to_string()],
         cache_paths: vec![],
+        total_source_steps: 2,
     }
 }
 
@@ -227,6 +230,7 @@ async fn end_to_end_real_firecracker_vm() {
                 working_dir: "/workspace".to_string(),
                 continue_on_error: false,
                 timeout_seconds: 5,
+                source_index: 0,
             },
             WorkflowStep {
                 name: "List Root".to_string(),
@@ -234,6 +238,7 @@ async fn end_to_end_real_firecracker_vm() {
                 working_dir: "/".to_string(),
                 continue_on_error: false,
                 timeout_seconds: 5,
+                source_index: 0,
             },
             WorkflowStep {
                 name: "Check Username".to_string(),
@@ -241,10 +246,12 @@ async fn end_to_end_real_firecracker_vm() {
                 working_dir: "/".to_string(),
                 continue_on_error: false,
                 timeout_seconds: 5,
+                source_index: 0,
             },
         ],
         cleanup_commands: vec![],
         cache_paths: vec![],
+        total_source_steps: 3,
     };
 
     println!("✅ Workflow created with {} steps", workflow.steps.len());
