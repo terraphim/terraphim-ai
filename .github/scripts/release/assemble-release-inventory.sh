@@ -201,15 +201,44 @@ if [[ -n "$LEGACY" && -d "$LEGACY" ]]; then
 fi
 
 # 3. Managed DEB/RPM matrix artifacts: all-or-nothing gate.
-MANAGED_PRESENT=()
-if [[ -n "$MANAGED_STAGING" && ! -d "$MANAGED_STAGING" ]]; then
+if [[ -n "$MANAGED_STAGING" && ! -e "$MANAGED_STAGING" && ! -L "$MANAGED_STAGING" ]]; then
     # The workflow only downloads managed artifacts when the managed package
     # job succeeded; a missing staging directory means the stage is absent.
     echo "NOTE: managed staging directory absent (job skipped): $MANAGED_STAGING" >&2
     MANAGED_STAGING=""
 fi
 if [[ -n "$MANAGED_STAGING" ]]; then
+    if [[ -L "$MANAGED_STAGING" || ! -d "$MANAGED_STAGING" ]]; then
+        echo "::error::managed staging root must be a regular non-symlink directory: $MANAGED_STAGING" >&2
+        exit 1
+    fi
+
+    declare -A REQUESTED_MANAGED_TARGETS=()
+    for target in "${MANAGED_TARGETS[@]}"; do
+        case "$target" in
+            x86_64-unknown-linux-musl|aarch64-unknown-linux-musl)
+                if [[ -n "${REQUESTED_MANAGED_TARGETS[$target]:-}" ]]; then
+                    echo "::error::duplicate managed package target: $target" >&2
+                    exit 1
+                fi
+                REQUESTED_MANAGED_TARGETS["$target"]=1
+                ;;
+            *)
+                echo "::error::unsupported managed package target: $target" >&2
+                exit 1
+                ;;
+        esac
+    done
+    if [[ ${#REQUESTED_MANAGED_TARGETS[@]} -ne 2 ||
+        -z "${REQUESTED_MANAGED_TARGETS[x86_64-unknown-linux-musl]:-}" ||
+        -z "${REQUESTED_MANAGED_TARGETS[aarch64-unknown-linux-musl]:-}" ]]; then
+        echo "::error::managed staging root requires exactly the x86_64 and aarch64 MUSL targets" >&2
+        exit 1
+    fi
+
+    managed_root_entries=0
     while IFS= read -r -d '' path; do
+        managed_root_entries=$((managed_root_entries + 1))
         base="$(basename "$path")"
         case "$base" in
             server-managed-packages-x86_64-unknown-linux-musl|server-managed-packages-aarch64-unknown-linux-musl)
@@ -225,30 +254,24 @@ if [[ -n "$MANAGED_STAGING" ]]; then
         esac
     done < <(find "$MANAGED_STAGING" -mindepth 1 -maxdepth 1 -print0)
 
-    absent=()
-    for target in "${MANAGED_TARGETS[@]}"; do
-        dir="$MANAGED_STAGING/server-managed-packages-$target"
-        if [[ -L "$dir" || ( -e "$dir" && ! -d "$dir" ) ]]; then
-            echo "::error::managed artifact target must be a regular directory: $dir" >&2
-            exit 1
-        fi
-        if [[ -d "$dir" ]] && find "$dir" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
-            MANAGED_PRESENT+=("$dir")
-        else
-            absent+=("$target")
-        fi
-    done
-
-    if [[ ${#MANAGED_PRESENT[@]} -gt 0 && ${#absent[@]} -gt 0 ]]; then
-        printf '::error::managed package matrix incomplete; missing targets: %s (all-or-nothing)\n' "${absent[*]}" >&2
+    if [[ "$managed_root_entries" -ne 2 ]]; then
+        missing_targets=()
+        for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
+            if [[ ! -d "$MANAGED_STAGING/server-managed-packages-$target" ]]; then
+                missing_targets+=("$target")
+            fi
+        done
+        printf '::error::managed package matrix incomplete; missing targets: %s (all-or-nothing)\n' "${missing_targets[*]}" >&2
         exit 1
     fi
 
-    for target in "${MANAGED_TARGETS[@]}"; do
+    for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
         dir="$MANAGED_STAGING/server-managed-packages-$target"
-        if [[ -d "$dir" ]] && find "$dir" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
-            validate_managed_dir "$dir" "$target"
+        if [[ -L "$dir" || ! -d "$dir" ]]; then
+            echo "::error::managed artifact target must be a regular directory: $dir" >&2
+            exit 1
         fi
+        validate_managed_dir "$dir" "$target"
     done
 fi
 

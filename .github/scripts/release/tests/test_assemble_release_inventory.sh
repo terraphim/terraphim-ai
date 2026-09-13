@@ -330,6 +330,61 @@ test_managed_staging_root_symlink_entry_fails() {
         --managed-target aarch64-unknown-linux-musl
 }
 
+# Once the managed staging root exists it is authoritative. An empty root is
+# an incomplete producer result, not an absent/skipped managed-package stage.
+test_present_empty_managed_staging_root_fails() {
+    local out="$TMP/out15" staging="$TMP/staging15"
+    mkdir -p "$out" "$staging"
+
+    expect_fail "managed package matrix incomplete" \
+        --output "$out" --managed-staging "$staging" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+}
+
+# Both target directories must contain the exact non-empty DEB/RPM/checksum
+# set. Merely creating the expected directory names is not a complete stage.
+test_both_managed_target_dirs_empty_fail() {
+    local out="$TMP/out16" staging="$TMP/staging16"
+    mkdir -p "$out" \
+        "$staging/server-managed-packages-x86_64-unknown-linux-musl" \
+        "$staging/server-managed-packages-aarch64-unknown-linux-musl"
+
+    expect_fail "managed artifact directory missing package checksum manifest" \
+        --output "$out" --managed-staging "$staging" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+}
+
+test_present_managed_staging_root_must_be_real_directory() {
+    local out="$TMP/out17" file_root="$TMP/staging17-file"
+    local link_root="$TMP/staging17-link" link_target="$TMP/staging17-target"
+    mkdir -p "$out" "$link_target"
+    printf 'not a directory\n' > "$file_root"
+    ln -s "$link_target" "$link_root"
+
+    expect_fail "managed staging root must be a regular non-symlink directory" \
+        --output "$out" --managed-staging "$file_root" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+    expect_fail "managed staging root must be a regular non-symlink directory" \
+        --output "$out" --managed-staging "$link_root" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+}
+
+test_expected_managed_target_symlink_fails() {
+    local out="$TMP/out18" staging="$TMP/staging18" linked="$TMP/staging18-linked"
+    mkdir -p "$out" "$staging" "$linked" \
+        "$staging/server-managed-packages-aarch64-unknown-linux-musl"
+    ln -s "$linked" "$staging/server-managed-packages-x86_64-unknown-linux-musl"
+
+    expect_fail "unexpected managed staging entry (expected a regular target directory)" \
+        --output "$out" --managed-staging "$staging" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+}
+
 test_complete_managed_matrix_is_merged
 test_managed_legacy_basename_conflict_fails
 test_partial_managed_matrix_fails
@@ -344,5 +399,9 @@ test_zero_length_managed_input_fails_before_merge
 test_wrong_target_managed_staging_dir_fails
 test_unexpected_managed_staging_entry_fails_before_merge
 test_managed_staging_root_symlink_entry_fails
+test_present_empty_managed_staging_root_fails
+test_both_managed_target_dirs_empty_fail
+test_present_managed_staging_root_must_be_real_directory
+test_expected_managed_target_symlink_fails
 
 echo "assemble-release-inventory tests passed"
