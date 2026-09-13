@@ -44,6 +44,58 @@ require_docker_or_fail() {
     }
 }
 
+validate_qualified_binary() {
+    local path="$1"
+    local target="$2"
+    local label="$3"
+
+    if [[ -L "$path" || ! -f "$path" ]]; then
+        echo "$label must be a regular non-symlink file: $path" >&2
+        exit 1
+    fi
+    if [[ ! -s "$path" ]]; then
+        echo "$label must not be zero-length: $path" >&2
+        exit 1
+    fi
+    command -v readelf >/dev/null 2>&1 || {
+        echo "readelf is required to validate qualified binary ELF architecture" >&2
+        exit 127
+    }
+    if ! LC_ALL=C readelf -h -- "$path" >/dev/null 2>&1; then
+        echo "$label is not a valid ELF file: $path" >&2
+        exit 1
+    fi
+
+    local ident machine expected_machine
+    ident="$(od -An -tx1 -N6 -- "$path" | tr -d '[:space:]')"
+    machine="$(od -An -tx1 -j18 -N2 -- "$path" | tr -d '[:space:]')"
+    [[ "$ident" == "7f454c460201" ]] || {
+        echo "$label is not a supported ELF64 little-endian file: $path" >&2
+        exit 1
+    }
+    case "$target" in
+        x86_64-unknown-linux-musl) expected_machine="3e00" ;;
+        aarch64-unknown-linux-musl) expected_machine="b700" ;;
+        *)
+            echo "unsupported server package target: $target" >&2
+            exit 2
+            ;;
+    esac
+    [[ "$machine" == "$expected_machine" ]] || {
+        echo "$label ELF architecture mismatch target=$target expected_machine=$expected_machine actual_machine=$machine" >&2
+        exit 1
+    }
+}
+
+validate_extracted_payload() {
+    local path="$1"
+    local format="$2"
+    if [[ -L "$path" || ! -f "$path" || ! -s "$path" ]]; then
+        echo "extracted $format payload must be a non-empty regular non-symlink file: $path" >&2
+        exit 1
+    fi
+}
+
 # Fail-closed lint result policy shared by the host and Docker lint paths.
 #
 # The only tolerated lint error is the exact justified static-MUSL
@@ -268,7 +320,12 @@ docker_rpm_tool() {
             fi
             cd /extract
             rpm2cpio /pkg.rpm | cpio -idmv >/dev/null 2>&1
-            actual_sha="$(sha256sum /extract/usr/bin/terraphim_server | awk "{print \$1}")"
+            payload=/extract/usr/bin/terraphim_server
+            if test -L "$payload" || ! test -f "$payload" || ! test -s "$payload"; then
+                echo "extracted RPM payload must be a non-empty regular non-symlink file: $payload" >&2
+                exit 1
+            fi
+            actual_sha="$(sha256sum "$payload" | awk "{print \$1}")"
             test "$actual_sha" = "$1"
             grep -qx rpm /extract/usr/share/terraphim/package-manager.d/terraphim_server
             {
@@ -369,6 +426,7 @@ verify_deb() {
     mkdir -p "$tmp"
     dpkg-deb --extract "$pkg" "$tmp"
 
+    validate_extracted_payload "$tmp/usr/bin/terraphim_server" DEB
     local actual_sha
     actual_sha="$(sha256sum "$tmp/usr/bin/terraphim_server" | awk '{print $1}')"
     [[ "$actual_sha" == "$EXPECTED_SHA" ]] || {
@@ -402,6 +460,8 @@ verify_rpm() {
     else
         docker_rpm_tool "$pkg" "$tmp" "$EXPECTED_SHA" "$metadata"
     fi
+
+    validate_extracted_payload "$tmp/usr/bin/terraphim_server" RPM
 
     # Fail closed unless the produced package carries the architecture that
     # was requested for the target triple. The arch is consumed from the
@@ -479,6 +539,7 @@ verify_cargo_deb_parity() {
     mkdir -p "$tmp"
     dpkg-deb --extract "${matches[0]}" "$tmp"
 
+    validate_extracted_payload "$tmp/usr/bin/terraphim_server" DEB
     local cargo_sha nfpm_sha
     cargo_sha="$(sha256sum "$tmp/usr/bin/terraphim_server" | awk '{print $1}')"
     nfpm_sha="$(sha256sum "$WORK_DIR/deb-extract/usr/bin/terraphim_server" | awk '{print $1}')"
@@ -553,10 +614,8 @@ main() {
             ;;
     esac
 
-    if [[ ! -f "$BINARY" ]]; then
-        echo "missing qualified binary: $BINARY" >&2
-        exit 1
-    fi
+    local SOURCE_BINARY="$BINARY"
+    validate_qualified_binary "$SOURCE_BINARY" "$TARGET" "qualified binary"
 
     if ! command -v "$NFPM_BIN" >/dev/null 2>&1; then
         echo "nFPM is required for managed package production; not found: $NFPM_BIN" >&2
@@ -581,6 +640,19 @@ main() {
     PACKAGE_DIR="$STAGE_ROOT/packages"
     mkdir -m 0700 "$WORK_DIR" "$PACKAGE_DIR"
     trap cleanup_stage EXIT
+
+    # Capture the qualified input into private storage without following a
+    # source symlink raced into place. Validate and package only this copy so
+    # later source-path changes cannot alter the package payload.
+    local VALIDATED_BINARY="$WORK_DIR/qualified-terraphim_server"
+    cp -P --reflink=never -- "$SOURCE_BINARY" "$VALIDATED_BINARY"
+    validate_qualified_binary "$SOURCE_BINARY" "$TARGET" "qualified binary"
+    validate_qualified_binary "$VALIDATED_BINARY" "$TARGET" "staged qualified binary"
+    if ! cmp -s -- "$SOURCE_BINARY" "$VALIDATED_BINARY"; then
+        echo "qualified binary changed while creating the validated private copy: $SOURCE_BINARY" >&2
+        exit 1
+    fi
+    BINARY="$VALIDATED_BINARY"
 
     if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
         if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then

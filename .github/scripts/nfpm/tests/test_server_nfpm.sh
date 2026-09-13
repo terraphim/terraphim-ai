@@ -34,6 +34,184 @@ make_fixture_binary() {
     chmod 0755 "$path"
 }
 
+make_elf_header_fixture() {
+    local path="$1"
+    local machine="$2"
+    mkdir -p "$(dirname "$path")"
+    case "$machine" in
+        x86_64) machine='\x3e\x00' ;;
+        aarch64) machine='\xb7\x00' ;;
+        *) fail "unsupported ELF fixture machine: $machine" ;;
+    esac
+    # A deterministic ELF64 little-endian executable header is sufficient for
+    # source qualification tests; these fixtures are never executed.
+    printf '%b' \
+        "\x7f\x45\x4c\x46\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00${machine}\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x38\x00\x00\x00\x40\x00\x00\x00\x00\x00" > "$path"
+    chmod 0755 "$path"
+}
+
+expect_build_source_fail() {
+    local message="$1"
+    local target="$2"
+    local binary="$3"
+    local label="$4"
+    local log="$TMP/source-$label.log"
+    if "$BUILD" --version 9.8.7 --target "$target" --binary "$binary" \
+        --out-dir "$TMP/source-$label-out" --nfpm /bin/true >"$log" 2>&1; then
+        fail "build accepted unsafe source binary ($label)"
+    fi
+    assert_contains "$log" "$message"
+}
+
+test_build_rejects_unqualified_source_binaries() {
+    local real="$TMP/source-real/terraphim_server"
+    local linked="$TMP/source-linked/terraphim_server"
+    local empty="$TMP/source-empty/terraphim_server"
+    local directory="$TMP/source-directory/terraphim_server"
+    local text="$TMP/source-text/terraphim_server"
+    local arm="$TMP/source-arm/terraphim_server"
+
+    make_elf_header_fixture "$real" x86_64
+    mkdir -p "$(dirname "$linked")" "$(dirname "$empty")"
+    ln -s "$real" "$linked"
+    : > "$empty"
+    mkdir -p "$directory"
+    make_fixture_binary "$text"
+    make_elf_header_fixture "$arm" aarch64
+
+    expect_build_source_fail "qualified binary must be a regular non-symlink file" \
+        x86_64-unknown-linux-musl "$linked" symlink
+    expect_build_source_fail "qualified binary must not be zero-length" \
+        x86_64-unknown-linux-musl "$empty" empty
+    expect_build_source_fail "qualified binary must be a regular non-symlink file" \
+        x86_64-unknown-linux-musl "$directory" directory
+    expect_build_source_fail "qualified binary is not a valid ELF file" \
+        x86_64-unknown-linux-musl "$text" non-elf
+    expect_build_source_fail "qualified binary ELF architecture mismatch" \
+        aarch64-unknown-linux-musl "$real" x86-as-arm
+    expect_build_source_fail "qualified binary ELF architecture mismatch" \
+        x86_64-unknown-linux-musl "$arm" arm-as-x86
+}
+
+make_deb_payload_fixture() {
+    local root="$1"
+    local deb="$2"
+    local payload_type="$3"
+    mkdir -p "$root/DEBIAN" "$root/usr/bin" \
+        "$root/usr/share/terraphim/package-manager.d"
+    case "$payload_type" in
+        symlink)
+            printf 'validated payload\n' > "$root/usr/bin/real_server"
+            ln -s real_server "$root/usr/bin/terraphim_server"
+            ;;
+        empty)
+            : > "$root/usr/bin/terraphim_server"
+            ;;
+        directory)
+            mkdir "$root/usr/bin/terraphim_server"
+            ;;
+        *) fail "unsupported DEB payload fixture type: $payload_type" ;;
+    esac
+    printf 'dpkg\n' > "$root/usr/share/terraphim/package-manager.d/terraphim_server"
+    cat > "$root/DEBIAN/control" <<'EOF'
+Package: terraphim-server
+Version: 9.8.7
+Section: utility
+Priority: optional
+Architecture: amd64
+Maintainer: Terraphim Contributors <team@terraphim.ai>
+Description: Terraphim AI server payload validation fixture
+EOF
+    dpkg-deb --build --root-owner-group "$root" "$deb" >/dev/null
+}
+
+expect_deb_payload_fail() {
+    local payload_type="$1"
+    local expected_sha="$2"
+    local root="$TMP/deb-$payload_type-root"
+    local deb="$TMP/deb-$payload_type.deb"
+    local log="$TMP/deb-$payload_type.log"
+    make_deb_payload_fixture "$root" "$deb" "$payload_type"
+
+    if (
+        TERRAPHIM_BUILD_SERVER_PACKAGES_SOURCED=1 source "$BUILD"
+        WORK_DIR="$TMP/deb-$payload_type-work"
+        DEB_ARCH=amd64
+        EXPECTED_SHA="$expected_sha"
+        mkdir -p "$WORK_DIR"
+        lint_deb() { :; }
+        verify_deb "$deb"
+    ) >"$log" 2>&1; then
+        fail "verify_deb accepted $payload_type payload"
+    fi
+    assert_contains "$log" "extracted DEB payload must be a non-empty regular non-symlink file"
+}
+
+expect_rpm_payload_fail() {
+    local payload_type="$1"
+    local expected_sha="$2"
+    local rpm="$TMP/rpm-$payload_type.rpm"
+    local log="$TMP/rpm-$payload_type.log"
+    printf 'fixture rpm\n' > "$rpm"
+
+    if (
+        TERRAPHIM_BUILD_SERVER_PACKAGES_SOURCED=1 source "$BUILD"
+        WORK_DIR="$TMP/rpm-$payload_type-work"
+        RPM_ARCH=x86_64
+        EXPECTED_SHA="$expected_sha"
+        mkdir -p "$WORK_DIR"
+        docker_rpm_tool() {
+            local extract="$2"
+            local metadata="$4"
+            mkdir -p "$extract/usr/bin" \
+                "$extract/usr/share/terraphim/package-manager.d"
+            case "$payload_type" in
+                symlink)
+                    printf 'validated payload\n' > "$extract/usr/bin/real_server"
+                    ln -s real_server "$extract/usr/bin/terraphim_server"
+                    ;;
+                empty)
+                    : > "$extract/usr/bin/terraphim_server"
+                    ;;
+                directory)
+                    mkdir "$extract/usr/bin/terraphim_server"
+                    ;;
+            esac
+            printf 'rpm\n' > "$extract/usr/share/terraphim/package-manager.d/terraphim_server"
+            printf 'arch=x86_64\nrequires<<EOF\nEOF\nfile_digest=8\n' > "$metadata"
+        }
+        lint_rpm() { :; }
+        command() {
+            if [[ "$1" == "-v" &&
+                ( "$2" == "rpm2cpio" || "$2" == "rpm" || "$2" == "cpio" ) ]]; then
+                return 1
+            fi
+            builtin command "$@"
+        }
+        verify_rpm "$rpm"
+    ) >"$log" 2>&1; then
+        fail "verify_rpm accepted $payload_type payload"
+    fi
+    assert_contains "$log" "extracted RPM payload must be a non-empty regular non-symlink file"
+}
+
+test_extracted_payload_type_and_size_are_rejected() {
+    command -v dpkg-deb >/dev/null 2>&1 || {
+        echo "SKIP: dpkg-deb not installed"
+        return 0
+    }
+    local content_sha empty_sha
+    content_sha="$(printf 'validated payload\n' | sha256sum | awk '{print $1}')"
+    empty_sha="$(sha256sum /dev/null | awk '{print $1}')"
+
+    expect_deb_payload_fail symlink "$content_sha"
+    expect_deb_payload_fail empty "$empty_sha"
+    expect_deb_payload_fail directory "$empty_sha"
+    expect_rpm_payload_fail symlink "$content_sha"
+    expect_rpm_payload_fail empty "$empty_sha"
+    expect_rpm_payload_fail directory "$empty_sha"
+}
+
 test_render_deb_descriptor() {
     local bin="$TMP/target/x86_64-unknown-linux-musl/release/terraphim_server"
     local yaml="$TMP/server-deb.yaml"
@@ -105,7 +283,7 @@ test_render_rejects_gnu_target() {
 
 test_build_reports_missing_nfpm_without_fallback_claim() {
     local bin="$TMP/target/x86_64-unknown-linux-musl/release/terraphim_server"
-    make_fixture_binary "$bin"
+    make_elf_header_fixture "$bin" x86_64
 
     if "$BUILD" --version 9.8.7 --target x86_64-unknown-linux-musl --binary "$bin" --out-dir "$TMP/out" --nfpm "$TMP/missing-nfpm" 2>"$TMP/missing.err"; then
         fail "build succeeded without nFPM"
@@ -118,7 +296,7 @@ test_failed_validation_leaves_no_partial_outputs() {
     local bin="$TMP/partial/terraphim_server"
     local out="$TMP/partial-out"
     local fake_nfpm="$TMP/fake-nfpm"
-    make_fixture_binary "$bin"
+    make_elf_header_fixture "$bin" x86_64
 
     cat > "$fake_nfpm" <<'EOF'
 #!/usr/bin/env bash
@@ -243,6 +421,13 @@ test_build_script_has_cargo_deb_parity_oracle() {
     assert_contains "$BUILD" "cargo-deb/nFPM payload SHA mismatch"
 }
 
+test_build_script_packages_a_validated_private_copy() {
+    assert_contains "$BUILD" 'cp -P --reflink=never -- "$SOURCE_BINARY" "$VALIDATED_BINARY"'
+    assert_contains "$BUILD" 'cmp -s -- "$SOURCE_BINARY" "$VALIDATED_BINARY"'
+    assert_contains "$BUILD" 'BINARY="$VALIDATED_BINARY"'
+    assert_contains "$BUILD" 'EXPECTED_SHA="$(sha256sum "$BINARY"'
+}
+
 test_build_script_fails_closed_on_package_architecture() {
     assert_contains "$BUILD" 'dpkg-deb --field "$pkg" Architecture'
     assert_contains "$BUILD" "DEB arch mismatch expected=\$DEB_ARCH actual=\$pkg_arch"
@@ -352,12 +537,15 @@ test_workflow_installs_hash_pinned_nfpm() {
 test_render_deb_descriptor
 test_render_rpm_descriptor
 test_render_rejects_gnu_target
+test_build_rejects_unqualified_source_binaries
+test_extracted_payload_type_and_size_are_rejected
 test_build_reports_missing_nfpm_without_fallback_claim
 test_failed_validation_leaves_no_partial_outputs
 test_deb_payload_fixture_matches_input_binary
 test_build_script_expects_nfpm_deb_filename
 test_build_script_fails_closed_without_source_date_epoch_fallback
 test_build_script_has_cargo_deb_parity_oracle
+test_build_script_packages_a_validated_private_copy
 test_build_script_has_docker_closed_fallbacks_and_lint
 test_build_script_has_fail_closed_static_musl_lint_policy
 test_build_script_fails_closed_on_package_architecture
