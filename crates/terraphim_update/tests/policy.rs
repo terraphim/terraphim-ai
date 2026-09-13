@@ -75,21 +75,6 @@ fn managed_receipt_path_uses_terraphim_server_key() {
 fn supported_server_receipt_values_are_accepted() {
     let cases = [
         (
-            b"pacman".as_slice(),
-            PackageManager::Pacman,
-            "sudo pacman -Syu",
-        ),
-        (
-            b"pacman\n".as_slice(),
-            PackageManager::Pacman,
-            "sudo pacman -Syu",
-        ),
-        (
-            b"pacman\r\n".as_slice(),
-            PackageManager::Pacman,
-            "sudo pacman -Syu",
-        ),
-        (
             b"dpkg".as_slice(),
             PackageManager::Dpkg,
             "sudo apt update && sudo apt upgrade",
@@ -140,14 +125,14 @@ fn supported_server_receipt_values_are_accepted() {
 }
 
 #[test]
-fn pacman_receipt_is_supported_for_parser_parity() {
+fn unsupported_pacman_receipt_is_self_managed() {
     let root = tempfile::tempdir().expect("tempdir");
     let (prefix, exe) = install_binary(root.path(), "usr", BIN_NAME);
     write_receipt(&prefix, BIN_NAME, b"pacman\n");
 
     let policy = detect_update_policy(&exe);
 
-    assert_managed(policy, PackageManager::Pacman, "sudo pacman -Syu");
+    assert_eq!(policy, UpdatePolicy::SelfManaged);
 }
 
 #[test]
@@ -187,6 +172,21 @@ fn malformed_or_missing_receipts_are_self_managed() {
 }
 
 #[test]
+fn marker_only_and_prefix_only_layouts_are_self_managed() {
+    let root = tempfile::tempdir().expect("tempdir");
+    let marker_only_prefix = root.path().join("marker-only");
+    write_receipt(&marker_only_prefix, BIN_NAME, b"dpkg\n");
+    assert_eq!(
+        detect_update_policy(&marker_only_prefix.join("bin").join(BIN_NAME)),
+        UpdatePolicy::SelfManaged
+    );
+
+    let root = tempfile::tempdir().expect("tempdir");
+    let (_prefix, exe) = install_binary(root.path(), "prefix-only", BIN_NAME);
+    assert_eq!(detect_update_policy(&exe), UpdatePolicy::SelfManaged);
+}
+
+#[test]
 fn mismatched_and_cross_prefix_receipts_are_self_managed() {
     let root = tempfile::tempdir().expect("tempdir");
     let (prefix, exe) = install_binary(root.path(), "usr", BIN_NAME);
@@ -202,13 +202,19 @@ fn mismatched_and_cross_prefix_receipts_are_self_managed() {
 
 #[test]
 fn executable_name_mismatch_is_self_managed() {
-    let root = tempfile::tempdir().expect("tempdir");
-    let (prefix, exe) = install_binary(root.path(), "usr", "terraphim-server");
-    write_receipt(&prefix, BIN_NAME, b"dpkg\n");
+    for executable_name in ["terraphim-server", "terraphim", "terraphim-agent"] {
+        let root = tempfile::tempdir().expect("tempdir");
+        let (prefix, exe) = install_binary(root.path(), "usr", executable_name);
+        write_receipt(&prefix, BIN_NAME, b"dpkg\n");
 
-    let policy = detect_update_policy(&exe);
+        let policy = detect_update_policy(&exe);
 
-    assert_eq!(policy, UpdatePolicy::SelfManaged);
+        assert_eq!(
+            policy,
+            UpdatePolicy::SelfManaged,
+            "unexpected managed policy for executable {executable_name}"
+        );
+    }
 }
 
 #[test]
@@ -219,7 +225,7 @@ fn caller_supplied_bin_name_cannot_bypass_canonical_receipt() {
 
     let policy = detect_update_policy(&exe);
 
-    assert_managed(policy, PackageManager::Rpm, "sudo dnf upgrade");
+    assert_eq!(policy, UpdatePolicy::SelfManaged);
 }
 
 #[test]
@@ -282,6 +288,13 @@ fn inferred_prefix_strips_bin_and_binary_name() {
     let prefix = inferred_prefix(exe);
 
     assert_eq!(prefix, Some(PathBuf::from("/usr/local")));
+}
+
+#[test]
+fn inferred_prefix_rejects_non_server_executable() {
+    let exe = Path::new("/usr/local/bin/terraphim-server");
+
+    assert_eq!(inferred_prefix(exe), None);
 }
 
 #[test]
