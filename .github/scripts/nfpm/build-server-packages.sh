@@ -297,7 +297,58 @@ render_and_build() {
         --binary "$BINARY" \
         --output "$config" >/dev/null
 
-    "$NFPM_BIN" pkg --packager "$format" --config "$config" --target "$OUT_DIR"
+    "$NFPM_BIN" pkg --packager "$format" --config "$config" --target "$PACKAGE_DIR"
+}
+
+cleanup_stage() {
+    local rc=$?
+    trap - EXIT
+    if [[ -n "${STAGE_ROOT:-}" && -n "${STAGE_PARENT:-}" &&
+        "$(dirname -- "$STAGE_ROOT")" == "$STAGE_PARENT" &&
+        "$(basename -- "$STAGE_ROOT")" == .terraphim-server-nfpm.* &&
+        ( -e "$STAGE_ROOT" || -L "$STAGE_ROOT" ) ]]; then
+        # rm does not dereference a symlink supplied as its command-line
+        # operand. The constrained mktemp basename prevents a broad target.
+        rm -rf -- "$STAGE_ROOT" || true
+    fi
+    exit "$rc"
+}
+
+require_safe_empty_output_dir() {
+    if [[ -L "$OUT_DIR" || ( -e "$OUT_DIR" && ! -d "$OUT_DIR" ) ]]; then
+        echo "unsafe output directory (must be a regular directory, not a symlink): $OUT_DIR" >&2
+        exit 1
+    fi
+    if [[ -d "$OUT_DIR" ]] && find "$OUT_DIR" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+        echo "output directory must be empty; refusing to delete pre-existing data: $OUT_DIR" >&2
+        exit 1
+    fi
+}
+
+validate_publish_inventory() {
+    local expected_deb="$1"
+    local expected_rpm="$2"
+    local expected_sums="$3"
+    local path base count=0
+
+    while IFS= read -r -d '' path; do
+        if [[ -L "$path" || ! -f "$path" || ! -s "$path" ]]; then
+            echo "staged package output must be a non-empty regular non-symlink file: $path" >&2
+            exit 1
+        fi
+        base="$(basename "$path")"
+        if [[ "$base" != "$expected_deb" && "$base" != "$expected_rpm" && "$base" != "$expected_sums" ]]; then
+            echo "unexpected staged package output: $path" >&2
+            exit 1
+        fi
+        count=$((count + 1))
+    done < <(find "$PACKAGE_DIR" -mindepth 1 -maxdepth 1 -print0)
+
+    [[ "$count" -eq 3 && -f "$PACKAGE_DIR/$expected_deb" &&
+        -f "$PACKAGE_DIR/$expected_rpm" && -f "$PACKAGE_DIR/$expected_sums" ]] || {
+        echo "staged package inventory is incomplete" >&2
+        exit 1
+    }
 }
 
 verify_deb() {
@@ -513,14 +564,23 @@ main() {
         exit 127
     fi
 
-    local ROOT RENDER
+    local ROOT RENDER OUT_PARENT OUT_BASE
     ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
     RENDER="$ROOT/.github/scripts/nfpm/render-server-nfpm.sh"
-    mkdir -p "$OUT_DIR"
-    # WORK_DIR/EXPECTED_SHA stay global: verify_* helpers and the EXIT trap
-    # (which fires after main returns) reference them.
-    WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/terraphim-server-nfpm.XXXXXX")"
-    trap 'rm -rf "$WORK_DIR"' EXIT
+    OUT_PARENT="$(dirname -- "$OUT_DIR")"
+    OUT_BASE="$(basename -- "$OUT_DIR")"
+    mkdir -p "$OUT_PARENT"
+    OUT_DIR="$OUT_PARENT/$OUT_BASE"
+    require_safe_empty_output_dir
+
+    # Stage on the output filesystem so publishing can replace the empty
+    # destination with one directory rename after every validation passes.
+    STAGE_PARENT="$OUT_PARENT"
+    STAGE_ROOT="$(mktemp -d "$STAGE_PARENT/.terraphim-server-nfpm.XXXXXX")"
+    WORK_DIR="$STAGE_ROOT/work"
+    PACKAGE_DIR="$STAGE_ROOT/packages"
+    mkdir -m 0700 "$WORK_DIR" "$PACKAGE_DIR"
+    trap cleanup_stage EXIT
 
     if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
         if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -538,9 +598,12 @@ main() {
     render_and_build deb
     render_and_build rpm
 
-    local DEB RPM
-    DEB="$OUT_DIR/terraphim-server_${VERSION}-1_${DEB_ARCH}.deb"
-    RPM="$OUT_DIR/terraphim-server-${VERSION}-1.${RPM_ARCH}.rpm"
+    local DEB RPM DEB_BASE RPM_BASE SUMS_BASE
+    DEB_BASE="terraphim-server_${VERSION}-1_${DEB_ARCH}.deb"
+    RPM_BASE="terraphim-server-${VERSION}-1.${RPM_ARCH}.rpm"
+    SUMS_BASE="terraphim-server-${VERSION}-${TARGET}.package-sha256sums.txt"
+    DEB="$PACKAGE_DIR/$DEB_BASE"
+    RPM="$PACKAGE_DIR/$RPM_BASE"
 
     verify_deb "$DEB"
     verify_rpm "$RPM"
@@ -548,7 +611,14 @@ main() {
         verify_cargo_deb_parity "$CARGO_DEB_DIR"
     fi
 
-    sha256sum "$DEB" "$RPM" > "$OUT_DIR/terraphim-server-${VERSION}-${TARGET}.package-sha256sums.txt"
+    (cd "$PACKAGE_DIR" && sha256sum "$DEB_BASE" "$RPM_BASE" > "$SUMS_BASE")
+    validate_publish_inventory "$DEB_BASE" "$RPM_BASE" "$SUMS_BASE"
+
+    # Recheck immediately before publication. GNU mv -T treats OUT_DIR as the
+    # exact destination and atomically replaces an empty directory without
+    # traversing a raced symlink or nesting packages inside a raced directory.
+    require_safe_empty_output_dir
+    mv -T -- "$PACKAGE_DIR" "$OUT_DIR"
     printf 'package payload ok %s %s\n' "$TARGET" "$EXPECTED_SHA"
 }
 
