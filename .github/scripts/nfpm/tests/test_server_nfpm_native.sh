@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 # Native gate for terraphim_server nFPM packages.
+#
+# REQUIRE_INSTALL semantics (fail closed):
+#   REQUIRE_INSTALL=0  -> install/upgrade/remove lifecycle is skipped with an
+#                         explicit qualification message (byte/metadata/lint
+#                         checks still run before this point in the gate).
+#   REQUIRE_INSTALL=1  -> the install/upgrade/remove lifecycle MUST run.
+#                         If the target triple is non-native on this host the
+#                         gate fails; there is no successful QUALIFIED skip.
+#                         The release workflow must therefore set
+#                         REQUIRE_INSTALL=1 only where execution is genuinely
+#                         possible and explicitly qualify cross targets with
+#                         REQUIRE_INSTALL=0.
 
 set -euo pipefail
 
@@ -43,23 +55,36 @@ is_native_target() {
 
 require_install_path() {
     local package_type="$1"
-    if [[ "$REQUIRE_INSTALL" == "0" ]]; then
-        echo "SKIP: $package_type install/upgrade/remove gate disabled by REQUIRE_INSTALL=0"
-        return 1
-    fi
-
     echo "BLOCKED: $package_type install/upgrade/remove gate requires host root or Docker for native target $TARGET" >&2
     exit 127
 }
 
-# The fixture must be a real dynamically-linked executable, not a shell script
-# (rpmlint E: no-binary) and not a static one (lintian E:
-# statically-linked-binary). Compilation is deterministic for a fixed
-# compiler/flag set, and the production qualified-byte checks still compare
-# exact SHA-256 of whatever input binary is provided.
+# Fixture binaries.
+#
+# Native target: a real dynamically-linked executable compiled with the host
+# C compiler (not a shell script: rpmlint E: no-binary; not static: lintian
+# E: statically-linked-binary). The native install lifecycle executes it
+# (--version must print the new version after upgrade). Compilation is
+# deterministic for a fixed compiler/flag set, and the production
+# qualified-byte checks still compare exact SHA-256 of whatever input binary
+# is provided.
+#
+# Cross target: a deterministic minimal ELF for the target architecture
+# (correct e_machine, PT_INTERP plus PT_DYNAMIC with DT_NEEDED so lintian and
+# rpmlint see a dynamically linked foreign-arch binary, PT_GNU_STACK to avoid
+# hardening noise). Cross fixtures are never executed: cross-target gates
+# QUALIFY byte/metadata/lint only, so deterministic exact bytes are the
+# property under test.
 make_binary() {
     local path="$1"
     local version="$2"
+
+    mkdir -p "$(dirname "$path")"
+
+    if ! is_native_target; then
+        write_cross_elf_fixture "$path"
+        return 0
+    fi
     local cc_bin=""
     local candidate
     for candidate in "${CC:-}" cc gcc clang; do
@@ -73,7 +98,6 @@ make_binary() {
         exit 127
     }
 
-    mkdir -p "$(dirname "$path")"
     local src="$path.fixture.c"
     cat > "$src" <<'EOF'
 #include <stdio.h>
@@ -203,12 +227,32 @@ inspect_rpm() {
     }
 }
 
+write_cross_elf_fixture() {
+    local path="$1"
+    case "$TARGET" in
+        aarch64-unknown-linux-musl)
+            printf '%b' \
+                '\x7f\x45\x4c\x46\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00\x01\x00\x00\x00\x60\x01\x40\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x38\x00\x04\x00\x40\x00\x00\x00\x00\x00\x01\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x85\x01\x00\x00\x00\x00\x00\x00\x85\x01\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x04\x00\x00\x00\x60\x01\x00\x00\x00\x00\x00\x00\x60\x01\x40\x00\x00\x00\x00\x00\x60\x01\x40\x00\x00\x00\x00\x00\x1b\x00\x00\x00\x00\x00\x00\x00\x1b\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x06\x00\x00\x00\x20\x01\x00\x00\x00\x00\x00\x00\x20\x01\x40\x00\x00\x00\x00\x00\x20\x01\x40\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00\x51\xe5\x74\x64\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x7b\x01\x40\x00\x00\x00\x00\x00\x0a\x00\x00\x00\x00\x00\x00\x00\x0a\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x2f\x6c\x69\x62\x2f\x6c\x64\x2d\x6c\x69\x6e\x75\x78\x2d\x61\x61\x72\x63\x68\x36\x34\x2e\x73\x6f\x2e\x31\x00\x6c\x69\x62\x63\x2e\x73\x6f\x2e\x36\x00' > "$path"
+            ;;
+        x86_64-unknown-linux-musl)
+            printf '%b' \
+                '\x7f\x45\x4c\x46\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00\x01\x00\x00\x00\x60\x01\x40\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x38\x00\x04\x00\x40\x00\x00\x00\x00\x00\x01\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x86\x01\x00\x00\x00\x00\x00\x00\x86\x01\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x04\x00\x00\x00\x60\x01\x00\x00\x00\x00\x00\x00\x60\x01\x40\x00\x00\x00\x00\x00\x60\x01\x40\x00\x00\x00\x00\x00\x1c\x00\x00\x00\x00\x00\x00\x00\x1c\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x06\x00\x00\x00\x20\x01\x00\x00\x00\x00\x00\x00\x20\x01\x40\x00\x00\x00\x00\x00\x20\x01\x40\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00\x51\xe5\x74\x64\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x7c\x01\x40\x00\x00\x00\x00\x00\x0a\x00\x00\x00\x00\x00\x00\x00\x0a\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x2f\x6c\x69\x62\x36\x34\x2f\x6c\x64\x2d\x6c\x69\x6e\x75\x78\x2d\x78\x38\x36\x2d\x36\x34\x2e\x73\x6f\x2e\x32\x00\x6c\x69\x62\x63\x2e\x73\x6f\x2e\x36\x00' > "$path"
+            ;;
+        *)
+            echo "unsupported cross fixture target: $TARGET" >&2
+            exit 2
+            ;;
+    esac
+    chmod 0755 "$path"
+}
+
 install_upgrade_remove_deb_host() {
     local old_deb="$1"
     local new_deb="$2"
 
     dpkg -i "$old_deb"
     dpkg-query -S /usr/bin/terraphim_server >/dev/null
+    dpkg-query -S /usr/share/terraphim/package-manager.d/terraphim_server >/dev/null
     [[ "$(stat -c '%U:%G %a' /usr/bin/terraphim_server)" == "root:root 755" ]]
     grep -qx 'dpkg' /usr/share/terraphim/package-manager.d/terraphim_server
     dpkg -i "$new_deb"
@@ -229,6 +273,7 @@ install_upgrade_remove_deb_docker() {
         sh -euxc '
             dpkg -i /old.deb
             dpkg-query -S /usr/bin/terraphim_server >/dev/null
+            dpkg-query -S /usr/share/terraphim/package-manager.d/terraphim_server >/dev/null
             test "$(stat -c "%U:%G %a" /usr/bin/terraphim_server)" = "root:root 755"
             grep -qx dpkg /usr/share/terraphim/package-manager.d/terraphim_server
             dpkg -i /new.deb
@@ -244,6 +289,7 @@ install_upgrade_remove_rpm_host() {
 
     rpm -Uvh "$old_rpm"
     rpm -qf /usr/bin/terraphim_server >/dev/null
+    rpm -qf /usr/share/terraphim/package-manager.d/terraphim_server >/dev/null
     [[ "$(stat -c '%U:%G %a' /usr/bin/terraphim_server)" == "root:root 755" ]]
     grep -qx 'rpm' /usr/share/terraphim/package-manager.d/terraphim_server
     rpm -Uvh "$new_rpm"
@@ -274,6 +320,7 @@ install_upgrade_remove_rpm_docker() {
             fi
             rpm -Uvh /old.rpm
             rpm -qf /usr/bin/terraphim_server >/dev/null
+            rpm -qf /usr/share/terraphim/package-manager.d/terraphim_server >/dev/null
             test "$(stat -c "%U:%G %a" /usr/bin/terraphim_server)" = "root:root 755"
             grep -qx rpm /usr/share/terraphim/package-manager.d/terraphim_server
             rpm -Uvh /new.rpm
@@ -287,9 +334,18 @@ install_upgrade_remove_deb() {
     local old_deb="$1"
     local new_deb="$2"
 
-    if ! is_native_target; then
-        echo "QUALIFIED: $TARGET DEB byte/metadata/lint checks passed; install lifecycle is native-only"
+    if [[ "$REQUIRE_INSTALL" == "0" ]]; then
+        if ! is_native_target; then
+            echo "QUALIFIED: $TARGET DEB byte/metadata/lint checks passed; install lifecycle skipped for non-native target (REQUIRE_INSTALL=0)"
+        else
+            echo "SKIP: DEB install/upgrade/remove gate disabled by REQUIRE_INSTALL=0 for native target $TARGET"
+        fi
         return 0
+    fi
+
+    if ! is_native_target; then
+        echo "BLOCKED: REQUIRE_INSTALL=1 requires the DEB install/upgrade/remove gate, but target $TARGET is non-native on $(uname -m); cross-target byte/metadata/lint-only qualification must be requested explicitly with REQUIRE_INSTALL=0" >&2
+        exit 1
     fi
 
     if [[ "$(id -u)" -eq 0 ]] && command -v dpkg >/dev/null 2>&1; then
@@ -305,9 +361,18 @@ install_upgrade_remove_rpm() {
     local old_rpm="$1"
     local new_rpm="$2"
 
-    if ! is_native_target; then
-        echo "QUALIFIED: $TARGET RPM byte/metadata/lint checks passed; install lifecycle is native-only"
+    if [[ "$REQUIRE_INSTALL" == "0" ]]; then
+        if ! is_native_target; then
+            echo "QUALIFIED: $TARGET RPM byte/metadata/lint checks passed; install lifecycle skipped for non-native target (REQUIRE_INSTALL=0)"
+        else
+            echo "SKIP: RPM install/upgrade/remove gate disabled by REQUIRE_INSTALL=0 for native target $TARGET"
+        fi
         return 0
+    fi
+
+    if ! is_native_target; then
+        echo "BLOCKED: REQUIRE_INSTALL=1 requires the RPM install/upgrade/remove gate, but target $TARGET is non-native on $(uname -m); cross-target byte/metadata/lint-only qualification must be requested explicitly with REQUIRE_INSTALL=0" >&2
+        exit 1
     fi
 
     if [[ "$(id -u)" -eq 0 ]] && command -v rpm >/dev/null 2>&1; then
@@ -319,37 +384,46 @@ install_upgrade_remove_rpm() {
     fi
 }
 
-command -v "$NFPM_BIN" >/dev/null 2>&1 || {
-    echo "BLOCKED: nFPM is required for native gate: $NFPM_BIN" >&2
-    exit 127
+main() {
+    command -v "$NFPM_BIN" >/dev/null 2>&1 || {
+        echo "BLOCKED: nFPM is required for native gate: $NFPM_BIN" >&2
+        exit 127
+    }
+
+    export SOURCE_DATE_EPOCH=1700000000
+    local OLD_BIN="$TMP/v-old/terraphim_server"
+    local NEW_BIN="$TMP/v-new/terraphim_server"
+    make_binary "$OLD_BIN" "$VERSION_OLD"
+    make_binary "$NEW_BIN" "$VERSION_NEW"
+
+    "$BUILD" --version "$VERSION_OLD" --target "$TARGET" --binary "$OLD_BIN" --out-dir "$TMP/out-old" --nfpm "$NFPM_BIN"
+    "$BUILD" --version "$VERSION_NEW" --target "$TARGET" --binary "$NEW_BIN" --out-dir "$TMP/out-new-a" --nfpm "$NFPM_BIN"
+    "$BUILD" --version "$VERSION_NEW" --target "$TARGET" --binary "$NEW_BIN" --out-dir "$TMP/out-new-b" --nfpm "$NFPM_BIN"
+
+    local OLD_DEB="$TMP/out-old/terraphim-server_${VERSION_OLD}-1_${DEB_ARCH}.deb"
+    local NEW_DEB_A="$TMP/out-new-a/terraphim-server_${VERSION_NEW}-1_${DEB_ARCH}.deb"
+    local NEW_DEB_B="$TMP/out-new-b/terraphim-server_${VERSION_NEW}-1_${DEB_ARCH}.deb"
+    local OLD_RPM="$TMP/out-old/terraphim-server-${VERSION_OLD}-1.${RPM_ARCH}.rpm"
+    local NEW_RPM_A="$TMP/out-new-a/terraphim-server-${VERSION_NEW}-1.${RPM_ARCH}.rpm"
+    local NEW_RPM_B="$TMP/out-new-b/terraphim-server-${VERSION_NEW}-1.${RPM_ARCH}.rpm"
+
+    inspect_deb "$OLD_DEB" "$OLD_BIN"
+    inspect_deb "$NEW_DEB_A" "$NEW_BIN"
+    inspect_rpm "$OLD_RPM" "$OLD_BIN"
+    inspect_rpm "$NEW_RPM_A" "$NEW_BIN"
+
+    cmp "$NEW_DEB_A" "$NEW_DEB_B"
+    cmp "$NEW_RPM_A" "$NEW_RPM_B"
+
+    install_upgrade_remove_deb "$OLD_DEB" "$NEW_DEB_A"
+    install_upgrade_remove_rpm "$OLD_RPM" "$NEW_RPM_A"
+
+    echo "server nFPM native gate passed for $TARGET"
 }
 
-export SOURCE_DATE_EPOCH=1700000000
-OLD_BIN="$TMP/v-old/terraphim_server"
-NEW_BIN="$TMP/v-new/terraphim_server"
-make_binary "$OLD_BIN" "$VERSION_OLD"
-make_binary "$NEW_BIN" "$VERSION_NEW"
-
-"$BUILD" --version "$VERSION_OLD" --target "$TARGET" --binary "$OLD_BIN" --out-dir "$TMP/out-old" --nfpm "$NFPM_BIN"
-"$BUILD" --version "$VERSION_NEW" --target "$TARGET" --binary "$NEW_BIN" --out-dir "$TMP/out-new-a" --nfpm "$NFPM_BIN"
-"$BUILD" --version "$VERSION_NEW" --target "$TARGET" --binary "$NEW_BIN" --out-dir "$TMP/out-new-b" --nfpm "$NFPM_BIN"
-
-OLD_DEB="$TMP/out-old/terraphim-server_${VERSION_OLD}-1_${DEB_ARCH}.deb"
-NEW_DEB_A="$TMP/out-new-a/terraphim-server_${VERSION_NEW}-1_${DEB_ARCH}.deb"
-NEW_DEB_B="$TMP/out-new-b/terraphim-server_${VERSION_NEW}-1_${DEB_ARCH}.deb"
-OLD_RPM="$TMP/out-old/terraphim-server-${VERSION_OLD}-1.${RPM_ARCH}.rpm"
-NEW_RPM_A="$TMP/out-new-a/terraphim-server-${VERSION_NEW}-1.${RPM_ARCH}.rpm"
-NEW_RPM_B="$TMP/out-new-b/terraphim-server-${VERSION_NEW}-1.${RPM_ARCH}.rpm"
-
-inspect_deb "$OLD_DEB" "$OLD_BIN"
-inspect_deb "$NEW_DEB_A" "$NEW_BIN"
-inspect_rpm "$OLD_RPM" "$OLD_BIN"
-inspect_rpm "$NEW_RPM_A" "$NEW_BIN"
-
-cmp "$NEW_DEB_A" "$NEW_DEB_B"
-cmp "$NEW_RPM_A" "$NEW_RPM_B"
-
-install_upgrade_remove_deb "$OLD_DEB" "$NEW_DEB_A"
-install_upgrade_remove_rpm "$OLD_RPM" "$NEW_RPM_A"
-
-echo "server nFPM native gate passed for $TARGET"
+# Policy regression tests source this script with
+# TERRAPHIM_SERVER_NFPM_NATIVE_SOURCED=1 to drive
+# install_upgrade_remove_deb/rpm directly on fixture packages.
+if [[ "${TERRAPHIM_SERVER_NFPM_NATIVE_SOURCED:-0}" != "1" ]]; then
+    main "$@"
+fi

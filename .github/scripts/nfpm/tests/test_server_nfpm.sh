@@ -167,6 +167,73 @@ test_build_script_has_cargo_deb_parity_oracle() {
     assert_contains "$BUILD" "cargo-deb/nFPM payload SHA mismatch"
 }
 
+test_build_script_fails_closed_on_package_architecture() {
+    assert_contains "$BUILD" 'dpkg-deb --field "$pkg" Architecture'
+    assert_contains "$BUILD" "DEB arch mismatch expected=\$DEB_ARCH actual=\$pkg_arch"
+    assert_contains "$BUILD" "sed -n 's/^arch=//p' \"\$metadata\""
+    assert_contains "$BUILD" "rpm -qp --qf '%{ARCH}' \"\$pkg\""
+    assert_contains "$BUILD" "RPM arch mismatch expected=\$RPM_ARCH actual=\$pkg_arch"
+    assert_contains "$BUILD" "cargo-deb arch mismatch expected=\$DEB_ARCH actual=\$cargo_arch"
+}
+
+test_native_gate_require_install_policy_and_receipt_ownership() {
+    local native="$ROOT/.github/scripts/nfpm/tests/test_server_nfpm_native.sh"
+
+    assert_contains "$native" "REQUIRE_INSTALL=1 requires the DEB install/upgrade/remove gate"
+    assert_contains "$native" "REQUIRE_INSTALL=1 requires the RPM install/upgrade/remove gate"
+    assert_contains "$native" "QUALIFIED: \$TARGET DEB byte/metadata/lint checks passed"
+    assert_contains "$native" "QUALIFIED: \$TARGET RPM byte/metadata/lint checks passed"
+    # Receipt ownership: the package-manager.d receipt must be owned by the
+    # package manager database, not only the binary.
+    assert_contains "$native" "dpkg-query -S /usr/share/terraphim/package-manager.d/terraphim_server"
+    assert_contains "$native" "rpm -qf /usr/share/terraphim/package-manager.d/terraphim_server"
+}
+
+test_native_gate_builds_cross_arch_elf_fixture_for_lint() {
+    local native="$ROOT/.github/scripts/nfpm/tests/test_server_nfpm_native.sh"
+
+    # Cross targets package a deterministic arch-correct ELF (correct
+    # e_machine, PT_INTERP + PT_DYNAMIC/DT_NEEDED) so lintian/rpmlint see a
+    # dynamically linked foreign-arch binary; cross fixtures are never
+    # executed (install lifecycle is native-only).
+    assert_contains "$native" "write_cross_elf_fixture"
+    assert_contains "$native" "if ! is_native_target; then"
+    assert_contains "$native" 'write_cross_elf_fixture "$path"'
+}
+
+test_workflow_builds_per_target_cargo_deb_parity_from_qualified_musl() {
+    local workflow="$ROOT/.github/workflows/release-comprehensive.yml"
+
+    assert_contains "$workflow" "NFPM_ARCHIVE_SHA256: 0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783"
+    assert_contains "$workflow" "NFPM_BINARY_SHA256: 17133a2467ffb7cec851c2d7bae0c6098d09d7ed7d3d101a9605f6a473323936"
+    assert_contains "$workflow" ".github/scripts/nfpm/verify-nfpm.sh"
+    assert_contains "$workflow" "test_server_nfpm_native.sh"
+    # Parity is built per matrix target from the exact qualified MUSL bytes
+    # staged into the cargo-deb assets path; never from a host-native build.
+    assert_contains "$workflow" 'cp "$BIN" "target/${TARGET}/release/terraphim_server"'
+    assert_contains "$workflow" "--no-build --no-strip"
+    assert_contains "$workflow" '--output "cargo-deb-parity/${TARGET}"'
+    assert_contains "$workflow" '--cargo-deb-dir "cargo-deb-parity/${TARGET}"'
+    assert_not_contains "$workflow" "cargo-deb-artifact"
+    # REQUIRE_INSTALL=1 only where the target triple matches the runner arch.
+    assert_contains "$workflow" "runner.arch == 'X64' && matrix.target == 'x86_64-unknown-linux-musl'"
+    assert_contains "$workflow" "runner.arch == 'ARM64' && matrix.target == 'aarch64-unknown-linux-musl'"
+}
+
+test_workflow_assembles_managed_release_inventory() {
+    local workflow="$ROOT/.github/workflows/release-comprehensive.yml"
+
+    assert_contains "$workflow" "assemble-release-inventory.sh"
+    assert_contains "$workflow" "pattern: server-managed-packages-*"
+    assert_contains "$workflow" "--managed-target x86_64-unknown-linux-musl"
+    assert_contains "$workflow" "--managed-target aarch64-unknown-linux-musl"
+    # The authoritative release paths are managed-only: the legacy
+    # cargo-deb DEB shares its canonical basename with the managed x86_64
+    # DEB, so merging both stages can only fail on duplicate rejection.
+    assert_not_contains "$workflow" "path: legacy-deb"
+    assert_not_contains "$workflow" "--legacy legacy-deb"
+}
+
 test_build_script_has_docker_closed_fallbacks_and_lint() {
     assert_contains "$BUILD" "docker_rpm_tool"
     assert_contains "$BUILD" "require_docker_or_fail"
@@ -176,14 +243,33 @@ test_build_script_has_docker_closed_fallbacks_and_lint() {
     assert_contains "$BUILD" "RPM payload and metadata verification"
 }
 
-test_workflow_installs_hash_pinned_nfpm_and_downloads_cargo_deb() {
+test_build_script_has_fail_closed_static_musl_lint_policy() {
+    # The only allowlisted lint error is the exact justified static-MUSL
+    # diagnostic for terraphim-server at usr/bin/terraphim_server; the
+    # fail-closed parser is shared by the host and Docker lint paths.
+    assert_contains "$BUILD" "LINTIAN_JUSTIFIED_STATIC_E='E: terraphim-server: statically-linked-binary [usr/bin/terraphim_server]'"
+    assert_contains "$BUILD" 'statically-linked-binary /usr/bin/terraphim_server$'
+    assert_contains "$BUILD" "enforce_lint_policy lintian"
+    assert_contains "$BUILD" "enforce_lint_policy rpmlint"
+    assert_contains "$BUILD" "unjustified error"
+    assert_contains "$BUILD" "tool/install/transport failure"
+    assert_contains "$BUILD" "no error line could be parsed"
+    assert_contains "$BUILD" "contains error lines"
+    assert_contains "$BUILD" "justified static-MUSL diagnostic more than once"
+    assert_contains "$BUILD" "empty lint output"
+    assert_contains "$BUILD" "--tag-display-limit 0"
+    # Broad tag suppression is a forbidden policy escape hatch.
+    assert_not_contains "$BUILD" "--suppress-tags"
+    assert_not_contains "$BUILD" "--suppress-tags-from-file"
+}
+
+test_workflow_installs_hash_pinned_nfpm() {
     local workflow="$ROOT/.github/workflows/release-comprehensive.yml"
 
     assert_contains "$workflow" "NFPM_ARCHIVE_SHA256: 0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783"
     assert_contains "$workflow" "NFPM_BINARY_SHA256: 17133a2467ffb7cec851c2d7bae0c6098d09d7ed7d3d101a9605f6a473323936"
     assert_contains "$workflow" ".github/scripts/nfpm/verify-nfpm.sh"
     assert_contains "$workflow" "name: debian-packages"
-    assert_contains "$workflow" "--cargo-deb-dir cargo-deb-artifact"
     assert_contains "$workflow" "test_server_nfpm_native.sh"
 }
 
@@ -196,6 +282,12 @@ test_build_script_expects_nfpm_deb_filename
 test_build_script_fails_closed_without_source_date_epoch_fallback
 test_build_script_has_cargo_deb_parity_oracle
 test_build_script_has_docker_closed_fallbacks_and_lint
-test_workflow_installs_hash_pinned_nfpm_and_downloads_cargo_deb
+test_build_script_has_fail_closed_static_musl_lint_policy
+test_build_script_fails_closed_on_package_architecture
+test_native_gate_require_install_policy_and_receipt_ownership
+test_native_gate_builds_cross_arch_elf_fixture_for_lint
+test_workflow_builds_per_target_cargo_deb_parity_from_qualified_musl
+test_workflow_assembles_managed_release_inventory
+test_workflow_installs_hash_pinned_nfpm
 
 echo "server nFPM tests passed"

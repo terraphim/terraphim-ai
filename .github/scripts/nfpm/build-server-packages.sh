@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Wrap qualified terraphim_server MUSL binaries into managed DEB/RPM packages.
+#
+# Fails closed on architecture: the produced DEB must declare Architecture ==
+# DEB_ARCH for the requested target and the produced RPM must carry
+# ARCH == RPM_ARCH (consumed from the Docker RPM metadata when host rpm
+# tooling is unavailable). The optional cargo-deb parity package must carry
+# the same DEB_ARCH and the exact payload bytes.
 
 set -euo pipefail
 
@@ -14,102 +20,17 @@ or the arm64/aarch64 equivalents.
 EOF
 }
 
-VERSION=""
-TARGET=""
-BINARY=""
-OUT_DIR=""
-NFPM_BIN="${NFPM_BIN:-nfpm}"
-CARGO_DEB_DIR=""
-
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --version)
-            VERSION="${2:-}"
-            shift 2
-            ;;
-        --target)
-            TARGET="${2:-}"
-            shift 2
-            ;;
-        --binary)
-            BINARY="${2:-}"
-            shift 2
-            ;;
-        --out-dir)
-            OUT_DIR="${2:-}"
-            shift 2
-            ;;
-        --nfpm)
-            NFPM_BIN="${2:-}"
-            shift 2
-            ;;
-        --cargo-deb-dir)
-            CARGO_DEB_DIR="${2:-}"
-            shift 2
-            ;;
-        -h|--help)
-            usage
-            exit 0
-            ;;
-        *)
-            usage
-            exit 2
-            ;;
-    esac
-done
-
-if [[ -z "$VERSION" || -z "$TARGET" || -z "$BINARY" || -z "$OUT_DIR" ]]; then
-    usage
-    exit 2
-fi
-
-case "$TARGET" in
-    x86_64-unknown-linux-musl)
-        DEB_ARCH="amd64"
-        RPM_ARCH="x86_64"
-        ;;
-    aarch64-unknown-linux-musl)
-        DEB_ARCH="arm64"
-        RPM_ARCH="aarch64"
-        ;;
-    *)
-        echo "unsupported server package target: $TARGET" >&2
-        exit 2
-        ;;
-esac
-
-if [[ ! -f "$BINARY" ]]; then
-    echo "missing qualified binary: $BINARY" >&2
-    exit 1
-fi
-
-if ! command -v "$NFPM_BIN" >/dev/null 2>&1; then
-    echo "nFPM is required for managed package production; not found: $NFPM_BIN" >&2
-    echo "retain the existing cargo-deb parity path until the nFPM native gates pass" >&2
-    exit 127
-fi
-
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-RENDER="$ROOT/.github/scripts/nfpm/render-server-nfpm.sh"
-mkdir -p "$OUT_DIR"
-WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/terraphim-server-nfpm.XXXXXX")"
-trap 'rm -rf "$WORK_DIR"' EXIT
+FORBIDDEN_MUSL_DEPS_RE='(^|[[:space:],|])((lib)?c6|glibc|gcc-libs|libstdc\+\+|libstdc\+\+6|libgcc|libgcc_s|libgcc-s1)([[:space:],|]|$)'
 DEB_LINT_IMAGE="${DEB_LINT_IMAGE:-debian:bookworm-slim}"
 RPM_LINT_IMAGE="${RPM_LINT_IMAGE:-fedora:latest}"
 RPM_TOOL_IMAGE="${RPM_TOOL_IMAGE:-fedora:latest}"
 
-if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
-    if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        export SOURCE_DATE_EPOCH
-        SOURCE_DATE_EPOCH="$(git -C "$ROOT" log -1 --format=%ct)"
-    else
-        echo "SOURCE_DATE_EPOCH is required outside a git worktree" >&2
-        exit 1
-    fi
-fi
-
-EXPECTED_SHA="$(sha256sum "$BINARY" | awk '{print $1}')"
-FORBIDDEN_MUSL_DEPS_RE='(^|[[:space:],|])((lib)?c6|glibc|gcc-libs|libstdc\+\+|libstdc\+\+6|libgcc|libgcc_s|libgcc-s1)([[:space:],|]|$)'
+# The single justified lint error: the qualified MUSL server binary is
+# intentionally fully static, and both lintian and rpmlint report exactly
+# this fact for package terraphim-server at path usr/bin/terraphim_server:
+#   lintian: E: terraphim-server: statically-linked-binary [usr/bin/terraphim_server]
+#   rpmlint: terraphim-server.<arch>: E: statically-linked-binary /usr/bin/terraphim_server
+LINTIAN_JUSTIFIED_STATIC_E='E: terraphim-server: statically-linked-binary [usr/bin/terraphim_server]'
 
 docker_available() {
     command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1
@@ -123,47 +44,198 @@ require_docker_or_fail() {
     }
 }
 
-lint_deb() {
-    local pkg="$1"
-    if command -v lintian >/dev/null 2>&1; then
-        lintian --fail-on error "$pkg"
-        return 0
+# Fail-closed lint result policy shared by the host and Docker lint paths.
+#
+# The only tolerated lint error is the exact justified static-MUSL
+# diagnostic (LINTIAN_JUSTIFIED_STATIC_E / the rpmlint equivalent for the
+# requested RPM_ARCH), and only once. Everything else fails the build:
+#   * any other error line, whatever the tag;
+#   * a wrong package or a wrong path variant of the static diagnostic;
+#   * a malformed variant or a duplicate of the justified line;
+#   * a tool, installer or transport failure: any exit status outside the
+#     tool's documented clean/errors pair (lintian: 0 clean, 2 errors;
+#     rpmlint: 0 clean, 64 errors, 65 promoted-errors);
+#   * an inconsistent result: an errors exit without a parseable error
+#     line (lintian also exits 2 for an unreadable input), or a clean
+#     exit with error lines in the output.
+# Warnings remain nonfatal per the established `--fail-on error` lint
+# policy. The complete raw transport and lint output is echoed as
+# evidence before the verdict.
+enforce_lint_policy() {
+    local tool="$1"
+    local pkg="$2"
+    local log="$3"
+    local rc="$4"
+    local transport="$5"
+
+    echo "----- $tool transport log for $(basename "$pkg") -----"
+    cat "$transport" 2>/dev/null || true
+    echo "----- $tool raw lint output for $(basename "$pkg") (exit $rc) -----"
+    cat "$log" 2>/dev/null || true
+    echo "----- end $tool evidence for $(basename "$pkg") -----"
+
+    if [[ ! -f "$log" ]]; then
+        echo "$tool produced no lint output file for $pkg" >&2
+        exit 1
     fi
 
-    require_docker_or_fail "DEB linting"
-    docker run --rm -v "$(realpath "$pkg"):/pkg.deb:ro" "$DEB_LINT_IMAGE" sh -euxc '
-        export DEBIAN_FRONTEND=noninteractive
-        apt-get update
-        apt-get install -y --no-install-recommends lintian
-        lintian --fail-on error /pkg.deb
-    '
+    local -a error_rcs=()
+    local justified_re=""
+    case "$tool" in
+        lintian)
+            error_rcs=(2)
+            ;;
+        rpmlint)
+            error_rcs=(64 65)
+            justified_re="^terraphim-server\\.${RPM_ARCH}: E: statically-linked-binary /usr/bin/terraphim_server$"
+            ;;
+        *)
+            echo "unknown lint tool: $tool" >&2
+            exit 1
+            ;;
+    esac
+
+    local rc_class="invalid"
+    if [[ "$rc" -eq 0 ]]; then
+        rc_class="clean"
+    else
+        local candidate
+        for candidate in "${error_rcs[@]}"; do
+            if [[ "$rc" -eq "$candidate" ]]; then
+                rc_class="errors"
+            fi
+        done
+    fi
+    if [[ "$rc_class" == "invalid" ]]; then
+        printf '%s exited %s for %s: tool/install/transport failure (allowed exits: 0' "$tool" "$rc" "$pkg" >&2
+        printf ' %s' "${error_rcs[@]}" >&2
+        printf ')\n' >&2
+        exit 1
+    fi
+
+    if [[ "$tool" == "rpmlint" && ! -s "$log" ]]; then
+        echo "rpmlint produced empty lint output for $pkg (a real run always reports a session banner)" >&2
+        exit 1
+    fi
+
+    local -a e_lines=()
+    case "$tool" in
+        lintian)
+            mapfile -t e_lines < <(grep -E '^E: ' "$log" || true)
+            ;;
+        rpmlint)
+            mapfile -t e_lines < <(grep -E '^[^:[:space:]]+: E: ' "$log" || true)
+            ;;
+    esac
+
+    local justified=0
+    local line ok
+    for line in "${e_lines[@]}"; do
+        ok=0
+        if [[ "$tool" == "lintian" ]]; then
+            if [[ "$line" == "$LINTIAN_JUSTIFIED_STATIC_E" ]]; then
+                ok=1
+            fi
+        else
+            if [[ "$line" =~ $justified_re ]]; then
+                ok=1
+            fi
+        fi
+        if [[ "$ok" -eq 1 ]]; then
+            justified=$((justified + 1))
+            if [[ "$justified" -gt 1 ]]; then
+                echo "$tool reported the justified static-MUSL diagnostic more than once for $pkg:" >&2
+                printf '  %s\n' "$line" >&2
+                exit 1
+            fi
+        else
+            echo "$tool reported an unjustified error for $pkg (only the exact static-MUSL diagnostic for terraphim-server at usr/bin/terraphim_server is tolerated):" >&2
+            printf '  %s\n' "$line" >&2
+            exit 1
+        fi
+    done
+
+    if [[ "$rc_class" == "errors" && "$justified" -eq 0 ]]; then
+        echo "$tool exited $rc (errors reported) but no error line could be parsed from the lint output for $pkg" >&2
+        exit 1
+    fi
+    if [[ "$rc_class" == "clean" && "$justified" -ne 0 ]]; then
+        echo "$tool exited 0 but the lint output contains error lines for $pkg" >&2
+        exit 1
+    fi
+
+    echo "lint policy satisfied: $tool accepted $(basename "$pkg") with $justified justified static-MUSL diagnostic(s)"
+}
+
+lint_deb() {
+    local pkg="$1"
+    local log="$WORK_DIR/lintian-$(basename "$pkg").log"
+    local transport="$log.transport"
+    local rc=0
+
+    : > "$log"
+    : > "$transport"
+
+    if command -v lintian >/dev/null 2>&1; then
+        # --tag-display-limit 0 keeps lintian from hiding error lines
+        # behind its per-tag display cap: the parser must see every E:.
+        lintian --fail-on error --tag-display-limit 0 "$pkg" >"$log" 2>&1 || rc=$?
+    else
+        require_docker_or_fail "DEB linting"
+        docker run --rm \
+            -v "$(realpath "$pkg"):/pkg.deb:ro" \
+            -v "$(realpath "$log"):/lint.log" \
+            "$DEB_LINT_IMAGE" sh -euxc '
+                export DEBIAN_FRONTEND=noninteractive
+                apt-get update
+                apt-get install -y --no-install-recommends lintian
+                rc=0
+                lintian --fail-on error --tag-display-limit 0 /pkg.deb >/lint.log 2>&1 || rc=$?
+                exit "$rc"
+            ' >"$transport" 2>&1 || rc=$?
+    fi
+
+    enforce_lint_policy lintian "$pkg" "$log" "$rc" "$transport"
 }
 
 lint_rpm() {
     local pkg="$1"
-    if command -v rpmlint >/dev/null 2>&1; then
-        rpmlint "$pkg"
-        return 0
-    fi
-
     # Mount with the real package basename so rpmlint sees a coherent
     # name-version-release.arch.rpm filename.
     local base
     base="$(basename "$pkg")"
-    require_docker_or_fail "RPM linting"
-    docker run --rm -v "$(realpath "$pkg"):/$base:ro" "$RPM_LINT_IMAGE" sh -euxc '
-        if ! command -v rpmlint >/dev/null 2>&1; then
-            if command -v dnf >/dev/null 2>&1; then
-                dnf install -y rpmlint
-            elif command -v microdnf >/dev/null 2>&1; then
-                microdnf install -y rpmlint
-            else
-                echo "no RPM package manager available in lint image" >&2
-                exit 127
-            fi
-        fi
-        rpmlint "/$1"
-    ' sh "$base"
+    local log="$WORK_DIR/rpmlint-$base.log"
+    local transport="$log.transport"
+    local rc=0
+
+    : > "$log"
+    : > "$transport"
+
+    if command -v rpmlint >/dev/null 2>&1; then
+        rpmlint "$pkg" >"$log" 2>&1 || rc=$?
+    else
+        require_docker_or_fail "RPM linting"
+        docker run --rm \
+            -v "$(realpath "$pkg"):/$base:ro" \
+            -v "$(realpath "$log"):/lint.log" \
+            "$RPM_LINT_IMAGE" sh -euxc '
+                if ! command -v rpmlint >/dev/null 2>&1; then
+                    if command -v dnf >/dev/null 2>&1; then
+                        dnf install -y rpmlint
+                    elif command -v microdnf >/dev/null 2>&1; then
+                        microdnf install -y rpmlint
+                    else
+                        echo "no RPM package manager available in lint image" >&2
+                        exit 127
+                    fi
+                fi
+                rc=0
+                rpmlint "/$1" >/lint.log 2>&1 || rc=$?
+                exit "$rc"
+            ' sh "$base" >"$transport" 2>&1 || rc=$?
+    fi
+
+    enforce_lint_policy rpmlint "$pkg" "$log" "$rc" "$transport"
 }
 
 docker_rpm_tool() {
@@ -228,17 +300,21 @@ render_and_build() {
     "$NFPM_BIN" pkg --packager "$format" --config "$config" --target "$OUT_DIR"
 }
 
-render_and_build deb
-render_and_build rpm
-
-DEB="$OUT_DIR/terraphim-server_${VERSION}-1_${DEB_ARCH}.deb"
-RPM="$OUT_DIR/terraphim-server-${VERSION}-1.${RPM_ARCH}.rpm"
-
 verify_deb() {
     local pkg="$1"
     local tmp="$WORK_DIR/deb-extract"
 
     [[ -f "$pkg" ]] || { echo "missing DEB output: $pkg" >&2; exit 1; }
+
+    # Fail closed unless the produced package declares the architecture that
+    # was requested for the target triple.
+    local pkg_arch
+    pkg_arch="$(dpkg-deb --field "$pkg" Architecture)"
+    [[ "$pkg_arch" == "$DEB_ARCH" ]] || {
+        echo "DEB arch mismatch expected=$DEB_ARCH actual=$pkg_arch package=$pkg" >&2
+        exit 1
+    }
+
     mkdir -p "$tmp"
     dpkg-deb --extract "$pkg" "$tmp"
 
@@ -275,6 +351,21 @@ verify_rpm() {
     else
         docker_rpm_tool "$pkg" "$tmp" "$EXPECTED_SHA" "$metadata"
     fi
+
+    # Fail closed unless the produced package carries the architecture that
+    # was requested for the target triple. The arch is consumed from the
+    # Docker RPM metadata when host rpm tooling produced it, or queried from
+    # the host rpm otherwise.
+    local pkg_arch
+    if [[ -s "$metadata" ]]; then
+        pkg_arch="$(sed -n 's/^arch=//p' "$metadata")"
+    else
+        pkg_arch="$(rpm -qp --qf '%{ARCH}' "$pkg")"
+    fi
+    [[ "$pkg_arch" == "$RPM_ARCH" ]] || {
+        echo "RPM arch mismatch expected=$RPM_ARCH actual=$pkg_arch package=$pkg" >&2
+        exit 1
+    }
 
     local actual_sha
     actual_sha="$(sha256sum "$tmp/usr/bin/terraphim_server" | awk '{print $1}')"
@@ -327,6 +418,13 @@ verify_cargo_deb_parity() {
         exit 1
     }
 
+    local cargo_arch
+    cargo_arch="$(dpkg-deb --field "${matches[0]}" Architecture)"
+    [[ "$cargo_arch" == "$DEB_ARCH" ]] || {
+        echo "cargo-deb arch mismatch expected=$DEB_ARCH actual=$cargo_arch package=${matches[0]}" >&2
+        exit 1
+    }
+
     mkdir -p "$tmp"
     dpkg-deb --extract "${matches[0]}" "$tmp"
 
@@ -343,11 +441,120 @@ verify_cargo_deb_parity() {
     }
 }
 
-verify_deb "$DEB"
-verify_rpm "$RPM"
-if [[ -n "$CARGO_DEB_DIR" ]]; then
-    verify_cargo_deb_parity "$CARGO_DEB_DIR"
-fi
+main() {
+    local VERSION="" TARGET="" BINARY="" OUT_DIR="" CARGO_DEB_DIR=""
+    local NFPM_BIN="${NFPM_BIN:-nfpm}"
 
-sha256sum "$DEB" "$RPM" > "$OUT_DIR/terraphim-server-${VERSION}-${TARGET}.package-sha256sums.txt"
-printf 'package payload ok %s %s\n' "$TARGET" "$EXPECTED_SHA"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --version)
+                VERSION="${2:-}"
+                shift 2
+                ;;
+            --target)
+                TARGET="${2:-}"
+                shift 2
+                ;;
+            --binary)
+                BINARY="${2:-}"
+                shift 2
+                ;;
+            --out-dir)
+                OUT_DIR="${2:-}"
+                shift 2
+                ;;
+            --nfpm)
+                NFPM_BIN="${2:-}"
+                shift 2
+                ;;
+            --cargo-deb-dir)
+                CARGO_DEB_DIR="${2:-}"
+                shift 2
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                usage
+                exit 2
+                ;;
+        esac
+    done
+
+    if [[ -z "$VERSION" || -z "$TARGET" || -z "$BINARY" || -z "$OUT_DIR" ]]; then
+        usage
+        exit 2
+    fi
+
+    case "$TARGET" in
+        x86_64-unknown-linux-musl)
+            DEB_ARCH="amd64"
+            RPM_ARCH="x86_64"
+            ;;
+        aarch64-unknown-linux-musl)
+            DEB_ARCH="arm64"
+            RPM_ARCH="aarch64"
+            ;;
+        *)
+            echo "unsupported server package target: $TARGET" >&2
+            exit 2
+            ;;
+    esac
+
+    if [[ ! -f "$BINARY" ]]; then
+        echo "missing qualified binary: $BINARY" >&2
+        exit 1
+    fi
+
+    if ! command -v "$NFPM_BIN" >/dev/null 2>&1; then
+        echo "nFPM is required for managed package production; not found: $NFPM_BIN" >&2
+        echo "retain the existing cargo-deb parity path until the nFPM native gates pass" >&2
+        exit 127
+    fi
+
+    local ROOT RENDER
+    ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+    RENDER="$ROOT/.github/scripts/nfpm/render-server-nfpm.sh"
+    mkdir -p "$OUT_DIR"
+    # WORK_DIR/EXPECTED_SHA stay global: verify_* helpers and the EXIT trap
+    # (which fires after main returns) reference them.
+    WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/terraphim-server-nfpm.XXXXXX")"
+    trap 'rm -rf "$WORK_DIR"' EXIT
+
+    if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
+        if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            export SOURCE_DATE_EPOCH
+            SOURCE_DATE_EPOCH="$(git -C "$ROOT" log -1 --format=%ct)"
+        else
+            echo "SOURCE_DATE_EPOCH is required outside a git worktree" >&2
+            exit 1
+        fi
+    fi
+
+    local EXPECTED_SHA=""
+    EXPECTED_SHA="$(sha256sum "$BINARY" | awk '{print $1}')"
+
+    render_and_build deb
+    render_and_build rpm
+
+    local DEB RPM
+    DEB="$OUT_DIR/terraphim-server_${VERSION}-1_${DEB_ARCH}.deb"
+    RPM="$OUT_DIR/terraphim-server-${VERSION}-1.${RPM_ARCH}.rpm"
+
+    verify_deb "$DEB"
+    verify_rpm "$RPM"
+    if [[ -n "$CARGO_DEB_DIR" ]]; then
+        verify_cargo_deb_parity "$CARGO_DEB_DIR"
+    fi
+
+    sha256sum "$DEB" "$RPM" > "$OUT_DIR/terraphim-server-${VERSION}-${TARGET}.package-sha256sums.txt"
+    printf 'package payload ok %s %s\n' "$TARGET" "$EXPECTED_SHA"
+}
+
+# Tests source this script with TERRAPHIM_BUILD_SERVER_PACKAGES_SOURCED=1 to
+# exercise verify_deb/verify_rpm on tampered fixtures without running the
+# production pipeline.
+if [[ "${TERRAPHIM_BUILD_SERVER_PACKAGES_SOURCED:-0}" != "1" ]]; then
+    main "$@"
+fi
