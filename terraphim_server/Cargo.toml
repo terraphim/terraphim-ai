@@ -96,6 +96,10 @@ futures-util = "0.3"
 
 [dev-dependencies.tempfile]
 workspace = true
+
+# Keep this metadata as the cargo-deb parity oracle for managed package
+# rollout. The nFPM producer wraps qualified MUSL release bytes and must not
+# replace this path until the native install/upgrade/remove gates pass.
 [package.metadata.deb]
 maintainer = "Terraphim Contributors <team@terraphim.ai>"
 copyright = "2024, Terraphim Contributors"

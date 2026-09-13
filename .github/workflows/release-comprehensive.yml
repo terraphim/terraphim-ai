@@ -23,6 +23,14 @@ on:
         required: false
         default: false
         type: boolean
+      managed_packages:
+        description: 'Build managed DEB/RPM packages from qualified MUSL server binaries'
+        required: false
+        default: 'disabled'
+        type: choice
+        options:
+          - disabled
+          - enabled
 
 permissions:
   contents: write
@@ -687,6 +695,99 @@ jobs:
         with:
           name: debian-packages
           path: target/debian/*.deb
+
+  build-server-managed-packages:
+    name: Build server managed packages for ${{ matrix.target }}
+    needs: [resolve-release-source, verify-versions, build-binaries, build-debian-packages]
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.managed_packages == 'enabled' &&
+      needs.verify-versions.result == 'success' &&
+      needs.build-binaries.result == 'success' &&
+      needs.build-debian-packages.result == 'success'
+    runs-on: [self-hosted, bigbox]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+          - target: aarch64-unknown-linux-musl
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Download qualified server binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-${{ matrix.target }}
+          path: qualified-binary
+
+      - name: Download cargo-deb parity package
+        uses: actions/download-artifact@v4
+        with:
+          name: debian-packages
+          path: cargo-deb-artifact
+
+      - name: Install pinned nFPM
+        shell: bash
+        env:
+          NFPM_VERSION: 2.47.0
+          NFPM_ARCHIVE_SHA256: 0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783
+          NFPM_BINARY_SHA256: 17133a2467ffb7cec851c2d7bae0c6098d09d7ed7d3d101a9605f6a473323936
+        run: |
+          set -euo pipefail
+          install_dir="/tmp/nfpm-bin"
+          mkdir -p "$install_dir"
+          archive="$install_dir/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          url="https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          curl -fsSL "$url" -o "$archive"
+          printf '%s  %s\n' "$NFPM_ARCHIVE_SHA256" "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$install_dir" nfpm
+          printf '%s  %s\n' "$NFPM_BINARY_SHA256" "$install_dir/nfpm" | sha256sum -c -
+          mv "$install_dir/nfpm" "$install_dir/nfpm-${NFPM_VERSION}"
+          chmod 0755 "$install_dir/nfpm-${NFPM_VERSION}"
+          .github/scripts/nfpm/verify-nfpm.sh \
+            --binary "$install_dir/nfpm-${NFPM_VERSION}" \
+            --version "$NFPM_VERSION" \
+            --sha256 "$NFPM_BINARY_SHA256"
+
+      - name: Run native managed-package lifecycle gate
+        shell: bash
+        env:
+          NFPM_BIN: /tmp/nfpm-bin/nfpm-2.47.0
+          TARGET: ${{ matrix.target }}
+          REQUIRE_INSTALL: "1"
+        run: |
+          set -euo pipefail
+          .github/scripts/nfpm/tests/test_server_nfpm_native.sh
+
+      - name: Build managed DEB/RPM packages
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify-versions.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          NFPM_BIN: /tmp/nfpm-bin/nfpm-2.47.0
+        run: |
+          set -euo pipefail
+          BIN="qualified-binary/terraphim_server-${TARGET}"
+          test -f "$BIN"
+          chmod 0755 "$BIN"
+          .github/scripts/nfpm/build-server-packages.sh \
+            --version "$VERSION" \
+            --target "$TARGET" \
+            --binary "$BIN" \
+            --out-dir "server-managed-packages/${TARGET}" \
+            --nfpm "$NFPM_BIN" \
+            --cargo-deb-dir cargo-deb-artifact
+
+      - name: Upload server managed packages
+        uses: actions/upload-artifact@v5
+        with:
+          name: server-managed-packages-${{ matrix.target }}
+          path: server-managed-packages/${{ matrix.target }}/*
 
   trigger-desktop-release:
     name: Trigger Desktop Release

@@ -12,6 +12,16 @@
 
 set -euo pipefail
 
+cat >&2 <<'EOF'
+Deprecated: build-all-formats.sh is intentionally disabled.
+
+This legacy aggregate script can report success after individual package
+formats fail. Use the format-specific producer scripts instead; for managed
+terraphim_server DEB/RPM packages, use:
+  .github/scripts/nfpm/build-server-packages.sh
+EOF
+exit 1
+
 VERSION="${1:-}"
 shift || true
 
