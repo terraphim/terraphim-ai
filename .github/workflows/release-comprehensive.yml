@@ -132,13 +132,15 @@ jobs:
             exit 1
           fi
 
-          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "version_series=${VERSION%.*}" >> "$GITHUB_OUTPUT"
-          echo "source_sha=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
-          echo "source_ref=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
-          echo "workflow_ref=${WORKFLOW_SHA}" >> "$GITHUB_OUTPUT"
-          echo "is_standard_release=${IS_STANDARD_RELEASE}" >> "$GITHUB_OUTPUT"
+          {
+            echo "release_tag=${RELEASE_TAG}"
+            echo "version=${VERSION}"
+            echo "version_series=${VERSION%.*}"
+            echo "source_sha=${SOURCE_SHA}"
+            echo "source_ref=${SOURCE_SHA}"
+            echo "workflow_ref=${WORKFLOW_SHA}"
+            echo "is_standard_release=${IS_STANDARD_RELEASE}"
+          } >> "$GITHUB_OUTPUT"
 
   verify-versions:
     name: Verify version consistency
@@ -304,7 +306,7 @@ jobs:
 
       - name: Clear cross custom images
         if: matrix.use_cross
-        run: docker rmi $(docker images -q cross-custom-*) 2>/dev/null || true
+        run: docker images -q 'cross-custom-*' | xargs -r docker rmi 2>/dev/null || true
 
       - name: Setup zig for cross builds
         if: matrix.use_cross
@@ -317,8 +319,10 @@ jobs:
           ZIG_OPTS="$ZIG_OPTS -e ZIG=$ZIG_BIN"
           ZIG_OPTS="$ZIG_OPTS -e ZIG_GLOBAL_CACHE_DIR=/tmp/zig-global-cache"
           ZIG_OPTS="$ZIG_OPTS -e ZIG_LOCAL_CACHE_DIR=/tmp/zig-local-cache"
-          echo "CROSS_CONTAINER_OPTS=$ZIG_OPTS" >> $GITHUB_ENV
-          echo "ZIG=$ZIG_BIN" >> $GITHUB_ENV
+          {
+            echo "CROSS_CONTAINER_OPTS=$ZIG_OPTS"
+            echo "ZIG=$ZIG_BIN"
+          } >> "$GITHUB_ENV"
 
       - name: Cache dependencies
         if: matrix.target != 'x86_64-unknown-linux-gnu'
@@ -565,11 +569,13 @@ jobs:
           echo "Loading credentials from 1Password..."
 
           # Read credentials with --no-newline to avoid trailing characters
-          echo "APPLE_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/username' --no-newline)" >> $GITHUB_ENV
-          echo "APPLE_TEAM_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_TEAM_ID' --no-newline)" >> $GITHUB_ENV
-          echo "APPLE_APP_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_APP_SPECIFIC_PASSWORD' --no-newline)" >> $GITHUB_ENV
-          echo "CERT_BASE64=$(op read 'op://TerraphimPlatform/apple.developer.certificate/base64' --no-newline)" >> $GITHUB_ENV
-          echo "CERT_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.certificate/password' --no-newline)" >> $GITHUB_ENV
+          {
+            echo "APPLE_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/username' --no-newline)"
+            echo "APPLE_TEAM_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_TEAM_ID' --no-newline)"
+            echo "APPLE_APP_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_APP_SPECIFIC_PASSWORD' --no-newline)"
+            echo "CERT_BASE64=$(op read 'op://TerraphimPlatform/apple.developer.certificate/base64' --no-newline)"
+            echo "CERT_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.certificate/password' --no-newline)"
+          } >> "$GITHUB_ENV"
 
           echo "✅ Credentials loaded successfully"
 
@@ -698,13 +704,15 @@ jobs:
 
   build-server-managed-packages:
     name: Build server managed packages for ${{ matrix.target }}
-    needs: [resolve-release-source, verify-versions, build-binaries, build-debian-packages]
+    needs: [resolve-release-source, verify-versions, build-binaries]
+    # Normal tag pushes always produce the managed DEB/RPM matrix (the
+    # release inventory assembles all-or-nothing from it). A manual
+    # dispatch must opt in explicitly with managed_packages=enabled.
     if: >-
-      github.event_name == 'workflow_dispatch' &&
-      inputs.managed_packages == 'enabled' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.managed_packages == 'enabled')) &&
       needs.verify-versions.result == 'success' &&
-      needs.build-binaries.result == 'success' &&
-      needs.build-debian-packages.result == 'success'
+      needs.build-binaries.result == 'success'
     runs-on: [self-hosted, bigbox]
     strategy:
       fail-fast: false
@@ -712,12 +720,35 @@ jobs:
         include:
           - target: x86_64-unknown-linux-musl
           - target: aarch64-unknown-linux-musl
+    env:
+      CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
     steps:
+      - name: Disable Rust wrappers for self-hosted release builds
+        shell: bash
+        run: |
+          unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
+          {
+            echo "RUSTC_WRAPPER="
+            echo "RUSTC_WORKSPACE_WRAPPER="
+          } >> "$GITHUB_ENV"
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           ref: ${{ needs.resolve-release-source.outputs.source_sha }}
           fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deb
+        run: |
+          if command -v cargo-deb &>/dev/null; then
+            cargo-deb --version
+          else
+            # Self-hosted runners may alias `cargo` via rustup; use stable explicitly.
+            rustup run stable cargo install cargo-deb --locked
+          fi
 
       - name: Download qualified server binary
         uses: actions/download-artifact@v4
@@ -725,11 +756,30 @@ jobs:
           name: binaries-${{ matrix.target }}
           path: qualified-binary
 
-      - name: Download cargo-deb parity package
-        uses: actions/download-artifact@v4
-        with:
-          name: debian-packages
-          path: cargo-deb-artifact
+      - name: Build cargo-deb parity package for target
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify-versions.outputs.version }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          BIN="qualified-binary/terraphim_server-${TARGET}"
+          test -f "$BIN"
+          chmod 0755 "$BIN"
+          # Stage the exact qualified MUSL bytes at the assets path consumed by
+          # terraphim_server [package.metadata.deb]: the declared asset
+          # target/release/terraphim_server resolves against
+          # target/<triple>/release when cargo-deb is given --target.
+          # --no-build wraps without rebuilding and --no-strip preserves the
+          # exact bytes, so the parity oracle compares qualified MUSL payload
+          # bytes per matrix target (never host-native bytes).
+          mkdir -p "target/${TARGET}/release"
+          cp "$BIN" "target/${TARGET}/release/terraphim_server"
+          rustup run stable cargo deb -p terraphim_server \
+            --no-build --no-strip \
+            --target "$TARGET" \
+            --output "cargo-deb-parity/${TARGET}"
+          ls -la "cargo-deb-parity/${TARGET}"
 
       - name: Install pinned nFPM
         shell: bash
@@ -759,7 +809,12 @@ jobs:
         env:
           NFPM_BIN: /tmp/nfpm-bin/nfpm-2.47.0
           TARGET: ${{ matrix.target }}
-          REQUIRE_INSTALL: "1"
+          # The install/upgrade/remove lifecycle is required (REQUIRE_INSTALL=1)
+          # only where execution is genuinely possible: the target triple must
+          # match the runner architecture. Cross targets fail closed under
+          # REQUIRE_INSTALL=1 and must be qualified explicitly via
+          # REQUIRE_INSTALL=0 (byte/metadata/lint checks still run).
+          REQUIRE_INSTALL: ${{ ((runner.arch == 'X64' && matrix.target == 'x86_64-unknown-linux-musl') || (runner.arch == 'ARM64' && matrix.target == 'aarch64-unknown-linux-musl')) && '1' || '0' }}
         run: |
           set -euo pipefail
           .github/scripts/nfpm/tests/test_server_nfpm_native.sh
@@ -781,7 +836,7 @@ jobs:
             --binary "$BIN" \
             --out-dir "server-managed-packages/${TARGET}" \
             --nfpm "$NFPM_BIN" \
-            --cargo-deb-dir cargo-deb-artifact
+            --cargo-deb-dir "cargo-deb-parity/${TARGET}"
 
       - name: Upload server managed packages
         uses: actions/upload-artifact@v5
@@ -967,7 +1022,11 @@ jobs:
 
   create-release:
     name: Create GitHub release
-    needs: [resolve-release-source, verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos]
+    needs: [resolve-release-source, verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos, build-server-managed-packages]
+    # Tag-push publication requires the managed package producer to have
+    # SUCCEEDED. A skipped or failed managed job blocks publication: the
+    # managed matrix is part of the release contract and only the explicit
+    # manual recovery path may proceed without it.
     if: >-
       always() &&
       !cancelled() &&
@@ -975,7 +1034,8 @@ jobs:
       !inputs.test_run &&
       needs.verify-versions.result == 'success' &&
       needs.sign-and-notarize-macos.result == 'success' &&
-      needs.verify-release-assets.result == 'success'
+      needs.verify-release-assets.result == 'success' &&
+      needs.build-server-managed-packages.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -994,14 +1054,18 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Download Debian package artifacts
+      - name: Download managed server packages (all matrix targets)
         uses: actions/download-artifact@v4
-        id: download_debian
-        continue-on-error: true
+        id: download_managed
+        # The job condition already required the managed producer to
+        # succeed; this gate keeps the step absent if that ever regresses
+        # so the all-or-nothing assemble step below fails closed instead
+        # of publishing an incomplete managed matrix.
+        if: needs.build-server-managed-packages.result == 'success'
         with:
-          name: debian-packages
-          path: release-assets
-          merge-multiple: true
+          pattern: server-managed-packages-*
+          path: managed-staging
+          merge-multiple: false
 
       - name: Retry artifact download if needed
         if: steps.download.outcome == 'failure'
@@ -1014,13 +1078,11 @@ jobs:
             rm -rf binaries-* release-assets
             mkdir -p release-assets
 
-            gh run download ${{ github.run_id }} --dir release-assets -n debian-packages || true
-
             gh api \
               repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
               --jq '.artifacts[].name' \
               | grep '^binaries-' \
-              | while read artifact_name; do
+              | while read -r artifact_name; do
                   gh run download ${{ github.run_id }} --dir release-assets -n "$artifact_name"
                 done && break
 
@@ -1032,17 +1094,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Assemble release inventory (managed all-or-nothing, duplicate rejection)
+        run: |
+          set -euo pipefail
+          .github/scripts/release/assemble-release-inventory.sh \
+            --output release-assets \
+            --managed-staging managed-staging \
+            --managed-target x86_64-unknown-linux-musl \
+            --managed-target aarch64-unknown-linux-musl
+
       - name: Prepare release assets
         run: |
-          # Artifacts are already downloaded to release-assets/ with merge-multiple
-          # Just verify everything is there
+          # Artifacts are assembled into release-assets/ (binaries merged,
+          # managed DEB/RPM matrix gated all-or-nothing; duplicates rejected)
           echo "Release assets:"
           ls -la release-assets/
 
       - name: Generate checksums
         working-directory: release-assets
         run: |
-          sha256sum * > checksums.txt
+          sha256sum -- * > checksums.txt
 
       - name: Extract release notes from tag
         id: release-notes
@@ -1062,7 +1133,7 @@ jobs:
             TITLE="$TAG"
           fi
 
-          echo "title=$TITLE" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -1126,7 +1197,13 @@ jobs:
 
   upload-recovered-release-assets:
     name: Upload recovered release assets
-    needs: [resolve-release-source, verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos]
+    needs: [resolve-release-source, verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos, build-server-managed-packages]
+    # Recovery semantics only: historical releases were published before
+    # the managed matrix existed and the managed job used to be
+    # dispatch-gated, so an explicitly skipped managed job is tolerated
+    # exclusively on this manual recovery path. Normal tag-push
+    # publication (create-release) requires the managed producer to have
+    # succeeded and never accepts skipped.
     if: >-
       always() &&
       !cancelled() &&
@@ -1134,7 +1211,8 @@ jobs:
       !inputs.test_run &&
       needs.verify-versions.result == 'success' &&
       needs.sign-and-notarize-macos.result == 'success' &&
-      needs.verify-release-assets.result == 'success'
+      needs.verify-release-assets.result == 'success' &&
+      (needs.build-server-managed-packages.result == 'success' || needs.build-server-managed-packages.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1152,13 +1230,26 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Download Debian package artifacts
+      - name: Download managed server packages (all matrix targets)
         uses: actions/download-artifact@v4
-        continue-on-error: true
+        # Recovery-only relaxation, mirroring the job condition: a skipped
+        # managed job leaves the stage absent and recovery proceeds
+        # without managed packages (all-or-nothing is enforced by the
+        # assemble step).
+        if: needs.build-server-managed-packages.result == 'success'
         with:
-          name: debian-packages
-          path: release-assets
-          merge-multiple: true
+          pattern: server-managed-packages-*
+          path: managed-staging
+          merge-multiple: false
+
+      - name: Assemble release inventory (managed all-or-nothing, duplicate rejection)
+        run: |
+          set -euo pipefail
+          .github/scripts/release/assemble-release-inventory.sh \
+            --output release-assets \
+            --managed-staging managed-staging \
+            --managed-target x86_64-unknown-linux-musl \
+            --managed-target aarch64-unknown-linux-musl
 
       - name: Snapshot existing release asset digests
         env:
@@ -1267,7 +1358,7 @@ jobs:
         env:
           VERSION: ${{ needs.resolve-release-source.outputs.version }}
         run: |
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Updating Homebrew formulas for version: $VERSION"
 
       - name: Download release checksums
@@ -1304,12 +1395,14 @@ jobs:
             echo "⚠️  Using MUSL fallback for grep"
           fi
 
-          echo "server_sha=$SERVER_SHA" >> $GITHUB_OUTPUT
-          echo "agent_sha=$AGENT_SHA" >> $GITHUB_OUTPUT
-          echo "grep_sha=$GREP_SHA" >> $GITHUB_OUTPUT
-          echo "server_linux_gnu_sha=$SERVER_LINUX_GNU_SHA" >> $GITHUB_OUTPUT
-          echo "agent_linux_gnu_sha=$AGENT_LINUX_GNU_SHA" >> $GITHUB_OUTPUT
-          echo "grep_linux_gnu_sha=$GREP_LINUX_GNU_SHA" >> $GITHUB_OUTPUT
+          {
+            echo "server_sha=$SERVER_SHA"
+            echo "agent_sha=$AGENT_SHA"
+            echo "grep_sha=$GREP_SHA"
+            echo "server_linux_gnu_sha=$SERVER_LINUX_GNU_SHA"
+            echo "agent_linux_gnu_sha=$AGENT_LINUX_GNU_SHA"
+            echo "grep_linux_gnu_sha=$GREP_LINUX_GNU_SHA"
+          } >> "$GITHUB_OUTPUT"
 
           echo "Server universal binary SHA256: $SERVER_SHA"
           echo "Agent universal binary SHA256: $AGENT_SHA"

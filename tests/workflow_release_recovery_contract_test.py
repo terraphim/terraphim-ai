@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import textwrap
@@ -108,6 +109,57 @@ def has_need(job: str, dependency: str) -> bool:
     )
 
 
+def job_if_condition(text: str, job_name: str) -> str:
+    """Return the folded scalar expression of a job's `if: >-` block."""
+    job = job_block(text, job_name)
+    match = re.search(r"^    if: >-\n((?:      .*\n?)*)", job, re.MULTILINE)
+    if not match:
+        return ""
+    return " ".join(match.group(1).split())
+
+
+def evaluate_condition(
+    condition: str,
+    *,
+    event_name: str = "push",
+    results: dict[str, str] | None = None,
+    inputs: dict[str, str] | None = None,
+) -> bool:
+    """Evaluate a GitHub Actions `if:` expression under a simulated state.
+
+    Supports the constructs used by the release workflow: always(),
+    !cancelled(), github.event_name comparisons, inputs comparisons and
+    bare negated inputs, needs.<job>.result comparisons, && and ||.
+    """
+    results = results or {}
+    inputs = inputs or {}
+    expr = " ".join(condition.split())
+    expr = expr.replace("always()", "True").replace("!cancelled()", "True")
+
+    def repl_event(match: re.Match[str]) -> str:
+        return str(match.group(1) == event_name)
+
+    expr = re.sub(r"github\.event_name == '([a-z_]+)'", repl_event, expr)
+
+    def repl_input(match: re.Match[str]) -> str:
+        negate = "not " if match.group(1) else ""
+        value = inputs.get(match.group(2), "")
+        return f"({negate}{value!r})"
+
+    expr = re.sub(r"(!)?inputs\.([A-Za-z0-9_]+)", repl_input, expr)
+
+    def repl_need(match: re.Match[str]) -> str:
+        job = match.group(1)
+        return f"({results.get(job, 'skipped')!r} == {match.group(2)!r})"
+
+    expr = re.sub(r"needs\.([A-Za-z0-9_-]+)\.result == '([a-z]+)'", repl_need, expr)
+
+    expr = expr.replace(" && ", " and ").replace(" || ", " or ")
+    if not re.fullmatch(r"[A-Za-z0-9_'(), .=]+", expr):
+        raise AssertionError(f"unsupported condition construct: {expr}")
+    return bool(eval(expr, {"__builtins__": {}, "bool": bool}, {}))  # noqa: S307 - fixed vocabulary
+
+
 class ReleaseRecoveryWorkflowContract(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -140,6 +192,7 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             "build-binaries",
             "sign-and-notarize-macos",
             "build-debian-packages",
+            "build-server-managed-packages",
             "verify-release-assets",
             "create-release",
             "upload-recovered-release-assets",
@@ -160,6 +213,7 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             "build-binaries",
             "sign-and-notarize-macos",
             "build-debian-packages",
+            "build-server-managed-packages",
             "verify-release-assets",
             "create-release",
             "upload-recovered-release-assets",
@@ -287,7 +341,7 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertNotRegex(combined, r"\bgit\s+push\b.*--delete\b")
 
     def test_self_hosted_release_jobs_disable_rust_wrappers_before_toolchain(self) -> None:
-        for job_name in ["build-binaries", "build-debian-packages"]:
+        for job_name in ["build-binaries", "build-debian-packages", "build-server-managed-packages"]:
             job = job_block(self.release_text, job_name)
             disable = step_run_block(
                 job, "Disable Rust wrappers for self-hosted release builds"
@@ -495,6 +549,305 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             self.assertIn("github.event_name == 'push'", job)
             self.assertIn("!inputs.test_run", job)
             self.assertIn("needs.resolve-release-source.outputs.is_standard_release == 'true'", job)
+
+    def test_managed_packages_are_release_and_recovery_dependencies(self) -> None:
+        for job_name in ["create-release", "upload-recovered-release-assets"]:
+            job = job_block(self.release_text, job_name)
+            self.assertTrue(has_need(job, "build-server-managed-packages"), job_name)
+
+    def test_managed_packages_job_runs_on_tag_push_or_explicit_dispatch(self) -> None:
+        managed = job_block(self.release_text, "build-server-managed-packages")
+        self.assertIn("github.event_name == 'push'", managed)
+        self.assertIn(
+            "(github.event_name == 'workflow_dispatch' && inputs.managed_packages == 'enabled')",
+            managed,
+        )
+        # The dispatch opt-in must not gate the plain tag-push path.
+        condition = managed[managed.index("if: >-"):managed.index("runs-on:")]
+        self.assertLess(condition.index("github.event_name == 'push'"), condition.index("workflow_dispatch"))
+
+        condition_expr = job_if_condition(self.release_text, "build-server-managed-packages")
+        self.assertTrue(condition_expr)
+        happy = {
+            "verify-versions": "success",
+            "build-binaries": "success",
+        }
+        self.assertTrue(
+            evaluate_condition(condition_expr, event_name="push", results=happy),
+            "tag push must run the managed package job",
+        )
+        self.assertTrue(
+            evaluate_condition(
+                condition_expr,
+                event_name="workflow_dispatch",
+                results=happy,
+                inputs={"managed_packages": "enabled"},
+            ),
+            "dispatch with managed_packages=enabled must run the managed package job",
+        )
+        self.assertFalse(
+            evaluate_condition(
+                condition_expr,
+                event_name="workflow_dispatch",
+                results=happy,
+                inputs={"managed_packages": "disabled"},
+            ),
+            "dispatch with managed_packages=disabled must not run the managed package job",
+        )
+        self.assertFalse(
+            evaluate_condition(
+                condition_expr,
+                event_name="push",
+                results={"verify-versions": "success", "build-binaries": "failure"},
+            ),
+            "a failed build matrix must not run the managed package job",
+        )
+
+    def test_release_creation_requires_managed_success_never_skipped(self) -> None:
+        create_release = job_block(self.release_text, "create-release")
+        self.assertIn(
+            "needs.build-server-managed-packages.result == 'success'",
+            create_release,
+        )
+        # create-release must never accept a skipped (or via the skipped
+        # clause, failed-then-skipped) managed producer.
+        self.assertNotIn(
+            "needs.build-server-managed-packages.result == 'skipped'",
+            create_release,
+        )
+        self.assertIn(
+            "Tag-push publication requires the managed package producer",
+            create_release,
+        )
+
+    def test_release_creation_cannot_publish_when_managed_skipped_or_failed(self) -> None:
+        condition_expr = job_if_condition(self.release_text, "create-release")
+        self.assertTrue(condition_expr)
+        happy = {
+            "verify-versions": "success",
+            "sign-and-notarize-macos": "success",
+            "verify-release-assets": "success",
+            "build-server-managed-packages": "success",
+        }
+        self.assertTrue(
+            evaluate_condition(condition_expr, event_name="push", results=happy),
+            "a healthy tag push with a successful managed producer must publish",
+        )
+        for blocked in ["skipped", "failure", "cancelled"]:
+            results = dict(happy, **{"build-server-managed-packages": blocked})
+            self.assertFalse(
+                evaluate_condition(condition_expr, event_name="push", results=results),
+                f"create-release must not publish when the managed job is {blocked}",
+            )
+        # The recovery-only relaxation (explicit skipped acceptance) must
+        # not be reachable from create-release on a tag push.
+        recovery_expr = job_if_condition(self.release_text, "upload-recovered-release-assets")
+        self.assertTrue(recovery_expr)
+        self.assertIn("needs.build-server-managed-packages.result == 'skipped'", recovery_expr)
+
+    def test_recovery_explicitly_accepts_skipped_managed_producer(self) -> None:
+        recovery = job_block(self.release_text, "upload-recovered-release-assets")
+        self.assertIn(
+            "needs.build-server-managed-packages.result == 'success' || needs.build-server-managed-packages.result == 'skipped'",
+            recovery,
+        )
+        condition_expr = job_if_condition(self.release_text, "upload-recovered-release-assets")
+        happy = {
+            "verify-versions": "success",
+            "sign-and-notarize-macos": "success",
+            "verify-release-assets": "success",
+            "build-server-managed-packages": "skipped",
+        }
+        self.assertTrue(
+            evaluate_condition(
+                condition_expr, event_name="workflow_dispatch", results=happy
+            ),
+            "manual recovery must explicitly tolerate a historically skipped managed producer",
+        )
+
+    def test_release_and_recovery_download_all_managed_matrix_artifacts(self) -> None:
+        managed = job_block(self.release_text, "build-server-managed-packages")
+        self.assertIn("name: server-managed-packages-${{ matrix.target }}", managed)
+        self.assertIn("path: server-managed-packages/${{ matrix.target }}/*", managed)
+
+        for job_name in ["create-release", "upload-recovered-release-assets"]:
+            job = job_block(self.release_text, job_name)
+            self.assertIn("pattern: server-managed-packages-*", job, job_name)
+            self.assertIn("merge-multiple: false", job, job_name)
+            self.assertIn(
+                "if: needs.build-server-managed-packages.result == 'success'",
+                job,
+                job_name,
+            )
+
+    def test_release_inventory_is_gated_by_assemble_step(self) -> None:
+        for job_name in ["create-release", "upload-recovered-release-assets"]:
+            job = job_block(self.release_text, job_name)
+            self.assertIn("assemble-release-inventory.sh", job, job_name)
+            self.assertIn("--managed-target x86_64-unknown-linux-musl", job, job_name)
+            self.assertIn("--managed-target aarch64-unknown-linux-musl", job, job_name)
+
+    def test_release_inventory_call_sites_are_managed_only(self) -> None:
+        """The authoritative release paths must never merge legacy and managed DEBs.
+
+        The legacy host-native cargo-deb package and the managed x86_64 DEB
+        share the canonical basename terraphim-server_<version>-1_amd64.deb,
+        so passing both stages to the assembler would make every normal tag
+        push fail closed on duplicate rejection. Both call sites therefore
+        stay managed-only: no debian-packages download, no legacy-deb
+        staging directory, no --legacy flag, and no legacy resurrection in
+        the artifact-download retry path.
+        """
+        assemble_step = "Assemble release inventory (managed all-or-nothing, duplicate rejection)"
+        for job_name in ["create-release", "upload-recovered-release-assets"]:
+            job = job_block(self.release_text, job_name)
+            self.assertNotIn("--legacy", job, job_name)
+            self.assertNotIn("path: legacy-deb", job, job_name)
+            self.assertNotIn("name: debian-packages", job, job_name)
+            assemble = step_run_block(job, assemble_step)
+            self.assertTrue(assemble, job_name)
+            self.assertIn("--managed-staging managed-staging", assemble, job_name)
+            self.assertNotIn("--legacy", assemble, job_name)
+
+        retry = step_run_block(
+            job_block(self.release_text, "create-release"),
+            "Retry artifact download if needed",
+        )
+        self.assertTrue(retry)
+        self.assertNotIn("legacy-deb", retry)
+        self.assertNotIn("debian-packages", retry)
+
+        # The legacy cargo-deb producer survives only as non-authoritative
+        # validation; nothing downstream may consume its artifact.
+        legacy_producer = job_block(self.release_text, "build-debian-packages")
+        self.assertIn("continue-on-error: true", legacy_producer)
+        self.assertIn("name: debian-packages", legacy_producer)
+
+    def test_release_inventory_assembler_rejects_duplicates_and_partial_matrix(self) -> None:
+        assembler = ROOT / ".github/scripts/release/assemble-release-inventory.sh"
+        self.assertTrue(assembler.exists(), "assemble-release-inventory.sh must exist")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            out = root / "release-assets"
+            out.mkdir()
+            (out / "terraphim_server-universal-apple-darwin").write_bytes(b"bin")
+            legacy = root / "legacy-deb"
+            legacy.mkdir()
+            (legacy / "terraphim-server_1.0.0-1_amd64.deb").write_bytes(b"legacy-native")
+            staging = root / "managed-staging"
+            for target, arch in [
+                ("x86_64-unknown-linux-musl", "amd64"),
+                ("aarch64-unknown-linux-musl", "arm64"),
+            ]:
+                target_dir = staging / f"server-managed-packages-{target}"
+                target_dir.mkdir(parents=True)
+                (target_dir / f"terraphim-server_1.0.0-1_{arch}.deb").write_bytes(b"managed")
+                (target_dir / f"terraphim-server-1.0.0-1.{arch.replace('amd64', 'x86_64')}.rpm").write_bytes(b"managed")
+                (target_dir / f"terraphim-server-1.0.0-{target}.package-sha256sums.txt").write_bytes(b"managed")
+
+            command = [
+                str(assembler),
+                "--output", str(out),
+                "--legacy", str(legacy),
+                "--managed-staging", str(staging),
+                "--managed-target", "x86_64-unknown-linux-musl",
+                "--managed-target", "aarch64-unknown-linux-musl",
+            ]
+
+            # The legacy amd64 cargo-deb basename collides with the managed
+            # amd64 DEB; the assembler must fail closed on the conflict.
+            conflicted = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(conflicted.returncode, 0, conflicted.stdout)
+            self.assertIn("duplicate release asset basename", conflicted.stderr)
+            self.assertIn("terraphim-server_1.0.0-1_amd64.deb", conflicted.stderr)
+            self.assertFalse((out / "terraphim-server_1.0.0-1_amd64.deb").exists())
+
+            # A partial managed matrix is all-or-nothing.
+            (legacy / "terraphim-server_1.0.0-1_amd64.deb").unlink()
+            shutil.rmtree(staging / "server-managed-packages-aarch64-unknown-linux-musl")
+            partial = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(partial.returncode, 0, partial.stdout)
+            self.assertIn("managed package matrix incomplete", partial.stderr)
+            self.assertIn("aarch64-unknown-linux-musl", partial.stderr)
+
+            # A normal managed-only inventory (the workflow's exact
+            # call shape: no --legacy stage at all) succeeds.
+            managed_only_command = [
+                str(assembler),
+                "--output", str(out),
+                "--managed-staging", str(staging),
+                "--managed-target", "x86_64-unknown-linux-musl",
+                "--managed-target", "aarch64-unknown-linux-musl",
+            ]
+            shutil.rmtree(staging)
+            for target, deb_arch, rpm_arch in [
+                ("x86_64-unknown-linux-musl", "amd64", "x86_64"),
+                ("aarch64-unknown-linux-musl", "arm64", "aarch64"),
+            ]:
+                target_dir = staging / f"server-managed-packages-{target}"
+                target_dir.mkdir(parents=True)
+                (target_dir / f"terraphim-server_1.0.0-1_{deb_arch}.deb").write_bytes(b"managed")
+                (target_dir / f"terraphim-server-1.0.0-1.{rpm_arch}.rpm").write_bytes(b"managed")
+                (target_dir / f"terraphim-server-1.0.0-{target}.package-sha256sums.txt").write_bytes(b"managed")
+            merged = subprocess.run(managed_only_command, capture_output=True, text=True)
+            self.assertEqual(merged.returncode, 0, merged.stderr)
+            self.assertTrue((out / "terraphim-server_1.0.0-1_amd64.deb").exists())
+            self.assertTrue((out / "terraphim-server_1.0.0-1_arm64.deb").exists())
+            self.assertTrue((out / "terraphim-server-1.0.0-1.x86_64.rpm").exists())
+            self.assertTrue((out / "terraphim-server-1.0.0-1.aarch64.rpm").exists())
+            self.assertTrue(
+                (out / "terraphim-server-1.0.0-x86_64-unknown-linux-musl.package-sha256sums.txt").exists()
+            )
+            self.assertTrue(
+                (out / "terraphim-server-1.0.0-aarch64-unknown-linux-musl.package-sha256sums.txt").exists()
+            )
+
+    def test_release_uploads_include_assembled_managed_inventory(self) -> None:
+        create_release = job_block(self.release_text, "create-release")
+        recovery = job_block(self.release_text, "upload-recovered-release-assets")
+
+        # Both publishing paths upload everything assembled into
+        # release-assets, which the assemble step extended with the managed
+        # DEB/RPM outputs and their package checksum manifests.
+        self.assertIn("files: release-assets/*", create_release)
+        self.assertIn(
+            'gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY" --clobber',
+            recovery,
+        )
+        # Checksum inventories are computed over the assembled directory.
+        self.assertIn("working-directory: release-assets", create_release)
+
+    def test_managed_parity_cargo_deb_is_per_target_from_qualified_musl_bytes(self) -> None:
+        managed = job_block(self.release_text, "build-server-managed-packages")
+        # Parity is built per matrix target from the exact qualified MUSL
+        # input staged into the cargo-deb assets path, never from a host
+        # native cargo-deb build.
+        self.assertIn("cargo deb -p terraphim_server", managed)
+        self.assertIn("--no-build --no-strip", managed)
+        self.assertIn('--target "$TARGET"', managed)
+        self.assertIn('--output "cargo-deb-parity/${TARGET}"', managed)
+        self.assertIn('cp "$BIN" "target/${TARGET}/release/terraphim_server"', managed)
+        self.assertIn('--cargo-deb-dir "cargo-deb-parity/${TARGET}"', managed)
+        self.assertNotIn("name: debian-packages", managed)
+        self.assertNotIn("cargo-deb-artifact", self.release_text)
+        self.assertNotIn("needs.build-debian-packages.result == 'success'", managed)
+
+    def test_native_gate_require_install_matches_runner_arch(self) -> None:
+        gate = step_run_block(
+            job_block(self.release_text, "build-server-managed-packages"),
+            "Run native managed-package lifecycle gate",
+        )
+        self.assertIn("REQUIRE_INSTALL:", gate)
+        self.assertIn(
+            "runner.arch == 'X64' && matrix.target == 'x86_64-unknown-linux-musl'",
+            gate,
+        )
+        self.assertIn(
+            "runner.arch == 'ARM64' && matrix.target == 'aarch64-unknown-linux-musl'",
+            gate,
+        )
+        self.assertIn("&& '1' || '0'", gate)
 
 
 class HostileInputContract(unittest.TestCase):
