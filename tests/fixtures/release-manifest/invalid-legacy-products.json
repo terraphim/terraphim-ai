@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0.0",
+  "release_version": "1.2.3",
+  "release_tag": "v1.2.3",
+  "sources": {
+    "terraphim-ai": {
+      "gitea_sha": "1111111111111111111111111111111111111111",
+      "github_sha": "1111111111111111111111111111111111111111",
+      "tree_sha": "2222222222222222222222222222222222222222",
+      "workflow_run_id": 33380001
+    },
+    "terraphim-clients": {
+      "gitea_sha": "3333333333333333333333333333333333333333",
+      "github_sha": "3333333333333333333333333333333333333333",
+      "tree_sha": "4444444444444444444444444444444444444444",
+      "workflow_run_id": 33360001
+    }
+  },
+  "products": [
+    {
+      "name": "terraphim-agent",
+      "assets": []
+    }
+  ],
+  "required_channels": [
+    "github_release",
+    "r2_stable_manifest",
+    "homebrew_tap_pr",
+    "aur_terraphim_clients_bin",
+    "omarchy_terraphim_clients_bin"
+  ],
+  "central_channels": [
+    "github_release",
+    "r2_stable_manifest"
+  ],
+  "downstream_channels": [
+    "homebrew_tap_pr",
+    "aur_terraphim_clients_bin",
+    "omarchy_terraphim_clients_bin"
+  ],
+  "created_at": "2026-09-12T10:00:00Z"
+}
