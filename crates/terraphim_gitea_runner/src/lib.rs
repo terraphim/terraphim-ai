@@ -85,14 +85,19 @@ fn native_ci_workflow_declares_targeted_package_default_policy_tests() {
 
     let count = |needle: &str| commands.iter().copied().filter(|c| *c == needle).count();
 
-    assert_eq!(count("cargo test --workspace --lib --no-fail-fast"), 1);
     assert_eq!(
-        count("cargo test -p terraphim_gitea_runner --no-fail-fast"),
+        count("CARGO_HTTP_TIMEOUT=600 cargo test --workspace --offline --lib --no-fail-fast"),
         1
     );
     assert_eq!(
         count(
-            "CARGO_REGISTRIES_TERRAPHIM_INDEX=sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/ cargo test -p terraphim_llm_runner --no-fail-fast"
+            "CARGO_HTTP_TIMEOUT=600 cargo test -p terraphim_gitea_runner --offline --no-fail-fast"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            "CARGO_HTTP_TIMEOUT=600 CARGO_REGISTRIES_TERRAPHIM_INDEX=sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/ cargo test -p terraphim_llm_runner --offline --no-fail-fast"
         ),
         1
     );
@@ -118,9 +123,9 @@ fn native_ci_workflow_declares_targeted_package_default_policy_tests() {
     assert_eq!(
         direct_cargo_test_lines,
         [
-            "cargo test --workspace --lib --no-fail-fast",
-            "cargo test -p terraphim_gitea_runner --no-fail-fast",
-            "cargo test -p terraphim_llm_runner --no-fail-fast",
+            "cargo test --workspace --offline --lib --no-fail-fast",
+            "cargo test -p terraphim_gitea_runner --offline --no-fail-fast",
+            "cargo test -p terraphim_llm_runner --offline --no-fail-fast",
         ]
     );
 }

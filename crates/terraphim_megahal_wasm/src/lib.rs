@@ -451,10 +451,6 @@ fn escape_html(text: &str) -> String {
         .replace('>', "&gt;")
 }
 
-fn default_rng() -> terraphim_sooth::DefaultRng {
-    rand_core::SeedableRng::seed_from_u64(42)
-}
-
 /// "Watch me learn": a guided loop that makes training visible. Type a
 /// nonsense word, teach three templated sentences about it (counters pulse
 /// as vocabulary and patterns grow), then ask -- the reply highlights the
