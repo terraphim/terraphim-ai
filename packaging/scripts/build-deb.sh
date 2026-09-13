@@ -5,6 +5,17 @@
 
 set -euo pipefail
 
+cat >&2 <<'EOF'
+Deprecated: build-deb.sh is intentionally disabled for CI package production.
+
+The managed DEB/RPM producer wraps qualified MUSL terraphim_server bytes
+without rebuilding. Keep cargo-deb only as the existing parity oracle artifact;
+do not use this legacy script for release package production.
+Use:
+  .github/scripts/nfpm/build-server-packages.sh
+EOF
+exit 1
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TARGET="${1:---all}"
 

@@ -2,8 +2,22 @@
 # packaging/scripts/build-rpm.sh
 # Build RPM packages using cargo-rpm or rpmbuild
 # Usage: ./build-rpm.sh
+#
+# Deprecated: server RPM production now lives in
+# .github/scripts/nfpm/build-server-packages.sh and wraps qualified MUSL
+# terraphim_server bytes without rebuilding. Keep this legacy script only
+# until the managed-package nFPM native gates have passed for two releases.
 
 set -euo pipefail
+
+cat >&2 <<'EOF'
+Deprecated: build-rpm.sh is intentionally disabled for CI package production.
+
+The managed RPM producer wraps qualified MUSL terraphim_server bytes without
+rebuilding. Use:
+  .github/scripts/nfpm/build-server-packages.sh
+EOF
+exit 1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUTPUT_DIR="$ROOT/target/rpm"
