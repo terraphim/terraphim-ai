@@ -188,20 +188,19 @@ pub fn load_key() -> Result<KeyRedacted, AuthError> {
     }
 
     // 2. $LINEAR_API_KEY
-    if let Ok(key) = std::env::var("LINEAR_API_KEY") {
-        if !key.is_empty() {
-            return Ok(KeyRedacted::new(key));
-        }
+    if let Ok(key) = std::env::var("LINEAR_API_KEY")
+        && !key.is_empty()
+    {
+        return Ok(KeyRedacted::new(key));
     }
 
     // 3. `op read` — only in TTY (avoids the non-tty biometric trap
     //    documented in terraphim-rlm-preflight-notes).
-    if std::io::stdout().is_terminal() {
-        if let Ok(key) = try_op_read() {
-            if !key.is_empty() {
-                return Ok(KeyRedacted::new(key));
-            }
-        }
+    if std::io::stdout().is_terminal()
+        && let Ok(key) = try_op_read()
+        && !key.is_empty()
+    {
+        return Ok(KeyRedacted::new(key));
     }
 
     Err(AuthError::Missing)
@@ -226,10 +225,10 @@ fn load_from_linearctl_config() -> Result<Option<String>, AuthError> {
     // by reading ~/.linearctl/config.json):
     //   1. `currentKey` (top-level) — what `lc` actually uses for HTTP calls
     //   2. `profiles[defaultProfile].apiKey` — legacy fallback
-    if let Some(k) = cfg.current_key {
-        if !k.is_empty() {
-            return Ok(Some(k));
-        }
+    if let Some(k) = cfg.current_key
+        && !k.is_empty()
+    {
+        return Ok(Some(k));
     }
     let default_name = cfg.default_profile.as_deref().unwrap_or("default");
     let key = cfg
