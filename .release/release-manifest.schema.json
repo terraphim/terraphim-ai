@@ -1,0 +1,308 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraphim.ai/schemas/release-manifest-v1.json",
+  "title": "Terraphim Release Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "release_version",
+    "release_tag",
+    "sources",
+    "assets",
+    "required_channels",
+    "central_channels",
+    "downstream_channels",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "release_version": {
+      "$ref": "#/$defs/semver"
+    },
+    "release_tag": {
+      "type": "string",
+      "pattern": "^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "terraphim-ai",
+        "terraphim-clients"
+      ],
+      "properties": {
+        "terraphim-ai": {
+          "$ref": "#/$defs/source"
+        },
+        "terraphim-clients": {
+          "$ref": "#/$defs/source"
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/asset"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "component"
+            ],
+            "properties": {
+              "component": {
+                "const": "terraphim-server"
+              }
+            }
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "component"
+            ],
+            "properties": {
+              "component": {
+                "const": "terraphim-agent"
+              }
+            }
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "component"
+            ],
+            "properties": {
+              "component": {
+                "const": "terraphim-grep"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "required_channels": {
+      "$ref": "#/$defs/required_channels"
+    },
+    "central_channels": {
+      "$ref": "#/$defs/central_channels"
+    },
+    "downstream_channels": {
+      "$ref": "#/$defs/downstream_channels"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "git_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gitea_sha",
+        "github_sha",
+        "tree_sha",
+        "workflow_run_id"
+      ],
+      "properties": {
+        "gitea_sha": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "github_sha": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "tree_sha": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "workflow_run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tag_peel_matches_gitea": {
+          "type": "boolean",
+          "const": true
+        },
+        "tag_peel_matches_github": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "component",
+        "format",
+        "target",
+        "arch",
+        "os",
+        "source_repo",
+        "source_sha",
+        "sha256",
+        "size_bytes",
+        "signature"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component": {
+          "type": "string",
+          "enum": [
+            "terraphim-server",
+            "terraphim-agent",
+            "terraphim-grep"
+          ]
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "tar.gz",
+            "deb",
+            "rpm",
+            "pkg.tar.zst",
+            "rb",
+            "exe",
+            "dmg",
+            "zip"
+          ]
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "arch": {
+          "type": "string",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "universal"
+          ]
+        },
+        "os": {
+          "type": "string",
+          "enum": [
+            "linux",
+            "macos",
+            "windows"
+          ]
+        },
+        "source_repo": {
+          "type": "string",
+          "enum": [
+            "terraphim-ai",
+            "terraphim-clients"
+          ]
+        },
+        "source_sha": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "signature": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "format": {
+                "const": "rb"
+              }
+            },
+            "required": [
+              "format"
+            ]
+          },
+          "then": {
+            "properties": {
+              "signature": {
+                "type": "string"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "signature": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "required_channels": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "github_release",
+          "r2_stable_manifest",
+          "homebrew_tap_pr",
+          "aur_terraphim_clients_bin",
+          "omarchy_terraphim_clients_bin"
+        ]
+      }
+    },
+    "central_channels": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "github_release",
+          "r2_stable_manifest"
+        ]
+      }
+    },
+    "downstream_channels": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "homebrew_tap_pr",
+          "aur_terraphim_clients_bin",
+          "omarchy_terraphim_clients_bin"
+        ]
+      }
+    }
+  }
+}
