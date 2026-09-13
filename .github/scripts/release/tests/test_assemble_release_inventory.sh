@@ -278,6 +278,58 @@ test_zero_length_managed_input_fails_before_merge() {
         --managed-target aarch64-unknown-linux-musl
 }
 
+# The staging root is itself an exact producer/consumer boundary. A directory
+# for any target outside the release matrix must not be mistaken for an absent
+# managed stage.
+test_wrong_target_managed_staging_dir_fails() {
+    local out="$TMP/out12" staging="$TMP/staging12"
+    mkdir -p "$out"
+    make_stage "$staging/server-managed-packages-riscv64gc-unknown-linux-gnu" \
+        "terraphim-server_1.0.0-1_riscv64.deb"
+
+    expect_fail "unexpected managed staging entry" \
+        --output "$out" --managed-staging "$staging" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+}
+
+# Unexpected root entries, including hidden files, reject an otherwise
+# complete matrix before any managed package is merged.
+test_unexpected_managed_staging_entry_fails_before_merge() {
+    local out="$TMP/out13" staging="$TMP/staging13"
+    mkdir -p "$out"
+    make_stage "$staging/server-managed-packages-x86_64-unknown-linux-musl" \
+        "terraphim-server_1.0.0-1_amd64.deb" \
+        "terraphim-server-1.0.0-1.x86_64.rpm" \
+        "terraphim-server-1.0.0-x86_64-unknown-linux-musl.package-sha256sums.txt"
+    make_stage "$staging/server-managed-packages-aarch64-unknown-linux-musl" \
+        "terraphim-server_1.0.0-1_arm64.deb" \
+        "terraphim-server-1.0.0-1.aarch64.rpm" \
+        "terraphim-server-1.0.0-aarch64-unknown-linux-musl.package-sha256sums.txt"
+    printf 'unexpected\n' > "$staging/.unexpected-root-entry"
+
+    expect_fail "unexpected managed staging entry" \
+        --output "$out" --managed-staging "$staging" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+
+    [[ ! -e "$out/terraphim-server_1.0.0-1_amd64.deb" ]] ||
+        fail "managed matrix with an unexpected root entry was partially merged"
+}
+
+# A symlink at the staging root must not be followed or ignored, regardless of
+# whether it resolves to a directory.
+test_managed_staging_root_symlink_entry_fails() {
+    local out="$TMP/out14" staging="$TMP/staging14" linked="$TMP/linked-root-dir"
+    mkdir -p "$out" "$staging" "$linked"
+    ln -s "$linked" "$staging/server-managed-packages-extra"
+
+    expect_fail "unexpected managed staging entry" \
+        --output "$out" --managed-staging "$staging" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+}
+
 test_complete_managed_matrix_is_merged
 test_managed_legacy_basename_conflict_fails
 test_partial_managed_matrix_fails
@@ -289,5 +341,8 @@ test_unexpected_managed_inventory_fails_before_merge
 test_stale_version_managed_inventory_fails_before_merge
 test_unsafe_managed_inputs_fail_before_merge
 test_zero_length_managed_input_fails_before_merge
+test_wrong_target_managed_staging_dir_fails
+test_unexpected_managed_staging_entry_fails_before_merge
+test_managed_staging_root_symlink_entry_fails
 
 echo "assemble-release-inventory tests passed"
