@@ -209,6 +209,22 @@ if [[ -n "$MANAGED_STAGING" && ! -d "$MANAGED_STAGING" ]]; then
     MANAGED_STAGING=""
 fi
 if [[ -n "$MANAGED_STAGING" ]]; then
+    while IFS= read -r -d '' path; do
+        base="$(basename "$path")"
+        case "$base" in
+            server-managed-packages-x86_64-unknown-linux-musl|server-managed-packages-aarch64-unknown-linux-musl)
+                if [[ -L "$path" || ! -d "$path" ]]; then
+                    echo "::error::unexpected managed staging entry (expected a regular target directory): $path" >&2
+                    exit 1
+                fi
+                ;;
+            *)
+                echo "::error::unexpected managed staging entry: $path" >&2
+                exit 1
+                ;;
+        esac
+    done < <(find "$MANAGED_STAGING" -mindepth 1 -maxdepth 1 -print0)
+
     absent=()
     for target in "${MANAGED_TARGETS[@]}"; do
         dir="$MANAGED_STAGING/server-managed-packages-$target"
