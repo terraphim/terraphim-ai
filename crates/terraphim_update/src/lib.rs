@@ -21,6 +21,7 @@ use self_update::version::bump_is_greater;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::NamedTempFile;
 use tracing::{error, info, warn};
@@ -139,21 +140,12 @@ pub struct UpdaterConfig {
     /// Defaults to `true` to honour the documented contract. Set to `false`
     /// (e.g. in air-gapped environments with a mirror) to fail hard on R2.
     pub github_fallback: bool,
-    /// Cached startup policy. A cached [`policy::UpdatePolicy::SelfManaged`]
-    /// is treated only as a hint; update boundaries re-detect before network
-    /// and write-capable work.
-    pub policy: policy::UpdatePolicy,
-    /// Optional executable path used for policy detection in tests or callers
-    /// that have already resolved the binary path. Production callers should
-    /// normally leave this unset so detection uses `std::env::current_exe()`.
-    current_exe_path: Option<PathBuf>,
 }
 
 impl UpdaterConfig {
     /// Create a new updater config for Terraphim AI binaries
     pub fn new(bin_name: impl Into<String>) -> Self {
         let bin_name = bin_name.into();
-        let policy = policy::detect_update_policy_default();
         Self {
             bin_name,
             repo_owner: "terraphim".to_string(),
@@ -162,8 +154,6 @@ impl UpdaterConfig {
             show_progress: true,
             r2_base_url: r2::DEFAULT_R2_BASE_URL.to_string(),
             github_fallback: true,
-            policy,
-            current_exe_path: None,
         }
     }
 
@@ -190,36 +180,34 @@ impl UpdaterConfig {
         self.github_fallback = enabled;
         self
     }
-
-    /// Explicitly inject a resolved update policy.
-    pub fn with_policy(mut self, policy: policy::UpdatePolicy) -> Self {
-        self.policy = policy;
-        self
-    }
-
-    /// Override the executable path used for managed-install detection.
-    pub fn with_current_exe_path(mut self, path: impl Into<PathBuf>) -> Self {
-        self.current_exe_path = Some(path.into());
-        self
-    }
 }
+
+type PolicyDetector = Arc<dyn Fn() -> policy::UpdatePolicy + Send + Sync>;
 
 /// Updater client for Terraphim AI binaries
 pub struct TerraphimUpdater {
     config: UpdaterConfig,
+    policy_detector: PolicyDetector,
 }
 
 impl TerraphimUpdater {
     /// Create a new updater instance
     pub fn new(config: UpdaterConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            policy_detector: Arc::new(policy::detect_update_policy_default),
+        }
     }
 
-    fn detect_policy_for(current_exe_path: Option<&Path>) -> policy::UpdatePolicy {
-        current_exe_path.map_or_else(
-            policy::detect_update_policy_default,
-            policy::detect_update_policy,
-        )
+    #[cfg(test)]
+    fn new_with_policy_detector(
+        config: UpdaterConfig,
+        detect_policy: impl Fn() -> policy::UpdatePolicy + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            config,
+            policy_detector: Arc::new(detect_policy),
+        }
     }
 
     // Keep the package-managed gate centralized in the update library:
@@ -227,21 +215,11 @@ impl TerraphimUpdater {
     // these public updater/free-function paths, so a second main.rs-only gate
     // would be redundant and easier for future call sites to bypass.
     fn managed_status(&self) -> Option<UpdateStatus> {
-        Self::managed_status_with_detector(&self.config.policy, || {
-            Self::detect_policy_for(self.config.current_exe_path.as_deref())
-        })
+        Self::managed_status_with_detector(&self.policy_detector)
     }
 
-    fn managed_status_with_detector(
-        configured_policy: &policy::UpdatePolicy,
-        detect_policy: impl FnOnce() -> policy::UpdatePolicy,
-    ) -> Option<UpdateStatus> {
-        let resolved_policy = match configured_policy {
-            policy::UpdatePolicy::PackageManaged { .. } => configured_policy.clone(),
-            policy::UpdatePolicy::SelfManaged => detect_policy(),
-        };
-
-        match resolved_policy {
+    fn managed_status_with_detector(detect_policy: &PolicyDetector) -> Option<UpdateStatus> {
+        match detect_policy() {
             policy::UpdatePolicy::PackageManaged {
                 manager,
                 update_command,
@@ -276,13 +254,10 @@ impl TerraphimUpdater {
         let repo_owner = self.config.repo_owner.clone();
         let repo_name = self.config.repo_name.clone();
         let show_progress = self.config.show_progress;
-        let configured_policy = self.config.policy.clone();
-        let current_exe_path = self.config.current_exe_path.clone();
+        let policy_detector = Arc::clone(&self.policy_detector);
 
         let result = tokio::task::spawn_blocking(move || {
-            if let Some(status) = Self::managed_status_with_detector(&configured_policy, || {
-                Self::detect_policy_for(current_exe_path.as_deref())
-            }) {
+            if let Some(status) = Self::managed_status_with_detector(&policy_detector) {
                 return Ok::<UpdateStatus, anyhow::Error>(status);
             }
 
@@ -303,11 +278,7 @@ impl TerraphimUpdater {
             }
 
             // GitHub fallback (unchanged behaviour).
-            if let Some(status) =
-                Self::managed_status_with_detector(&policy::UpdatePolicy::SelfManaged, || {
-                    Self::detect_policy_for(current_exe_path.as_deref())
-                })
-            {
+            if let Some(status) = Self::managed_status_with_detector(&policy_detector) {
                 return Ok::<UpdateStatus, anyhow::Error>(status);
             }
             Self::check_via_github(
@@ -316,7 +287,7 @@ impl TerraphimUpdater {
                 &bin_name,
                 &current_version,
                 show_progress,
-                current_exe_path.as_deref(),
+                &policy_detector,
             )
         })
         .await;
@@ -359,13 +330,9 @@ impl TerraphimUpdater {
         bin_name: &str,
         current_version: &str,
         show_progress: bool,
-        current_exe_path: Option<&Path>,
+        policy_detector: &PolicyDetector,
     ) -> Result<UpdateStatus> {
-        if let Some(status) =
-            Self::managed_status_with_detector(&policy::UpdatePolicy::SelfManaged, || {
-                Self::detect_policy_for(current_exe_path)
-            })
-        {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
             return Ok(status);
         }
 
@@ -451,8 +418,7 @@ impl TerraphimUpdater {
         let repo_owner = self.config.repo_owner.clone();
         let repo_name = self.config.repo_name.clone();
         let show_progress = self.config.show_progress;
-        let configured_policy = self.config.policy.clone();
-        let current_exe_path = self.config.current_exe_path.clone();
+        let policy_detector = Arc::clone(&self.policy_detector);
 
         // Decode the embedded public key for signature verification (shared by
         // both the R2 and GitHub paths).
@@ -469,9 +435,7 @@ impl TerraphimUpdater {
         key_array.copy_from_slice(&key_bytes);
 
         let result = tokio::task::spawn_blocking(move || {
-            if let Some(status) = Self::managed_status_with_detector(&configured_policy, || {
-                Self::detect_policy_for(current_exe_path.as_deref())
-            }) {
+            if let Some(status) = Self::managed_status_with_detector(&policy_detector) {
                 return Ok::<UpdateStatus, anyhow::Error>(status);
             }
 
@@ -481,7 +445,7 @@ impl TerraphimUpdater {
                 &bin_name,
                 &current_version,
                 show_progress,
-                current_exe_path.as_deref(),
+                &policy_detector,
             ) {
                 Ok(status) => return Ok::<UpdateStatus, anyhow::Error>(status),
                 Err(e) => {
@@ -496,11 +460,7 @@ impl TerraphimUpdater {
             }
 
             // GitHub fallback (self_update, Ed25519 via verifying_keys).
-            if let Some(status) =
-                Self::managed_status_with_detector(&policy::UpdatePolicy::SelfManaged, || {
-                    Self::detect_policy_for(current_exe_path.as_deref())
-                })
-            {
+            if let Some(status) = Self::managed_status_with_detector(&policy_detector) {
                 return Ok::<UpdateStatus, anyhow::Error>(status);
             }
             Self::update_via_github(
@@ -510,7 +470,7 @@ impl TerraphimUpdater {
                 &current_version,
                 show_progress,
                 key_array,
-                current_exe_path.as_deref(),
+                &policy_detector,
             )
         })
         .await;
@@ -544,13 +504,9 @@ impl TerraphimUpdater {
         bin_name: &str,
         current_version: &str,
         show_progress: bool,
-        current_exe_path: Option<&Path>,
+        policy_detector: &PolicyDetector,
     ) -> Result<UpdateStatus> {
-        if let Some(status) =
-            Self::managed_status_with_detector(&policy::UpdatePolicy::SelfManaged, || {
-                Self::detect_policy_for(current_exe_path)
-            })
-        {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
             return Ok(status);
         }
 
@@ -581,11 +537,7 @@ impl TerraphimUpdater {
             "Downloading R2 update {} for {} from {}",
             manifest.version, asset.target, asset.url
         );
-        if let Some(status) =
-            Self::managed_status_with_detector(&policy::UpdatePolicy::SelfManaged, || {
-                Self::detect_policy_for(current_exe_path)
-            })
-        {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
             return Ok(status);
         }
 
@@ -625,11 +577,7 @@ impl TerraphimUpdater {
             }
         }
 
-        if let Some(status) =
-            Self::managed_status_with_detector(&policy::UpdatePolicy::SelfManaged, || {
-                Self::detect_policy_for(current_exe_path)
-            })
-        {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
             return Ok(status);
         }
         match Self::install_verified_archive(&archive_path, bin_name) {
@@ -649,13 +597,9 @@ impl TerraphimUpdater {
         current_version: &str,
         show_progress: bool,
         key_array: [u8; 32],
-        current_exe_path: Option<&Path>,
+        policy_detector: &PolicyDetector,
     ) -> Result<UpdateStatus> {
-        if let Some(status) =
-            Self::managed_status_with_detector(&policy::UpdatePolicy::SelfManaged, || {
-                Self::detect_policy_for(current_exe_path)
-            })
-        {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
             return Ok(status);
         }
 
@@ -720,14 +664,11 @@ impl TerraphimUpdater {
         let bin_name = self.config.bin_name.clone();
         let current_version = self.config.current_version.clone();
         let show_progress = self.config.show_progress;
-        let configured_policy = self.config.policy.clone();
-        let current_exe_path = self.config.current_exe_path.clone();
+        let policy_detector = Arc::clone(&self.policy_detector);
 
         // Move self_update operations to a blocking task
         let result = tokio::task::spawn_blocking(move || {
-            if let Some(status) = Self::managed_status_with_detector(&configured_policy, || {
-                Self::detect_policy_for(current_exe_path.as_deref())
-            }) {
+            if let Some(status) = Self::managed_status_with_detector(&policy_detector) {
                 return Ok(status);
             }
 
@@ -737,7 +678,7 @@ impl TerraphimUpdater {
                 &bin_name,
                 &current_version,
                 show_progress,
-                current_exe_path.as_deref(),
+                &policy_detector,
             )
         })
         .await;
@@ -792,13 +733,9 @@ impl TerraphimUpdater {
         bin_name: &str,
         current_version: &str,
         show_progress: bool,
-        current_exe_path: Option<&Path>,
+        policy_detector: &PolicyDetector,
     ) -> Result<UpdateStatus> {
-        if let Some(status) =
-            Self::managed_status_with_detector(&policy::UpdatePolicy::SelfManaged, || {
-                Self::detect_policy_for(current_exe_path)
-            })
-        {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
             return Ok(status);
         }
 
@@ -820,11 +757,7 @@ impl TerraphimUpdater {
             };
 
         let latest_version = &release.version;
-        if let Some(status) =
-            Self::managed_status_with_detector(&policy::UpdatePolicy::SelfManaged, || {
-                Self::detect_policy_for(current_exe_path)
-            })
-        {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
             return Ok(status);
         }
 
@@ -846,11 +779,7 @@ impl TerraphimUpdater {
         };
 
         let archive_path = temp_archive.path().to_path_buf();
-        if let Some(status) =
-            Self::managed_status_with_detector(&policy::UpdatePolicy::SelfManaged, || {
-                Self::detect_policy_for(current_exe_path)
-            })
-        {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
             return Ok(status);
         }
 
@@ -885,11 +814,7 @@ impl TerraphimUpdater {
         }
 
         // Step 4: Install the verified archive
-        if let Some(status) =
-            Self::managed_status_with_detector(&policy::UpdatePolicy::SelfManaged, || {
-                Self::detect_policy_for(current_exe_path)
-            })
-        {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
             return Ok(status);
         }
         match Self::install_verified_archive(&archive_path, bin_name) {
@@ -1326,32 +1251,20 @@ pub async fn update_binary_silent(bin_name: impl Into<String>) -> Result<UpdateS
 /// };
 /// ```
 pub async fn check_for_updates_auto(bin_name: &str, current_version: &str) -> Result<UpdateStatus> {
-    let policy = policy::detect_update_policy_default();
-    check_for_updates_auto_with_policy(bin_name, current_version, &policy).await
-}
-
-/// Check for updates with an explicitly provided policy.
-pub async fn check_for_updates_auto_with_policy(
-    bin_name: &str,
-    current_version: &str,
-    policy: &policy::UpdatePolicy,
-) -> Result<UpdateStatus> {
-    check_for_updates_auto_with_policy_and_detector(bin_name, current_version, policy, || {
-        policy::detect_update_policy_default()
-    })
+    check_for_updates_auto_with_detector(
+        bin_name,
+        current_version,
+        Arc::new(policy::detect_update_policy_default),
+    )
     .await
 }
 
-async fn check_for_updates_auto_with_policy_and_detector<D>(
+async fn check_for_updates_auto_with_detector(
     bin_name: &str,
     current_version: &str,
-    policy: &policy::UpdatePolicy,
-    detect_policy: D,
-) -> Result<UpdateStatus>
-where
-    D: FnOnce() -> policy::UpdatePolicy,
-{
-    if let Some(status) = TerraphimUpdater::managed_status_with_detector(policy, detect_policy) {
+    policy_detector: PolicyDetector,
+) -> Result<UpdateStatus> {
+    if let Some(status) = TerraphimUpdater::managed_status_with_detector(&policy_detector) {
         return Ok(status);
     }
 
@@ -1361,6 +1274,10 @@ where
     let current_version = current_version.to_string();
 
     let result = tokio::task::spawn_blocking(move || {
+        if let Some(status) = TerraphimUpdater::managed_status_with_detector(&policy_detector) {
+            return Ok::<UpdateStatus, anyhow::Error>(status);
+        }
+
         // Normalize binary name for asset lookup (underscores to hyphens)
         let bin_name_for_asset = bin_name.replace('_', "-");
 
@@ -1633,7 +1550,210 @@ pub fn rollback(backup_path: &Path, target_path: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use std::io::Write;
-    use tempfile::NamedTempFile;
+    use tempfile::{NamedTempFile, TempDir};
+
+    const MANAGED_BIN_NAME: &str = "terraphim_server";
+    const POISON_R2_URL: &str = "not a usable update URL";
+
+    fn write_test_file(path: &Path, contents: &[u8]) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent dirs");
+        }
+        fs::write(path, contents).expect("write test file");
+    }
+
+    fn install_test_binary(root: &Path, bin_name: &str, receipt: Option<&[u8]>) -> PathBuf {
+        let prefix = root.join("usr");
+        let exe = prefix.join("bin").join(bin_name);
+        write_test_file(&exe, b"binary");
+        if let Some(contents) = receipt {
+            write_test_file(
+                &prefix
+                    .join("share/terraphim/package-manager.d")
+                    .join(bin_name),
+                contents,
+            );
+        }
+        exe
+    }
+
+    fn updater_for_executable(config: UpdaterConfig, exe: PathBuf) -> TerraphimUpdater {
+        TerraphimUpdater::new_with_policy_detector(config, move || {
+            policy::detect_update_policy(&exe)
+        })
+    }
+
+    fn package_managed_updater(config: UpdaterConfig) -> (TempDir, TerraphimUpdater) {
+        let root = tempfile::tempdir().expect("tempdir");
+        let exe = install_test_binary(root.path(), MANAGED_BIN_NAME, Some(b"dpkg\n"));
+        let updater = updater_for_executable(config, exe);
+        (root, updater)
+    }
+
+    fn install_destination_candidates(bin_name: &str) -> Vec<PathBuf> {
+        let dir = std::env::current_exe()
+            .expect("current_exe")
+            .parent()
+            .expect("parent")
+            .to_path_buf();
+        vec![dir.join(bin_name), dir.join(bin_name.replace('_', "-"))]
+    }
+
+    fn assert_package_managed(status: UpdateStatus) {
+        assert!(
+            matches!(status, UpdateStatus::PackageManaged { .. }),
+            "expected PackageManaged, got {status:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn package_managed_check_update_makes_zero_requests() {
+        let config = UpdaterConfig::new(MANAGED_BIN_NAME)
+            .with_r2_base_url(POISON_R2_URL)
+            .with_github_fallback(false);
+        let (_root, updater) = package_managed_updater(config);
+
+        let status = updater.check_update().await.expect("check_update");
+
+        assert_package_managed(status);
+    }
+
+    #[tokio::test]
+    async fn alias_receipt_uses_normal_self_managed_check_behavior() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let exe = install_test_binary(root.path(), "terraphim-server", Some(b"rpm\n"));
+        let config = UpdaterConfig::new(MANAGED_BIN_NAME)
+            .with_r2_base_url(POISON_R2_URL)
+            .with_github_fallback(false);
+        let updater = updater_for_executable(config, exe);
+
+        let status = updater.check_update().await.expect("check_update");
+
+        assert!(
+            matches!(status, UpdateStatus::Failed(_)),
+            "alias receipt must not short-circuit SelfManaged behavior, got {status:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn package_managed_update_makes_zero_requests_and_zero_writes() {
+        let bin_name = format!("{MANAGED_BIN_NAME}_managed_update_{}", std::process::id());
+        let destinations = install_destination_candidates(&bin_name);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "precondition: {destination:?} must not exist"
+            );
+        }
+        let config = UpdaterConfig::new(&bin_name)
+            .with_r2_base_url(POISON_R2_URL)
+            .with_github_fallback(false);
+        let (_root, updater) = package_managed_updater(config);
+
+        let status = updater.update().await.expect("update");
+
+        assert_package_managed(status);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "update must not write {destination:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn package_managed_check_and_update_makes_zero_requests_and_zero_writes() {
+        let bin_name = format!("{MANAGED_BIN_NAME}_managed_full_{}", std::process::id());
+        let destinations = install_destination_candidates(&bin_name);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "precondition: {destination:?} must not exist"
+            );
+        }
+        let config = UpdaterConfig::new(&bin_name)
+            .with_r2_base_url(POISON_R2_URL)
+            .with_github_fallback(false);
+        let (_root, updater) = package_managed_updater(config);
+
+        let status = updater.check_and_update().await.expect("check_and_update");
+
+        assert_package_managed(status);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "check_and_update must not write {destination:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn stale_self_managed_result_is_redetected_before_request() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let exe = install_test_binary(root.path(), MANAGED_BIN_NAME, None);
+        let config = UpdaterConfig::new(MANAGED_BIN_NAME)
+            .with_r2_base_url(POISON_R2_URL)
+            .with_github_fallback(false);
+        let updater = updater_for_executable(config, exe);
+        assert!(updater.managed_status().is_none());
+        write_test_file(
+            &root
+                .path()
+                .join("usr/share/terraphim/package-manager.d")
+                .join(MANAGED_BIN_NAME),
+            b"rpm\n",
+        );
+
+        let status = updater.check_update().await.expect("check_update");
+
+        assert_package_managed(status);
+    }
+
+    #[tokio::test]
+    async fn package_managed_update_with_verification_makes_zero_writes() {
+        let bin_name = format!("{MANAGED_BIN_NAME}_verify_{}", std::process::id());
+        let destinations = install_destination_candidates(&bin_name);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "precondition: {destination:?} must not exist"
+            );
+        }
+        let config = UpdaterConfig::new(&bin_name);
+        let (_root, updater) = package_managed_updater(config);
+
+        let status =
+            tokio::time::timeout(Duration::from_secs(5), updater.update_with_verification())
+                .await
+                .expect("update_with_verification must short-circuit")
+                .expect("update_with_verification");
+
+        assert_package_managed(status);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "update_with_verification must not write {destination:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn startup_auto_check_with_managed_detector_short_circuits() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let exe = install_test_binary(root.path(), MANAGED_BIN_NAME, Some(b"homebrew\n"));
+        let detector: PolicyDetector =
+            Arc::new(move || policy::detect_update_policy(exe.as_path()));
+
+        let status = tokio::time::timeout(
+            Duration::from_secs(5),
+            check_for_updates_auto_with_detector(MANAGED_BIN_NAME, "0.0.1", detector),
+        )
+        .await
+        .expect("startup check must short-circuit")
+        .expect("startup check");
+
+        assert_package_managed(status);
+    }
 
     #[test]
     fn test_version_comparison() {

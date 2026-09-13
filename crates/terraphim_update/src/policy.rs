@@ -1,9 +1,9 @@
 //! Runtime detection of whether the current binary is managed by a system
 //! package manager, as opposed to Terraphim's own self-update mechanism.
 //!
-//! Detection is per binary: a canonical executable at
-//! `<prefix>/bin/<binary-name>` is managed only when the matching receipt at
-//! `<prefix>/share/terraphim/package-manager.d/<binary-name>` contains one
+//! Detection applies only to the canonical `terraphim_server` executable at
+//! `<prefix>/bin/terraphim_server`, and only when the matching receipt at
+//! `<prefix>/share/terraphim/package-manager.d/terraphim_server` contains one
 //! supported manager value. Missing, malformed, mismatched, receipt-only,
 //! layout-only, or unrelated receipts resolve to [`UpdatePolicy::SelfManaged`].
 //!
@@ -17,10 +17,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+const TRACKED_EXECUTABLE: &str = "terraphim_server";
+
 /// A supported system package manager.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PackageManager {
-    Pacman,
     Dpkg,
     Rpm,
     Homebrew,
@@ -31,7 +32,6 @@ impl PackageManager {
     /// manager. Also used as the manager's human-readable name.
     pub fn name(&self) -> &'static str {
         match self {
-            PackageManager::Pacman => "pacman",
             PackageManager::Dpkg => "dpkg",
             PackageManager::Rpm => "rpm",
             PackageManager::Homebrew => "homebrew",
@@ -41,7 +41,6 @@ impl PackageManager {
     /// The operator-facing update command for this manager and binary.
     pub fn update_command(&self, bin_name: &str) -> String {
         match self {
-            PackageManager::Pacman => "sudo pacman -Syu".to_string(),
             PackageManager::Dpkg => "sudo apt update && sudo apt upgrade".to_string(),
             PackageManager::Rpm => "sudo dnf upgrade".to_string(),
             PackageManager::Homebrew => format!("brew upgrade {bin_name}"),
@@ -54,7 +53,6 @@ impl PackageManager {
     /// UTF-8, extra line endings, or trailing bytes.
     fn from_marker_value(value: &[u8]) -> Option<Self> {
         match value {
-            b"pacman" | b"pacman\n" | b"pacman\r\n" => Some(PackageManager::Pacman),
             b"dpkg" | b"dpkg\n" | b"dpkg\r\n" => Some(PackageManager::Dpkg),
             b"rpm" | b"rpm\n" | b"rpm\r\n" => Some(PackageManager::Rpm),
             b"homebrew" | b"homebrew\n" | b"homebrew\r\n" => Some(PackageManager::Homebrew),
@@ -91,7 +89,9 @@ fn read_receipt(receipt_path: &Path) -> Option<PackageManager> {
 
 /// Infer the install prefix from `<prefix>/bin/<actual-executable-name>`.
 pub fn inferred_prefix(current_exe: &Path) -> Option<PathBuf> {
-    actual_executable_basename(current_exe)?;
+    if actual_executable_basename(current_exe)? != TRACKED_EXECUTABLE {
+        return None;
+    }
     let bin_dir = current_exe.parent()?;
     if bin_dir.file_name()?.to_str()? != "bin" {
         return None;
@@ -121,16 +121,19 @@ pub fn detect_update_policy(current_exe: &Path) -> UpdatePolicy {
     let Some(actual_bin_name) = actual_executable_basename(&canonical_exe) else {
         return UpdatePolicy::SelfManaged;
     };
+    if actual_bin_name != TRACKED_EXECUTABLE {
+        return UpdatePolicy::SelfManaged;
+    }
     let Some(prefix) = inferred_prefix(&canonical_exe) else {
         return UpdatePolicy::SelfManaged;
     };
-    let Some(manager) = read_receipt(&receipt_path(&prefix, actual_bin_name)) else {
+    let Some(manager) = read_receipt(&receipt_path(&prefix, TRACKED_EXECUTABLE)) else {
         return UpdatePolicy::SelfManaged;
     };
 
     UpdatePolicy::PackageManaged {
         manager,
-        update_command: manager.update_command(actual_bin_name),
+        update_command: manager.update_command(TRACKED_EXECUTABLE),
     }
 }
 
