@@ -32,7 +32,7 @@ make_stage() {
     mkdir -p "$dir"
     local name
     for name in "$@"; do
-        : > "$dir/$name"
+        printf 'fixture\n' > "$dir/$name"
     done
 }
 
@@ -188,6 +188,96 @@ test_managed_only_inventory_succeeds() {
     done
 }
 
+# A managed target directory is an exact producer/consumer boundary. An
+# unrelated fourth file must reject the entire matrix before any asset moves.
+test_unexpected_managed_inventory_fails_before_merge() {
+    local out="$TMP/out8" staging="$TMP/staging8"
+    mkdir -p "$out"
+    printf 'binary\n' > "$out/terraphim_server-universal-apple-darwin"
+    make_stage "$staging/server-managed-packages-x86_64-unknown-linux-musl" \
+        "terraphim-server_1.0.0-1_amd64.deb" \
+        "terraphim-server-1.0.0-1.x86_64.rpm" \
+        "terraphim-server-1.0.0-x86_64-unknown-linux-musl.package-sha256sums.txt" \
+        "unexpected.txt"
+    make_stage "$staging/server-managed-packages-aarch64-unknown-linux-musl" \
+        "terraphim-server_1.0.0-1_arm64.deb" \
+        "terraphim-server-1.0.0-1.aarch64.rpm" \
+        "terraphim-server-1.0.0-aarch64-unknown-linux-musl.package-sha256sums.txt"
+
+    expect_fail "unexpected managed artifact" \
+        --output "$out" --managed-staging "$staging" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+
+    [[ ! -e "$out/terraphim-server_1.0.0-1_amd64.deb" ]] ||
+        fail "unexpected managed inventory was partially merged"
+}
+
+# Every format in a target directory must describe the same version. A stale
+# DEB beside current RPM/checksum outputs must fail before authoritative merge.
+test_stale_version_managed_inventory_fails_before_merge() {
+    local out="$TMP/out9" staging="$TMP/staging9"
+    mkdir -p "$out"
+    printf 'binary\n' > "$out/terraphim_server-universal-apple-darwin"
+    make_stage "$staging/server-managed-packages-x86_64-unknown-linux-musl" \
+        "terraphim-server_0.9.0-1_amd64.deb" \
+        "terraphim-server-1.0.0-1.x86_64.rpm" \
+        "terraphim-server-1.0.0-x86_64-unknown-linux-musl.package-sha256sums.txt"
+    make_stage "$staging/server-managed-packages-aarch64-unknown-linux-musl" \
+        "terraphim-server_1.0.0-1_arm64.deb" \
+        "terraphim-server-1.0.0-1.aarch64.rpm" \
+        "terraphim-server-1.0.0-aarch64-unknown-linux-musl.package-sha256sums.txt"
+
+    expect_fail "unexpected managed artifact" \
+        --output "$out" --managed-staging "$staging" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+
+    [[ ! -e "$out/terraphim-server-1.0.0-1.x86_64.rpm" ]] ||
+        fail "stale managed inventory was partially merged"
+}
+
+test_unsafe_managed_inputs_fail_before_merge() {
+    local out="$TMP/out10" staging="$TMP/staging10" linked="$TMP/linked-rpm"
+    mkdir -p "$out"
+    printf 'linked package\n' > "$linked"
+    make_stage "$staging/server-managed-packages-x86_64-unknown-linux-musl" \
+        "terraphim-server_1.0.0-1_amd64.deb" \
+        "terraphim-server-1.0.0-x86_64-unknown-linux-musl.package-sha256sums.txt"
+    ln -s "$linked" "$staging/server-managed-packages-x86_64-unknown-linux-musl/terraphim-server-1.0.0-1.x86_64.rpm"
+    make_stage "$staging/server-managed-packages-aarch64-unknown-linux-musl" \
+        "terraphim-server_1.0.0-1_arm64.deb" \
+        "terraphim-server-1.0.0-1.aarch64.rpm" \
+        "terraphim-server-1.0.0-aarch64-unknown-linux-musl.package-sha256sums.txt"
+
+    expect_fail "managed artifact must be a regular non-symlink file" \
+        --output "$out" --managed-staging "$staging" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+
+    [[ "$(find "$out" -mindepth 1 -maxdepth 1 -type f | wc -l)" -eq 0 ]] ||
+        fail "unsafe managed inventory was partially merged"
+}
+
+test_zero_length_managed_input_fails_before_merge() {
+    local out="$TMP/out11" staging="$TMP/staging11"
+    mkdir -p "$out"
+    make_stage "$staging/server-managed-packages-x86_64-unknown-linux-musl" \
+        "terraphim-server_1.0.0-1_amd64.deb" \
+        "terraphim-server-1.0.0-1.x86_64.rpm" \
+        "terraphim-server-1.0.0-x86_64-unknown-linux-musl.package-sha256sums.txt"
+    : > "$staging/server-managed-packages-x86_64-unknown-linux-musl/terraphim-server_1.0.0-1_amd64.deb"
+    make_stage "$staging/server-managed-packages-aarch64-unknown-linux-musl" \
+        "terraphim-server_1.0.0-1_arm64.deb" \
+        "terraphim-server-1.0.0-1.aarch64.rpm" \
+        "terraphim-server-1.0.0-aarch64-unknown-linux-musl.package-sha256sums.txt"
+
+    expect_fail "managed artifact must not be zero-length" \
+        --output "$out" --managed-staging "$staging" \
+        --managed-target x86_64-unknown-linux-musl \
+        --managed-target aarch64-unknown-linux-musl
+}
+
 test_complete_managed_matrix_is_merged
 test_managed_legacy_basename_conflict_fails
 test_partial_managed_matrix_fails
@@ -195,5 +285,9 @@ test_absent_managed_stage_is_tolerated
 test_incomplete_managed_target_dir_fails
 test_binary_legacy_basename_conflict_fails
 test_managed_only_inventory_succeeds
+test_unexpected_managed_inventory_fails_before_merge
+test_stale_version_managed_inventory_fails_before_merge
+test_unsafe_managed_inputs_fail_before_merge
+test_zero_length_managed_input_fails_before_merge
 
 echo "assemble-release-inventory tests passed"

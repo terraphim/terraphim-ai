@@ -114,6 +114,82 @@ test_build_reports_missing_nfpm_without_fallback_claim() {
     assert_contains "$TMP/missing.err" "cargo-deb parity path"
 }
 
+test_failed_validation_leaves_no_partial_outputs() {
+    local bin="$TMP/partial/terraphim_server"
+    local out="$TMP/partial-out"
+    local fake_nfpm="$TMP/fake-nfpm"
+    make_fixture_binary "$bin"
+
+    cat > "$fake_nfpm" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+format=""
+target=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --packager)
+            format="$2"
+            shift 2
+            ;;
+        --target)
+            target="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+case "$format" in
+    deb) printf 'invalid deb\n' > "$target/terraphim-server_9.8.7-1_amd64.deb" ;;
+    rpm) printf 'invalid rpm\n' > "$target/terraphim-server-9.8.7-1.x86_64.rpm" ;;
+    *) exit 2 ;;
+esac
+EOF
+    chmod 0755 "$fake_nfpm"
+
+    if "$BUILD" --version 9.8.7 --target x86_64-unknown-linux-musl \
+        --binary "$bin" --out-dir "$out" --nfpm "$fake_nfpm" \
+        >"$TMP/partial.log" 2>&1; then
+        fail "build accepted invalid package fixtures"
+    fi
+    assert_contains "$TMP/partial.log" "dpkg-deb"
+    [[ ! -e "$out/terraphim-server_9.8.7-1_amd64.deb" ]] ||
+        fail "failed validation left a partial DEB in OUT_DIR"
+    [[ ! -e "$out/terraphim-server-9.8.7-1.x86_64.rpm" ]] ||
+        fail "failed validation left a partial RPM in OUT_DIR"
+    [[ ! -e "$out/terraphim-server-9.8.7-x86_64-unknown-linux-musl.package-sha256sums.txt" ]] ||
+        fail "failed validation left a partial checksum manifest in OUT_DIR"
+    if find "$TMP" -mindepth 1 -maxdepth 1 -name '.terraphim-server-nfpm.*' -print -quit | grep -q .; then
+        fail "failed validation left its private staging directory behind"
+    fi
+
+    local occupied="$TMP/occupied-out"
+    mkdir -p "$occupied"
+    printf 'keep me\n' > "$occupied/unrelated-user-data"
+    if "$BUILD" --version 9.8.7 --target x86_64-unknown-linux-musl \
+        --binary "$bin" --out-dir "$occupied" --nfpm "$fake_nfpm" \
+        >"$TMP/occupied.log" 2>&1; then
+        fail "build accepted a non-empty output directory"
+    fi
+    assert_contains "$TMP/occupied.log" "refusing to delete pre-existing data"
+    grep -qx 'keep me' "$occupied/unrelated-user-data" ||
+        fail "non-empty output rejection altered unrelated user data"
+
+    local victim="$TMP/output-symlink-victim" unsafe="$TMP/unsafe-out"
+    mkdir -p "$victim"
+    printf 'keep me too\n' > "$victim/unrelated-user-data"
+    ln -s "$victim" "$unsafe"
+    if "$BUILD" --version 9.8.7 --target x86_64-unknown-linux-musl \
+        --binary "$bin" --out-dir "$unsafe" --nfpm "$fake_nfpm" \
+        >"$TMP/unsafe.log" 2>&1; then
+        fail "build accepted a symlink output directory"
+    fi
+    assert_contains "$TMP/unsafe.log" "unsafe output directory"
+    grep -qx 'keep me too' "$victim/unrelated-user-data" ||
+        fail "symlink output rejection altered its target"
+}
+
 test_deb_payload_fixture_matches_input_binary() {
     command -v dpkg-deb >/dev/null 2>&1 || {
         echo "SKIP: dpkg-deb not installed"
@@ -277,6 +353,7 @@ test_render_deb_descriptor
 test_render_rpm_descriptor
 test_render_rejects_gnu_target
 test_build_reports_missing_nfpm_without_fallback_claim
+test_failed_validation_leaves_no_partial_outputs
 test_deb_payload_fixture_matches_input_binary
 test_build_script_expects_nfpm_deb_filename
 test_build_script_fails_closed_without_source_date_epoch_fallback
