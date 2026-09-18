@@ -21,6 +21,7 @@ use crate::{Result, RunnerError};
 use base64::Engine;
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::process::Command;
 
 /// Outcome of a single git invocation: exit status plus captured stderr.
@@ -59,15 +60,16 @@ fn git_command(dir: Option<&Path>, token: Option<&str>) -> Command {
         );
     }
     cmd.stdin(Stdio::null());
+    cmd.kill_on_drop(true);
     cmd
 }
 
 /// Run a prepared git command, capturing its outcome. `what` names the operation
 /// for error context (never includes the token-bearing argument).
-async fn run_git(mut cmd: Command, what: &str) -> Result<GitOutput> {
-    let output = cmd
-        .output()
+async fn run_git(mut cmd: Command, what: &str, timeout: Duration) -> Result<GitOutput> {
+    let output = tokio::time::timeout(timeout, cmd.output())
         .await
+        .map_err(|_| RunnerError::Execution(format!("git {what} timed out after {timeout:?}")))?
         .map_err(|e| RunnerError::Execution(format!("git {what}: spawn failed: {e}")))?;
     Ok(GitOutput {
         success: output.status.success(),
@@ -129,7 +131,8 @@ fn validate_path_component(label: &str, value: &str) -> Result<()> {
 /// 4. `git checkout --force --detach <sha>`.
 ///
 /// All git invocations inherit a clean, non-interactive environment; the auth
-/// token is passed only via `http.extraHeader` and never persisted.
+/// token is passed only via `http.extraHeader` and never persisted. Every
+/// invocation is killed and reported as an error after `operation_timeout`.
 pub async fn ensure_checkout(
     instance_url: &str,
     owner: &str,
@@ -137,6 +140,7 @@ pub async fn ensure_checkout(
     sha: &str,
     token: Option<&str>,
     checkout_root: &Path,
+    operation_timeout: Duration,
 ) -> Result<PathBuf> {
     // Guard against path-traversal in owner/repo before any filesystem access.
     // A forged payload such as `repository: "../../sensitive"` would otherwise
@@ -174,7 +178,7 @@ pub async fn ensure_checkout(
 
         let mut init = git_command(None, None);
         init.arg("init").arg("-q").arg(&target);
-        let out = run_git(init, "init").await?;
+        let out = run_git(init, "init", operation_timeout).await?;
         if !out.success {
             return Err(RunnerError::Execution(format!(
                 "git init {} failed: {}",
@@ -185,7 +189,7 @@ pub async fn ensure_checkout(
 
         let mut remote = git_command(Some(&target), None);
         remote.arg("remote").arg("add").arg("origin").arg(&url);
-        let out = run_git(remote, "remote add origin").await?;
+        let out = run_git(remote, "remote add origin", operation_timeout).await?;
         if !out.success {
             return Err(RunnerError::Execution(format!(
                 "git remote add origin failed: {}",
@@ -203,7 +207,7 @@ pub async fn ensure_checkout(
         .arg("1")
         .arg("origin")
         .arg(sha);
-    let shallow_out = run_git(shallow, "fetch --depth 1 origin <sha>").await?;
+    let shallow_out = run_git(shallow, "fetch --depth 1 origin <sha>", operation_timeout).await?;
 
     if !shallow_out.success {
         // Some servers reject want-sha for shallow fetch; fetch everything and
@@ -213,7 +217,7 @@ pub async fn ensure_checkout(
         );
         let mut full = git_command(Some(&target), token);
         full.arg("fetch").arg("origin");
-        let full_out = run_git(full, "fetch origin").await?;
+        let full_out = run_git(full, "fetch origin", operation_timeout).await?;
         if !full_out.success {
             return Err(RunnerError::Execution(format!(
                 "git fetch origin failed for {owner}/{repo}: {}",
@@ -229,7 +233,12 @@ pub async fn ensure_checkout(
         .arg("--force")
         .arg("--detach")
         .arg(sha);
-    let checkout_out = run_git(checkout, "checkout --force --detach <sha>").await?;
+    let checkout_out = run_git(
+        checkout,
+        "checkout --force --detach <sha>",
+        operation_timeout,
+    )
+    .await?;
     if !checkout_out.success {
         return Err(RunnerError::Execution(format!(
             "git checkout {sha} failed for {owner}/{repo}: {}",
@@ -316,6 +325,7 @@ mod tests {
             &sha,
             None,
             &checkout_root,
+            crate::config::DEFAULT_GIT_OPERATION_TIMEOUT,
         )
         .await
         .expect("checkout succeeds");
@@ -344,6 +354,7 @@ mod tests {
             &sha,
             None,
             &checkout_root,
+            crate::config::DEFAULT_GIT_OPERATION_TIMEOUT,
         )
         .await
         .expect("first checkout succeeds");
@@ -356,6 +367,7 @@ mod tests {
             &sha,
             None,
             &checkout_root,
+            crate::config::DEFAULT_GIT_OPERATION_TIMEOUT,
         )
         .await
         .expect("idempotent re-checkout succeeds");
@@ -407,6 +419,7 @@ mod tests {
             &sha,
             Some(token),
             &checkout_root,
+            crate::config::DEFAULT_GIT_OPERATION_TIMEOUT,
         )
         .await
         .expect("checkout with token succeeds");
@@ -433,6 +446,7 @@ mod tests {
             "abc123",
             None,
             &checkout_root,
+            crate::config::DEFAULT_GIT_OPERATION_TIMEOUT,
         )
         .await;
         assert!(result.is_err(), "expected error for owner='..'");
@@ -454,6 +468,7 @@ mod tests {
             "abc123",
             None,
             &checkout_root,
+            crate::config::DEFAULT_GIT_OPERATION_TIMEOUT,
         )
         .await;
         assert!(
@@ -478,6 +493,7 @@ mod tests {
             "abc123",
             None,
             &checkout_root,
+            crate::config::DEFAULT_GIT_OPERATION_TIMEOUT,
         )
         .await;
         assert!(result.is_err(), "expected error for repo='/etc/passwd'");
@@ -499,6 +515,7 @@ mod tests {
             "abc123",
             None,
             &checkout_root,
+            crate::config::DEFAULT_GIT_OPERATION_TIMEOUT,
         )
         .await;
         assert!(result.is_err(), "expected error for empty owner");

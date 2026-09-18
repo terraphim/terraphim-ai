@@ -140,8 +140,48 @@ impl CommandExecutor for MockCommandExecutor {
 /// and `rollback` return errors). Callers MUST construct the [`WorkflowExecutor`]
 /// with `snapshot_on_success = false` and `auto_rollback = false`; otherwise every
 /// step fails at snapshot time. The native runner sets these in `task_worker`.
+///
+/// On Unix each command owns a fresh process group so cancellation can kill
+/// shell descendants. Runner service units must use systemd
+/// `KillMode=control-group`: process-only or parent-PGID stop scripts cannot
+/// reach these separate groups after an ungraceful runner termination.
 pub struct HostCommandExecutor {
     base_dir: std::path::PathBuf,
+}
+
+/// Kills an entire host-command process group if its execution future is
+/// cancelled. `kill_on_drop` only covers the immediate shell; workflow steps
+/// may spawn descendants which would otherwise outlive the runner task.
+#[cfg(unix)]
+struct ProcessGroupGuard {
+    process_group_id: Option<i32>,
+}
+
+#[cfg(unix)]
+impl ProcessGroupGuard {
+    fn new(child_id: Option<u32>) -> Self {
+        Self {
+            process_group_id: child_id.and_then(|id| i32::try_from(id).ok()),
+        }
+    }
+
+    fn disarm(&mut self) {
+        self.process_group_id = None;
+    }
+}
+
+#[cfg(unix)]
+impl Drop for ProcessGroupGuard {
+    fn drop(&mut self) {
+        if let Some(process_group_id) = self.process_group_id {
+            // SAFETY: `process_group_id` comes from the positive PID returned
+            // by the child we started in a fresh process group. A negative PID
+            // targets precisely that group; SIGKILL is async-signal-safe.
+            unsafe {
+                libc::kill(-process_group_id, libc::SIGKILL);
+            }
+        }
+    }
 }
 
 impl HostCommandExecutor {
@@ -180,17 +220,26 @@ impl CommandExecutor for HostCommandExecutor {
     ) -> Result<CommandResult> {
         let start = std::time::Instant::now();
         let cwd = self.resolve_dir(working_dir);
-        let child = tokio::process::Command::new("sh")
+        let mut command_process = tokio::process::Command::new("sh");
+        command_process
             .arg("-c")
             .arg(command)
             .current_dir(&cwd)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| crate::error::GitHubRunnerError::ExecutionFailed {
+            .kill_on_drop(true);
+        #[cfg(unix)]
+        command_process.process_group(0);
+
+        let child = command_process.spawn().map_err(|e| {
+            crate::error::GitHubRunnerError::ExecutionFailed {
                 command: command.to_string(),
                 reason: format!("spawn failed: {e}"),
-            })?;
+            }
+        })?;
+
+        #[cfg(unix)]
+        let mut process_group_guard = ProcessGroupGuard::new(child.id());
 
         let output = match tokio::time::timeout(timeout, child.wait_with_output()).await {
             Ok(Ok(o)) => o,
@@ -207,6 +256,9 @@ impl CommandExecutor for HostCommandExecutor {
                 });
             }
         };
+
+        #[cfg(unix)]
+        process_group_guard.disarm();
 
         Ok(CommandResult {
             exit_code: output.status.code().unwrap_or(-1),

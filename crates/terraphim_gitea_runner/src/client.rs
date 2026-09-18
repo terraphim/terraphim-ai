@@ -5,6 +5,7 @@
 //! `Content-Type: application/json`. All methods except `Register` authenticate
 //! with `x-runner-uuid` + `x-runner-token` headers.
 
+use crate::config::DEFAULT_HTTP_REQUEST_TIMEOUT;
 use crate::state::RunnerState;
 use crate::types::*;
 use crate::{Result, RunnerError};
@@ -49,7 +50,7 @@ pub struct ReqwestRunnerClient {
 impl ReqwestRunnerClient {
     /// Create a client with a 30-second per-request timeout.
     pub fn new(instance_url: impl Into<String>) -> Self {
-        Self::new_with_timeout(instance_url, Duration::from_secs(30))
+        Self::new_with_timeout(instance_url, DEFAULT_HTTP_REQUEST_TIMEOUT)
     }
 
     /// Create a client with an explicit per-request timeout.

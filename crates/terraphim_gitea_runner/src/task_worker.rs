@@ -10,6 +10,7 @@ use crate::task_journal::TaskJournal;
 use crate::types::{Task, TaskState, UpdateTaskRequest, result};
 use crate::{Result, RunnerError, workflow_payload};
 use std::collections::BTreeMap;
+use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -39,9 +40,17 @@ pub struct TaskWorker<C: GiteaRunnerClient, P: PolicyPlanner> {
     fcctl_url: String,
     /// VM type to allocate from fcctl-web (e.g. "rust-ci").
     fcctl_vm_type: String,
+    /// Frequency of nonterminal task updates while a claimed workflow runs.
+    heartbeat_interval: Duration,
+    /// Consecutive heartbeat failures tolerated before failing closed.
+    heartbeat_failure_attempts: u32,
+    /// Per-process bound for checkout Git operations.
+    checkout_timeout: Duration,
+    /// Per-request bound for best-effort commit-status publication.
+    status_request_timeout: Duration,
 }
 
-impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
+impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner> TaskWorker<C, P> {
     /// Create a worker bound to a client, planner, clone base URL, and checkout
     /// root. `instance_url` is the Gitea base the target repository is fetched
     /// from before the build runs; `checkout_dir` is the root under which
@@ -63,7 +72,40 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             vm_mode: crate::config::VmMode::Host,
             fcctl_url: "http://127.0.0.1:8080".to_string(),
             fcctl_vm_type: "rust-ci".to_string(),
+            heartbeat_interval: crate::config::DEFAULT_HEARTBEAT_INTERVAL,
+            heartbeat_failure_attempts: crate::config::DEFAULT_HEARTBEAT_FAILURE_ATTEMPTS,
+            checkout_timeout: crate::config::DEFAULT_GIT_OPERATION_TIMEOUT,
+            status_request_timeout: crate::config::DEFAULT_HTTP_REQUEST_TIMEOUT,
         }
+    }
+
+    /// Override the claimed-task heartbeat interval.
+    ///
+    /// Production construction passes [`crate::config::RunnerConfig::heartbeat_interval`];
+    /// tests use a short interval with deterministic workflow synchronization.
+    pub fn with_heartbeat_interval(mut self, interval: Duration) -> Self {
+        self.heartbeat_interval = interval;
+        self
+    }
+
+    /// Override the consecutive heartbeat failure budget.
+    pub fn with_heartbeat_failure_attempts(mut self, attempts: u32) -> Self {
+        assert!(attempts > 0, "heartbeat failure attempts must be non-zero");
+        self.heartbeat_failure_attempts = attempts;
+        self
+    }
+
+    /// Override the timeout applied to each checkout Git subprocess.
+    pub fn with_checkout_timeout(mut self, timeout: Duration) -> Self {
+        assert!(!timeout.is_zero(), "checkout timeout must be non-zero");
+        self.checkout_timeout = timeout;
+        self
+    }
+
+    /// Bound best-effort commit-status HTTP requests.
+    pub fn with_status_request_timeout(mut self, timeout: Duration) -> Self {
+        self.status_request_timeout = timeout;
+        self
     }
 
     /// Attach a legacy commit-status mirror (e.g. `adf/build`) posted alongside
@@ -138,7 +180,11 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             }
             return;
         };
-        let writer = SingleStatusWriter::new(&self.instance_url, token);
+        let writer = SingleStatusWriter::new_with_timeout(
+            &self.instance_url,
+            token,
+            self.status_request_timeout,
+        );
         if let Err(e) = writer.post(owner, repo, &sha, state, &context, desc).await {
             log::warn!("native commit status post failed for {owner}/{repo}@{sha}: {e}");
         }
@@ -216,6 +262,7 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             &sha,
             Some(job_token.as_str()),
             &self.checkout_dir,
+            self.checkout_timeout,
         )
         .await
         {
@@ -322,28 +369,31 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
         err: &RunnerError,
     ) -> Result<()> {
         let detail = redact(&err.to_string(), state, task);
+        let status_detail = failure_status_description(&detail);
         log::error!("task {} failed after claim: {detail}", task.id);
 
-        logs.add_line(format!("runner error: {detail}"));
-        if let Err(e) = logs.flush(&*self.client, state, true).await {
+        if logs.is_sealed() {
             log::warn!(
-                "failure log delivery for task {} failed: {}",
-                task.id,
-                redact(&e.to_string(), state, task)
+                "failure occurred after task {} log stream was sealed; preserving the closed stream",
+                task.id
             );
+        } else {
+            logs.add_line(format!("runner error: {detail}"));
+            if let Err(e) = logs.flush(&*self.client, state, true).await {
+                log::warn!(
+                    "failure log delivery for task {} failed: {}",
+                    task.id,
+                    redact(&e.to_string(), state, task)
+                );
+            }
         }
 
         // Only tasks whose payload compiles have a derivable status context.
         if let Ok(workflow) = workflow_payload::compile_task(task) {
-            self.mirror(task, StatusState::Failure, TERMINAL_FAILURE_DESC)
+            self.mirror(task, StatusState::Failure, &status_detail)
                 .await;
-            self.post_native_commit_status(
-                task,
-                &workflow,
-                StatusState::Failure,
-                TERMINAL_FAILURE_DESC,
-            )
-            .await;
+            self.post_native_commit_status(task, &workflow, StatusState::Failure, &status_detail)
+                .await;
         }
 
         self.send_terminal_update(state, task.id, result::FAILURE)
@@ -408,16 +458,33 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
         terminalized: &mut bool,
     ) -> Result<bool> {
         let task = task.clone();
+        // FetchTask has already claimed the task. Start lease maintenance before
+        // payload compilation and observe it across every subsequent await,
+        // including checkout and session/Firecracker setup.
+        let mut heartbeat = TaskHeartbeat::spawn(
+            self.client.clone(),
+            state.clone(),
+            task.id,
+            self.heartbeat_interval,
+            self.heartbeat_failure_attempts,
+        );
         // Compile the workflow payload, then apply policy (allowlist + cargo->rch).
-        let workflow = workflow_payload::compile_task(&task)?;
+        let workflow = match workflow_payload::compile_task(&task) {
+            Ok(workflow) => workflow,
+            Err(error) => {
+                heartbeat.cancel_and_join().await?;
+                return Err(error);
+            }
+        };
         let status_workflow = workflow.clone();
-        let plan = self.planner.compile(workflow).await?;
+        let plan = race_heartbeat_result(&mut heartbeat, self.planner.compile(workflow)).await?;
 
         // Check out the target repo at the task's sha so the build runs against
         // real repo content. Tasks that carry no repository/sha (e.g. existing
         // protocol-proof / one-step tasks) skip checkout and run in the bare
         // `checkout_dir`; a checkout that is attempted and fails is fatal.
-        let work_dir = self.resolve_work_dir(state, &task).await?;
+        let work_dir =
+            race_heartbeat_result(&mut heartbeat, self.resolve_work_dir(state, &task)).await?;
 
         // Build the execution stack. In Host mode (default, fail-open), commands
         // run directly on the host. In Firecracker mode, commands run inside
@@ -451,7 +518,7 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
                 ..Default::default()
             },
         ));
-        let exec = WorkflowExecutor::with_executor(
+        let exec = Arc::new(WorkflowExecutor::with_executor(
             executor.clone(),
             session_manager.clone(),
             WorkflowExecutorConfig {
@@ -461,19 +528,33 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
                 default_timeout: Duration::from_secs(1800),
                 max_execution_time: Duration::from_secs(7200),
             },
-        );
-        let session = session_manager
-            .create_session_from_spec(&SessionStartSpec {
-                session_id: SessionId::new(),
-                vm_type: None,
-            })
-            .await
-            .map_err(|e| RunnerError::Execution(e.to_string()))?;
+        ));
+        let session = complete_session_allocation(&mut heartbeat, async {
+            session_manager
+                .create_session_from_spec(&SessionStartSpec {
+                    session_id: SessionId::new(),
+                    vm_type: None,
+                })
+                .await
+                .map_err(|e| RunnerError::Execution(e.to_string()))
+        })
+        .await?;
 
         // Everything after session creation runs inside this block so the session
         // is released on *every* exit path -- an error that escaped here used to
         // leak the allocated session (a live VM in Firecracker mode).
         let run_result: Result<bool> = async {
+            // Allocation cannot be select-cancelled because an already-created
+            // Firecracker VM would have no owner capable of releasing it. Observe
+            // lease loss only after the returned session enters this release-owned
+            // block, then fail promptly before starting any subsequent work.
+            if heartbeat.is_finished() {
+                return Err(heartbeat
+                    .wait()
+                    .await
+                    .expect_err("heartbeat cannot stop while its owner holds the stop sender"));
+            }
+
             // In Firecracker mode, clone the repo inside the VM before running
             // the workflow.  The host checkout is skipped (sources live in the VM).
             if self.vm_mode == crate::config::VmMode::Firecracker {
@@ -499,25 +580,23 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
                         "Firecracker: cloning {full}@{sha:.8} into VM {} at /workspace",
                         session.vm_id
                     );
-                    match executor
-                        .execute(&session, &clone_cmd, Duration::from_secs(120), "/root")
-                        .await
+                    match race_heartbeat(
+                        &mut heartbeat,
+                        executor.execute(&session, &clone_cmd, Duration::from_secs(120), "/root"),
+                    )
+                    .await?
                     {
-                        Ok(r) if r.success() => {
-                            log::info!(
-                                "Firecracker: repo cloned in {:?} (exit {})",
-                                r.duration,
-                                r.exit_code
-                            );
-                        }
-                        Ok(r) => {
-                            log::error!(
-                                "Firecracker: git clone failed (exit {}): {}",
-                                r.exit_code,
-                                r.stderr
-                            );
-                        }
-                        Err(e) => log::error!("Firecracker: git clone error: {e}"),
+                        Ok(result) if result.success() => log::info!(
+                            "Firecracker: repo cloned in {:?} (exit {})",
+                            result.duration,
+                            result.exit_code
+                        ),
+                        Ok(result) => log::error!(
+                            "Firecracker: git clone failed (exit {}): {}",
+                            result.exit_code,
+                            result.stderr
+                        ),
+                        Err(error) => log::error!("Firecracker: git clone error: {error}"),
                     }
                 } else {
                     log::info!("Firecracker: task has no repo/sha; running workflow without clone");
@@ -525,81 +604,138 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             }
 
             // Report running.
-            self.client
-                .update_task(
-                    state,
-                    UpdateTaskRequest {
-                        state: TaskState {
-                            id: task.id,
-                            // In-progress heartbeat: non-terminal (UNSPECIFIED) so the
-                            // server records startedAt without completing the task.
-                            result: result::UNSPECIFIED,
-                            started_at: Some(chrono::Utc::now().to_rfc3339()),
-                            stopped_at: None,
-                            steps: Vec::new(),
-                        },
-                        outputs: BTreeMap::new(),
-                    },
+            race_heartbeat_result(&mut heartbeat, async {
+                self.client
+                    .update_task(state, started_task_state(task.id))
+                    .await?;
+                Ok(())
+            })
+            .await?;
+            race_heartbeat_result(&mut heartbeat, async {
+                self.mirror(&task, StatusState::Pending, "build started")
+                    .await;
+                self.post_native_commit_status(
+                    &task,
+                    &status_workflow,
+                    StatusState::Pending,
+                    "build started",
                 )
-                .await?;
-            self.mirror(&task, StatusState::Pending, "build started")
                 .await;
-            self.post_native_commit_status(
-                &task,
-                &status_workflow,
-                StatusState::Pending,
-                "build started",
-            )
+                Ok(())
+            })
+            .await?;
+
+            // The workflow runs in an owned task so heartbeat lease loss can
+            // cancel and join it before the repair path publishes FAILURE.
+            // Host commands are kill-on-drop process-group owners; Firecracker
+            // commands are bounded by the session release after this block.
+            let workflow = plan.workflow.clone();
+            let execution_session = session.clone();
+            let mut execution = OwnedWorkflowExecution::spawn(async move {
+                exec.execute_workflow_in_session(&workflow, &execution_session)
+                    .await
+            });
+
+            let outcome = tokio::select! {
+                biased;
+                heartbeat_result = heartbeat.wait() => {
+                    let heartbeat_error = heartbeat_result.expect_err(
+                        "heartbeat cannot stop while its owner still holds the stop sender"
+                    );
+                    execution.cancel_and_join().await?;
+                    return Err(heartbeat_error);
+                }
+                execution_result = execution.wait() => match execution_result {
+                    Ok(outcome) => outcome,
+                    Err(error) => {
+                        heartbeat.cancel_and_join().await?;
+                        return Err(RunnerError::Execution(format!(
+                            "workflow execution task failed to join: {error}"
+                        )));
+                    }
+                }
+            };
+
+            let log_delivery: Result<bool> = async {
+                let success = match &outcome {
+                    Ok(wf) => {
+                        for step in &wf.steps {
+                            logs.add_line(format!(
+                                "[{:?}] {} (exit {:?})",
+                                step.status, step.name, step.exit_code
+                            ));
+                            for line in step.stdout.lines() {
+                                logs.add_line(line.to_string());
+                            }
+                            for line in step.stderr.lines() {
+                                logs.add_line(line.to_string());
+                            }
+                            // Preserve #3387's durable, monotonic per-step log batches.
+                            // Do not select-cancel an in-flight flush on lease loss:
+                            // its exclusive ack cursor would become unknowable. Each
+                            // RPC has the configured HTTP timeout and no-progress is
+                            // bounded; observe heartbeat failure after the batch loop.
+                            logs.flush(&*self.client, state, false).await?;
+                            propagate_lease_failure_after_allocation(&mut heartbeat).await?;
+                        }
+                        logs.add_line(wf.summary.clone());
+                        wf.success
+                    }
+                    Err(e) => {
+                        logs.add_line(format!("execution error: {e}"));
+                        false
+                    }
+                };
+
+                // Seal monotonically. As above, never cancel UpdateLog mid-flight;
+                // observe lease loss immediately after its bounded batch loop.
+                logs.flush(&*self.client, state, true).await?;
+                if heartbeat.is_finished() {
+                    return Err(heartbeat.wait().await.expect_err(
+                        "heartbeat cannot stop while its owner holds the stop sender",
+                    ));
+                }
+                Ok(success)
+            }
             .await;
 
-            // Execute, then stream logs in per-step batches (multi-batch UpdateLog).
-            let outcome = exec
-                .execute_workflow_in_session(&plan.workflow, &session)
-                .await;
-
-            let success = match &outcome {
-                Ok(wf) => {
-                    for step in &wf.steps {
-                        logs.add_line(format!(
-                            "[{:?}] {} (exit {:?})",
-                            step.status, step.name, step.exit_code
-                        ));
-                        for line in step.stdout.lines() {
-                            logs.add_line(line.to_string());
-                        }
-                        for line in step.stderr.lines() {
-                            logs.add_line(line.to_string());
-                        }
-                        // Flush this step's batch so the Gitea UI shows progress as
-                        // steps complete (exercises the monotonic multi-batch ack).
-                        logs.flush(&*self.client, state, false).await?;
-                    }
-                    logs.add_line(wf.summary.clone());
-                    wf.success
-                }
-                Err(e) => {
-                    logs.add_line(format!("execution error: {e}"));
-                    false
+            let success = match log_delivery {
+                Ok(success) => success,
+                Err(error) => {
+                    heartbeat.cancel_and_join().await?;
+                    return Err(error);
                 }
             };
 
-            // Close the log stream, then post terminal commit status *before* marking the
-            // task complete. Gitea revokes the per-job `github.token` once UpdateTask
-            // reports SUCCESS/FAILURE; posting status afterward yields HTTP 401 (Refs #2464).
-            logs.flush(&*self.client, state, true).await?;
-            let terminal_state = if success {
-                StatusState::Success
-            } else {
-                StatusState::Failure
-            };
-            let terminal_desc = if success {
-                "native build passed"
-            } else {
-                TERMINAL_FAILURE_DESC
-            };
-            self.mirror(&task, terminal_state, terminal_desc).await;
-            self.post_native_commit_status(&task, &status_workflow, terminal_state, terminal_desc)
+            // Post terminal commit status before UpdateTask: Gitea revokes the
+            // per-job token after terminal publication (Refs #2464).
+            let status_delivery = async {
+                let terminal_state = if success {
+                    StatusState::Success
+                } else {
+                    StatusState::Failure
+                };
+                let terminal_desc = if success {
+                    "native build passed"
+                } else {
+                    TERMINAL_FAILURE_DESC
+                };
+                self.mirror(&task, terminal_state, terminal_desc).await;
+                self.post_native_commit_status(
+                    &task,
+                    &status_workflow,
+                    terminal_state,
+                    terminal_desc,
+                )
                 .await;
+                Ok::<(), RunnerError>(())
+            };
+
+            heartbeat = await_status_delivery(heartbeat, status_delivery).await?;
+
+            // Last safe point: join before publishing terminal state, so no
+            // heartbeat can race after SUCCESS/FAILURE.
+            heartbeat.stop_and_join().await?;
             self.send_terminal_update(
                 state,
                 task.id,
@@ -626,11 +762,285 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
 /// Description attached to every terminal failure status/mirror post.
 const TERMINAL_FAILURE_DESC: &str = "native build failed";
 
+/// Preserve a redacted post-seal failure explanation in commit status, because
+/// #3387 correctly forbids appending another row after `UpdateLog(no_more=true)`.
+fn failure_status_description(detail: &str) -> String {
+    format!("runner failure: {detail}")
+}
+
 /// Attempts allowed for delivering a terminal `UpdateTask` (1 try + 2 retries).
 const TERMINAL_UPDATE_ATTEMPTS: u32 = 3;
 
 /// Base backoff between terminal `UpdateTask` attempts; scaled by attempt number.
 const TERMINAL_UPDATE_BACKOFF: Duration = Duration::from_millis(200);
+
+/// Owned heartbeat task. Its lifecycle owner joins it before terminal state.
+struct TaskHeartbeat {
+    stop: Option<tokio::sync::oneshot::Sender<()>>,
+    join: tokio::task::JoinHandle<Result<()>>,
+    joined: bool,
+}
+
+impl TaskHeartbeat {
+    fn spawn<C: GiteaRunnerClient + 'static>(
+        client: Arc<C>,
+        state: RunnerState,
+        task_id: i64,
+        interval: Duration,
+        failure_attempts: u32,
+    ) -> Self {
+        let (stop, mut stop_rx) = tokio::sync::oneshot::channel();
+        let join = tokio::spawn(async move {
+            let mut consecutive_failures = 0;
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = &mut stop_rx => return Ok(()),
+                    _ = tokio::time::sleep(interval) => {}
+                }
+
+                match client
+                    .update_task(&state, heartbeat_task_state(task_id))
+                    .await
+                {
+                    Ok(_) => consecutive_failures = 0,
+                    Err(error) => {
+                        consecutive_failures += 1;
+                        log::warn!(
+                            "claimed-task heartbeat attempt {consecutive_failures}/\
+                             {failure_attempts} for task {task_id} failed: {error}"
+                        );
+                        if consecutive_failures >= failure_attempts {
+                            return Err(RunnerError::Protocol(format!(
+                                "claimed-task heartbeat for task {task_id} failed \
+                                 {failure_attempts} consecutive times; failing closed: \
+                                 {error}"
+                            )));
+                        }
+                    }
+                }
+            }
+        });
+        Self {
+            stop: Some(stop),
+            join,
+            joined: false,
+        }
+    }
+
+    async fn stop_and_join(&mut self) -> Result<()> {
+        if self.joined {
+            return Ok(());
+        }
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+        let joined = (&mut self.join).await.map_err(|error| {
+            RunnerError::Protocol(format!(
+                "claimed-task heartbeat task failed to join: {error}"
+            ))
+        })?;
+        self.joined = true;
+        joined
+    }
+
+    async fn cancel_and_join(&mut self) -> Result<()> {
+        self.stop.take();
+        if self.joined {
+            return Ok(());
+        }
+        if !self.join.is_finished() {
+            self.join.abort();
+        }
+        let joined = match (&mut self.join).await {
+            Ok(result) => result,
+            Err(error) if error.is_cancelled() => Ok(()),
+            Err(error) => Err(RunnerError::Protocol(format!(
+                "cancelled claimed-task heartbeat failed to join: {error}"
+            ))),
+        };
+        self.joined = true;
+        joined
+    }
+
+    fn is_finished(&self) -> bool {
+        self.join.is_finished()
+    }
+
+    async fn wait(&mut self) -> Result<()> {
+        let joined = (&mut self.join).await;
+        self.joined = true;
+        joined.map_err(|error| {
+            RunnerError::Protocol(format!(
+                "claimed-task heartbeat task failed to join: {error}"
+            ))
+        })?
+    }
+}
+
+impl Drop for TaskHeartbeat {
+    fn drop(&mut self) {
+        if !self.joined {
+            self.join.abort();
+        }
+    }
+}
+
+async fn race_heartbeat<F, T>(heartbeat: &mut TaskHeartbeat, operation: F) -> Result<T>
+where
+    F: Future<Output = T>,
+{
+    tokio::pin!(operation);
+    tokio::select! {
+        biased;
+        heartbeat_result = heartbeat.wait() => {
+            Err(heartbeat_result.expect_err(
+                "heartbeat cannot stop while its owner still holds the stop sender"
+            ))
+        }
+        value = &mut operation => Ok(value),
+    }
+}
+
+/// Race a fallible post-claim operation against lease loss. An operation error
+/// cancels and joins the heartbeat before repair terminalization begins.
+async fn race_heartbeat_result<F, T>(heartbeat: &mut TaskHeartbeat, operation: F) -> Result<T>
+where
+    F: Future<Output = Result<T>>,
+{
+    tokio::pin!(operation);
+    tokio::select! {
+        biased;
+        heartbeat_result = heartbeat.wait() => {
+            Err(heartbeat_result.expect_err(
+                "heartbeat cannot stop while its owner still holds the stop sender"
+            ))
+        }
+        operation_result = &mut operation => match operation_result {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                heartbeat.cancel_and_join().await?;
+                Err(error)
+            }
+        }
+    }
+}
+
+async fn complete_session_allocation<F, T>(
+    heartbeat: &mut TaskHeartbeat,
+    allocation: F,
+) -> Result<T>
+where
+    F: Future<Output = Result<T>>,
+{
+    match allocation.await {
+        Ok(value) => Ok(value),
+        Err(error) => {
+            heartbeat.cancel_and_join().await?;
+            Err(error)
+        }
+    }
+}
+
+async fn propagate_lease_failure_after_allocation(heartbeat: &mut TaskHeartbeat) -> Result<()> {
+    if heartbeat.is_finished() {
+        return Err(heartbeat
+            .wait()
+            .await
+            .expect_err("heartbeat cannot stop while its owner holds the stop sender"));
+    }
+    Ok(())
+}
+
+async fn await_status_delivery<F>(
+    mut heartbeat: TaskHeartbeat,
+    status_delivery: F,
+) -> Result<TaskHeartbeat>
+where
+    F: Future<Output = Result<()>>,
+{
+    tokio::pin!(status_delivery);
+    tokio::select! {
+        biased;
+        heartbeat_result = heartbeat.wait() => {
+            return Err(heartbeat_result.expect_err(
+                "heartbeat cannot stop while its owner still holds the stop sender"
+            ));
+        }
+        status_result = &mut status_delivery => {
+            if let Err(error) = status_result {
+                heartbeat.cancel_and_join().await?;
+                return Err(error);
+            }
+        }
+    }
+    Ok(heartbeat)
+}
+
+type WorkflowTaskResult = terraphim_github_runner::Result<terraphim_github_runner::WorkflowResult>;
+
+/// Owned workflow cancellation boundary. Lease loss aborts and joins it so
+/// process-group guards run before terminal failure publication.
+struct OwnedWorkflowExecution {
+    join: tokio::task::JoinHandle<WorkflowTaskResult>,
+}
+
+impl OwnedWorkflowExecution {
+    fn spawn(future: impl Future<Output = WorkflowTaskResult> + Send + 'static) -> Self {
+        Self {
+            join: tokio::spawn(future),
+        }
+    }
+
+    async fn wait(&mut self) -> std::result::Result<WorkflowTaskResult, tokio::task::JoinError> {
+        (&mut self.join).await
+    }
+
+    async fn cancel_and_join(mut self) -> Result<()> {
+        self.join.abort();
+        match (&mut self.join).await {
+            Ok(_) => Ok(()),
+            Err(error) if error.is_cancelled() => Ok(()),
+            Err(error) => Err(RunnerError::Execution(format!(
+                "cancelled workflow task failed to join: {error}"
+            ))),
+        }
+    }
+}
+
+impl Drop for OwnedWorkflowExecution {
+    fn drop(&mut self) {
+        self.join.abort();
+    }
+}
+
+/// First nonterminal update: records when execution began.
+fn started_task_state(task_id: i64) -> UpdateTaskRequest {
+    UpdateTaskRequest {
+        state: TaskState {
+            id: task_id,
+            result: result::UNSPECIFIED,
+            started_at: Some(chrono::Utc::now().to_rfc3339()),
+            stopped_at: None,
+            steps: Vec::new(),
+        },
+        outputs: BTreeMap::new(),
+    }
+}
+
+/// Periodic lease refresh: minimal and explicitly nonterminal.
+fn heartbeat_task_state(task_id: i64) -> UpdateTaskRequest {
+    UpdateTaskRequest {
+        state: TaskState {
+            id: task_id,
+            result: result::UNSPECIFIED,
+            started_at: None,
+            stopped_at: None,
+            steps: Vec::new(),
+        },
+        outputs: BTreeMap::new(),
+    }
+}
 
 /// Minimal terminal `UpdateTask` payload: a result code plus `stopped_at`, which
 /// is what Gitea needs to move the job out of running.
@@ -670,22 +1080,187 @@ fn redact(text: &str, state: &RunnerState, task: &Task) -> String {
 
 #[cfg(test)]
 mod tests {
-    /// Regression guard for #2464: terminal commit status must use the per-job token
-    /// while it is still valid (before UpdateTask reports SUCCESS/FAILURE).
-    #[test]
-    fn terminal_commit_status_precedes_task_completion() {
-        let src = include_str!("task_worker.rs");
-        let marker = "// Close the log stream, then post terminal commit status";
-        let block = src.split(marker).nth(1).expect("terminal close block");
-        let status_pos = block
-            .find("post_native_commit_status")
-            .expect("terminal status post");
-        let update_pos = block
-            .find("send_terminal_update")
-            .expect("terminal update delivery");
+    use super::*;
+    use async_trait::async_trait;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use tokio::sync::Notify;
+
+    struct BlockingHeartbeatClient {
+        heartbeat_started: Arc<Notify>,
+        heartbeat_cancelled: Arc<AtomicBool>,
+    }
+
+    struct FailingHeartbeatClient;
+
+    struct CancellationProof(Arc<AtomicBool>);
+
+    impl Drop for CancellationProof {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    #[async_trait]
+    impl GiteaRunnerClient for BlockingHeartbeatClient {
+        async fn register(
+            &self,
+            _: crate::types::RegisterRequest,
+        ) -> Result<crate::types::RunnerInfo> {
+            unreachable!()
+        }
+
+        async fn declare(
+            &self,
+            _: &RunnerState,
+            _: crate::types::DeclareRequest,
+        ) -> Result<crate::types::DeclareResponse> {
+            unreachable!()
+        }
+
+        async fn fetch_task(
+            &self,
+            _: &RunnerState,
+            _: i64,
+        ) -> Result<crate::types::FetchTaskResponse> {
+            unreachable!()
+        }
+
+        async fn update_task(
+            &self,
+            _: &RunnerState,
+            _: UpdateTaskRequest,
+        ) -> Result<crate::types::UpdateTaskResponse> {
+            let _proof = CancellationProof(self.heartbeat_cancelled.clone());
+            self.heartbeat_started.notify_one();
+            std::future::pending().await
+        }
+
+        async fn update_log(
+            &self,
+            _: &RunnerState,
+            _: crate::types::UpdateLogRequest,
+        ) -> Result<crate::types::UpdateLogResponse> {
+            unreachable!()
+        }
+    }
+
+    #[async_trait]
+    impl GiteaRunnerClient for FailingHeartbeatClient {
+        async fn register(
+            &self,
+            _: crate::types::RegisterRequest,
+        ) -> Result<crate::types::RunnerInfo> {
+            unreachable!()
+        }
+
+        async fn declare(
+            &self,
+            _: &RunnerState,
+            _: crate::types::DeclareRequest,
+        ) -> Result<crate::types::DeclareResponse> {
+            unreachable!()
+        }
+
+        async fn fetch_task(
+            &self,
+            _: &RunnerState,
+            _: i64,
+        ) -> Result<crate::types::FetchTaskResponse> {
+            unreachable!()
+        }
+
+        async fn update_task(
+            &self,
+            _: &RunnerState,
+            _: UpdateTaskRequest,
+        ) -> Result<crate::types::UpdateTaskResponse> {
+            Err(RunnerError::Protocol("deterministic lease failure".into()))
+        }
+
+        async fn update_log(
+            &self,
+            _: &RunnerState,
+            _: crate::types::UpdateLogRequest,
+        ) -> Result<crate::types::UpdateLogResponse> {
+            unreachable!()
+        }
+    }
+
+    fn test_state() -> RunnerState {
+        RunnerState {
+            uuid: "test-uuid".into(),
+            token: "test-token".into(),
+            name: "test-runner".into(),
+            version: "test-version".into(),
+            labels: vec![],
+            ephemeral: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn status_delivery_error_joins_an_in_flight_heartbeat_before_propagating() {
+        let heartbeat_started = Arc::new(Notify::new());
+        let heartbeat_cancelled = Arc::new(AtomicBool::new(false));
+        let client = Arc::new(BlockingHeartbeatClient {
+            heartbeat_started: heartbeat_started.clone(),
+            heartbeat_cancelled: heartbeat_cancelled.clone(),
+        });
+        let heartbeat =
+            TaskHeartbeat::spawn(client, test_state(), 3390, Duration::from_millis(1), 3);
+        let status_delivery = async move {
+            heartbeat_started.notified().await;
+            Err(RunnerError::Protocol(
+                "deterministic status-delivery failure".into(),
+            ))
+        };
+
+        let error = match await_status_delivery(heartbeat, status_delivery).await {
+            Err(error) => error,
+            Ok(_) => panic!("status-delivery failure must propagate"),
+        };
+
+        assert!(error.to_string().contains("status-delivery failure"));
         assert!(
-            status_pos < update_pos,
-            "post_native_commit_status must run before the terminal update (Refs #2464)"
+            heartbeat_cancelled.load(Ordering::SeqCst),
+            "status error returned before the in-flight heartbeat was cancelled and joined"
+        );
+    }
+
+    #[tokio::test]
+    async fn session_allocation_completes_before_lease_failure_is_observed() {
+        let mut heartbeat = TaskHeartbeat::spawn(
+            Arc::new(FailingHeartbeatClient),
+            test_state(),
+            3390,
+            Duration::from_millis(1),
+            1,
+        );
+        let allocation_completed = Arc::new(AtomicBool::new(false));
+        let completed = allocation_completed.clone();
+
+        let session = complete_session_allocation(&mut heartbeat, async move {
+            tokio::time::sleep(Duration::from_millis(30)).await;
+            completed.store(true, Ordering::SeqCst);
+            Ok("owned-session")
+        })
+        .await;
+
+        assert!(
+            allocation_completed.load(Ordering::SeqCst),
+            "lease loss must not cancel an allocation that may already own a VM"
+        );
+        assert_eq!(
+            session.expect("the acquired session must reach the release-owned scope"),
+            "owned-session"
+        );
+        let lease_error = propagate_lease_failure_after_allocation(&mut heartbeat)
+            .await
+            .expect_err("the release-owned scope must promptly propagate pending lease loss");
+        assert!(
+            lease_error
+                .to_string()
+                .contains("deterministic lease failure"),
+            "{lease_error}"
         );
     }
 }

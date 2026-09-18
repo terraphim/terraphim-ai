@@ -5,9 +5,11 @@
 //! the same context. Used for both the native status and the optional legacy
 //! `adf/build` mirror during migration.
 
+use crate::config::DEFAULT_HTTP_REQUEST_TIMEOUT;
 use crate::{Result, RunnerError};
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::Duration;
 
 /// Commit-status state strings accepted by Gitea.
 #[derive(Debug, Clone, Copy)]
@@ -38,12 +40,24 @@ pub struct SingleStatusWriter {
 }
 
 impl SingleStatusWriter {
-    /// Create a writer for the given Gitea instance + API token.
+    /// Create a writer with the runner's default per-request timeout.
     pub fn new(instance_url: impl Into<String>, token: impl Into<String>) -> Self {
+        Self::new_with_timeout(instance_url, token, DEFAULT_HTTP_REQUEST_TIMEOUT)
+    }
+
+    /// Create a writer with an explicit per-request timeout.
+    pub fn new_with_timeout(
+        instance_url: impl Into<String>,
+        token: impl Into<String>,
+        timeout: Duration,
+    ) -> Self {
         Self {
             base_url: instance_url.into().trim_end_matches('/').to_string(),
             token: token.into(),
-            http: reqwest::Client::new(),
+            http: reqwest::Client::builder()
+                .timeout(timeout)
+                .build()
+                .expect("failed to build status reqwest client"),
             seen: Mutex::new(HashMap::new()),
         }
     }
@@ -107,6 +121,7 @@ impl SingleStatusWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn idempotent_on_sha_context_state() {
@@ -129,5 +144,37 @@ mod tests {
         assert!(w.should_send("deadbeef", "adf/build", StatusState::Success));
         // Different sha, same context, also distinct.
         assert!(w.should_send("cafef00d", "terraphim-native/build", StatusState::Success));
+    }
+
+    #[tokio::test]
+    async fn status_post_is_bounded_by_configured_http_timeout() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let stalled_server = tokio::spawn(async move {
+            let (_socket, _) = listener.accept().await.unwrap();
+            std::future::pending::<()>().await;
+        });
+        let writer = SingleStatusWriter::new_with_timeout(
+            format!("http://{address}"),
+            "tok",
+            Duration::from_millis(20),
+        );
+
+        let _error = tokio::time::timeout(
+            Duration::from_secs(1),
+            writer.post(
+                "owner",
+                "repo",
+                "deadbeef",
+                StatusState::Success,
+                "terraphim-native/build",
+                "complete",
+            ),
+        )
+        .await
+        .expect("status writer must enforce its configured request timeout")
+        .expect_err("stalled status endpoint must fail");
+
+        stalled_server.abort();
     }
 }

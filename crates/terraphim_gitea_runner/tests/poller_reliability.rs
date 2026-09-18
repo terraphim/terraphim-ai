@@ -390,3 +390,46 @@ async fn worker_outliving_poll_timeout_is_not_cancelled_before_terminalizing() {
         "the job actually executed (logs streamed)"
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn graceful_shutdown_waits_for_claimed_task_terminalization() {
+    let shared: Shared = Arc::new(Mutex::new(Recorded::default()));
+    let url = spawn_full(
+        shared.clone(),
+        post(fetch_proof_once),
+        post(update_task_slow_first),
+    )
+    .await;
+    let (poller, _tmp) = poller_cfg(
+        url,
+        RunnerConfig {
+            active_repos: vec!["proof".into()],
+            poll_interval: Duration::from_millis(10),
+            ..RunnerConfig::default()
+        },
+    );
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+    let run = tokio::spawn(async move { poller.run_until_shutdown(&state(), shutdown_rx).await });
+
+    tokio::time::timeout(Duration::from_secs(1), async {
+        loop {
+            if shared.lock().unwrap().update_attempts > 0 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the claimed task must enter its slow update");
+    shutdown_tx.send(true).unwrap();
+
+    tokio::time::timeout(Duration::from_secs(2), run)
+        .await
+        .expect("graceful shutdown must finish after the claimed task")
+        .expect("poller task must join")
+        .expect("graceful poller exit must succeed");
+
+    let recorded = shared.lock().unwrap();
+    assert_eq!(recorded.terminal_results(), vec![1]);
+    assert_eq!(recorded.terminal_stopped_at, vec![true]);
+}
