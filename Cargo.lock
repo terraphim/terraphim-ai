@@ -8177,6 +8177,7 @@ dependencies = [
  "dashmap 6.2.1",
  "env_logger",
  "flate2",
+ "libc",
  "log",
  "reqwest 0.12.28",
  "serde",

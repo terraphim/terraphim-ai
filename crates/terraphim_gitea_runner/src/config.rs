@@ -3,6 +3,40 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+/// Default per-request timeout shared by RunnerService and commit-status HTTP.
+pub const DEFAULT_HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Default upper bound for each local Git subprocess used during checkout.
+pub const DEFAULT_GIT_OPERATION_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+
+/// Default interval between nonterminal updates for a claimed task.
+pub const DEFAULT_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
+
+/// Gitea release against which the lease-refresh contract is verified.
+pub const GITEA_LEASE_CONTRACT_VERSION: &str = "1.26.0";
+
+/// Database timestamp refreshed by nonterminal `UpdateTask` in Gitea 1.26.0.
+pub const GITEA_LEASE_TIMESTAMP_FIELD: &str = "action_task.updated";
+
+/// Gitea 1.26.0's default `[actions].ZOMBIE_TASK_TIMEOUT`.
+///
+/// The deployed version is pinned in `docker-compose-resilient.yml`. In Gitea
+/// v1.26.0, `UpdateTaskByState` handles `RESULT_UNSPECIFIED` by explicitly
+/// updating `ActionTask.Updated` (the `action_task.updated` / `updated_unix`
+/// column) so the zombie-task reaper does not expire the lease. The upstream
+/// default cutoff is ten minutes:
+/// <https://github.com/go-gitea/gitea/blob/v1.26.0/models/actions/task.go#L330-L375>
+/// <https://docs.gitea.com/1.26/administration/config-cheat-sheet/#actions-actions>
+pub const GITEA_ZOMBIE_TASK_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+
+/// Consecutive heartbeat failures tolerated before failing closed.
+///
+/// Ten attempts are independent of terminal-delivery retries and tolerate
+/// 2.5 minutes of immediate rejections. Even if every request consumes the
+/// default 30-second HTTP bound, exhaustion occurs within 7.5 minutes, below
+/// Gitea 1.26.0's ten-minute stale-task cutoff.
+pub const DEFAULT_HEARTBEAT_FAILURE_ATTEMPTS: u32 = 10;
+
 /// VM execution mode for build steps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VmMode {
@@ -53,6 +87,16 @@ pub struct RunnerConfig {
     /// A hung `FetchTask` call is aborted after this duration rather than
     /// blocking the poll loop indefinitely.
     pub http_request_timeout: Duration,
+    /// Maximum duration of each `git init`, `remote`, `fetch`, or `checkout`
+    /// subprocess after a task has been claimed.
+    pub git_operation_timeout: Duration,
+    /// Interval between nonterminal `UpdateTask` heartbeats while an already
+    /// claimed workflow executes. This must remain comfortably below Gitea's
+    /// stale-task cutoff; the production default is 15 seconds.
+    pub heartbeat_interval: Duration,
+    /// Consecutive heartbeat transport failures tolerated before failing
+    /// closed. A successful heartbeat resets the count.
+    pub heartbeat_failure_attempts: u32,
     /// Belt-and-suspenders timeout wrapping only the pre-claim `FetchTask`
     /// request. It must never cancel an already-claimed task's worker lifecycle.
     /// Should exceed `http_request_timeout` so reqwest's own timeout fires first;
@@ -90,7 +134,10 @@ impl Default for RunnerConfig {
             active_repos: Vec::new(),
             legacy_status_mirror: None,
             status_token: None,
-            http_request_timeout: Duration::from_secs(30),
+            http_request_timeout: DEFAULT_HTTP_REQUEST_TIMEOUT,
+            git_operation_timeout: DEFAULT_GIT_OPERATION_TIMEOUT,
+            heartbeat_interval: DEFAULT_HEARTBEAT_INTERVAL,
+            heartbeat_failure_attempts: DEFAULT_HEARTBEAT_FAILURE_ATTEMPTS,
             poll_timeout: Duration::from_secs(60),
             taxonomy_dir: None,
             vm_mode: VmMode::Host,

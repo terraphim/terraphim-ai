@@ -35,17 +35,19 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
     ) -> Self {
         let legacy = config.legacy_status_mirror.as_ref().map(|m| {
             (
-                Arc::new(SingleStatusWriter::new(
+                Arc::new(SingleStatusWriter::new_with_timeout(
                     config.instance_url.clone(),
                     m.token.clone(),
+                    config.http_request_timeout,
                 )),
                 m.context.clone(),
             )
         });
         let status_fallback = config.status_token.as_ref().map(|token| {
-            Arc::new(SingleStatusWriter::new(
+            Arc::new(SingleStatusWriter::new_with_timeout(
                 config.instance_url.clone(),
                 token.clone(),
+                config.http_request_timeout,
             ))
         });
         Self {
@@ -96,11 +98,16 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
         if let Some(writer) = &self.status_fallback {
             worker = worker.with_status_fallback(writer.clone());
         }
-        worker.with_vm_config(
-            self.config.vm_mode,
-            self.config.fcctl_url.clone(),
-            self.config.fcctl_vm_type.clone(),
-        )
+        worker
+            .with_heartbeat_interval(self.config.heartbeat_interval)
+            .with_heartbeat_failure_attempts(self.config.heartbeat_failure_attempts)
+            .with_checkout_timeout(self.config.git_operation_timeout)
+            .with_status_request_timeout(self.config.http_request_timeout)
+            .with_vm_config(
+                self.config.vm_mode,
+                self.config.fcctl_url.clone(),
+                self.config.fcctl_vm_type.clone(),
+            )
     }
 
     /// Run one fetch/dispatch iteration. Returns the updated `tasks_version`.
@@ -178,23 +185,57 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
     /// guard; `poll_timeout` is belt-and-suspenders for kernel-level hangs.
     ///
     /// After every successful poll a `WATCHDOG=1` notification is sent to systemd
-    /// if `$NOTIFY_SOCKET` is set. Set `WatchdogSec=` in the `.service` unit to
-    /// auto-restart when no heartbeat arrives within the window.
+    /// if `$NOTIFY_SOCKET` is set. A poll that claims work awaits that task through
+    /// terminalization, so no watchdog notification is sent while it runs.
+    /// `WatchdogSec` must be unset or exceed the maximum claimed-task duration
+    /// unless watchdog notifications are moved into the owned-task heartbeat.
     pub async fn run_forever(&self, state: &RunnerState) -> Result<()> {
         let mut consecutive_errors = 0u32;
         loop {
-            match self.poll_once(state, 0).await {
-                Ok(_tasks_version) => {
-                    consecutive_errors = 0;
-                    // Heartbeat: no-op when $NOTIFY_SOCKET is unset.
-                    let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog]);
-                }
-                Err(e) => {
-                    consecutive_errors += 1;
-                    log::error!("poll error (streak={consecutive_errors}): {e}");
+            self.poll_and_notify(state, &mut consecutive_errors).await;
+            tokio::time::sleep(self.config.poll_interval).await;
+        }
+    }
+
+    /// Poll until a shutdown signal is received, without cancelling a claimed
+    /// task. A signal observed during `poll_once` is acted on only after the
+    /// worker has delivered (or exhausted delivery of) its terminal update.
+    pub async fn run_until_shutdown(
+        &self,
+        state: &RunnerState,
+        mut shutdown: tokio::sync::watch::Receiver<bool>,
+    ) -> Result<()> {
+        let mut consecutive_errors = 0u32;
+        loop {
+            if *shutdown.borrow() {
+                return Ok(());
+            }
+            self.poll_and_notify(state, &mut consecutive_errors).await;
+            if *shutdown.borrow() {
+                return Ok(());
+            }
+            tokio::select! {
+                _ = tokio::time::sleep(self.config.poll_interval) => {}
+                changed = shutdown.changed() => {
+                    if changed.is_err() || *shutdown.borrow() {
+                        return Ok(());
+                    }
                 }
             }
-            tokio::time::sleep(self.config.poll_interval).await;
+        }
+    }
+
+    async fn poll_and_notify(&self, state: &RunnerState, consecutive_errors: &mut u32) {
+        match self.poll_once(state, 0).await {
+            Ok(_tasks_version) => {
+                *consecutive_errors = 0;
+                // Heartbeat: no-op when $NOTIFY_SOCKET is unset.
+                let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog]);
+            }
+            Err(e) => {
+                *consecutive_errors += 1;
+                log::error!("poll error (streak={consecutive_errors}): {e}");
+            }
         }
     }
 }
