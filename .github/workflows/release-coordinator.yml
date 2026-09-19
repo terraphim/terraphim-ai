@@ -759,6 +759,22 @@ jobs:
               )
           PY
 
+  verify-release-signatures:
+    name: Independent post-publish signature verification (read-only)
+    needs: central-promote
+    # GitHub suppresses `release: [published]` workflow runs for
+    # GITHUB_TOKEN-published releases, so the coordinator invokes the
+    # read-only verifier explicitly after promotion. The callee declares
+    # `permissions: contents: read` and performs no mutation; this call
+    # grants no new token permissions.
+    if: needs.central-promote.result == 'success' && inputs.promote == true
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-sign.yml
+    with:
+      release_tag: ${{ inputs.release_tag }}
+    secrets: inherit
+
   downstream-handoff:
     name: Downstream handoff (Homebrew/AUR/Omarchy) -- only after both central channels succeed
     needs: central-promote

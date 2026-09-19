@@ -119,10 +119,10 @@ create-release
   ├── Generate checksums
   └── Create GitHub Release with signed binaries
   ↓
-update-homebrew (only for v* tags)
-  ├── Clone terraphim/homebrew-terraphim
-  ├── Update formula versions and SHA256 checksums
-  └── Push to GitHub with homebrew-tap-token
+release-coordinator.yml (sole publisher for standard vX.Y.Z releases)
+  ├── Approval-gated promotion to GitHub release + R2 stable manifest
+  ├── Signed R2 discovery pointer per component (<component>/manifest.json)
+  └── Downstream handoff (Homebrew tap PR, AUR, Omarchy)
 ```
 
 ## Manual Testing

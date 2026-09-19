@@ -57,6 +57,14 @@ if [[ -z "$FORMAT" || -z "$VERSION" || -z "$TARGET" || -z "$BINARY" || -z "$OUTP
     exit 2
 fi
 
+# VERSION is interpolated into the nFPM YAML descriptor below; validate the
+# semver grammar before any interpolation (defense in depth, mirroring
+# verify-nfpm.sh). An optional v prefix is tolerated and rendered verbatim.
+if ! [[ "$VERSION" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "version must be semantic MAJOR.MINOR.PATCH (optional v prefix): $VERSION" >&2
+    exit 2
+fi
+
 case "$FORMAT" in
     deb)
         RECEIPT_VALUE="dpkg"

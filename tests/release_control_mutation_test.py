@@ -339,8 +339,8 @@ class ReleaseControlMutationContract(unittest.TestCase):
             (
                 "PyPI bare-tag release guard",
                 Path(".github/workflows/publish-pypi.yml"),
-                "if: (startsWith(github.ref, 'refs/tags/python-v') || startsWith(github.ref, 'refs/tags/pypi-v')) && inputs.dry_run != 'true'",
-                "if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'",
+                "if: (startsWith(github.ref, 'refs/tags/python-v') || startsWith(github.ref, 'refs/tags/pypi-v')) && inputs.dry_run == false",
+                "if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run == false",
                 1,
                 "tests.workflow_release_recovery_contract_test.ReleaseRecoveryWorkflowContract.test_exhaustive_github_release_writer_inventory_is_single_publisher_safe",
             ),

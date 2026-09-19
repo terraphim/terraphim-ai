@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::NamedTempFile;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 /// Timeout for the R2 manifest fetch.
 ///
@@ -261,10 +261,13 @@ impl TerraphimUpdater {
                 return Ok::<UpdateStatus, anyhow::Error>(status);
             }
 
-            // R2-first: if the manifest is reachable, it is authoritative.
-            match r2::try_fetch_r2_manifest(&r2_base_url, &bin_name, R2_MANIFEST_TIMEOUT) {
+            // R2-first: if the signed manifest is reachable and authentic, it
+            // is authoritative. Unauthenticated bytes (missing/invalid
+            // detached signature) are a hard error and never reach version
+            // evaluation.
+            match r2::try_fetch_signed_manifest(&r2_base_url, &bin_name, R2_MANIFEST_TIMEOUT) {
                 Ok(manifest) => {
-                    return Self::evaluate_version(&manifest.version, &current_version);
+                    return Self::evaluate_version(&manifest.release_version, &current_version);
                 }
                 Err(e) => {
                     if !github_fallback {
@@ -439,9 +442,11 @@ impl TerraphimUpdater {
                 return Ok::<UpdateStatus, anyhow::Error>(status);
             }
 
-            // R2-first: download + verify + install from the manifest.
+            // R2-first: download + verify + install from the signed manifest.
             match Self::update_via_r2(
                 &r2_base_url,
+                &repo_owner,
+                &repo_name,
                 &bin_name,
                 &current_version,
                 show_progress,
@@ -493,14 +498,19 @@ impl TerraphimUpdater {
         }
     }
 
-    /// R2-first update: fetch manifest, pick the platform asset, download,
-    /// verify the Ed25519 signature, and install.
+    /// R2-first update: fetch the *signed* canonical manifest, pick the exact
+    /// platform asset, download the payload from the immutable GitHub release
+    /// it names, verify payload SHA-256 and the embedded Ed25519 archive
+    /// signature, and install.
     ///
     /// Returns `Ok(UpdateStatus)` on a completed decision (including
     /// `UpToDate` and `Failed`), and `Err` only when the R2 backend itself is
-    /// unreachable — which signals the caller to fall back to GitHub.
+    /// unreachable or unauthenticated — which signals the caller to fall back
+    /// to GitHub.
     fn update_via_r2(
         r2_base_url: &str,
+        repo_owner: &str,
+        repo_name: &str,
         bin_name: &str,
         current_version: &str,
         show_progress: bool,
@@ -510,10 +520,10 @@ impl TerraphimUpdater {
             return Ok(status);
         }
 
-        let manifest = r2::fetch_r2_manifest(r2_base_url, bin_name, R2_MANIFEST_TIMEOUT)?;
+        let manifest = r2::fetch_signed_manifest(r2_base_url, bin_name, R2_MANIFEST_TIMEOUT)?;
 
         // No update available? Report UpToDate without touching the network again.
-        match is_newer_version_static(&manifest.version, current_version) {
+        match is_newer_version_static(&manifest.release_version, current_version) {
             Ok(true) => {}
             Ok(false) => return Ok(UpdateStatus::UpToDate(current_version.to_string())),
             Err(e) => {
@@ -525,17 +535,31 @@ impl TerraphimUpdater {
         }
 
         let targets = Self::get_target_triples_with_fallback()?;
-        let asset = manifest.select_asset(&targets).ok_or_else(|| {
+        // The manifest's component namespace uses the hyphenated binary name
+        // (terraphim-agent / terraphim-grep), matching GitHub asset naming.
+        let component = bin_name.replace('_', "-");
+        let asset = manifest.select_asset(&component, &targets).ok_or_else(|| {
             anyhow!(
-                "R2 manifest for {} has no asset matching any of {:?}",
+                "signed R2 manifest for {} has no tar.gz asset for component {} matching any of {:?}",
                 bin_name,
+                component,
                 targets
             )
         })?;
 
+        // The download URL is constructed from trusted repository coordinates
+        // plus the authenticated tag and validated asset name — never taken
+        // verbatim from manifest content.
+        let download_url = r2::github_release_asset_url(
+            repo_owner,
+            repo_name,
+            &manifest.release_tag,
+            &asset.name,
+        )?;
+
         info!(
-            "Downloading R2 update {} for {} from {}",
-            manifest.version, asset.target, asset.url
+            "Downloading R2-designated update {} for {} from {}",
+            manifest.release_version, asset.target, download_url
         );
         if let Some(status) = Self::managed_status_with_detector(policy_detector) {
             return Ok(status);
@@ -547,34 +571,28 @@ impl TerraphimUpdater {
             ..Default::default()
         };
         crate::downloader::download_with_retry(
-            &asset.url,
+            &download_url,
             temp_archive.path(),
             Some(download_config),
         )?;
 
         let archive_path = temp_archive.path().to_path_buf();
 
+        // Exact payload integrity: the downloaded bytes must match the digest
+        // carried by the cryptographically authenticated manifest.
+        let archive_bytes = fs::read(&archive_path).context("Failed to read downloaded archive")?;
+        if let Err(e) = r2::verify_payload_sha256(&archive_bytes, &asset.sha256) {
+            return Ok(UpdateStatus::Failed(format!(
+                "R2 payload integrity check failed: {}",
+                e
+            )));
+        }
+
         // Verify the Ed25519 signature before installing. Signed .tar.gz archives
         // carry the signature embedded (zipsign); unsigned archives are rejected.
-        match crate::signature::verify_archive_signature(&archive_path, None)? {
-            crate::signature::VerificationResult::Valid => {
-                info!("R2 archive signature verified, installing");
-            }
-            crate::signature::VerificationResult::Invalid { reason } => {
-                return Ok(UpdateStatus::Failed(format!(
-                    "R2 archive signature invalid: {}",
-                    reason
-                )));
-            }
-            crate::signature::VerificationResult::MissingSignature => {
-                warn!("R2 archive has no embedded signature; installing unverified");
-            }
-            crate::signature::VerificationResult::Error(msg) => {
-                return Ok(UpdateStatus::Failed(format!(
-                    "Signature verification error: {}",
-                    msg
-                )));
-            }
+        let verification = crate::signature::verify_archive_signature(&archive_path, None)?;
+        if let Some(status) = Self::gate_archive_verification(verification, "R2") {
+            return Ok(status);
         }
 
         if let Some(status) = Self::managed_status_with_detector(policy_detector) {
@@ -583,9 +601,40 @@ impl TerraphimUpdater {
         match Self::install_verified_archive(&archive_path, bin_name) {
             Ok(_) => Ok(UpdateStatus::Updated {
                 from_version: current_version.to_string(),
-                to_version: manifest.version,
+                to_version: manifest.release_version,
             }),
             Err(e) => Ok(UpdateStatus::Failed(format!("R2 install failed: {}", e))),
+        }
+    }
+
+    /// Shared fail-closed gate for archive signature verification outcomes.
+    ///
+    /// Returns `None` only for a cryptographically valid archive (proceed to
+    /// install); every other outcome — invalid, missing signature, or
+    /// verifier error — yields `UpdateStatus::Failed`. Both the R2 path and
+    /// the manual GitHub verification path route through this gate so the
+    /// policy cannot drift between arms.
+    fn gate_archive_verification(
+        result: crate::signature::VerificationResult,
+        channel: &str,
+    ) -> Option<UpdateStatus> {
+        match result {
+            crate::signature::VerificationResult::Valid => {
+                info!("{} archive signature verified, installing", channel);
+                None
+            }
+            crate::signature::VerificationResult::Invalid { reason } => Some(UpdateStatus::Failed(
+                format!("{} archive signature invalid: {}", channel, reason),
+            )),
+            crate::signature::VerificationResult::MissingSignature => {
+                Some(UpdateStatus::Failed(format!(
+                    "{} archive has no embedded signature; unsigned archives are rejected (fail closed)",
+                    channel
+                )))
+            }
+            crate::signature::VerificationResult::Error(msg) => Some(UpdateStatus::Failed(
+                format!("{} signature verification error: {}", channel, msg),
+            )),
         }
     }
 
@@ -795,21 +844,13 @@ impl TerraphimUpdater {
             crate::signature::VerificationResult::Valid => {
                 info!("Signature verification passed - proceeding with installation");
             }
-            crate::signature::VerificationResult::Invalid { reason } => {
-                let error_msg = format!("Signature verification failed: {}", reason);
-                error!("{}", error_msg);
-                return Ok(UpdateStatus::Failed(error_msg));
-            }
-            crate::signature::VerificationResult::MissingSignature => {
-                warn!(
-                    "No signature found in archive - proceeding without verification. \
-                       Archives will be signed in a future release."
-                );
-            }
-            crate::signature::VerificationResult::Error(msg) => {
-                let error_msg = format!("Verification error: {}", msg);
-                error!("{}", error_msg);
-                return Ok(UpdateStatus::Failed(error_msg));
+            other => {
+                // Fail closed through the shared gate: Invalid, MissingSignature
+                // and Error all reject the archive instead of installing it.
+                if let Some(status) = Self::gate_archive_verification(other, "GitHub") {
+                    error!("{:?}", status);
+                    return Ok(status);
+                }
             }
         }
 
@@ -1950,6 +1991,62 @@ mod tests {
 
         let failed = UpdateStatus::Failed("test error".to_string());
         assert!(failed.to_string().contains("test error"));
+    }
+
+    // ------------------------------------------------------------------
+    // P2-4 RED: both archive-verification arms must fail closed.
+    //
+    // `MissingSignature` (and any non-Valid result) must produce
+    // `UpdateStatus::Failed`; only a cryptographically valid archive may
+    // proceed to install. A single shared gate keeps the R2 and GitHub
+    // manual-verification arms coherent.
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_archive_verification_gate_valid_proceeds() {
+        let gate = TerraphimUpdater::gate_archive_verification(
+            crate::signature::VerificationResult::Valid,
+            "test",
+        );
+        assert!(gate.is_none(), "valid signatures must proceed to install");
+    }
+
+    #[test]
+    fn test_archive_verification_gate_missing_signature_fails_closed() {
+        let gate = TerraphimUpdater::gate_archive_verification(
+            crate::signature::VerificationResult::MissingSignature,
+            "test",
+        );
+        match gate {
+            Some(UpdateStatus::Failed(msg)) => {
+                assert!(
+                    msg.to_lowercase().contains("signature"),
+                    "failure must mention the signature: {}",
+                    msg
+                );
+            }
+            other => panic!("MissingSignature must fail closed, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_archive_verification_gate_invalid_fails_closed() {
+        let gate = TerraphimUpdater::gate_archive_verification(
+            crate::signature::VerificationResult::Invalid {
+                reason: "bad".to_string(),
+            },
+            "test",
+        );
+        assert!(matches!(gate, Some(UpdateStatus::Failed(_))));
+    }
+
+    #[test]
+    fn test_archive_verification_gate_error_fails_closed() {
+        let gate = TerraphimUpdater::gate_archive_verification(
+            crate::signature::VerificationResult::Error("boom".to_string()),
+            "test",
+        );
+        assert!(matches!(gate, Some(UpdateStatus::Failed(_))));
     }
 
     #[test]

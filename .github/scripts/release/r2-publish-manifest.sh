@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 # Publish or verify the approval-bound, detached-signed stable manifest in R2.
-# Existing objects are immutable: identical bytes are an idempotent retry;
-# different bytes fail closed.  Only an explicit NoSuchKey/404 is absence --
-# authentication, DNS, timeout, and other transport failures never authorize a
-# create.  The signature is landed and verified before manifest.json, which is
-# the stable commit point consumers observe.
+# Existing per-tag objects are immutable: identical bytes are an idempotent
+# retry; different bytes fail closed.  Only an explicit NoSuchKey/404 is
+# absence -- authentication, DNS, timeout, and other transport failures never
+# authorize a create.  The signature is landed and verified before
+# manifest.json, which is the stable commit point consumers observe.
+#
+# In addition to the immutable per-tag objects, publish mode advances the
+# SIGNED STABLE DISCOVERY POINTER per component at <component>/manifest.json
+# (+ .sig) -- the exact bytes the terraphim_update crate fetches and verifies
+# (detached zipsign/Ed25519, context terraphim-release-manifest-v1). Pointer
+# keys are the ONLY mutable objects in this contract: they are overwritten by
+# each new release, but carry the same signed bytes as the immutable per-tag
+# object, so one approval-bound signature authenticates both. Pointer
+# components are derived from the canonical manifest itself and must match
+# the component key grammar; anything else fails closed before any put.
 
 set -euo pipefail
 
@@ -107,12 +117,66 @@ immutable_put() {
 }
 
 if [[ "$MODE" == "publish" ]]; then
+  # Signed stable discovery pointers: the terraphim_update crate consumes
+  # <component>/manifest.json (+ .sig). The pointer carries the SAME signed
+  # bytes as the immutable per-tag object, so the approval-bound detached
+  # signature authenticates both. Pointer keys are derived from the canonical
+  # manifest's component set (never a hard-coded list) and must match the
+  # component key grammar. Validation happens BEFORE any put so a malformed
+  # manifest cannot leave a half-published release behind.
+  if ! components_raw="$(python3 - "$MANIFEST_FILE" <<'PY'
+import json, re, sys
+with open(sys.argv[1], encoding="utf-8") as manifest_file:
+    manifest = json.load(manifest_file)
+grammar = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+components = sorted({asset.get("component", "") for asset in manifest.get("assets", [])})
+if not components or any(not grammar.fullmatch(component) for component in components):
+    raise SystemExit(f"asset components outside the pointer key grammar: {components!r}")
+for component in components:
+    print(component)
+PY
+)"; then
+    fail "could not derive pointer components from the canonical manifest (fail closed, no R2 mutation attempted)"
+  fi
+  mapfile -t POINTER_COMPONENTS <<<"$components_raw"
+
   immutable_put "$SIGNATURE_OBJECT_KEY" "$MANIFEST_SIGNATURE_FILE" application/octet-stream
   verify_remote_object "$SIGNATURE_OBJECT_KEY" "$MANIFEST_SIGNATURE_FILE" \
     "$scratch_dir/signature.readback" "$scratch_dir/signature.stderr"
   # Commit point: manifest.json is written only after its detached signature
   # is durable and verified, and only after the GitHub release was verified.
   immutable_put "$OBJECT_KEY" "$MANIFEST_FILE" application/json
+
+  publish_signed_pointer() {
+    local component="$1"
+    local pointer_key="${component}/manifest.json"
+    local pointer_sig_key="${component}/manifest.json.sig"
+    local pointer_readback="$scratch_dir/pointer.${component}.readback"
+    local pointer_sig_readback="$scratch_dir/pointer.${component}.sig.readback"
+    # Signed and mutable: the pointer advances with each release. The bytes
+    # are the approval-bound signed manifest, and the readback pair is
+    # cryptographically verified below, so overwrite cannot inject content.
+    "$AWS_BIN" s3api put-object \
+      --endpoint-url "$R2_ENDPOINT_URL" --bucket "$R2_BUCKET" --key "$pointer_sig_key" \
+      --body "$MANIFEST_SIGNATURE_FILE" --content-type application/octet-stream >/dev/null \
+      || fail "pointer signature put-object failed for $pointer_sig_key"
+    "$AWS_BIN" s3api put-object \
+      --endpoint-url "$R2_ENDPOINT_URL" --bucket "$R2_BUCKET" --key "$pointer_key" \
+      --body "$MANIFEST_FILE" --content-type application/json >/dev/null \
+      || fail "pointer manifest put-object failed for $pointer_key"
+    verify_remote_object "$pointer_key" "$MANIFEST_FILE" \
+      "$pointer_readback" "$scratch_dir/pointer.${component}.stderr"
+    verify_remote_object "$pointer_sig_key" "$MANIFEST_SIGNATURE_FILE" \
+      "$pointer_sig_readback" "$scratch_dir/pointer.${component}.sig.stderr"
+    "$ZIPSIGN_BIN" verify separate --context terraphim-release-manifest-v1 --quiet \
+      "$pointer_readback" "$pointer_sig_readback" "$VERIFYING_KEY_FILE" \
+      || fail "pointer readback detached signature verification failed for $component"
+    echo "signed discovery pointer advanced: s3://$R2_BUCKET/$pointer_key"
+  }
+
+  for component in "${POINTER_COMPONENTS[@]}"; do
+    publish_signed_pointer "$component"
+  done
 fi
 
 verify_remote_object "$OBJECT_KEY" "$MANIFEST_FILE" \

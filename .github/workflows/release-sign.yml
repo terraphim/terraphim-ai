@@ -19,6 +19,23 @@ name: Verify Release Signatures
 on:
   release:
     types: [published]
+  # `release: [published]` never fires for coordinator-published releases
+  # (GitHub suppresses workflow runs from GITHUB_TOKEN-triggered events), so
+  # the verifier also accepts an explicit dispatch and a reusable-workflow
+  # call. release-coordinator.yml calls this workflow after every promoted
+  # release; both paths carry the release tag explicitly.
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to verify, e.g. v1.21.3 or terraphim_server-v1.21.3'
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      release_tag:
+        description: 'Release tag to verify, e.g. v1.21.3 or terraphim_server-v1.21.3'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -34,6 +51,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate release tag input
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          # Fail closed: the tag must match the producer tag grammar before it
+          # reaches any shell or gh invocation.
+          if [[ ! "$RELEASE_TAG" =~ ^([A-Za-z0-9_.-]+-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid release tag '$RELEASE_TAG' (expected vX.Y.Z or component-vX.Y.Z)"
+            exit 1
+          fi
+          echo "Valid release tag: $RELEASE_TAG"
+
       - name: Install zipsign
         run: |
           cargo install zipsign@0.2.1 --locked
@@ -42,7 +72,7 @@ jobs:
       - name: Download release artifacts
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
         run: |
           set -euo pipefail
           echo "Release tag: $RELEASE_TAG"
@@ -139,7 +169,7 @@ jobs:
       - name: Generate signature report
         if: always()
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
           SERVER_URL: ${{ github.server_url }}
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}

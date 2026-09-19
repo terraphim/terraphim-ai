@@ -78,10 +78,10 @@ git diff origin/main gitea/main --stat   # verify empty
 
 On `terraphim/terraphim-ai` tag `vX.Y.Z`:
 
-1. `release-comprehensive.yml` — server binaries, Docker, Debian, GitHub release
+1. `release-comprehensive.yml` — server binaries, Docker, Debian, durable producer artifacts (no publication for standard tags)
 2. Dispatches `terraphim-clients` → `release-binaries.yml` (attaches agent/cli/grep)
-3. `wait-for-client-binaries` — polls release asset count
-4. `update-homebrew` — updates tap formulas
+3. `release-coordinator.yml` — approval-gated publication (GitHub release, signed R2 manifest + per-component discovery pointer) and downstream handoff
+4. `release-sign.yml` — independent read-only signature verification, invoked by the coordinator via `workflow_call` after promotion
 
 Check:
 

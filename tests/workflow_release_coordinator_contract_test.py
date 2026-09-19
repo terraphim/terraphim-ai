@@ -404,10 +404,10 @@ class ReleaseCoordinatorWorkflowContract(unittest.TestCase):
                 job,
                 f"{job_name} must not compete with the standard-release coordinator",
             )
-        homebrew = job_block(text, "update-homebrew")
-        self.assertTrue(has_need(homebrew, "wait-for-client-binaries"))
-        wait = job_block(text, "wait-for-client-binaries")
-        self.assertTrue(has_need(wait, "create-release"))
+        # The permanently dead legacy wait/Homebrew jobs are removed rather
+        # than left as a misleading second ownership story (P2-1).
+        self.assertEqual(job_block(text, "update-homebrew"), "")
+        self.assertEqual(job_block(text, "wait-for-client-binaries"), "")
 
 
 if __name__ == "__main__":

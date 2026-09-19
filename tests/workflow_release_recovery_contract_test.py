@@ -429,6 +429,7 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             ".github/workflows/publish-tauri.yml",
             "tests/release_control_mutation_test.py",
             "tests/workflow_release_recovery_contract_test.py",
+            "tests/updater_r2_manifest_contract_test.py",
         ):
             self.assertEqual(
                 self.contract_text.count(f'- "{path}"'),
@@ -437,6 +438,10 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             )
         self.assertIn(
             "python -m unittest -v tests.workflow_release_recovery_contract_test",
+            self.contract_text,
+        )
+        self.assertIn(
+            "python -m unittest -v tests.updater_r2_manifest_contract_test",
             self.contract_text,
         )
         contract_job = job_block(self.contract_text, "release-coordinator-contract")
@@ -462,8 +467,93 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertIn("type: string", expected_sha)
 
         resolver = job_block(self.release_text, "resolve-release-source")
-        self.assertIn("^v[0-9]+\\.[0-9]+\\.[0-9]+$", resolver)
         self.assertIn("^[0-9a-f]{40}$", resolver)
+
+    def test_dispatch_recovery_accepts_only_component_tags(self) -> None:
+        """P1-3: the manual recovery path must be reachable under a safe
+        component-tag contract and fail closed for bare vX.Y.Z tags.
+
+        Bare-tag recovery is owned exclusively by release-coordinator.yml, so
+        the producer workflow's dispatch input must REQUIRE a component prefix
+        (making `is_standard_release` structurally false on dispatch) instead
+        of accepting only bare tags that can never satisfy the recovery guard.
+        """
+        resolver = job_block(self.release_text, "resolve-release-source")
+        dispatch_branch = resolver.split('if [[ "$EVENT_NAME" == "workflow_dispatch" ]]')[
+            1
+        ].split("else", 1)[0]
+
+        component_pattern = r"^[A-Za-z0-9_.-]+-v[0-9]+\.[0-9]+\.[0-9]+$"
+        self.assertIn(
+            component_pattern,
+            dispatch_branch,
+            "dispatch must require a component-prefixed tag so recovery is reachable",
+        )
+        regex = re.compile(component_pattern)
+        # Reachable recovery inputs:
+        self.assertTrue(regex.fullmatch("terraphim_server-v1.21.3"))
+        self.assertTrue(regex.fullmatch("terraphim_grep-v1.21.3"))
+        # Bare tags fail closed: single-writer ownership by the coordinator.
+        self.assertFalse(regex.fullmatch("v1.21.3"))
+        # Garbage fails closed.
+        self.assertFalse(regex.fullmatch("../../etc"))
+        self.assertFalse(regex.fullmatch(""))
+
+        # The resolver marks component tags as non-standard so the recovery
+        # job guard (`is_standard_release != 'true'`) can actually pass.
+        self.assertIn('IS_STANDARD_RELEASE="false"', resolver)
+        self.assertIn('VERSION="${RELEASE_TAG##*-v}"', resolver)
+
+        # The advertised input documents the component-tag contract.
+        release_tag = input_block(self.release_text, "release_tag")
+        self.assertIn("component", release_tag.lower())
+        self.assertIn("release-coordinator", release_tag)
+
+    def test_recovery_job_is_reachable_for_component_tag_dispatch(self) -> None:
+        """P1-3: with a component tag the dispatch guard must actually
+        evaluate to true (previously unreachable under every valid input)."""
+        condition_expr = job_if_condition(
+            self.release_text, "upload-recovered-release-assets"
+        )
+        self.assertTrue(condition_expr)
+        happy = {
+            "verify-versions": "success",
+            "sign-and-notarize-macos": "success",
+            "verify-release-assets": "success",
+            "build-server-managed-packages": "success",
+        }
+        self.assertTrue(
+            evaluate_condition(
+                condition_expr,
+                event_name="workflow_dispatch",
+                results=happy,
+                inputs={"test_run": False},
+                outputs={("resolve-release-source", "is_standard_release"): "false"},
+            ),
+            "component-tag dispatch recovery must be reachable",
+        )
+        # Bare (standard) releases stay coordinator-only even on dispatch.
+        self.assertFalse(
+            evaluate_condition(
+                condition_expr,
+                event_name="workflow_dispatch",
+                results=happy,
+                inputs={"test_run": False},
+                outputs={("resolve-release-source", "is_standard_release"): "true"},
+            ),
+            "standard-release recovery must not bypass the coordinator",
+        )
+        # test_run never recovers.
+        self.assertFalse(
+            evaluate_condition(
+                condition_expr,
+                event_name="workflow_dispatch",
+                results=happy,
+                inputs={"test_run": True},
+                outputs={("resolve-release-source", "is_standard_release"): "false"},
+            ),
+            "test_run dispatch must not mutate releases",
+        )
 
     def test_resolver_has_read_only_contents_permission(self) -> None:
         resolver = job_block(self.release_text, "resolve-release-source")
@@ -487,8 +577,6 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             "trigger-desktop-release",
             "trigger-clients-release",
             "build-docker",
-            "wait-for-client-binaries",
-            "update-homebrew",
         ]:
             self.assertTrue(
                 has_need(
@@ -861,8 +949,6 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         for job_name in [
             "create-release",
             "upload-recovered-release-assets",
-            "wait-for-client-binaries",
-            "update-homebrew",
         ]:
             self.assertIn(
                 "!inputs.test_run", job_block(self.release_text, job_name), job_name
@@ -928,21 +1014,53 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertIn("source_ref: releaseTag", clients)
         self.assertIn("expected_source_sha: expectedSourceSha", clients)
 
-    def test_wait_and_homebrew_are_tag_push_only_and_wait_does_not_need_trigger_clients(
-        self,
-    ) -> None:
-        wait = job_block(self.release_text, "wait-for-client-binaries")
-        homebrew = job_block(self.release_text, "update-homebrew")
-
-        self.assertTrue(has_need(wait, "create-release"))
-        self.assertFalse(has_need(wait, "trigger-clients-release"))
-        for job in [wait, homebrew]:
-            self.assertIn("github.event_name == 'push'", job)
-            self.assertIn("!inputs.test_run", job)
-            self.assertIn(
-                "needs.resolve-release-source.outputs.is_standard_release == 'true'",
-                job,
+    def test_dead_legacy_client_wait_and_homebrew_jobs_are_removed(self) -> None:
+        """P2-1: `wait-for-client-binaries`/`update-homebrew` were permanently
+        dead (they required `create-release` success while `create-release` is
+        barred from standard releases). The coordinator owns Homebrew
+        downstream dispatch, so the producer workflow must not carry a second,
+        contradictory ownership story."""
+        for job_name in ["wait-for-client-binaries", "update-homebrew"]:
+            self.assertEqual(
+                job_block(self.release_text, job_name),
+                "",
+                f"{job_name} must be removed from the producer workflow",
             )
+            self.assertNotIn(job_name, self.release_text)
+
+    def test_pypi_release_creation_uses_boolean_dry_run_comparison(self) -> None:
+        """P2-3: `type: boolean` inputs must be compared to booleans, not to
+        the string 'true' (which is truthy-mismatched under GitHub's loose
+        comparison and would publish during a dry run)."""
+        publish_job = job_block(self.pypi_text, "publish-pypi")
+        github_release = step_run_block(publish_job, "Create GitHub Release")
+        self.assertIn("inputs.dry_run == false", github_release)
+        self.assertNotIn("inputs.dry_run != 'true'", github_release)
+
+        verify_step = step_run_block(publish_job, "Verify published packages")
+        self.assertIn("inputs.dry_run == false", verify_step)
+        self.assertNotIn("inputs.dry_run != 'true'", verify_step)
+
+        condition = step_if_condition(publish_job, "Create GitHub Release")
+        self.assertTrue(condition)
+        cases = (
+            ("push", "refs/tags/python-v1.2.3", False, True),
+            ("push", "refs/tags/pypi-v1.2.3", False, True),
+            ("push", "refs/tags/v1.2.3", False, False),
+            ("workflow_dispatch", "refs/tags/python-v1.2.3", True, False),
+            ("workflow_dispatch", "refs/tags/python-v1.2.3", False, True),
+        )
+        for event_name, ref, dry_run, expected in cases:
+            with self.subTest(event_name=event_name, ref=ref, dry_run=dry_run):
+                self.assertEqual(
+                    evaluate_condition(
+                        condition,
+                        event_name=event_name,
+                        ref=ref,
+                        inputs={"dry_run": dry_run},
+                    ),
+                    expected,
+                )
 
     def test_managed_packages_are_release_and_recovery_dependencies(self) -> None:
         for job_name in ["create-release", "upload-recovered-release-assets"]:

@@ -12,7 +12,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/release-sign.yml"
+COORDINATOR_WORKFLOW = ROOT / ".github/workflows/release-coordinator.yml"
 ZIPSIGN_BIN = shutil.which("zipsign")
+
+TAG_GRAMMAR = r"^([A-Za-z0-9_.-]+-)?v[0-9]+\.[0-9]+\.[0-9]+$"
 
 
 def extract_step_run(step_name: str) -> str:
@@ -45,10 +48,60 @@ class ReleaseSignOwnershipContract(unittest.TestCase):
 
     def test_release_tag_is_taken_from_event_via_env_not_rewritten(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("RELEASE_TAG: ${{ github.event.release.tag_name }}", text)
+        self.assertIn(
+            "RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}",
+            text,
+        )
         self.assertIn('gh release view "$RELEASE_TAG"', text)
         self.assertNotIn("GITHUB_REF#refs/tags/v", text)
-        self.assertNotIn("${{ github.ref_name }}", text)
+
+    def test_verifier_is_reachable_for_coordinator_published_releases(self) -> None:
+        """P2-2: `release: [published]` never fires for GITHUB_TOKEN-published
+        (coordinator) releases. The verifier must also accept explicit
+        workflow_dispatch/workflow_call triggers carrying the release tag."""
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("types: [published]", text)
+        self.assertIn("workflow_dispatch:", text)
+        self.assertIn("workflow_call:", text)
+        for trigger in ("workflow_dispatch:", "workflow_call:"):
+            trigger_block = text.split(trigger, 1)[1]
+            self.assertIn("release_tag:", trigger_block, trigger)
+            self.assertIn("required: true", trigger_block, trigger)
+            self.assertIn("type: string", trigger_block, trigger)
+
+    def test_release_tag_input_is_validated_before_use(self) -> None:
+        """The dispatch/call tag must match the producer tag grammar before it
+        reaches any shell or gh invocation (fail closed, no interpolation)."""
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn(TAG_GRAMMAR, text)
+        # The tag flows via an env var, never inline ${{ }} in a run block.
+        self.assertNotIn('gh release view "${{', text)
+        self.assertNotIn('gh release download "${{', text)
+
+    def test_coordinator_dispatches_independent_verification_after_publish(
+        self,
+    ) -> None:
+        """P2-2: the coordinator must invoke the read-only verifier for every
+        promoted release via a reusable-workflow call (no new token
+        permissions: the callee stays contents: read)."""
+        text = COORDINATOR_WORKFLOW.read_text(encoding="utf-8")
+        caller = re.search(
+            r"(?ms)^  verify-release-signatures:\n(?:    .*\n?)+", text
+        )
+        self.assertIsNotNone(
+            caller, "release-coordinator.yml must call release-sign.yml"
+        )
+        block = caller.group(0)
+        self.assertIn("uses: ./.github/workflows/release-sign.yml", block)
+        self.assertIn("release_tag: ${{ inputs.release_tag }}", block)
+        self.assertIn("contents: read", block)
+        self.assertNotIn("contents: write", block)
+        # Only after a real promotion, never for rehearsals.
+        self.assertIn("central-promote", block)
+        self.assertIn("inputs.promote == true", block)
+        # The call happens only after GitHub publication verification
+        # succeeded inside central-promote (documented ordering anchor).
+        self.assertIn("secrets: inherit", block)
 
     def test_signature_report_uses_single_grouped_redirect(self) -> None:
         run = extract_step_run("Generate signature report")

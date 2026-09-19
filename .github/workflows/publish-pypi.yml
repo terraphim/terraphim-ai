@@ -332,7 +332,7 @@ jobs:
           ./scripts/publish-pypi.sh "${args[@]}"
 
       - name: Verify published packages
-        if: inputs.dry_run != 'true'
+        if: inputs.dry_run == false
         run: |
           PACKAGE_NAME="terraphim-automata"
           PACKAGE_VERSION="${{ steps.version.outputs.version }}"
@@ -350,7 +350,7 @@ jobs:
         # Bare vX.Y.Z releases are owned exclusively by release-coordinator.yml.
         # Python package publication still runs for bare and component-prefixed
         # tags; only component-prefixed tags may create a Python GitHub release.
-        if: (startsWith(github.ref, 'refs/tags/python-v') || startsWith(github.ref, 'refs/tags/pypi-v')) && inputs.dry_run != 'true'
+        if: (startsWith(github.ref, 'refs/tags/python-v') || startsWith(github.ref, 'refs/tags/pypi-v')) && inputs.dry_run == false
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
@@ -395,7 +395,7 @@ jobs:
           prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
 
       - name: Notify completion
-        if: inputs.dry_run != 'true'
+        if: inputs.dry_run == false
         run: |
           echo "🎉 PyPI publishing workflow completed successfully!"
           echo "📦 Package: terrraphim-automata"

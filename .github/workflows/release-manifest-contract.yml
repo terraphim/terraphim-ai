@@ -26,6 +26,8 @@ on:
       - "tests/workflow_release_coordinator_sequence_test.py"
       - "tests/workflow_release_recovery_contract_test.py"
       - "tests/workflow_release_sign_test.py"
+      - "tests/updater_r2_manifest_contract_test.py"
+      - "crates/terraphim_update/**"
   push:
     paths:
       - ".github/actionlint.yaml"
@@ -51,6 +53,8 @@ on:
       - "tests/workflow_release_coordinator_sequence_test.py"
       - "tests/workflow_release_recovery_contract_test.py"
       - "tests/workflow_release_sign_test.py"
+      - "tests/updater_r2_manifest_contract_test.py"
+      - "crates/terraphim_update/**"
 
 permissions:
   contents: read
@@ -182,6 +186,9 @@ jobs:
 
       - name: Run release-sign already-signed contract tests
         run: python -m unittest -v tests.workflow_release_sign_test
+
+      - name: Run updater/R2 manifest cross-boundary contract tests
+        run: python -m unittest -v tests.updater_r2_manifest_contract_test
 
       - name: Run R2 publish-manifest shell contract tests
         run: bash .github/scripts/release/tests/test_r2_publish_manifest.sh

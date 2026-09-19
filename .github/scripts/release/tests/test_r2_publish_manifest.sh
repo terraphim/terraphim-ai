@@ -13,7 +13,9 @@ SIGNATURE="$TMP/manifest.json.sig"
 PRIVATE_KEY="$TMP/private.key"
 VERIFYING_KEY="$TMP/verifying.key"
 STATE="$TMP/state.json"
-printf '{"release_tag":"v1.2.3"}\n' >"$MANIFEST"
+printf '%s\n' '{"release_tag":"v1.2.3","assets":['\
+'{"name":"terraphim-agent-1.2.3-linux-x86_64.tar.gz","component":"terraphim-agent"},'\
+'{"name":"terraphim-grep-1.2.3-linux-x86_64.tar.gz","component":"terraphim-grep"}]}' >"$MANIFEST"
 EXPECTED_SHA256="$(sha256sum -- "$MANIFEST" | awk '{print $1}')"
 zipsign gen-key "$PRIVATE_KEY" "$VERIFYING_KEY" >/dev/null
 zipsign sign separate --context terraphim-release-manifest-v1 --output "$SIGNATURE" --force "$MANIFEST" "$PRIVATE_KEY" >/dev/null
@@ -57,12 +59,13 @@ if [[ "$sub" == "put-object" && "${1:-}" == "help" ]]; then
   exit 0
 fi
 [[ "${STUB_TRANSPORT_FAILURE:-}" != "1" ]] || { echo "connection timed out" >&2; exit 255; }
-key=""; body=""; output=""
+key=""; body=""; output=""; if_none_match=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --key) key="$2"; shift 2 ;;
     --body) body="$2"; shift 2 ;;
-    --bucket|--endpoint-url|--content-type|--if-none-match) shift 2 ;;
+    --if-none-match) if_none_match="$2"; shift 2 ;;
+    --bucket|--endpoint-url|--content-type) shift 2 ;;
     *) output="$1"; shift ;;
   esac
 done
@@ -79,7 +82,12 @@ case "$sub" in
     fi
     ;;
   put-object)
-    [[ ! -e "$path" ]] || { echo "PreconditionFailed" >&2; exit 253; }
+    # Conditional puts are the immutability boundary; a put without
+    # --if-none-match is the signed, mutable discovery pointer and may
+    # overwrite (the bytes are signed and readback-verified by the caller).
+    if [[ "$if_none_match" == "*" && -e "$path" ]]; then
+      echo "PreconditionFailed" >&2; exit 253
+    fi
     mkdir -p "$(dirname "$path")"
     cp "$body" "$path"
     ;;
@@ -175,4 +183,73 @@ run_script >"$TMP/out" 2>"$TMP/err" || fail "authorized republish after negative
 run_script MODE=verify >"$TMP/out" 2>"$TMP/err" || fail "verify mode failed: $(cat "$TMP/err")"
 grep -Fq "terminal verification succeeded" "$TMP/out" || fail "missing terminal verification message"
 
-echo "r2-publish-manifest tests passed (13 cases)"
+# ---------------------------------------------------------------------------
+# P1-2 contract: the signed stable discovery pointer per component.
+#
+# The updater consumes `<component>/manifest.json` (+ `.sig`). The publisher
+# must land the SAME signed bytes (byte-identical to the immutable per-tag
+# object, so one detached signature verifies both) at the pointer keys,
+# derived from the canonical manifest's component set. Pointer keys are the
+# only mutable objects; per-tag objects stay conditional/immutable.
+# ---------------------------------------------------------------------------
+
+# Publish populated the pointer keys from the manifest's components.
+for component in terraphim-agent terraphim-grep; do
+  cmp -s "$MANIFEST" "$STORE/$component/manifest.json" \
+    || fail "pointer manifest bytes differ for $component"
+  cmp -s "$SIGNATURE" "$STORE/$component/manifest.json.sig" \
+    || fail "pointer signature bytes differ for $component"
+done
+
+# A new release advances the signed pointer while per-tag objects stay
+# immutable, and verify mode for the old tag still passes against the
+# immutable objects (pointers are discovery, not release evidence).
+MANIFEST2="$TMP/manifest2.json"
+SIGNATURE2="$TMP/manifest2.json.sig"
+printf '%s\n' '{"release_tag":"v1.2.4","assets":['\
+'{"name":"terraphim-agent-1.2.4-linux-x86_64.tar.gz","component":"terraphim-agent"},'\
+'{"name":"terraphim-grep-1.2.4-linux-x86_64.tar.gz","component":"terraphim-grep"}]}' >"$MANIFEST2"
+zipsign sign separate --context terraphim-release-manifest-v1 --output "$SIGNATURE2" --force "$MANIFEST2" "$PRIVATE_KEY" >/dev/null
+EXPECTED_SHA256_2="$(sha256sum -- "$MANIFEST2" | awk '{print $1}')"
+write_state promoting "$EXPECTED_SHA256_2" "$EXPECTED_SHA256_2"
+run_script MANIFEST_FILE="$MANIFEST2" MANIFEST_SIGNATURE_FILE="$SIGNATURE2" \
+  RELEASE_TAG=v1.2.4 EXPECTED_SHA256="$EXPECTED_SHA256_2" >"$TMP/out" 2>"$TMP/err" \
+  || fail "second release publish failed: $(cat "$TMP/err")"
+cmp -s "$MANIFEST2" "$STORE/terraphim-agent/manifest.json" || fail "pointer did not advance to v1.2.4"
+cmp -s "$MANIFEST" "$STORE/releases/v1.2.3/manifest.json" || fail "old tag object was mutated"
+write_state promoting
+run_script MODE=verify >"$TMP/out" 2>"$TMP/err" \
+  || fail "verify mode must not compare moved pointers: $(cat "$TMP/err")"
+
+# A corrupted pointer readback fails closed after the pointer put.
+find "$STORE" -mindepth 1 -delete
+write_state promoting
+if run_script STUB_CORRUPT_READBACK_ONCE_KEY=terraphim-agent/manifest.json >"$TMP/out" 2>"$TMP/err"; then
+  fail "corrupted pointer readback unexpectedly succeeded"
+fi
+grep -Fq "terraphim-agent/manifest.json differs from the approved immutable bytes" "$TMP/err" \
+  || fail "missing pointer readback failure: $(cat "$TMP/err")"
+
+# A component outside the key grammar fails closed before any pointer put.
+find "$STORE" -mindepth 1 -delete
+BAD_MANIFEST="$TMP/manifest-bad.json"
+BAD_SIGNATURE="$TMP/manifest-bad.json.sig"
+printf '%s\n' '{"release_tag":"v1.2.3","assets":['\
+'{"name":"evil.tar.gz","component":"../escape"}]}' >"$BAD_MANIFEST"
+zipsign sign separate --context terraphim-release-manifest-v1 --output "$BAD_SIGNATURE" --force "$BAD_MANIFEST" "$PRIVATE_KEY" >/dev/null
+BAD_SHA256="$(sha256sum -- "$BAD_MANIFEST" | awk '{print $1}')"
+write_state promoting "$BAD_SHA256" "$BAD_SHA256"
+if run_script MANIFEST_FILE="$BAD_MANIFEST" MANIFEST_SIGNATURE_FILE="$BAD_SIGNATURE" \
+  EXPECTED_SHA256="$BAD_SHA256" >"$TMP/out" 2>"$TMP/err"; then
+  fail "manifest with out-of-grammar component unexpectedly published"
+fi
+[[ ! -e "$STORE/../escape/manifest.json" ]] || fail "component traversal created an object"
+# Component validation runs before any put: not even the immutable per-tag
+# objects may be created for an out-of-grammar manifest.
+[[ -z "$(find "$STORE" -mindepth 1 -print -quit)" ]] || fail "out-of-grammar component still published tag objects"
+find "$STORE" -mindepth 1 -delete
+
+# Restore the happy-path state for any further cases.
+write_state promoting
+
+echo "r2-publish-manifest tests passed (17 cases)"
