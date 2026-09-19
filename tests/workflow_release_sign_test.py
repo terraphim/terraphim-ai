@@ -50,6 +50,20 @@ class ReleaseSignOwnershipContract(unittest.TestCase):
         self.assertNotIn("GITHUB_REF#refs/tags/v", text)
         self.assertNotIn("${{ github.ref_name }}", text)
 
+    def test_signature_report_uses_single_grouped_redirect(self) -> None:
+        run = extract_step_run("Generate signature report")
+        self.assertIn("} > signature-report.md", run)
+        self.assertNotIn(">> signature-report.md", run)
+        # The artifact listing belongs inside the fenced report block, not
+        # only on the runner's stdout.
+        group = run.split("{", 1)[1].split("} > signature-report.md", 1)[0]
+        self.assertIn("ls -lh artifacts/", group)
+
+    def test_job_summary_append_redirect_is_quoted(self) -> None:
+        run = extract_step_run("Add job summary")
+        self.assertIn('cat signature-report.md >> "$GITHUB_STEP_SUMMARY"', run)
+        self.assertNotIn(">> $GITHUB_STEP_SUMMARY", run)
+
 
 @unittest.skipUnless(ZIPSIGN_BIN, "zipsign binary not on PATH")
 class ReleaseSignExecutionContract(unittest.TestCase):

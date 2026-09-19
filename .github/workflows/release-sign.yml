@@ -144,17 +144,19 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          echo "# Signature Verification Report" > signature-report.md
-          echo "" >> signature-report.md
-          echo "**Release**: $RELEASE_TAG" >> signature-report.md
-          echo "**Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> signature-report.md
-          echo "**Workflow Run**: $SERVER_URL/$REPOSITORY/actions/runs/$RUN_ID" >> signature-report.md
-          echo "" >> signature-report.md
-          echo "## Signed Artifacts" >> signature-report.md
-          echo "" >> signature-report.md
-          echo '```' >> signature-report.md
-          ls -lh artifacts/
-          echo '```' >> signature-report.md
+          {
+            echo "# Signature Verification Report"
+            echo ""
+            echo "**Release**: $RELEASE_TAG"
+            echo "**Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+            echo "**Workflow Run**: $SERVER_URL/$REPOSITORY/actions/runs/$RUN_ID"
+            echo ""
+            echo "## Signed Artifacts"
+            echo ""
+            echo '```'
+            ls -lh artifacts/
+            echo '```'
+          } > signature-report.md
 
           cat signature-report.md
 
@@ -182,5 +184,5 @@ jobs:
       - name: Add job summary
         run: |
           if [ -f signature-report.md ]; then
-            cat signature-report.md >> $GITHUB_STEP_SUMMARY
+            cat signature-report.md >> "$GITHUB_STEP_SUMMARY"
           fi

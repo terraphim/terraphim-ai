@@ -54,8 +54,8 @@ jobs:
 
       - name: Validate version format
         run: |
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=$(echo "${{ github.ref }}" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=$(echo "$GITHUB_REF" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
             if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "Invalid version format: $VERSION"
               exit 1
@@ -271,10 +271,10 @@ jobs:
 
       - name: Rename universal binary for NAPI
         run: |
-          ls -la *.node || echo "No .node files found"
+          ls -la ./*.node || echo "No .node files found"
           # Rename to what index.js expects
           mv terraphim_ai_nodejs.darwin-universal.node terraphim_ai_nodejs.darwin-universal.node 2>/dev/null || true
-          ls -la *.node
+          ls -la ./*.node
 
       - name: Test package functionality with Node.js
         run: |
@@ -325,7 +325,7 @@ jobs:
           ls -la
           # NAPI-RS generates filenames with darwin-x64/darwin-arm64 naming convention
           lipo -create terraphim_ai_nodejs.darwin-x64.node terraphim_ai_nodejs.darwin-arm64.node -output terraphim_ai_nodejs.darwin-universal.node
-          ls -la *.node
+          ls -la ./*.node
 
       - name: Upload universal binary
         uses: actions/upload-artifact@v5
@@ -362,6 +362,8 @@ jobs:
 
       - name: Prepare package for publishing
         working-directory: terraphim_ai_nodejs
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           # Create npm directory structure
           mkdir -p npm
@@ -370,7 +372,7 @@ jobs:
           find ../artifacts -name "*.node" -exec cp {} npm/ \;
 
           # If no binaries found (NAPI build failed), try to find them manually
-          if [ ! -n "$(ls -A npm/)" ]; then
+          if [ -z "$(ls -A npm/)" ]; then
             echo "⚠️  No NAPI artifacts found, searching for built libraries..."
             # Look for libraries in target directories
             find ../target -name "libterraphim_ai_nodejs.so" -exec cp {} npm/terraphim_ai_nodejs.linux-x64-gnu.node \;
@@ -384,15 +386,15 @@ jobs:
 
           # Update package.json version if needed
           VERSION_TO_USE=""
-          if [[ "${{ inputs.version }}" != "" ]]; then
-            VERSION_TO_USE="${{ inputs.version }}"
-          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION_TO_USE=$(echo "${{ github.ref }}" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
+          if [[ "$INPUT_VERSION" != "" ]]; then
+            VERSION_TO_USE="$INPUT_VERSION"
+          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION_TO_USE=$(echo "$GITHUB_REF" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
           fi
 
           if [[ "$VERSION_TO_USE" != "" ]]; then
             echo "📝 Updating version to $VERSION_TO_USE"
-            npm pkg set version=$VERSION_TO_USE
+            npm pkg set "version=$VERSION_TO_USE"
           fi
 
       - name: Configure npm for GitHub Packages
@@ -409,17 +411,20 @@ jobs:
 
       - name: Determine publishing strategy
         id: strategy
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           VERSION_TYPE="patch"
           NPM_TAG="latest"
 
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            if [[ "${{ inputs.version }}" != "" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$INPUT_VERSION" != "" ]]; then
               VERSION_TYPE="manual"
-              NPM_TAG="${{ inputs.tag }}"
+              NPM_TAG="$INPUT_TAG"
             fi
-          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION_TAG=$(echo "${{ github.ref }}" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
+          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION_TAG=$(echo "$GITHUB_REF" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
             if [[ "$VERSION_TAG" =~ -beta$ ]]; then
               NPM_TAG="beta"
             elif [[ "$VERSION_TAG" =~ -alpha$ ]]; then
@@ -429,12 +434,12 @@ jobs:
             else
               NPM_TAG="latest"
             fi
-          elif [[ "${{ github.event_name }}" == "release" ]]; then
+          elif [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
             NPM_TAG="latest"
           fi
 
-          echo "version_type=$VERSION_TYPE" >> $GITHUB_OUTPUT
-          echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
+          echo "version_type=$VERSION_TYPE" >> "$GITHUB_OUTPUT"
+          echo "npm_tag=$NPM_TAG" >> "$GITHUB_OUTPUT"
           echo "🎯 Publishing strategy: $VERSION_TYPE -> $NPM_TAG"
 
       - name: Publish to GitHub Packages
@@ -473,7 +478,7 @@ jobs:
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
           echo "Checking: $PACKAGE_NAME@$PACKAGE_VERSION"
-          npm view $PACKAGE_NAME@$PACKAGE_VERSION --registry=https://npm.pkg.github.com || echo "Package not immediately visible (may take a few minutes)"
+          npm view "$PACKAGE_NAME@$PACKAGE_VERSION" --registry=https://npm.pkg.github.com || echo "Package not immediately visible (may take a few minutes)"
 
           echo "GitHub Packages URL: https://github.com/terraphim/terraphim-ai/packages"
 

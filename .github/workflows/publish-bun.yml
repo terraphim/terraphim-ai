@@ -62,8 +62,8 @@ jobs:
 
       - name: Validate version format
         run: |
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/bun-v//')
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=$(echo "$GITHUB_REF" | sed 's/refs\/tags\/bun-v//')
             if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "Invalid version format: $VERSION"
               exit 1
@@ -328,7 +328,7 @@ jobs:
           echo "arm64 node: $ARM64_NODE"
           if [ -n "$X64_NODE" ] && [ -n "$ARM64_NODE" ]; then
             lipo -create "$X64_NODE" "$ARM64_NODE" -output terraphim_ai_nodejs.darwin-universal.node
-            ls -la *.node
+            ls -la ./*.node
           else
             echo "Could not find both architecture binaries"
             exit 1
@@ -385,7 +385,7 @@ jobs:
 
           # List what we have
           echo "Built binaries for Bun:"
-          ls -la *.node || echo "No .node files found"
+          ls -la ./*.node || echo "No .node files found"
 
           # Update package.json version if provided (skip npm scripts)
           if [[ "${{ inputs.version }}" != "" ]]; then
@@ -413,18 +413,21 @@ jobs:
 
       - name: Determine publishing strategy
         id: strategy
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           VERSION_TYPE="patch"
           REGISTRY="npm"
           NPM_TAG="latest"
 
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            if [[ "${{ inputs.version }}" != "" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$INPUT_VERSION" != "" ]]; then
               VERSION_TYPE="manual"
-              NPM_TAG="${{ inputs.tag }}"
+              NPM_TAG="$INPUT_TAG"
             fi
-          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION_TAG=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/bun-v//')
+          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION_TAG=$(echo "$GITHUB_REF" | sed 's/refs\/tags\/bun-v//')
             if [[ "$VERSION_TAG" =~ -beta$ ]]; then
               NPM_TAG="beta"
             elif [[ "$VERSION_TAG" =~ -alpha$ ]]; then
@@ -434,13 +437,15 @@ jobs:
             else
               NPM_TAG="latest"
             fi
-          elif [[ "${{ github.event_name }}" == "release" ]]; then
+          elif [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
             NPM_TAG="latest"
           fi
 
-          echo "version_type=$VERSION_TYPE" >> $GITHUB_OUTPUT
-          echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
-          echo "registry=$REGISTRY" >> $GITHUB_OUTPUT
+          {
+            echo "version_type=$VERSION_TYPE"
+            echo "npm_tag=$NPM_TAG"
+            echo "registry=$REGISTRY"
+          } >> "$GITHUB_OUTPUT"
           echo "🎯 Publishing strategy: $VERSION_TYPE -> $NPM_TAG ($REGISTRY)"
 
       - name: Run napi prepublish
@@ -489,7 +494,7 @@ jobs:
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
           echo "Checking: $PACKAGE_NAME@$PACKAGE_VERSION"
-          npm view $PACKAGE_NAME@$PACKAGE_VERSION --registry=https://npm.pkg.github.com || echo "Package not immediately visible (may take a few minutes)"
+          npm view "$PACKAGE_NAME@$PACKAGE_VERSION" --registry=https://npm.pkg.github.com || echo "Package not immediately visible (may take a few minutes)"
 
           echo "Package verification completed"
           echo "GitHub Packages URL: https://github.com/terraphim/terraphim-ai/packages"

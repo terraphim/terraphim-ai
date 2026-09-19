@@ -21,6 +21,7 @@ NPM_WORKFLOW = ROOT / ".github/workflows/publish-npm.yml"
 BUN_WORKFLOW = ROOT / ".github/workflows/publish-bun.yml"
 TAURI_WORKFLOW = ROOT / ".github/workflows/publish-tauri.yml"
 CONTRACT_WORKFLOW = ROOT / ".github/workflows/release-manifest-contract.yml"
+AGENT_EVAL_WORKFLOW = ROOT / ".github/workflows/agent-eval.yml"
 WORKFLOW_DIR = ROOT / ".github/workflows"
 
 GITHUB_RELEASE_WRITER_PATTERN = re.compile(
@@ -340,6 +341,82 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         github_release = step_run_block(publish_job, "Create GitHub Release")
         self.assertIn("refs/tags/python-v", github_release)
         self.assertIn("refs/tags/pypi-v", github_release)
+
+    def test_validate_version_steps_use_runner_env_not_inline_expressions(
+        self,
+    ) -> None:
+        """Shell comparisons must see real values, not ${{ }} literals (SC2193)."""
+        for text, label in (
+            (self.npm_text, "publish-npm"),
+            (self.pypi_text, "publish-pypi"),
+            (self.bun_text, "publish-bun"),
+        ):
+            step = step_run_block(job_block(text, "validate"), "Validate version format")
+            self.assertTrue(step, label)
+            self.assertNotIn('"${{ github.event_name }}"', step, label)
+            self.assertNotIn('"${{ github.ref }}"', step, label)
+            self.assertIn('"$GITHUB_EVENT_NAME" == "push"', step, label)
+            self.assertIn('"$GITHUB_REF" == refs/tags/*', step, label)
+
+    def test_strategy_steps_bind_inputs_via_env_and_quote_github_output(
+        self,
+    ) -> None:
+        for text, label, job_name in (
+            (self.npm_text, "publish-npm", "publish"),
+            (self.bun_text, "publish-bun", "publish-to-bun"),
+        ):
+            step = step_run_block(
+                job_block(text, job_name), "Determine publishing strategy"
+            )
+            self.assertTrue(step, label)
+            self.assertNotIn('"${{ github.event_name }}"', step, label)
+            self.assertNotIn('"${{ github.ref }}"', step, label)
+            self.assertNotIn('"${{ inputs.version }}"', step, label)
+            self.assertNotIn('"${{ inputs.tag }}"', step, label)
+            self.assertIn("INPUT_VERSION: ${{ inputs.version }}", step, label)
+            self.assertIn("INPUT_TAG: ${{ inputs.tag }}", step, label)
+            self.assertNotIn(">> $GITHUB_OUTPUT", step, label)
+
+    def test_bun_strategy_groups_github_output_appends(self) -> None:
+        step = step_run_block(
+            job_block(self.bun_text, "publish-to-bun"), "Determine publishing strategy"
+        )
+        self.assertIn('} >> "$GITHUB_OUTPUT"', step)
+
+    def test_pypi_publish_script_invocation_uses_quoted_arg_array(self) -> None:
+        publish_package = step_run_block(
+            job_block(self.pypi_text, "publish-pypi"), "Run publish script"
+        )
+        self.assertIn('"${args[@]}"', publish_package)
+        self.assertNotIn(" $ARGS", publish_package)
+        self.assertIn('args=(--version "$VERSION"', publish_package)
+        self.assertIn("PYPI_TOKEN", publish_package)
+
+    def test_npm_and_bun_verify_steps_quote_package_spec(self) -> None:
+        for text, label, job_name, step_name in (
+            (self.npm_text, "publish-npm", "publish", "Verify published package"),
+            (
+                self.bun_text,
+                "publish-bun",
+                "publish-to-bun",
+                "Verify package on GitHub Packages",
+            ),
+        ):
+            step = step_run_block(job_block(text, job_name), step_name)
+            self.assertTrue(step, label)
+            self.assertIn('npm view "$PACKAGE_NAME@$PACKAGE_VERSION"', step, label)
+
+    def test_node_globs_cannot_be_misread_as_ls_options(self) -> None:
+        for text, label, job_name, step_name in (
+            (self.npm_text, "publish-npm", "test-macos", "Rename universal binary for NAPI"),
+            (self.npm_text, "publish-npm", "create-universal-macos", "Create universal binary"),
+            (self.bun_text, "publish-bun", "create-universal-macos-bun", "Create universal binary"),
+            (self.bun_text, "publish-bun", "publish-to-bun", "Prepare package for Bun publishing"),
+        ):
+            step = step_run_block(job_block(text, job_name), step_name)
+            self.assertTrue(step, f"{label}:{step_name}")
+            self.assertNotIn("ls -la *.node", step, label)
+            self.assertIn("ls -la ./*.node", step, label)
 
     def test_single_publisher_contract_is_wired_into_ci_paths_and_execution(
         self,
@@ -1284,6 +1361,40 @@ class HostileInputContract(unittest.TestCase):
             "../4a1d9f24c99f1504fdb2476667aa1087b698d33c",
         ]:
             self.assertNotRegex(sha, self.SHA_RE)
+
+
+class AgentEvalWorkflowContract(unittest.TestCase):
+    """agent-eval.yml runs Cargo against the private terraphim registry in
+    both baseline and candidate captures, so the job must bind the registry
+    token from secrets (GitHub job 105824356527 failed with "no token found
+    for terraphim" without it). The token must stay a job-level env binding:
+    never inlined into run scripts and never logged."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.text = AGENT_EVAL_WORKFLOW.read_text(encoding="utf-8")
+
+    def test_eval_job_binds_terraphim_registry_token_from_secrets(self) -> None:
+        job = job_block(self.text, "eval")
+        self.assertTrue(job)
+        self.assertIn(
+            "CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}",
+            job,
+        )
+
+    def test_token_binding_is_job_level_env_covering_both_captures(self) -> None:
+        job = job_block(self.text, "eval")
+        env_index = job.find("CARGO_REGISTRIES_TERRAPHIM_TOKEN:")
+        steps_index = job.find("steps:")
+        self.assertNotEqual(env_index, -1)
+        self.assertNotEqual(steps_index, -1)
+        self.assertLess(env_index, steps_index, "binding must be job-level env")
+        self.assertIn("evaluate-agent.sh --mode baseline", job)
+        self.assertIn("--mode candidate", job)
+
+    def test_token_is_never_inlined_into_scripts_or_logged(self) -> None:
+        # Exactly two occurrences: the env key and the secrets.* reference.
+        self.assertEqual(self.text.count("CARGO_REGISTRIES_TERRAPHIM_TOKEN"), 2)
 
 
 if __name__ == "__main__":
