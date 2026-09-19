@@ -341,7 +341,10 @@ jobs:
           echo "📊 Package verification complete"
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'
+        # Bare vX.Y.Z releases are owned exclusively by release-coordinator.yml.
+        # Python package publication still runs for bare and component-prefixed
+        # tags; only component-prefixed tags may create a Python GitHub release.
+        if: (startsWith(github.ref, 'refs/tags/python-v') || startsWith(github.ref, 'refs/tags/pypi-v')) && inputs.dry_run != 'true'
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
