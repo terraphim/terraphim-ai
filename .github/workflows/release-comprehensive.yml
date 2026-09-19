@@ -1023,7 +1023,10 @@ jobs:
   create-release:
     name: Create GitHub release
     needs: [resolve-release-source, verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos, build-server-managed-packages]
-    # Tag-push publication requires the managed package producer to have
+    # Standard vX.Y.Z runs are durable producers only.  The release
+    # coordinator is their sole release/Homebrew publisher; this legacy job
+    # remains available only for component-prefixed tags outside that
+    # coordinator's contract. Tag-push publication requires the managed package producer to have
     # SUCCEEDED. A skipped or failed managed job blocks publication: the
     # managed matrix is part of the release contract and only the explicit
     # manual recovery path may proceed without it.
@@ -1032,6 +1035,7 @@ jobs:
       !cancelled() &&
       github.event_name == 'push' &&
       !inputs.test_run &&
+      needs.resolve-release-source.outputs.is_standard_release != 'true' &&
       needs.verify-versions.result == 'success' &&
       needs.sign-and-notarize-macos.result == 'success' &&
       needs.verify-release-assets.result == 'success' &&
@@ -1198,7 +1202,9 @@ jobs:
   upload-recovered-release-assets:
     name: Upload recovered release assets
     needs: [resolve-release-source, verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos, build-server-managed-packages]
-    # Recovery semantics only: historical releases were published before
+    # Standard-release recovery is owned by the coordinator as well; the
+    # non-standard guard below prevents this legacy clobber path from
+    # becoming a second writer. Recovery semantics only: historical releases were published before
     # the managed matrix existed and the managed job used to be
     # dispatch-gated, so an explicitly skipped managed job is tolerated
     # exclusively on this manual recovery path. Normal tag-push
@@ -1209,6 +1215,7 @@ jobs:
       !cancelled() &&
       github.event_name == 'workflow_dispatch' &&
       !inputs.test_run &&
+      needs.resolve-release-source.outputs.is_standard_release != 'true' &&
       needs.verify-versions.result == 'success' &&
       needs.sign-and-notarize-macos.result == 'success' &&
       needs.verify-release-assets.result == 'success' &&

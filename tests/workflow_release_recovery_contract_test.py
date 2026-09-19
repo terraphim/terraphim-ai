@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Dependency-free static contracts for the v1.21.3 release recovery workflows."""
 
 from __future__ import annotations
@@ -14,10 +13,24 @@ import textwrap
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 RELEASE_WORKFLOW = ROOT / ".github/workflows/release-comprehensive.yml"
 DOCKER_WORKFLOW = ROOT / ".github/workflows/docker-multiarch.yml"
+PYPI_WORKFLOW = ROOT / ".github/workflows/publish-pypi.yml"
+NPM_WORKFLOW = ROOT / ".github/workflows/publish-npm.yml"
+BUN_WORKFLOW = ROOT / ".github/workflows/publish-bun.yml"
+TAURI_WORKFLOW = ROOT / ".github/workflows/publish-tauri.yml"
+CONTRACT_WORKFLOW = ROOT / ".github/workflows/release-manifest-contract.yml"
+WORKFLOW_DIR = ROOT / ".github/workflows"
+
+GITHUB_RELEASE_WRITER_PATTERN = re.compile(
+    r"uses:\s*actions/create-release\b|"
+    r"uses:\s*[\"']actions/create-release\b|"
+    r"softprops/action-gh-release|gh release (?:create|edit|upload)|"
+    r"repos\.(?:create|update)Release|createRelease|updateRelease|"
+    r"github-publish-release\.sh",
+    re.IGNORECASE,
+)
 
 
 def indent_of(line: str) -> int:
@@ -81,7 +94,11 @@ def checkout_blocks(job: str) -> list[str]:
         if "uses: actions/checkout@" not in line:
             continue
         block_lines = [line]
-        base = indent_of(lines[index - 1]) if index > 0 and "- name:" in lines[index - 1] else indent_of(line)
+        base = (
+            indent_of(lines[index - 1])
+            if index > 0 and "- name:" in lines[index - 1]
+            else indent_of(line)
+        )
         for later in lines[index + 1 :]:
             if later.strip() and indent_of(later) <= base:
                 break
@@ -101,10 +118,19 @@ def step_run_block(job: str, step_name: str) -> str:
     return job[start:]
 
 
+def step_if_condition(job: str, step_name: str) -> str:
+    """Return a named step's single-line GitHub Actions condition."""
+    step = step_run_block(job, step_name)
+    match = re.search(r"^\s+if:\s*(.+)$", step, re.MULTILINE)
+    return match.group(1).strip() if match else ""
+
+
 def has_need(job: str, dependency: str) -> bool:
     return bool(
         re.search(rf"^\s+needs:\s*{re.escape(dependency)}\s*$", job, re.MULTILINE)
-        or re.search(rf"^\s+needs:\s*\[[^\]]*\b{re.escape(dependency)}\b", job, re.MULTILINE)
+        or re.search(
+            rf"^\s+needs:\s*\[[^\]]*\b{re.escape(dependency)}\b", job, re.MULTILINE
+        )
         or re.search(rf"^\s+-\s*{re.escape(dependency)}\s*$", job, re.MULTILINE)
     )
 
@@ -122,24 +148,44 @@ def evaluate_condition(
     condition: str,
     *,
     event_name: str = "push",
+    ref: str = "",
     results: dict[str, str] | None = None,
-    inputs: dict[str, str] | None = None,
+    inputs: dict[str, str | bool] | None = None,
+    outputs: dict[tuple[str, str], str] | None = None,
 ) -> bool:
     """Evaluate a GitHub Actions `if:` expression under a simulated state.
 
-    Supports the constructs used by the release workflow: always(),
-    !cancelled(), github.event_name comparisons, inputs comparisons and
-    bare negated inputs, needs.<job>.result comparisons, && and ||.
+    Supports the constructs used by the release workflows: always(),
+    !cancelled(), startsWith(github.ref), github.event_name comparisons,
+    typed boolean and bare negated inputs, needs.<job>.result comparisons,
+    && and ||.
     """
     results = results or {}
     inputs = inputs or {}
+    outputs = outputs or {}
     expr = " ".join(condition.split())
     expr = expr.replace("always()", "True").replace("!cancelled()", "True")
 
-    def repl_event(match: re.Match[str]) -> str:
-        return str(match.group(1) == event_name)
+    def repl_starts_with_ref(match: re.Match[str]) -> str:
+        return str(ref.startswith(match.group(1)))
 
-    expr = re.sub(r"github\.event_name == '([a-z_]+)'", repl_event, expr)
+    expr = re.sub(r"startsWith\(github\.ref, '([^']+)'\)", repl_starts_with_ref, expr)
+
+    def repl_event(match: re.Match[str]) -> str:
+        operator, expected = match.groups()
+        matches = event_name == expected
+        return str(matches if operator == "==" else not matches)
+
+    expr = re.sub(r"github\.event_name (==|!=) '([a-z_]+)'", repl_event, expr)
+
+    def repl_boolean_input(match: re.Match[str]) -> str:
+        name, expected_literal = match.groups()
+        actual = inputs.get(name, False)
+        if isinstance(actual, str):
+            actual = actual.lower() == "true"
+        return str(bool(actual) == (expected_literal == "true"))
+
+    expr = re.sub(r"inputs\.([A-Za-z0-9_]+) == (true|false)", repl_boolean_input, expr)
 
     def repl_input(match: re.Match[str]) -> str:
         negate = "not " if match.group(1) else ""
@@ -154,10 +200,20 @@ def evaluate_condition(
 
     expr = re.sub(r"needs\.([A-Za-z0-9_-]+)\.result == '([a-z]+)'", repl_need, expr)
 
+    def repl_output_not_equal(match: re.Match[str]) -> str:
+        job, name, expected = match.groups()
+        return str(outputs.get((job, name), "") != expected)
+
+    expr = re.sub(
+        r"needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+) != '([^']+)'",
+        repl_output_not_equal,
+        expr,
+    )
+
     expr = expr.replace(" && ", " and ").replace(" || ", " or ")
     if not re.fullmatch(r"[A-Za-z0-9_'(), .=]+", expr):
         raise AssertionError(f"unsupported condition construct: {expr}")
-    return bool(eval(expr, {"__builtins__": {}, "bool": bool}, {}))  # noqa: S307 - fixed vocabulary
+    return bool(eval(expr, {"__builtins__": {}, "bool": bool}, {}))
 
 
 class ReleaseRecoveryWorkflowContract(unittest.TestCase):
@@ -165,8 +221,161 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.release_text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
         cls.docker_text = DOCKER_WORKFLOW.read_text(encoding="utf-8")
+        cls.pypi_text = PYPI_WORKFLOW.read_text(encoding="utf-8")
+        cls.npm_text = NPM_WORKFLOW.read_text(encoding="utf-8")
+        cls.bun_text = BUN_WORKFLOW.read_text(encoding="utf-8")
+        cls.tauri_text = TAURI_WORKFLOW.read_text(encoding="utf-8")
+        cls.contract_text = CONTRACT_WORKFLOW.read_text(encoding="utf-8")
 
-    def test_manual_dispatch_requires_recovery_tag_and_expected_source_sha(self) -> None:
+    def test_exhaustive_github_release_writer_inventory_is_single_publisher_safe(
+        self,
+    ) -> None:
+        writers = {
+            path.name
+            for path in WORKFLOW_DIR.glob("*.y*ml")
+            if GITHUB_RELEASE_WRITER_PATTERN.search(path.read_text(encoding="utf-8"))
+        }
+        self.assertEqual(
+            writers,
+            {
+                "publish-npm.yml",
+                "publish-pypi.yml",
+                "publish-bun.yml",
+                "publish-tauri.yml",
+                "release-comprehensive.yml",
+                "release-coordinator.yml",
+            },
+            "every workflow that writes GitHub releases must be classified",
+        )
+
+        # Standard releases in the comprehensive producer/recovery workflow
+        # are explicitly barred; component releases remain available.
+        for job_name in ("create-release", "upload-recovered-release-assets"):
+            self.assertIn(
+                "needs.resolve-release-source.outputs.is_standard_release != 'true'",
+                job_block(self.release_text, job_name),
+                job_name,
+            )
+
+        npm_release = step_run_block(
+            job_block(self.npm_text, "publish"), "Create GitHub Release"
+        ) or step_run_block(
+            job_block(self.npm_text, "publish-npm"), "Create GitHub Release"
+        )
+        self.assertIn("refs/tags/nodejs-", npm_release)
+
+        pypi_release = step_run_block(
+            job_block(self.pypi_text, "publish-pypi"), "Create GitHub Release"
+        )
+        self.assertIn("refs/tags/python-v", pypi_release)
+        self.assertIn("refs/tags/pypi-v", pypi_release)
+        self.assertNotIn("startsWith(github.ref, 'refs/tags/')", pypi_release)
+
+        bun_release = step_run_block(
+            job_block(self.bun_text, "publish-to-bun"),
+            "Create Bun-specific GitHub Release",
+        )
+        self.assertIn("uses: actions/create-release@v1", bun_release)
+        self.assertIn("refs/tags/bun-v", bun_release)
+        self.assertNotIn("startsWith(github.ref, 'refs/tags/')", bun_release)
+        self.assertNotIn("inputs.dry_run != 'true'", bun_release)
+
+        tauri_release = step_run_block(
+            job_block(self.tauri_text, "publish-tauri"),
+            "Upload to GitHub Releases",
+        )
+        self.assertIn("refs/tags/app-v", tauri_release)
+        self.assertIn("refs/tags/desktop-v", tauri_release)
+
+    def test_release_writer_detector_accepts_quoted_and_unquoted_action_syntax(
+        self,
+    ) -> None:
+        for syntax in (
+            "uses: actions/create-release@v1",
+            "uses:\tactions/create-release@main",
+            'uses: "actions/create-release@v1"',
+            "uses: 'actions/create-release@v1'",
+            "USES: actions/create-release@v1",
+        ):
+            with self.subTest(syntax=syntax):
+                self.assertRegex(syntax, GITHUB_RELEASE_WRITER_PATTERN)
+
+    def test_bun_release_writer_allows_only_component_tag_and_non_dry_dispatch(
+        self,
+    ) -> None:
+        condition = step_if_condition(
+            job_block(self.bun_text, "publish-to-bun"),
+            "Create Bun-specific GitHub Release",
+        )
+        self.assertTrue(condition)
+        cases = (
+            ("push", "refs/tags/bun-v1.2.3", False, True),
+            ("release", "refs/tags/bun-v1.2.3", False, True),
+            ("workflow_dispatch", "refs/tags/bun-v1.2.3", False, True),
+            ("workflow_dispatch", "refs/tags/bun-v1.2.3", True, False),
+            ("workflow_dispatch", "refs/tags/v1.2.3", False, False),
+            ("workflow_dispatch", "refs/heads/main", False, False),
+            ("push", "refs/tags/v1.2.3", False, False),
+        )
+        for event_name, ref, dry_run, expected in cases:
+            with self.subTest(event_name=event_name, ref=ref, dry_run=dry_run):
+                self.assertEqual(
+                    evaluate_condition(
+                        condition,
+                        event_name=event_name,
+                        ref=ref,
+                        inputs={"dry_run": dry_run},
+                    ),
+                    expected,
+                )
+
+    def test_pypi_bare_tag_still_publishes_package_but_not_github_release(
+        self,
+    ) -> None:
+        self.assertIn("- 'v*'", self.pypi_text)
+        publish_job = job_block(self.pypi_text, "publish-pypi")
+        publish_package = step_run_block(publish_job, "Run publish script")
+        self.assertIn("./scripts/publish-pypi.sh", publish_package)
+        self.assertNotIn("refs/tags/python-v", publish_package)
+        github_release = step_run_block(publish_job, "Create GitHub Release")
+        self.assertIn("refs/tags/python-v", github_release)
+        self.assertIn("refs/tags/pypi-v", github_release)
+
+    def test_single_publisher_contract_is_wired_into_ci_paths_and_execution(
+        self,
+    ) -> None:
+        for path in (
+            ".github/workflows/release-comprehensive.yml",
+            ".github/workflows/publish-npm.yml",
+            ".github/workflows/publish-pypi.yml",
+            ".github/workflows/publish-bun.yml",
+            ".github/workflows/publish-tauri.yml",
+            "tests/release_control_mutation_test.py",
+            "tests/workflow_release_recovery_contract_test.py",
+        ):
+            self.assertEqual(
+                self.contract_text.count(f'- "{path}"'),
+                2,
+                f"{path} must trigger both pull_request and push contracts",
+            )
+        self.assertIn(
+            "python -m unittest -v tests.workflow_release_recovery_contract_test",
+            self.contract_text,
+        )
+        contract_job = job_block(self.contract_text, "release-coordinator-contract")
+        for step_name in (
+            "actionlint (static workflow analysis)",
+            "Parse workflow YAML",
+        ):
+            self.assertIn(
+                ".github/workflows/publish-bun.yml",
+                step_run_block(contract_job, step_name),
+                step_name,
+            )
+
+    def test_manual_dispatch_requires_recovery_tag_and_expected_source_sha(
+        self,
+    ) -> None:
         release_tag = input_block(self.release_text, "release_tag")
         expected_sha = input_block(self.release_text, "expected_source_sha")
 
@@ -185,7 +394,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertIn("contents: read", resolver)
 
     def test_resolver_runs_before_source_dependent_jobs(self) -> None:
-        self.assertIn("resolve-release-source", top_level_mapping_keys(self.release_text, "jobs"))
+        self.assertIn(
+            "resolve-release-source", top_level_mapping_keys(self.release_text, "jobs")
+        )
 
         for job_name in [
             "verify-versions",
@@ -203,7 +414,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             "update-homebrew",
         ]:
             self.assertTrue(
-                has_need(job_block(self.release_text, job_name), "resolve-release-source"),
+                has_need(
+                    job_block(self.release_text, job_name), "resolve-release-source"
+                ),
                 job_name,
             )
 
@@ -256,7 +469,12 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
 
     def test_workflow_and_source_refs_are_distinct_outputs(self) -> None:
         resolver = job_block(self.release_text, "resolve-release-source")
-        for output_name in ["source_sha", "source_ref", "workflow_ref", "version_series"]:
+        for output_name in [
+            "source_sha",
+            "source_ref",
+            "workflow_ref",
+            "version_series",
+        ]:
             self.assertIn(f"{output_name}:", resolver)
         self.assertIn("source_sha=${SOURCE_SHA}", self.release_text)
         self.assertIn("version_series=${VERSION%.*}", self.release_text)
@@ -275,14 +493,19 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
     def test_recovery_checksums_merge_existing_release_digests(self) -> None:
         recovery = job_block(self.release_text, "upload-recovered-release-assets")
         self.assertIn("Snapshot existing release asset digests", recovery)
-        self.assertIn('releases/tags/${RELEASE_TAG}', recovery)
+        self.assertIn("releases/tags/${RELEASE_TAG}", recovery)
         self.assertIn('digest_re = re.compile(r"^sha256:([0-9a-f]{64})$")', recovery)
         self.assertIn('if name == "checksums.txt"', recovery)
-        self.assertIn("merged[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()", recovery)
-        self.assertIn('for name in sorted(merged)', recovery)
+        self.assertIn(
+            "merged[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()",
+            recovery,
+        )
+        self.assertIn("for name in sorted(merged)", recovery)
         self.assertNotIn("sha256sum * > checksums.txt", recovery)
 
-    def test_recovery_checksum_merge_executes_and_fails_without_existing_digest(self) -> None:
+    def test_recovery_checksum_merge_executes_and_fails_without_existing_digest(
+        self,
+    ) -> None:
         step = step_run_block(
             job_block(self.release_text, "upload-recovered-release-assets"),
             "Merge recovered and existing checksums",
@@ -314,7 +537,11 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
                 EXISTING_RELEASE_JSON=str(release_json),
             )
             result = subprocess.run(
-                ["python3", "-c", script], env=env, capture_output=True, text=True
+                ["python3", "-c", script],
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             checksums = (assets / "checksums.txt").read_text().splitlines()
@@ -328,10 +555,16 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
                 json.dumps({"assets": [{"name": "existing.bin", "digest": None}]})
             )
             failed = subprocess.run(
-                ["python3", "-c", script], env=env, capture_output=True, text=True
+                ["python3", "-c", script],
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
             )
             self.assertNotEqual(failed.returncode, 0)
-            self.assertIn("invalid existing release asset digest metadata", failed.stderr)
+            self.assertIn(
+                "invalid existing release asset digest metadata", failed.stderr
+            )
 
     def test_no_tag_moving_commands_exist(self) -> None:
         combined = f"{self.release_text}\n{self.docker_text}"
@@ -340,14 +573,20 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertNotRegex(combined, r"\bgit\s+push\b.*:refs/tags/")
         self.assertNotRegex(combined, r"\bgit\s+push\b.*--delete\b")
 
-    def test_self_hosted_release_jobs_disable_rust_wrappers_before_toolchain(self) -> None:
-        for job_name in ["build-binaries", "build-debian-packages", "build-server-managed-packages"]:
+    def test_self_hosted_release_jobs_disable_rust_wrappers_before_toolchain(
+        self,
+    ) -> None:
+        for job_name in [
+            "build-binaries",
+            "build-debian-packages",
+            "build-server-managed-packages",
+        ]:
             job = job_block(self.release_text, job_name)
             disable = step_run_block(
                 job, "Disable Rust wrappers for self-hosted release builds"
             )
             for var in ["RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"]:
-                self.assertIn(f"unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER", disable)
+                self.assertIn("unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER", disable)
                 self.assertIn(f'echo "{var}="', disable)
             self.assertLess(
                 job.index("Disable Rust wrappers for self-hosted release builds"),
@@ -364,14 +603,18 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertIn("cross --version || true", install_cross)
         self.assertNotIn("cross --version\n            exit 0", install_cross)
 
-    def test_docker_reusable_workflow_separates_source_and_build_recipe_refs(self) -> None:
+    def test_docker_reusable_workflow_separates_source_and_build_recipe_refs(
+        self,
+    ) -> None:
         source_ref = input_block(self.docker_text, "source_ref")
         recipe_ref = input_block(self.docker_text, "build_recipe_ref")
         for block in [source_ref, recipe_ref]:
             self.assertIn("required: true", block)
             self.assertIn("type: string", block)
 
-        frontend_checkouts = checkout_blocks(job_block(self.docker_text, "build-frontend"))
+        frontend_checkouts = checkout_blocks(
+            job_block(self.docker_text, "build-frontend")
+        )
         self.assertEqual(len(frontend_checkouts), 1)
         self.assertIn("ref: ${{ inputs.source_ref }}", frontend_checkouts[0])
 
@@ -380,7 +623,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertEqual(len(build_checkouts), 2)
         self.assertIn("ref: ${{ inputs.source_ref }}", build_checkouts[0])
         self.assertIn("ref: ${{ inputs.build_recipe_ref }}", build_checkouts[1])
-        self.assertIn("sparse-checkout: docker/Dockerfile.multiarch", build_checkouts[1])
+        self.assertIn(
+            "sparse-checkout: docker/Dockerfile.multiarch", build_checkouts[1]
+        )
         overlay = step_run_block(build, "Overlay reviewed Docker build recipe")
         self.assertIn(
             "cp .release-recipe/docker/Dockerfile.multiarch docker/Dockerfile.multiarch",
@@ -393,7 +638,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             caller,
         )
 
-    def test_docker_reusable_workflow_uses_required_resolver_inputs_for_tags(self) -> None:
+    def test_docker_reusable_workflow_uses_required_resolver_inputs_for_tags(
+        self,
+    ) -> None:
         for input_name in ["tag", "version", "version_series", "publish_latest"]:
             block = input_block(self.docker_text, input_name)
             self.assertIn("required: true", block, input_name)
@@ -411,10 +658,20 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertIn("if: inputs.push && !inputs.test_run", self.docker_text)
 
         caller = job_block(self.release_text, "build-docker")
-        self.assertIn("tag: ${{ needs.resolve-release-source.outputs.release_tag }}", caller)
-        self.assertIn("version: ${{ needs.resolve-release-source.outputs.version }}", caller)
-        self.assertIn("version_series: ${{ needs.resolve-release-source.outputs.version_series }}", caller)
-        self.assertIn("publish_latest: ${{ github.event_name == 'push' && needs.resolve-release-source.outputs.is_standard_release == 'true' && !inputs.test_run }}", caller)
+        self.assertIn(
+            "tag: ${{ needs.resolve-release-source.outputs.release_tag }}", caller
+        )
+        self.assertIn(
+            "version: ${{ needs.resolve-release-source.outputs.version }}", caller
+        )
+        self.assertIn(
+            "version_series: ${{ needs.resolve-release-source.outputs.version_series }}",
+            caller,
+        )
+        self.assertIn(
+            "publish_latest: ${{ github.event_name == 'push' && needs.resolve-release-source.outputs.is_standard_release == 'true' && !inputs.test_run }}",
+            caller,
+        )
 
     def test_docker_reusable_job_is_standard_release_only(self) -> None:
         caller = job_block(self.release_text, "build-docker")
@@ -425,19 +682,36 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         )
         self.assertIn("push: ${{ !inputs.test_run }}", caller)
 
-    def test_docker_recovery_publishes_immutable_manifests_without_moving_tags(self) -> None:
+    def test_docker_recovery_publishes_immutable_manifests_without_moving_tags(
+        self,
+    ) -> None:
         manifests = job_block(self.docker_text, "publish-release-manifests")
         ghcr = step_run_block(manifests, "Publish release manifests for GHCR")
         dockerhub = step_run_block(manifests, "Publish release manifests for DockerHub")
 
         self.assertIn("if: inputs.push && !inputs.test_run", manifests)
-        self.assertNotIn("if: inputs.push && !inputs.test_run && inputs.publish_latest", manifests)
-        self.assertIn("--tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}", ghcr)
-        self.assertIn("${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}-ubuntu22.04", ghcr)
-        self.assertIn("--tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}", ghcr)
-        self.assertIn("${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}-ubuntu22.04", ghcr)
+        self.assertNotIn(
+            "if: inputs.push && !inputs.test_run && inputs.publish_latest", manifests
+        )
+        self.assertIn(
+            "--tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}", ghcr
+        )
+        self.assertIn(
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}-ubuntu22.04",
+            ghcr,
+        )
+        self.assertIn(
+            "--tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}",
+            ghcr,
+        )
+        self.assertIn(
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}-ubuntu22.04",
+            ghcr,
+        )
         self.assertIn("--tag ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.tag }}", dockerhub)
-        self.assertIn("--tag ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version }}", dockerhub)
+        self.assertIn(
+            "--tag ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version }}", dockerhub
+        )
 
     def test_docker_moving_manifest_tags_are_publish_latest_gated(self) -> None:
         manifests = job_block(self.docker_text, "publish-release-manifests")
@@ -445,13 +719,23 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         dockerhub = step_run_block(manifests, "Publish release manifests for DockerHub")
 
         for block in [ghcr, dockerhub]:
-            moving_gate = block.index('if [[ "${{ inputs.publish_latest }}" == "true" ]]; then')
+            moving_gate = block.index(
+                'if [[ "${{ inputs.publish_latest }}" == "true" ]]; then'
+            )
             self.assertLess(moving_gate, block.index(":${{ inputs.version_series }}"))
             self.assertLess(moving_gate, block.index(":latest"))
 
-        self.assertIn("${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version_series }}-ubuntu22.04", ghcr)
-        self.assertIn("${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-ubuntu22.04", ghcr)
-        self.assertIn("${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version_series }}-ubuntu22.04", dockerhub)
+        self.assertIn(
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version_series }}-ubuntu22.04",
+            ghcr,
+        )
+        self.assertIn(
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-ubuntu22.04", ghcr
+        )
+        self.assertIn(
+            "${{ env.DOCKERHUB_IMAGE }}:${{ inputs.version_series }}-ubuntu22.04",
+            dockerhub,
+        )
         self.assertIn("${{ env.DOCKERHUB_IMAGE }}:latest-ubuntu22.04", dockerhub)
 
     def test_docker_summary_passes_source_ref_through_env(self) -> None:
@@ -463,7 +747,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertIn("source_ref remains $SOURCE_REF", summary)
         self.assertNotIn("source_ref remains '${{ inputs.source_ref }}'", summary)
 
-    def test_docker_buildx_has_real_bounded_retry_or_explicit_manual_rerun(self) -> None:
+    def test_docker_buildx_has_real_bounded_retry_or_explicit_manual_rerun(
+        self,
+    ) -> None:
         has_command_retry = all(
             marker in self.docker_text
             for marker in [
@@ -480,7 +766,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         )
         self.assertTrue(has_command_retry or has_operational_manual_rerun)
 
-    def test_universal_macos_is_gated_by_source_resolution_and_complete_builds(self) -> None:
+    def test_universal_macos_is_gated_by_source_resolution_and_complete_builds(
+        self,
+    ) -> None:
         self.assertIn(
             "needs: [resolve-release-source, build-binaries]", self.release_text
         )
@@ -499,28 +787,45 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             "wait-for-client-binaries",
             "update-homebrew",
         ]:
-            self.assertIn("!inputs.test_run", job_block(self.release_text, job_name), job_name)
+            self.assertIn(
+                "!inputs.test_run", job_block(self.release_text, job_name), job_name
+            )
 
         for job_name in ["trigger-desktop-release", "trigger-clients-release"]:
             job = job_block(self.release_text, job_name)
             self.assertIn("github.event_name == 'push'", job, job_name)
-            self.assertIn("needs.resolve-release-source.outputs.is_standard_release == 'true'", job, job_name)
+            self.assertIn(
+                "needs.resolve-release-source.outputs.is_standard_release == 'true'",
+                job,
+                job_name,
+            )
 
-        self.assertIn("push: ${{ !inputs.test_run }}", job_block(self.release_text, "build-docker"))
+        self.assertIn(
+            "push: ${{ !inputs.test_run }}",
+            job_block(self.release_text, "build-docker"),
+        )
         self.assertIn("if: inputs.push && !inputs.test_run", self.docker_text)
 
-    def test_push_release_creation_is_separate_from_manual_recovery_upload(self) -> None:
+    def test_push_release_creation_is_separate_from_manual_recovery_upload(
+        self,
+    ) -> None:
         create_release = job_block(self.release_text, "create-release")
         recovery = job_block(self.release_text, "upload-recovered-release-assets")
 
         self.assertIn("github.event_name == 'push'", create_release)
-        self.assertNotIn("needs.resolve-release-source.outputs.is_standard_release == 'true'", create_release)
+        self.assertNotIn(
+            "needs.resolve-release-source.outputs.is_standard_release == 'true'",
+            create_release,
+        )
         self.assertIn("make_latest: true", create_release)
         self.assertIn("body: |", create_release)
         self.assertNotIn("gh release upload", create_release)
 
         self.assertIn("github.event_name == 'workflow_dispatch'", recovery)
-        self.assertIn('gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY" --clobber', recovery)
+        self.assertIn(
+            'gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY" --clobber',
+            recovery,
+        )
         self.assertNotIn("softprops/action-gh-release", recovery)
         self.assertNotIn("make_latest", recovery)
         self.assertNotIn("body: |", recovery)
@@ -529,17 +834,26 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         for job_name in ["trigger-desktop-release", "trigger-clients-release"]:
             job = job_block(self.release_text, job_name)
             self.assertIn("github.event_name == 'push'", job, job_name)
-            self.assertIn("needs.resolve-release-source.outputs.is_standard_release == 'true'", job, job_name)
+            self.assertIn(
+                "needs.resolve-release-source.outputs.is_standard_release == 'true'",
+                job,
+                job_name,
+            )
 
         clients = job_block(self.release_text, "trigger-clients-release")
         self.assertIn("async function resolveTagCommit", clients)
         self.assertIn("github.rest.git.getRef", clients)
         self.assertIn("github.rest.git.getTag", clients)
-        self.assertIn("const expectedSourceSha = await resolveTagCommit('terraphim', 'terraphim-clients', releaseTag);", clients)
+        self.assertIn(
+            "const expectedSourceSha = await resolveTagCommit('terraphim', 'terraphim-clients', releaseTag);",
+            clients,
+        )
         self.assertIn("source_ref: releaseTag", clients)
         self.assertIn("expected_source_sha: expectedSourceSha", clients)
 
-    def test_wait_and_homebrew_are_tag_push_only_and_wait_does_not_need_trigger_clients(self) -> None:
+    def test_wait_and_homebrew_are_tag_push_only_and_wait_does_not_need_trigger_clients(
+        self,
+    ) -> None:
         wait = job_block(self.release_text, "wait-for-client-binaries")
         homebrew = job_block(self.release_text, "update-homebrew")
 
@@ -548,7 +862,10 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         for job in [wait, homebrew]:
             self.assertIn("github.event_name == 'push'", job)
             self.assertIn("!inputs.test_run", job)
-            self.assertIn("needs.resolve-release-source.outputs.is_standard_release == 'true'", job)
+            self.assertIn(
+                "needs.resolve-release-source.outputs.is_standard_release == 'true'",
+                job,
+            )
 
     def test_managed_packages_are_release_and_recovery_dependencies(self) -> None:
         for job_name in ["create-release", "upload-recovered-release-assets"]:
@@ -563,10 +880,15 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             managed,
         )
         # The dispatch opt-in must not gate the plain tag-push path.
-        condition = managed[managed.index("if: >-"):managed.index("runs-on:")]
-        self.assertLess(condition.index("github.event_name == 'push'"), condition.index("workflow_dispatch"))
+        condition = managed[managed.index("if: >-") : managed.index("runs-on:")]
+        self.assertLess(
+            condition.index("github.event_name == 'push'"),
+            condition.index("workflow_dispatch"),
+        )
 
-        condition_expr = job_if_condition(self.release_text, "build-server-managed-packages")
+        condition_expr = job_if_condition(
+            self.release_text, "build-server-managed-packages"
+        )
         self.assertTrue(condition_expr)
         happy = {
             "verify-versions": "success",
@@ -620,7 +942,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             create_release,
         )
 
-    def test_release_creation_cannot_publish_when_managed_skipped_or_failed(self) -> None:
+    def test_release_creation_cannot_publish_when_managed_skipped_or_failed(
+        self,
+    ) -> None:
         condition_expr = job_if_condition(self.release_text, "create-release")
         self.assertTrue(condition_expr)
         happy = {
@@ -629,21 +953,46 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             "verify-release-assets": "success",
             "build-server-managed-packages": "success",
         }
+        self.assertFalse(
+            evaluate_condition(
+                condition_expr,
+                event_name="push",
+                results=happy,
+                outputs={("resolve-release-source", "is_standard_release"): "true"},
+            ),
+            "a standard release must remain producer-only for the coordinator",
+        )
         self.assertTrue(
-            evaluate_condition(condition_expr, event_name="push", results=happy),
-            "a healthy tag push with a successful managed producer must publish",
+            evaluate_condition(
+                condition_expr,
+                event_name="push",
+                results=happy,
+                outputs={("resolve-release-source", "is_standard_release"): "false"},
+            ),
+            "component-prefixed releases remain outside the coordinator contract",
         )
         for blocked in ["skipped", "failure", "cancelled"]:
             results = dict(happy, **{"build-server-managed-packages": blocked})
             self.assertFalse(
-                evaluate_condition(condition_expr, event_name="push", results=results),
+                evaluate_condition(
+                    condition_expr,
+                    event_name="push",
+                    results=results,
+                    outputs={
+                        ("resolve-release-source", "is_standard_release"): "false"
+                    },
+                ),
                 f"create-release must not publish when the managed job is {blocked}",
             )
         # The recovery-only relaxation (explicit skipped acceptance) must
         # not be reachable from create-release on a tag push.
-        recovery_expr = job_if_condition(self.release_text, "upload-recovered-release-assets")
+        recovery_expr = job_if_condition(
+            self.release_text, "upload-recovered-release-assets"
+        )
         self.assertTrue(recovery_expr)
-        self.assertIn("needs.build-server-managed-packages.result == 'skipped'", recovery_expr)
+        self.assertIn(
+            "needs.build-server-managed-packages.result == 'skipped'", recovery_expr
+        )
 
     def test_recovery_explicitly_accepts_skipped_managed_producer(self) -> None:
         recovery = job_block(self.release_text, "upload-recovered-release-assets")
@@ -651,18 +1000,23 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             "needs.build-server-managed-packages.result == 'success' || needs.build-server-managed-packages.result == 'skipped'",
             recovery,
         )
-        condition_expr = job_if_condition(self.release_text, "upload-recovered-release-assets")
+        condition_expr = job_if_condition(
+            self.release_text, "upload-recovered-release-assets"
+        )
         happy = {
             "verify-versions": "success",
             "sign-and-notarize-macos": "success",
             "verify-release-assets": "success",
             "build-server-managed-packages": "skipped",
         }
-        self.assertTrue(
+        self.assertFalse(
             evaluate_condition(
-                condition_expr, event_name="workflow_dispatch", results=happy
+                condition_expr,
+                event_name="workflow_dispatch",
+                results=happy,
+                outputs={("resolve-release-source", "is_standard_release"): "true"},
             ),
-            "manual recovery must explicitly tolerate a historically skipped managed producer",
+            "standard-release recovery must not bypass the coordinator",
         )
 
     def test_release_and_recovery_download_all_managed_matrix_artifacts(self) -> None:
@@ -698,7 +1052,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         staging directory, no --legacy flag, and no legacy resurrection in
         the artifact-download retry path.
         """
-        assemble_step = "Assemble release inventory (managed all-or-nothing, duplicate rejection)"
+        assemble_step = (
+            "Assemble release inventory (managed all-or-nothing, duplicate rejection)"
+        )
         for job_name in ["create-release", "upload-recovered-release-assets"]:
             job = job_block(self.release_text, job_name)
             self.assertNotIn("--legacy", job, job_name)
@@ -723,7 +1079,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertIn("continue-on-error: true", legacy_producer)
         self.assertIn("name: debian-packages", legacy_producer)
 
-    def test_release_inventory_assembler_rejects_duplicates_and_partial_matrix(self) -> None:
+    def test_release_inventory_assembler_rejects_duplicates_and_partial_matrix(
+        self,
+    ) -> None:
         assembler = ROOT / ".github/scripts/release/assemble-release-inventory.sh"
         self.assertTrue(assembler.exists(), "assemble-release-inventory.sh must exist")
 
@@ -734,7 +1092,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             (out / "terraphim_server-universal-apple-darwin").write_bytes(b"bin")
             legacy = root / "legacy-deb"
             legacy.mkdir()
-            (legacy / "terraphim-server_1.0.0-1_amd64.deb").write_bytes(b"legacy-native")
+            (legacy / "terraphim-server_1.0.0-1_amd64.deb").write_bytes(
+                b"legacy-native"
+            )
             staging = root / "managed-staging"
             for target, arch in [
                 ("x86_64-unknown-linux-musl", "amd64"),
@@ -742,22 +1102,37 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             ]:
                 target_dir = staging / f"server-managed-packages-{target}"
                 target_dir.mkdir(parents=True)
-                (target_dir / f"terraphim-server_1.0.0-1_{arch}.deb").write_bytes(b"managed")
-                (target_dir / f"terraphim-server-1.0.0-1.{arch.replace('amd64', 'x86_64')}.rpm").write_bytes(b"managed")
-                (target_dir / f"terraphim-server-1.0.0-{target}.package-sha256sums.txt").write_bytes(b"managed")
+                (target_dir / f"terraphim-server_1.0.0-1_{arch}.deb").write_bytes(
+                    b"managed"
+                )
+                (
+                    target_dir
+                    / f"terraphim-server-1.0.0-1.{arch.replace('amd64', 'x86_64')}.rpm"
+                ).write_bytes(b"managed")
+                (
+                    target_dir
+                    / f"terraphim-server-1.0.0-{target}.package-sha256sums.txt"
+                ).write_bytes(b"managed")
 
             command = [
                 str(assembler),
-                "--output", str(out),
-                "--legacy", str(legacy),
-                "--managed-staging", str(staging),
-                "--managed-target", "x86_64-unknown-linux-musl",
-                "--managed-target", "aarch64-unknown-linux-musl",
+                "--output",
+                str(out),
+                "--legacy",
+                str(legacy),
+                "--managed-staging",
+                str(staging),
+                "--managed-target",
+                "x86_64-unknown-linux-musl",
+                "--managed-target",
+                "aarch64-unknown-linux-musl",
             ]
 
             # The legacy amd64 cargo-deb basename collides with the managed
             # amd64 DEB; the assembler must fail closed on the conflict.
-            conflicted = subprocess.run(command, capture_output=True, text=True)
+            conflicted = subprocess.run(
+                command, check=False, capture_output=True, text=True
+            )
             self.assertNotEqual(conflicted.returncode, 0, conflicted.stdout)
             self.assertIn("duplicate release asset basename", conflicted.stderr)
             self.assertIn("terraphim-server_1.0.0-1_amd64.deb", conflicted.stderr)
@@ -765,8 +1140,12 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
 
             # A partial managed matrix is all-or-nothing.
             (legacy / "terraphim-server_1.0.0-1_amd64.deb").unlink()
-            shutil.rmtree(staging / "server-managed-packages-aarch64-unknown-linux-musl")
-            partial = subprocess.run(command, capture_output=True, text=True)
+            shutil.rmtree(
+                staging / "server-managed-packages-aarch64-unknown-linux-musl"
+            )
+            partial = subprocess.run(
+                command, check=False, capture_output=True, text=True
+            )
             self.assertNotEqual(partial.returncode, 0, partial.stdout)
             self.assertIn("managed package matrix incomplete", partial.stderr)
             self.assertIn("aarch64-unknown-linux-musl", partial.stderr)
@@ -775,10 +1154,14 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             # call shape: no --legacy stage at all) succeeds.
             managed_only_command = [
                 str(assembler),
-                "--output", str(out),
-                "--managed-staging", str(staging),
-                "--managed-target", "x86_64-unknown-linux-musl",
-                "--managed-target", "aarch64-unknown-linux-musl",
+                "--output",
+                str(out),
+                "--managed-staging",
+                str(staging),
+                "--managed-target",
+                "x86_64-unknown-linux-musl",
+                "--managed-target",
+                "aarch64-unknown-linux-musl",
             ]
             shutil.rmtree(staging)
             for target, deb_arch, rpm_arch in [
@@ -787,20 +1170,35 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
             ]:
                 target_dir = staging / f"server-managed-packages-{target}"
                 target_dir.mkdir(parents=True)
-                (target_dir / f"terraphim-server_1.0.0-1_{deb_arch}.deb").write_bytes(b"managed")
-                (target_dir / f"terraphim-server-1.0.0-1.{rpm_arch}.rpm").write_bytes(b"managed")
-                (target_dir / f"terraphim-server-1.0.0-{target}.package-sha256sums.txt").write_bytes(b"managed")
-            merged = subprocess.run(managed_only_command, capture_output=True, text=True)
+                (target_dir / f"terraphim-server_1.0.0-1_{deb_arch}.deb").write_bytes(
+                    b"managed"
+                )
+                (target_dir / f"terraphim-server-1.0.0-1.{rpm_arch}.rpm").write_bytes(
+                    b"managed"
+                )
+                (
+                    target_dir
+                    / f"terraphim-server-1.0.0-{target}.package-sha256sums.txt"
+                ).write_bytes(b"managed")
+            merged = subprocess.run(
+                managed_only_command, check=False, capture_output=True, text=True
+            )
             self.assertEqual(merged.returncode, 0, merged.stderr)
             self.assertTrue((out / "terraphim-server_1.0.0-1_amd64.deb").exists())
             self.assertTrue((out / "terraphim-server_1.0.0-1_arm64.deb").exists())
             self.assertTrue((out / "terraphim-server-1.0.0-1.x86_64.rpm").exists())
             self.assertTrue((out / "terraphim-server-1.0.0-1.aarch64.rpm").exists())
             self.assertTrue(
-                (out / "terraphim-server-1.0.0-x86_64-unknown-linux-musl.package-sha256sums.txt").exists()
+                (
+                    out
+                    / "terraphim-server-1.0.0-x86_64-unknown-linux-musl.package-sha256sums.txt"
+                ).exists()
             )
             self.assertTrue(
-                (out / "terraphim-server-1.0.0-aarch64-unknown-linux-musl.package-sha256sums.txt").exists()
+                (
+                    out
+                    / "terraphim-server-1.0.0-aarch64-unknown-linux-musl.package-sha256sums.txt"
+                ).exists()
             )
 
     def test_release_uploads_include_assembled_managed_inventory(self) -> None:
@@ -818,7 +1216,9 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         # Checksum inventories are computed over the assembled directory.
         self.assertIn("working-directory: release-assets", create_release)
 
-    def test_managed_parity_cargo_deb_is_per_target_from_qualified_musl_bytes(self) -> None:
+    def test_managed_parity_cargo_deb_is_per_target_from_qualified_musl_bytes(
+        self,
+    ) -> None:
         managed = job_block(self.release_text, "build-server-managed-packages")
         # Parity is built per matrix target from the exact qualified MUSL
         # input staged into the cargo-deb assets path, never from a host
@@ -874,9 +1274,7 @@ class HostileInputContract(unittest.TestCase):
             self.assertNotRegex(tag, self.TAG_RE)
 
     def test_expected_source_sha_contract(self) -> None:
-        self.assertRegex(
-            "4a1d9f24c99f1504fdb2476667aa1087b698d33c", self.SHA_RE
-        )
+        self.assertRegex("4a1d9f24c99f1504fdb2476667aa1087b698d33c", self.SHA_RE)
         for sha in [
             "",
             "4a1d9f24",
