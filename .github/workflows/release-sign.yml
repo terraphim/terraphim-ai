@@ -1,7 +1,8 @@
 # Sign Release Binaries
 #
-# This workflow signs all release artifacts with Ed25519 signatures
-# using zipsign. It runs automatically when a release is created.
+# This workflow verifies coordinator-signed release artifacts. Signing and
+# upload happen before approval inside release-coordinator.yml; this workflow
+# is deliberately read-only so it cannot become a second release publisher.
 #
 # Prerequisites:
 # - ZIPSIGN_PRIVATE_KEY secret must be set in GitHub repository settings
@@ -11,53 +12,84 @@
 # Security:
 # - Private key is stored as a GitHub secret (never in code)
 # - Signing happens in a clean GitHub Actions environment
-# - Signed artifacts are uploaded back to the release
+# - Release assets are never mutated or uploaded here
 
-name: Sign Release
+name: Verify Release Signatures
 
 on:
   release:
-    types: [created]
+    types: [published]
+  # `release: [published]` never fires for coordinator-published releases
+  # (GitHub suppresses workflow runs from GITHUB_TOKEN-triggered events), so
+  # the verifier also accepts an explicit dispatch and a reusable-workflow
+  # call. release-coordinator.yml calls this workflow after every promoted
+  # release; both paths carry the release tag explicitly.
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to verify, e.g. v1.21.3 or terraphim_server-v1.21.3'
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      release_tag:
+        description: 'Release tag to verify, e.g. v1.21.3 or terraphim_server-v1.21.3'
+        required: true
+        type: string
 
 permissions:
-  contents: write  # Required to upload artifacts to releases
+  contents: read
 
 jobs:
   sign:
-    name: Sign Release Artifacts
+    name: Verify Release Artifacts
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Validate release tag input
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          # Fail closed: the tag must match the producer tag grammar before it
+          # reaches any shell or gh invocation.
+          if [[ ! "$RELEASE_TAG" =~ ^([A-Za-z0-9_.-]+-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid release tag '$RELEASE_TAG' (expected vX.Y.Z or component-vX.Y.Z)"
+            exit 1
+          fi
+          echo "Valid release tag: $RELEASE_TAG"
 
       - name: Install zipsign
         run: |
-          cargo install zipsign
+          cargo install zipsign@0.2.1 --locked
           zipsign --version
 
       - name: Download release artifacts
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
         run: |
-          # Get the tag name without 'v' prefix
-          VERSION="${GITHUB_REF#refs/tags/v}"
-          echo "Version: $VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          set -euo pipefail
+          echo "Release tag: $RELEASE_TAG"
 
           # Create directory for artifacts
           mkdir -p artifacts
 
           # Download all assets from the release
-          gh release view "$VERSION" --json assets --jq '.assets[].name' | \
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | \
             while read -r asset_name; do
               # Remove quotes from asset name
               asset_name=$(echo "$asset_name" | tr -d '"')
 
-              # Only download tar.gz and tar.zst archives
-              if [[ "$asset_name" =~ \.(tar\.gz|tar\.zst)$ ]]; then
+              # zipsign supports gzipped tar and zip containers.
+              if [[ "$asset_name" =~ \.(tar\.gz|zip)$ ]]; then
                 echo "Downloading: $asset_name"
-                gh release download "$VERSION" --pattern "$asset_name" --dir artifacts
+                gh release download "$RELEASE_TAG" --pattern "$asset_name" --dir artifacts
               fi
             done
 
@@ -73,15 +105,15 @@ jobs:
           fi
 
           # Count archives
-          ARCHIVE_COUNT=$(find artifacts/ -type f \( -name "*.tar.gz" -o -name "*.tar.zst" \) | wc -l)
+          ARCHIVE_COUNT=$(find artifacts/ -type f \( -name "*.tar.gz" -o -name "*.zip" \) | wc -l)
           echo "Found $ARCHIVE_COUNT archive(s) to sign"
 
           if [ "$ARCHIVE_COUNT" -eq 0 ]; then
-            echo "No tar.gz or tar.zst archives found"
+            echo "No tar.gz or zip archives found"
             exit 1
           fi
 
-      - name: Sign artifacts
+      - name: Derive verifying key from signing private key
         env:
           ZIPSIGN_PRIVATE_KEY: ${{ secrets.ZIPSIGN_PRIVATE_KEY }}
         run: |
@@ -91,64 +123,41 @@ jobs:
             exit 1
           fi
 
-          # Save private key to temporary file
-          PRIVATE_KEY_FILE=$(mktemp)
-          echo "$ZIPSIGN_PRIVATE_KEY" > "$PRIVATE_KEY_FILE"
-          chmod 600 "$PRIVATE_KEY_FILE"
+          PRIVATE_KEY_FILE="$RUNNER_TEMP/zipsign-private.key"
+          VERIFYING_KEY_FILE="$RUNNER_TEMP/zipsign-verifying.key"
+          umask 077
+          printf '%s' "$ZIPSIGN_PRIVATE_KEY" > "$PRIVATE_KEY_FILE"
 
-          # Sign each archive
-          SIGNED_COUNT=0
-          for archive in artifacts/*.{tar.gz,tar.zst}; do
-            if [ -f "$archive" ]; then
-              echo "Signing: $(basename "$archive")"
+          # `zipsign verify` takes a *verifying* (public) key, not the
+          # private key -- extract it once so both the "already signed"
+          # check below and the standalone verification step use the
+          # correct key type. (Passing the private key file straight to
+          # `zipsign verify` always fails: "Cannot decompress Edwards
+          # point" -- it is not a valid verifying key.)
+          zipsign gen-key --extract -f "$PRIVATE_KEY_FILE" "$VERIFYING_KEY_FILE"
 
-              # Check if already signed
-              if zipsign verify tar "$archive" "$PRIVATE_KEY_FILE" >/dev/null 2>&1; then
-                echo "  Already signed, skipping"
-              else
-                # Sign the archive
-                if zipsign sign tar "$archive" "$PRIVATE_KEY_FILE"; then
-                  echo "  ✓ Signed successfully"
-                  ((SIGNED_COUNT++))
-                else
-                  echo "  ✗ Failed to sign"
-                  exit 1
-                fi
-              fi
-            fi
-          done
-
-          echo "Signed $SIGNED_COUNT archive(s)"
-
-          # Clean up private key file
-          rm -f "$PRIVATE_KEY_FILE"
+          {
+            echo "PRIVATE_KEY_FILE=$PRIVATE_KEY_FILE"
+            echo "VERIFYING_KEY_FILE=$VERIFYING_KEY_FILE"
+          } >> "$GITHUB_ENV"
 
       - name: Verify signatures
-        env:
-          ZIPSIGN_PRIVATE_KEY: ${{ secrets.ZIPSIGN_PRIVATE_KEY }}
         run: |
-          # Save private key to temporary file
-          PRIVATE_KEY_FILE=$(mktemp)
-          echo "$ZIPSIGN_PRIVATE_KEY" > "$PRIVATE_KEY_FILE"
-          chmod 600 "$PRIVATE_KEY_FILE"
-
-          # Verify each signed archive
+          set -euo pipefail
           FAILED_COUNT=0
-          for archive in artifacts/*.{tar.gz,tar.zst}; do
+          for archive in artifacts/*.{tar.gz,zip}; do
             if [ -f "$archive" ]; then
               echo "Verifying: $(basename "$archive")"
-
-              if zipsign verify tar "$archive" "$PRIVATE_KEY_FILE"; then
+              subcommand=tar
+              [[ "$archive" == *.zip ]] && subcommand=zip
+              if zipsign verify "$subcommand" "$archive" "$VERIFYING_KEY_FILE"; then
                 echo "  ✓ Signature valid"
               else
                 echo "  ✗ Signature invalid"
-                ((FAILED_COUNT++))
+                FAILED_COUNT=$((FAILED_COUNT + 1))
               fi
             fi
           done
-
-          # Clean up private key file
-          rm -f "$PRIVATE_KEY_FILE"
 
           if [ $FAILED_COUNT -gt 0 ]; then
             echo "Error: $FAILED_COUNT signature(s) failed verification"
@@ -157,41 +166,33 @@ jobs:
 
           echo "All signatures verified successfully"
 
-      - name: Upload signed artifacts to release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Upload each signed artifact back to the release
-          # Note: gh release upload will replace existing assets with the same name
-          for archive in artifacts/*.{tar.gz,tar.zst}; do
-            if [ -f "$archive" ]; then
-              echo "Uploading: $(basename "$archive")"
-              gh release upload "$VERSION" "$archive" --clobber
-            fi
-          done
-
-          echo "All signed artifacts uploaded"
-
       - name: Generate signature report
         if: always()
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
+          SERVER_URL: ${{ github.server_url }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
         run: |
-          echo "# Signature Verification Report" > signature-report.md
-          echo "" >> signature-report.md
-          echo "**Release**: ${{ github.ref_name }}" >> signature-report.md
-          echo "**Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> signature-report.md
-          echo "**Workflow Run**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> signature-report.md
-          echo "" >> signature-report.md
-          echo "## Signed Artifacts" >> signature-report.md
-          echo "" >> signature-report.md
-          echo '```' >> signature-report.md
-          ls -lh artifacts/
-          echo '```' >> signature-report.md
+          {
+            echo "# Signature Verification Report"
+            echo ""
+            echo "**Release**: $RELEASE_TAG"
+            echo "**Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+            echo "**Workflow Run**: $SERVER_URL/$REPOSITORY/actions/runs/$RUN_ID"
+            echo ""
+            echo "## Signed Artifacts"
+            echo ""
+            echo '```'
+            ls -lh artifacts/
+            echo '```'
+          } > signature-report.md
 
           cat signature-report.md
 
       - name: Upload signature report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: signature-report
           path: signature-report.md
@@ -205,7 +206,7 @@ jobs:
 
     steps:
       - name: Download signature report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: signature-report
           path: .
@@ -213,5 +214,5 @@ jobs:
       - name: Add job summary
         run: |
           if [ -f signature-report.md ]; then
-            cat signature-report.md >> $GITHUB_STEP_SUMMARY
+            cat signature-report.md >> "$GITHUB_STEP_SUMMARY"
           fi

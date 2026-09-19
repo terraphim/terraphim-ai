@@ -1,0 +1,197 @@
+name: Release Manifest Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/actionlint.yaml"
+      - ".github/workflows/release-manifest-contract.yml"
+      - ".github/workflows/release-coordinator.yml"
+      - ".github/workflows/release-comprehensive.yml"
+      - ".github/workflows/publish-npm.yml"
+      - ".github/workflows/publish-pypi.yml"
+      - ".github/workflows/publish-bun.yml"
+      - ".github/workflows/publish-tauri.yml"
+      - ".github/workflows/release-sign.yml"
+      - ".github/scripts/release/**"
+      - ".release/release-manifest.schema.json"
+      - "scripts/requirements-release-manifest.in"
+      - "scripts/requirements-release-manifest.txt"
+      - "scripts/requirements-release-workflow-tests.txt"
+      - "scripts/validate-release-manifest.py"
+      - "tests/fixtures/release-manifest/**"
+      - "tests/release_manifest_validator_test.py"
+      - "tests/release_coordinator_test.py"
+      - "tests/release_control_mutation_test.py"
+      - "tests/workflow_release_coordinator_contract_test.py"
+      - "tests/workflow_release_coordinator_sequence_test.py"
+      - "tests/workflow_release_recovery_contract_test.py"
+      - "tests/workflow_release_sign_test.py"
+      - "tests/updater_r2_manifest_contract_test.py"
+      - "crates/terraphim_update/**"
+  push:
+    paths:
+      - ".github/actionlint.yaml"
+      - ".github/workflows/release-manifest-contract.yml"
+      - ".github/workflows/release-coordinator.yml"
+      - ".github/workflows/release-comprehensive.yml"
+      - ".github/workflows/publish-npm.yml"
+      - ".github/workflows/publish-pypi.yml"
+      - ".github/workflows/publish-bun.yml"
+      - ".github/workflows/publish-tauri.yml"
+      - ".github/workflows/release-sign.yml"
+      - ".github/scripts/release/**"
+      - ".release/release-manifest.schema.json"
+      - "scripts/requirements-release-manifest.in"
+      - "scripts/requirements-release-manifest.txt"
+      - "scripts/requirements-release-workflow-tests.txt"
+      - "scripts/validate-release-manifest.py"
+      - "tests/fixtures/release-manifest/**"
+      - "tests/release_manifest_validator_test.py"
+      - "tests/release_coordinator_test.py"
+      - "tests/release_control_mutation_test.py"
+      - "tests/workflow_release_coordinator_contract_test.py"
+      - "tests/workflow_release_coordinator_sequence_test.py"
+      - "tests/workflow_release_recovery_contract_test.py"
+      - "tests/workflow_release_sign_test.py"
+      - "tests/updater_r2_manifest_contract_test.py"
+      - "crates/terraphim_update/**"
+
+permissions:
+  contents: read
+
+jobs:
+  release-manifest-contract:
+    name: Schema and validator contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install validator requirements
+        run: python -m pip install --require-hashes -r scripts/requirements-release-manifest.txt
+
+      - name: Self-check schema
+        run: scripts/validate-release-manifest.py --schema .release/release-manifest.schema.json --self-check
+
+      - name: Run unit tests
+        run: python -m unittest tests.release_manifest_validator_test
+
+      - name: Validate valid fixtures
+        run: |
+          scripts/validate-release-manifest.py --schema .release/release-manifest.schema.json tests/fixtures/release-manifest/valid-v1.json
+          scripts/validate-release-manifest.py --schema .release/release-manifest.schema.json tests/fixtures/release-manifest/valid-homebrew-rb-empty-signature.json
+
+      - name: Assert invalid fixtures fail
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          invalid_fixtures=(
+            tests/fixtures/release-manifest/invalid-duplicate-keys.json
+            tests/fixtures/release-manifest/invalid-empty-binary-signature.json
+            tests/fixtures/release-manifest/invalid-extra-channel.json
+            tests/fixtures/release-manifest/invalid-legacy-products.json
+            tests/fixtures/release-manifest/invalid-release-tag-unprefixed.json
+            tests/fixtures/release-manifest/invalid-release-version-prefixed.json
+            tests/fixtures/release-manifest/invalid-source-missing-required.json
+          )
+
+          if [[ "${#invalid_fixtures[@]}" -ne 7 ]]; then
+            echo "expected exactly 7 invalid fixtures, got ${#invalid_fixtures[@]}" >&2
+            exit 1
+          fi
+
+          actual_count="$(find tests/fixtures/release-manifest -maxdepth 1 -type f -name 'invalid-*.json' | wc -l | tr -d ' ')"
+          if [[ "$actual_count" -ne 7 ]]; then
+            echo "expected exactly 7 checked-in invalid fixtures, got $actual_count" >&2
+            exit 1
+          fi
+
+          for fixture in "${invalid_fixtures[@]}"; do
+            if [[ ! -f "$fixture" ]]; then
+              echo "expected invalid fixture file to exist: $fixture" >&2
+              exit 1
+            fi
+
+            if scripts/validate-release-manifest.py --schema .release/release-manifest.schema.json "$fixture"; then
+              echo "expected invalid fixture to fail: $fixture" >&2
+              exit 1
+            fi
+          done
+
+  release-coordinator-contract:
+    name: Release coordinator contract (static + execution-level)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install validator + workflow-test requirements
+        run: |
+          python -m pip install --require-hashes -r scripts/requirements-release-manifest.txt
+          python -m pip install --require-hashes --no-binary=PyYAML \
+            -r scripts/requirements-release-workflow-tests.txt
+
+      - name: Install zipsign (required for real signing/verification tests)
+        run: |
+          set -euo pipefail
+          cargo install zipsign@0.2.1 --locked
+          zipsign --version
+
+      - name: Install actionlint
+        run: |
+          set -euo pipefail
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: actionlint (static workflow analysis)
+        run: |
+          set -euo pipefail
+          actionlint .github/workflows/release-coordinator.yml .github/workflows/release-sign.yml .github/workflows/release-comprehensive.yml .github/workflows/publish-npm.yml .github/workflows/publish-pypi.yml .github/workflows/publish-bun.yml .github/workflows/publish-tauri.yml .github/workflows/release-manifest-contract.yml
+
+      - name: Parse workflow YAML
+        run: |
+          python3 -c "
+          import yaml
+          for f in ['.github/workflows/release-coordinator.yml', '.github/workflows/release-sign.yml', '.github/workflows/release-comprehensive.yml', '.github/workflows/publish-npm.yml', '.github/workflows/publish-pypi.yml', '.github/workflows/publish-bun.yml', '.github/workflows/publish-tauri.yml']:
+              with open(f) as fh:
+                  yaml.safe_load(fh)
+              print(f, 'parsed OK')
+          "
+
+      - name: Run coordinator state-machine contract tests
+        run: python -m unittest -v tests.release_coordinator_test
+
+      - name: Run workflow static contract tests
+        run: python -m unittest -v tests.workflow_release_coordinator_contract_test
+
+      - name: Run exhaustive release-writer and recovery contract tests
+        run: python -m unittest -v tests.workflow_release_recovery_contract_test
+
+      - name: Run exact release-control mutation probes
+        run: python -m unittest -v tests.release_control_mutation_test
+
+      - name: Run execution-level literal workflow-sequence tests
+        run: python -m unittest -v tests.workflow_release_coordinator_sequence_test
+
+      - name: Run release-sign already-signed contract tests
+        run: python -m unittest -v tests.workflow_release_sign_test
+
+      - name: Run updater/R2 manifest cross-boundary contract tests
+        run: python -m unittest -v tests.updater_r2_manifest_contract_test
+
+      - name: Run R2 publish-manifest shell contract tests
+        run: bash .github/scripts/release/tests/test_r2_publish_manifest.sh
+
+      - name: Run GitHub release publication shell contract tests
+        run: bash .github/scripts/release/tests/test_github_publish_release.sh

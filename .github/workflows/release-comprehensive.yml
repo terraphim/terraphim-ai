@@ -10,11 +10,27 @@ on:
       - 'terraphim_grep-v*'
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: 'Component release tag to recover, for example terraphim_server-v1.21.3. Bare vX.Y.Z releases are owned and recovered exclusively by release-coordinator.yml.'
+        required: true
+        type: string
+      expected_source_sha:
+        description: 'Expected peeled source commit SHA for manual recovery'
+        required: true
+        type: string
       test_run:
         description: 'Test run without creating release'
         required: false
         default: false
         type: boolean
+      managed_packages:
+        description: 'Build managed DEB/RPM packages from qualified MUSL server binaries'
+        required: false
+        default: 'disabled'
+        type: choice
+        options:
+          - disabled
+          - enabled
 
 permissions:
   contents: write
@@ -24,45 +40,132 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  resolve-release-source:
+    name: Resolve immutable release source
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    outputs:
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      version_series: ${{ steps.resolve.outputs.version_series }}
+      source_sha: ${{ steps.resolve.outputs.source_sha }}
+      source_ref: ${{ steps.resolve.outputs.source_ref }}
+      workflow_ref: ${{ steps.resolve.outputs.workflow_ref }}
+      is_standard_release: ${{ steps.resolve.outputs.is_standard_release }}
+    steps:
+      - name: Resolve and validate release source
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF_NAME: ${{ github.ref_name }}
+          WORKFLOW_SHA: ${{ github.sha }}
+          MANUAL_RELEASE_TAG: ${{ inputs.release_tag || '' }}
+          MANUAL_EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha || '' }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            RELEASE_TAG="$MANUAL_RELEASE_TAG"
+            EXPECTED_SOURCE_SHA="$MANUAL_EXPECTED_SOURCE_SHA"
+
+            # Manual recovery is a COMPONENT-TAG-ONLY contract: requiring the
+            # component prefix makes is_standard_release structurally false on
+            # dispatch, so the upload-recovered-release-assets guard can
+            # actually pass, while bare vX.Y.Z releases stay owned exclusively
+            # by release-coordinator.yml (fail closed, single writer).
+            if [[ ! "$RELEASE_TAG" =~ ^[A-Za-z0-9_.-]+-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Invalid release_tag '$RELEASE_TAG' (expected component-vX.Y.Z, e.g. terraphim_server-v1.21.3; bare vX.Y.Z recovery is owned by release-coordinator.yml)"
+              exit 1
+            fi
+            if [[ ! "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Invalid expected_source_sha '$EXPECTED_SOURCE_SHA' (expected 40 lowercase hex characters)"
+              exit 1
+            fi
+          else
+            RELEASE_TAG="$EVENT_REF_NAME"
+            EXPECTED_SOURCE_SHA=""
+
+            if [[ ! "$RELEASE_TAG" =~ ^([A-Za-z0-9_.-]+-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Invalid tag '$RELEASE_TAG' (expected vX.Y.Z or component-vX.Y.Z)"
+              exit 1
+            fi
+          fi
+
+          echo "Resolving release tag: $RELEASE_TAG"
+          OBJECT_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
+          OBJECT_SHA="$(jq -r '.object.sha' <<<"$OBJECT_JSON")"
+          OBJECT_TYPE="$(jq -r '.object.type' <<<"$OBJECT_JSON")"
+
+          while [[ "$OBJECT_TYPE" == "tag" ]]; do
+            TAG_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${OBJECT_SHA}")"
+            OBJECT_SHA="$(jq -r '.object.sha' <<<"$TAG_JSON")"
+            OBJECT_TYPE="$(jq -r '.object.type' <<<"$TAG_JSON")"
+          done
+
+          if [[ "$OBJECT_TYPE" != "commit" ]]; then
+            echo "::error::Tag '$RELEASE_TAG' peeled to unsupported object type '$OBJECT_TYPE'"
+            exit 1
+          fi
+
+          SOURCE_SHA="$OBJECT_SHA"
+          if [[ -n "$EXPECTED_SOURCE_SHA" && "$SOURCE_SHA" != "$EXPECTED_SOURCE_SHA" ]]; then
+            echo "::error::Resolved source SHA '$SOURCE_SHA' does not match expected_source_sha '$EXPECTED_SOURCE_SHA'"
+            exit 1
+          fi
+
+          git init source-check
+          git -C source-check remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -C source-check fetch --no-tags --depth=1 origin "+refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          GIT_SOURCE_SHA="$(git -C source-check rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          if [[ "$GIT_SOURCE_SHA" != "$SOURCE_SHA" ]]; then
+            echo "::error::Git peeled source SHA '$GIT_SOURCE_SHA' does not match GitHub API source SHA '$SOURCE_SHA'"
+            exit 1
+          fi
+
+          if [[ "$RELEASE_TAG" == *"-v"* ]]; then
+            VERSION="${RELEASE_TAG##*-v}"
+            IS_STANDARD_RELEASE="false"
+          else
+            VERSION="${RELEASE_TAG#v}"
+            IS_STANDARD_RELEASE="true"
+          fi
+
+          if [[ ! "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid workflow commit SHA '$WORKFLOW_SHA'"
+            exit 1
+          fi
+
+          {
+            echo "release_tag=${RELEASE_TAG}"
+            echo "version=${VERSION}"
+            echo "version_series=${VERSION%.*}"
+            echo "source_sha=${SOURCE_SHA}"
+            echo "source_ref=${SOURCE_SHA}"
+            echo "workflow_ref=${WORKFLOW_SHA}"
+            echo "is_standard_release=${IS_STANDARD_RELEASE}"
+          } >> "$GITHUB_OUTPUT"
+
   verify-versions:
     name: Verify version consistency
+    needs: resolve-release-source
     runs-on: ubuntu-22.04
     outputs:
-      version: ${{ steps.extract.outputs.version }}
+      version: ${{ needs.resolve-release-source.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Extract version from tag
-        id: extract
-        run: |
-          # Get the tag name
-          TAG="${{ github.ref_name }}"
-          echo "Tag: $TAG"
-
-          # Extract version (strip v prefix and any component prefix)
-          if [[ "$TAG" == *"-v"* ]]; then
-            # Component-specific tag like terraphim_agent-v1.5.2
-            VERSION="${TAG##*-v}"
-          elif [[ "$TAG" == v* ]]; then
-            # Standard version tag like v1.5.2
-            VERSION="${TAG#v}"
-          else
-            echo "::error::Invalid tag format: $TAG (expected v* or component-v*)"
-            exit 1
-          fi
-
-          echo "Extracted version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          # Also set as env var for fallback
-          echo "VERSION_FALLBACK=$VERSION" >> $GITHUB_ENV
-
       - name: Verify Cargo.toml versions match tag
         env:
-          EXPECTED_VERSION: ${{ steps.extract.outputs.version }}
+          EXPECTED_VERSION: ${{ needs.resolve-release-source.outputs.version }}
         run: |
           echo "Expected version: $EXPECTED_VERSION"
 
@@ -96,7 +199,7 @@ jobs:
 
   build-binaries:
     name: Build binaries for ${{ matrix.target }}
-    needs: verify-versions
+    needs: [resolve-release-source, verify-versions]
     # Only build if version verification passed
     if: needs.verify-versions.result == 'success'
     strategy:
@@ -144,6 +247,19 @@ jobs:
             "$FIX" || true
           fi
 
+      - name: Disable Rust wrappers for self-hosted release builds
+        if: contains(matrix.os, 'self-hosted')
+        shell: bash
+        run: |
+          # Release jobs require direct rustc output. Runner wrappers may be absent
+          # (for example kache) or may write status text that corrupts toolchain
+          # action parsing (for example fix-rust-toolchain-perms.sh).
+          unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
+          {
+            echo "RUSTC_WRAPPER="
+            echo "RUSTC_WORKSPACE_WRAPPER="
+          } >> "$GITHUB_ENV"
+
       - name: Cleanup self-hosted runner
         if: contains(matrix.os, 'self-hosted')
         run: |
@@ -158,6 +274,9 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -184,7 +303,7 @@ jobs:
         if: matrix.use_cross
         run: |
           if command -v cross &>/dev/null; then
-            cross --version
+            cross --version || true
             exit 0
           fi
           # Self-hosted runners may alias `cargo` via rustup; use stable explicitly.
@@ -192,7 +311,7 @@ jobs:
 
       - name: Clear cross custom images
         if: matrix.use_cross
-        run: docker rmi $(docker images -q cross-custom-*) 2>/dev/null || true
+        run: docker images -q 'cross-custom-*' | xargs -r docker rmi 2>/dev/null || true
 
       - name: Setup zig for cross builds
         if: matrix.use_cross
@@ -205,8 +324,10 @@ jobs:
           ZIG_OPTS="$ZIG_OPTS -e ZIG=$ZIG_BIN"
           ZIG_OPTS="$ZIG_OPTS -e ZIG_GLOBAL_CACHE_DIR=/tmp/zig-global-cache"
           ZIG_OPTS="$ZIG_OPTS -e ZIG_LOCAL_CACHE_DIR=/tmp/zig-local-cache"
-          echo "CROSS_CONTAINER_OPTS=$ZIG_OPTS" >> $GITHUB_ENV
-          echo "ZIG=$ZIG_BIN" >> $GITHUB_ENV
+          {
+            echo "CROSS_CONTAINER_OPTS=$ZIG_OPTS"
+            echo "ZIG=$ZIG_BIN"
+          } >> "$GITHUB_ENV"
 
       - name: Cache dependencies
         if: matrix.target != 'x86_64-unknown-linux-gnu'
@@ -368,9 +489,12 @@ jobs:
 
   create-universal-macos:
     name: Create macOS universal binaries
-    needs: build-binaries
-    # Run if macOS builds completed (even if other targets failed)
-    if: always() && needs.build-binaries.result != 'cancelled'
+    needs: [resolve-release-source, build-binaries]
+    # Run only after immutable-source validation and a complete build matrix.
+    if: >-
+      always() &&
+      needs.resolve-release-source.result == 'success' &&
+      needs.build-binaries.result == 'success'
     runs-on: [self-hosted, macOS]
     steps:
       - name: Download x86_64 macOS binaries
@@ -423,13 +547,16 @@ jobs:
 
   sign-and-notarize-macos:
     name: Sign and notarize macOS binaries
-    needs: create-universal-macos
+    needs: [resolve-release-source, create-universal-macos]
     # Run if universal binary creation completed (even if other jobs failed)
     if: always() && needs.create-universal-macos.result == 'success'
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Download universal macOS binaries
         uses: actions/download-artifact@v4
@@ -447,11 +574,13 @@ jobs:
           echo "Loading credentials from 1Password..."
 
           # Read credentials with --no-newline to avoid trailing characters
-          echo "APPLE_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/username' --no-newline)" >> $GITHUB_ENV
-          echo "APPLE_TEAM_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_TEAM_ID' --no-newline)" >> $GITHUB_ENV
-          echo "APPLE_APP_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_APP_SPECIFIC_PASSWORD' --no-newline)" >> $GITHUB_ENV
-          echo "CERT_BASE64=$(op read 'op://TerraphimPlatform/apple.developer.certificate/base64' --no-newline)" >> $GITHUB_ENV
-          echo "CERT_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.certificate/password' --no-newline)" >> $GITHUB_ENV
+          {
+            echo "APPLE_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/username' --no-newline)"
+            echo "APPLE_TEAM_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_TEAM_ID' --no-newline)"
+            echo "APPLE_APP_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_APP_SPECIFIC_PASSWORD' --no-newline)"
+            echo "CERT_BASE64=$(op read 'op://TerraphimPlatform/apple.developer.certificate/base64' --no-newline)"
+            echo "CERT_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.certificate/password' --no-newline)"
+          } >> "$GITHUB_ENV"
 
           echo "✅ Credentials loaded successfully"
 
@@ -506,11 +635,25 @@ jobs:
 
   build-debian-packages:
     name: Build Debian packages
+    needs: [resolve-release-source, verify-versions]
+    if: needs.verify-versions.result == 'success'
     continue-on-error: true
     runs-on: [self-hosted, bigbox]
     steps:
+      - name: Disable Rust wrappers for self-hosted release builds
+        shell: bash
+        run: |
+          unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
+          {
+            echo "RUSTC_WRAPPER="
+            echo "RUSTC_WORKSPACE_WRAPPER="
+          } >> "$GITHUB_ENV"
+
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -564,11 +707,153 @@ jobs:
           name: debian-packages
           path: target/debian/*.deb
 
+  build-server-managed-packages:
+    name: Build server managed packages for ${{ matrix.target }}
+    needs: [resolve-release-source, verify-versions, build-binaries]
+    # Normal tag pushes always produce the managed DEB/RPM matrix (the
+    # release inventory assembles all-or-nothing from it). A manual
+    # dispatch must opt in explicitly with managed_packages=enabled.
+    if: >-
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.managed_packages == 'enabled')) &&
+      needs.verify-versions.result == 'success' &&
+      needs.build-binaries.result == 'success'
+    runs-on: [self-hosted, bigbox]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+          - target: aarch64-unknown-linux-musl
+    env:
+      CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
+    steps:
+      - name: Disable Rust wrappers for self-hosted release builds
+        shell: bash
+        run: |
+          unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
+          {
+            echo "RUSTC_WRAPPER="
+            echo "RUSTC_WORKSPACE_WRAPPER="
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deb
+        run: |
+          if command -v cargo-deb &>/dev/null; then
+            cargo-deb --version
+          else
+            # Self-hosted runners may alias `cargo` via rustup; use stable explicitly.
+            rustup run stable cargo install cargo-deb --locked
+          fi
+
+      - name: Download qualified server binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-${{ matrix.target }}
+          path: qualified-binary
+
+      - name: Build cargo-deb parity package for target
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify-versions.outputs.version }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          BIN="qualified-binary/terraphim_server-${TARGET}"
+          test -f "$BIN"
+          chmod 0755 "$BIN"
+          # Stage the exact qualified MUSL bytes at the assets path consumed by
+          # terraphim_server [package.metadata.deb]: the declared asset
+          # target/release/terraphim_server resolves against
+          # target/<triple>/release when cargo-deb is given --target.
+          # --no-build wraps without rebuilding and --no-strip preserves the
+          # exact bytes, so the parity oracle compares qualified MUSL payload
+          # bytes per matrix target (never host-native bytes).
+          mkdir -p "target/${TARGET}/release"
+          cp "$BIN" "target/${TARGET}/release/terraphim_server"
+          rustup run stable cargo deb -p terraphim_server \
+            --no-build --no-strip \
+            --target "$TARGET" \
+            --output "cargo-deb-parity/${TARGET}"
+          ls -la "cargo-deb-parity/${TARGET}"
+
+      - name: Install pinned nFPM
+        shell: bash
+        env:
+          NFPM_VERSION: 2.47.0
+          NFPM_ARCHIVE_SHA256: 0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783
+          NFPM_BINARY_SHA256: 17133a2467ffb7cec851c2d7bae0c6098d09d7ed7d3d101a9605f6a473323936
+        run: |
+          set -euo pipefail
+          install_dir="/tmp/nfpm-bin"
+          mkdir -p "$install_dir"
+          archive="$install_dir/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          url="https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          curl -fsSL "$url" -o "$archive"
+          printf '%s  %s\n' "$NFPM_ARCHIVE_SHA256" "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$install_dir" nfpm
+          printf '%s  %s\n' "$NFPM_BINARY_SHA256" "$install_dir/nfpm" | sha256sum -c -
+          mv "$install_dir/nfpm" "$install_dir/nfpm-${NFPM_VERSION}"
+          chmod 0755 "$install_dir/nfpm-${NFPM_VERSION}"
+          .github/scripts/nfpm/verify-nfpm.sh \
+            --binary "$install_dir/nfpm-${NFPM_VERSION}" \
+            --version "$NFPM_VERSION" \
+            --sha256 "$NFPM_BINARY_SHA256"
+
+      - name: Run native managed-package lifecycle gate
+        shell: bash
+        env:
+          NFPM_BIN: /tmp/nfpm-bin/nfpm-2.47.0
+          TARGET: ${{ matrix.target }}
+          # The install/upgrade/remove lifecycle is required (REQUIRE_INSTALL=1)
+          # only where execution is genuinely possible: the target triple must
+          # match the runner architecture. Cross targets fail closed under
+          # REQUIRE_INSTALL=1 and must be qualified explicitly via
+          # REQUIRE_INSTALL=0 (byte/metadata/lint checks still run).
+          REQUIRE_INSTALL: ${{ ((runner.arch == 'X64' && matrix.target == 'x86_64-unknown-linux-musl') || (runner.arch == 'ARM64' && matrix.target == 'aarch64-unknown-linux-musl')) && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          .github/scripts/nfpm/tests/test_server_nfpm_native.sh
+
+      - name: Build managed DEB/RPM packages
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify-versions.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          NFPM_BIN: /tmp/nfpm-bin/nfpm-2.47.0
+        run: |
+          set -euo pipefail
+          BIN="qualified-binary/terraphim_server-${TARGET}"
+          test -f "$BIN"
+          chmod 0755 "$BIN"
+          .github/scripts/nfpm/build-server-packages.sh \
+            --version "$VERSION" \
+            --target "$TARGET" \
+            --binary "$BIN" \
+            --out-dir "server-managed-packages/${TARGET}" \
+            --nfpm "$NFPM_BIN" \
+            --cargo-deb-dir "cargo-deb-parity/${TARGET}"
+
+      - name: Upload server managed packages
+        uses: actions/upload-artifact@v5
+        with:
+          name: server-managed-packages-${{ matrix.target }}
+          path: server-managed-packages/${{ matrix.target }}/*
+
   trigger-desktop-release:
     name: Trigger Desktop Release
-    needs: verify-versions
+    needs: [resolve-release-source, verify-versions]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.verify-versions.result == 'success'
     steps:
       - name: Trigger terraphim-ai-desktop release workflow
         uses: actions/github-script@v9
@@ -576,7 +861,7 @@ jobs:
         with:
           github-token: ${{ secrets.TERRAPHIM_ORG_GITHUB_TOKEN || secrets.DESKTOP_REPO_TOKEN }}
           script: |
-            const tag = context.ref.replace('refs/tags/', '');
+            const tag = '${{ needs.resolve-release-source.outputs.release_tag }}';
             console.log(`Triggering desktop release for tag: ${tag}`);
             
             await github.rest.actions.createWorkflowDispatch({
@@ -590,9 +875,9 @@ jobs:
 
   trigger-clients-release:
     name: Trigger Client Binary Release
-    needs: verify-versions
+    needs: [resolve-release-source, verify-versions]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && needs.resolve-release-source.outputs.is_standard_release == 'true' && needs.verify-versions.result == 'success'
     continue-on-error: true
     permissions:
       actions: write
@@ -605,9 +890,35 @@ jobs:
           # dispatch workflows in other repos regardless of job permissions.
           github-token: ${{ secrets.TERRAPHIM_ORG_GITHUB_TOKEN || secrets.DESKTOP_REPO_TOKEN || secrets.CLIENTS_REPO_TOKEN }}
           script: |
-            const version = context.ref.replace('refs/tags/v', '');
-            const releaseTag = context.ref.replace('refs/tags/', '');
+            const version = '${{ needs.resolve-release-source.outputs.version }}';
+            const releaseTag = '${{ needs.resolve-release-source.outputs.release_tag }}';
             console.log(`Triggering client binaries for ${releaseTag} (version ${version})`);
+
+            async function resolveTagCommit(owner, repo, tag) {
+              const ref = await github.rest.git.getRef({
+                owner,
+                repo,
+                ref: `tags/${tag}`
+              });
+              let object = ref.data.object;
+
+              while (object.type === 'tag') {
+                const tagObject = await github.rest.git.getTag({
+                  owner,
+                  repo,
+                  tag_sha: object.sha
+                });
+                object = tagObject.data.object;
+              }
+
+              if (object.type !== 'commit') {
+                throw new Error(`Tag ${tag} peeled to unsupported object type ${object.type}`);
+              }
+              return object.sha;
+            }
+
+            const expectedSourceSha = await resolveTagCommit('terraphim', 'terraphim-clients', releaseTag);
+            console.log(`Resolved terraphim-clients ${releaseTag} to ${expectedSourceSha}`);
 
             await github.rest.actions.createWorkflowDispatch({
               owner: 'terraphim',
@@ -617,6 +928,8 @@ jobs:
               inputs: {
                 version: version,
                 release_tag: releaseTag,
+                source_ref: releaseTag,
+                expected_source_sha: expectedSourceSha,
                 target_repo: 'terraphim-ai'
               }
             });
@@ -625,25 +938,35 @@ jobs:
 
   build-docker:
     name: Build and push Docker images
+    needs: [resolve-release-source, verify-versions]
+    if: needs.verify-versions.result == 'success' && needs.resolve-release-source.outputs.is_standard_release == 'true'
     uses: ./.github/workflows/docker-multiarch.yml
     with:
       platforms: linux/amd64,linux/arm64
       ubuntu-versions: '["20.04", "22.04"]'
       push: ${{ !inputs.test_run }}
-      tag: ${{ github.ref_name }}
+      tag: ${{ needs.resolve-release-source.outputs.release_tag }}
+      version: ${{ needs.resolve-release-source.outputs.version }}
+      version_series: ${{ needs.resolve-release-source.outputs.version_series }}
+      publish_latest: ${{ github.event_name == 'push' && needs.resolve-release-source.outputs.is_standard_release == 'true' && !inputs.test_run }}
+      source_ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+      build_recipe_ref: ${{ needs.resolve-release-source.outputs.workflow_ref }}
       dockerhub-username: ${{ vars.DOCKERHUB_USERNAME || '' }}
       test_run: ${{ inputs.test_run || false }}
     secrets: inherit  # pragma: allowlist secret
 
   verify-release-assets:
     name: Verify release assets
-    needs: [build-binaries, sign-and-notarize-macos, build-debian-packages]
+    needs: [resolve-release-source, verify-versions, build-binaries, sign-and-notarize-macos, build-debian-packages]
     # Run even if some builds failed, but verify critical assets exist
     if: always() && needs.sign-and-notarize-macos.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Download all binary artifacts
         uses: actions/download-artifact@v4
@@ -704,19 +1027,33 @@ jobs:
 
   create-release:
     name: Create GitHub release
-    needs: [verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos]
+    needs: [resolve-release-source, verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos, build-server-managed-packages]
+    # Standard vX.Y.Z runs are durable producers only.  The release
+    # coordinator is their sole release/Homebrew publisher; this legacy job
+    # remains available only for component-prefixed tags outside that
+    # coordinator's contract. Tag-push publication requires the managed package producer to have
+    # SUCCEEDED. A skipped or failed managed job blocks publication: the
+    # managed matrix is part of the release contract and only the explicit
+    # manual recovery path may proceed without it.
     if: >-
       always() &&
       !cancelled() &&
+      github.event_name == 'push' &&
+      !inputs.test_run &&
+      needs.resolve-release-source.outputs.is_standard_release != 'true' &&
       needs.verify-versions.result == 'success' &&
       needs.sign-and-notarize-macos.result == 'success' &&
-      needs.verify-release-assets.result == 'success'
+      needs.verify-release-assets.result == 'success' &&
+      needs.build-server-managed-packages.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
 
       - name: Download binary artifacts
         uses: actions/download-artifact@v4
@@ -726,14 +1063,18 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Download Debian package artifacts
+      - name: Download managed server packages (all matrix targets)
         uses: actions/download-artifact@v4
-        id: download_debian
-        continue-on-error: true
+        id: download_managed
+        # The job condition already required the managed producer to
+        # succeed; this gate keeps the step absent if that ever regresses
+        # so the all-or-nothing assemble step below fails closed instead
+        # of publishing an incomplete managed matrix.
+        if: needs.build-server-managed-packages.result == 'success'
         with:
-          name: debian-packages
-          path: release-assets
-          merge-multiple: true
+          pattern: server-managed-packages-*
+          path: managed-staging
+          merge-multiple: false
 
       - name: Retry artifact download if needed
         if: steps.download.outcome == 'failure'
@@ -746,13 +1087,11 @@ jobs:
             rm -rf binaries-* release-assets
             mkdir -p release-assets
 
-            gh run download ${{ github.run_id }} --dir release-assets -n debian-packages || true
-
             gh api \
               repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
               --jq '.artifacts[].name' \
               | grep '^binaries-' \
-              | while read artifact_name; do
+              | while read -r artifact_name; do
                   gh run download ${{ github.run_id }} --dir release-assets -n "$artifact_name"
                 done && break
 
@@ -764,46 +1103,55 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Assemble release inventory (managed all-or-nothing, duplicate rejection)
+        run: |
+          set -euo pipefail
+          .github/scripts/release/assemble-release-inventory.sh \
+            --output release-assets \
+            --managed-staging managed-staging \
+            --managed-target x86_64-unknown-linux-musl \
+            --managed-target aarch64-unknown-linux-musl
+
       - name: Prepare release assets
         run: |
-          # Artifacts are already downloaded to release-assets/ with merge-multiple
-          # Just verify everything is there
+          # Artifacts are assembled into release-assets/ (binaries merged,
+          # managed DEB/RPM matrix gated all-or-nothing; duplicates rejected)
           echo "Release assets:"
           ls -la release-assets/
 
       - name: Generate checksums
         working-directory: release-assets
         run: |
-          sha256sum * > checksums.txt
+          sha256sum -- * > checksums.txt
 
       - name: Extract release notes from tag
         id: release-notes
+        env:
+          RELEASE_TAG: ${{ needs.resolve-release-source.outputs.release_tag }}
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG=${GITHUB_REF#refs/tags/}
-            echo "Creating release for tag: $TAG"
+          TAG="$RELEASE_TAG"
+          echo "Creating release for tag: $TAG"
 
-            # Extract component and version from tag
-            if [[ "$TAG" == *"-v"* ]]; then
-              COMPONENT=${TAG%-v*}
-              VERSION=${TAG##*-v}
-              echo "Component: $COMPONENT, Version: $VERSION"
-              TITLE="$COMPONENT v$VERSION"
-            else
-              TITLE="$TAG"
-            fi
-
-            echo "title=$TITLE" >> $GITHUB_OUTPUT
+          # Extract component and version from tag
+          if [[ "$TAG" == *"-v"* ]]; then
+            COMPONENT=${TAG%-v*}
+            VERSION=${TAG##*-v}
+            echo "Component: $COMPONENT, Version: $VERSION"
+            TITLE="$COMPONENT v$VERSION"
+          else
+            TITLE="$TAG"
           fi
+
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.release-notes.outputs.title }}
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ needs.resolve-release-source.outputs.release_tag }}
           draft: false
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-          overwrite: true
+          prerelease: ${{ contains(needs.resolve-release-source.outputs.release_tag, 'alpha') || contains(needs.resolve-release-source.outputs.release_tag, 'beta') || contains(needs.resolve-release-source.outputs.release_tag, 'rc') }}
+          overwrite_files: true
           make_latest: true
           files: release-assets/*
           body: |
@@ -856,250 +1204,123 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  wait-for-client-binaries:
-    name: Wait for client binaries on release
-    needs: [create-release, trigger-clients-release]
+  upload-recovered-release-assets:
+    name: Upload recovered release assets
+    needs: [resolve-release-source, verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos, build-server-managed-packages]
+    # Standard-release recovery is owned by the coordinator as well; the
+    # non-standard guard below prevents this legacy clobber path from
+    # becoming a second writer. Recovery semantics only: historical releases were published before
+    # the managed matrix existed and the managed job used to be
+    # dispatch-gated, so an explicitly skipped managed job is tolerated
+    # exclusively on this manual recovery path. Normal tag-push
+    # publication (create-release) requires the managed producer to have
+    # succeeded and never accepts skipped.
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'workflow_dispatch' &&
+      !inputs.test_run &&
+      needs.resolve-release-source.outputs.is_standard_release != 'true' &&
+      needs.verify-versions.result == 'success' &&
+      needs.sign-and-notarize-macos.result == 'success' &&
+      needs.verify-release-assets.result == 'success' &&
+      (needs.build-server-managed-packages.result == 'success' || needs.build-server-managed-packages.result == 'skipped')
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && needs.create-release.result == 'success'
+    permissions:
+      contents: write
     steps:
-      - name: Wait until terraphim-clients uploads client assets
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release-source.outputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binaries-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Download managed server packages (all matrix targets)
+        uses: actions/download-artifact@v4
+        # Recovery-only relaxation, mirroring the job condition: a skipped
+        # managed job leaves the stage absent and recovery proceeds
+        # without managed packages (all-or-nothing is enforced by the
+        # assemble step).
+        if: needs.build-server-managed-packages.result == 'success'
+        with:
+          pattern: server-managed-packages-*
+          path: managed-staging
+          merge-multiple: false
+
+      - name: Assemble release inventory (managed all-or-nothing, duplicate rejection)
+        run: |
+          set -euo pipefail
+          .github/scripts/release/assemble-release-inventory.sh \
+            --output release-assets \
+            --managed-staging managed-staging \
+            --managed-target x86_64-unknown-linux-musl \
+            --managed-target aarch64-unknown-linux-musl
+
+      - name: Snapshot existing release asset digests
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve-release-source.outputs.release_tag }}
         run: |
-          TAG="${{ github.ref_name }}"
-          # Require at least one asset matching each client binary family.
-          REQUIRED_PATTERNS=('terraphim-agent' 'terraphim-cli' 'terraphim-grep')
-          echo "Waiting for client binaries on release $TAG ..."
-          for attempt in $(seq 1 120); do
-            ASSETS=$(gh release view "$TAG" --repo terraphim/terraphim-ai --json assets -q '.assets[].name' 2>/dev/null || true)
-            MISSING=0
-            for pattern in "${REQUIRED_PATTERNS[@]}"; do
-              if ! echo "$ASSETS" | grep -q "$pattern"; then
-                echo "  missing pattern: $pattern"
-                MISSING=$((MISSING + 1))
-              fi
-            done
-            echo "Attempt $attempt: missing $MISSING client families"
-            if [ "$MISSING" -eq 0 ]; then
-              echo "Client binaries present on release"
-              exit 0
-            fi
-            sleep 30
-          done
-          echo "::error::Timed out waiting for terraphim-clients to attach agent/cli/grep binaries"
-          exit 1
+          mkdir -p existing-release
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" \
+            > existing-release/release.json
 
-  update-homebrew:
-    name: Update Homebrew formulas
-    needs: wait-for-client-binaries
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - name: Extract version from tag
-        id: version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Updating Homebrew formulas for version: $VERSION"
-
-      - name: Download release checksums
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          curl -sL "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/checksums.txt" -o checksums.txt
-          cat checksums.txt
-
-      - name: Calculate universal binary checksums
-        id: checksums
-        run: |
-          # Extract SHA256 for all binaries from checksums.txt
-          # macOS universal binaries
-          SERVER_SHA=$(grep "terraphim_server-universal-apple-darwin" checksums.txt | awk '{print $1}')
-          AGENT_SHA=$(grep "terraphim-agent-universal-apple-darwin" checksums.txt | awk '{print $1}')
-          GREP_SHA=$(grep "terraphim-grep-universal-apple-darwin" checksums.txt | awk '{print $1}')
-
-          # Linux GNU binaries (for Homebrew)
-          SERVER_LINUX_GNU_SHA=$(grep "terraphim_server-x86_64-unknown-linux-gnu" checksums.txt | grep -v tar.gz | awk '{print $1}')
-          AGENT_LINUX_GNU_SHA=$(grep "terraphim-agent-x86_64-unknown-linux-gnu" checksums.txt | grep -v tar.gz | awk '{print $1}')
-          GREP_LINUX_GNU_SHA=$(grep "terraphim-grep-x86_64-unknown-linux-gnu" checksums.txt | grep -v tar.gz | awk '{print $1}')
-
-          # Fallback to MUSL if GNU not available
-          if [ -z "$SERVER_LINUX_GNU_SHA" ]; then
-            SERVER_LINUX_GNU_SHA=$(grep "terraphim_server-x86_64-unknown-linux-musl" checksums.txt | grep -v tar.gz | awk '{print $1}')
-            echo "⚠️  Using MUSL fallback for server"
-          fi
-          if [ -z "$AGENT_LINUX_GNU_SHA" ]; then
-            AGENT_LINUX_GNU_SHA=$(grep "terraphim-agent-x86_64-unknown-linux-musl" checksums.txt | grep -v tar.gz | awk '{print $1}')
-            echo "⚠️  Using MUSL fallback for agent"
-          fi
-          if [ -z "$GREP_LINUX_GNU_SHA" ]; then
-            GREP_LINUX_GNU_SHA=$(grep "terraphim-grep-x86_64-unknown-linux-musl" checksums.txt | grep -v tar.gz | awk '{print $1}')
-            echo "⚠️  Using MUSL fallback for grep"
-          fi
-
-          echo "server_sha=$SERVER_SHA" >> $GITHUB_OUTPUT
-          echo "agent_sha=$AGENT_SHA" >> $GITHUB_OUTPUT
-          echo "grep_sha=$GREP_SHA" >> $GITHUB_OUTPUT
-          echo "server_linux_gnu_sha=$SERVER_LINUX_GNU_SHA" >> $GITHUB_OUTPUT
-          echo "agent_linux_gnu_sha=$AGENT_LINUX_GNU_SHA" >> $GITHUB_OUTPUT
-          echo "grep_linux_gnu_sha=$GREP_LINUX_GNU_SHA" >> $GITHUB_OUTPUT
-
-          echo "Server universal binary SHA256: $SERVER_SHA"
-          echo "Agent universal binary SHA256: $AGENT_SHA"
-          echo "Grep universal binary SHA256: $GREP_SHA"
-          echo "Server Linux GNU SHA256: $SERVER_LINUX_GNU_SHA"
-          echo "Agent Linux GNU SHA256: $AGENT_LINUX_GNU_SHA"
-          echo "Grep Linux GNU SHA256: $GREP_LINUX_GNU_SHA"
-
-      - name: Clone Homebrew tap
-        run: |
-          git clone https://github.com/terraphim/homebrew-terraphim.git
-          cd homebrew-terraphim
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Update formulas
+      - name: Merge recovered and existing checksums
         env:
-          VERSION: ${{ steps.version.outputs.version }}
-          SERVER_SHA: ${{ steps.checksums.outputs.server_sha }}
-          AGENT_SHA: ${{ steps.checksums.outputs.agent_sha }}
-          GREP_SHA: ${{ steps.checksums.outputs.grep_sha }}
-          SERVER_LINUX_GNU_SHA: ${{ steps.checksums.outputs.server_linux_gnu_sha }}
-          AGENT_LINUX_GNU_SHA: ${{ steps.checksums.outputs.agent_linux_gnu_sha }}
-          GREP_LINUX_GNU_SHA: ${{ steps.checksums.outputs.grep_linux_gnu_sha }}
+          RELEASE_ASSETS: release-assets
+          EXISTING_RELEASE_JSON: existing-release/release.json
         run: |
-          cd homebrew-terraphim
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import re
 
-          # Update terraphim-server.rb - switch to pre-built universal binary
-          cat > Formula/terraphim-server.rb << EOF
-          class TerraphimServer < Formula
-            desc "Privacy-first AI assistant HTTP server with semantic search"
-            homepage "https://github.com/terraphim/terraphim-ai"
-            version "${VERSION}"
-            license "Apache-2.0"
+          assets = Path(os.environ["RELEASE_ASSETS"])
+          release = json.loads(Path(os.environ["EXISTING_RELEASE_JSON"]).read_text())
+          name_re = re.compile(r"^[^/\r\n\t]+$")
+          digest_re = re.compile(r"^sha256:([0-9a-f]{64})$")
+          merged = {}
 
-            on_macos do
-              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim_server-universal-apple-darwin"
-              sha256 "${SERVER_SHA}"
-            end
+          for asset in release.get("assets", []):
+              name = asset.get("name", "")
+              if name == "checksums.txt":
+                  continue
+              digest_match = digest_re.fullmatch(asset.get("digest") or "")
+              if not name_re.fullmatch(name) or not digest_match:
+                  raise SystemExit(f"invalid existing release asset digest metadata for {name!r}")
+              if name in merged and merged[name] != digest_match.group(1):
+                  raise SystemExit(f"conflicting existing checksum for {name}")
+              merged[name] = digest_match.group(1)
 
-            on_linux do
-              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim_server-x86_64-unknown-linux-gnu"
-              sha256 "${SERVER_LINUX_GNU_SHA}"
-            end
+          recovered = [
+              path for path in sorted(assets.iterdir())
+              if path.is_file() and path.name not in {"checksums.txt", "recovered-checksums.txt"}
+          ]
+          if not recovered:
+              raise SystemExit("no recovered release assets found")
 
-            def install
-              if OS.mac?
-                bin.install "terraphim_server-universal-apple-darwin" => "terraphim_server"
-              else
-                bin.install "terraphim_server-x86_64-unknown-linux-gnu" => "terraphim_server"
-              end
-            end
+          for path in recovered:
+              if not name_re.fullmatch(path.name):
+                  raise SystemExit(f"invalid recovered release asset name: {path.name!r}")
+              merged[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
 
-            service do
-              run opt_bin/"terraphim_server"
-              keep_alive true
-              log_path var/"log/terraphim-server.log"
-              error_log_path var/"log/terraphim-server-error.log"
-            end
+          (assets / "checksums.txt").write_text(
+              "".join(f"{merged[name]}  {name}\n" for name in sorted(merged))
+          )
+          PY
 
-            test do
-              assert_match "terraphim", shell_output("#{bin}/terraphim_server --version 2>&1", 0)
-            end
-          end
-          EOF
-
-          # Update terraphim-agent.rb - switch to pre-built universal binary
-          cat > Formula/terraphim-agent.rb << EOF
-          class TerraphimAgent < Formula
-            desc "Interactive TUI and REPL for Terraphim AI semantic search"
-            homepage "https://github.com/terraphim/terraphim-ai"
-            version "${VERSION}"
-            license "Apache-2.0"
-
-            on_macos do
-              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim-agent-universal-apple-darwin"
-              sha256 "${AGENT_SHA}"
-            end
-
-            on_linux do
-              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim-agent-x86_64-unknown-linux-gnu"
-              sha256 "${AGENT_LINUX_GNU_SHA}"
-            end
-
-            def install
-              if OS.mac?
-                bin.install "terraphim-agent-universal-apple-darwin" => "terraphim-agent"
-              else
-                bin.install "terraphim-agent-x86_64-unknown-linux-gnu" => "terraphim-agent"
-              end
-            end
-
-            test do
-              assert_match "terraphim", shell_output("#{bin}/terraphim-agent --version 2>&1", 0)
-            end
-          end
-          EOF
-
-          # Update terraphim-grep.rb -- hybrid grep CLI with KG boost and LLM fallback
-          cat > Formula/terraphim-grep.rb << EOF
-          class TerraphimGrep < Formula
-            desc "Intelligent hybrid grep with knowledge-graph boosting and LLM fallback"
-            homepage "https://github.com/terraphim/terraphim-ai"
-            version "${VERSION}"
-            license "MIT"
-
-            on_macos do
-              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim-grep-universal-apple-darwin"
-              sha256 "${GREP_SHA}"
-            end
-
-            on_linux do
-              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim-grep-x86_64-unknown-linux-gnu"
-              sha256 "${GREP_LINUX_GNU_SHA}"
-            end
-
-            def install
-              if OS.mac?
-                bin.install "terraphim-grep-universal-apple-darwin" => "terraphim-grep"
-              else
-                bin.install "terraphim-grep-x86_64-unknown-linux-gnu" => "terraphim-grep"
-              end
-            end
-
-            test do
-              assert_match "terraphim", shell_output("#{bin}/terraphim-grep --version 2>&1", 0)
-            end
-          end
-          EOF
-
-          git add Formula/
-          git commit -m "feat: update formulas to v${VERSION} with universal binaries
-
-          - terraphim-server v${VERSION}
-          - terraphim-agent v${VERSION}
-          - terraphim-grep v${VERSION}
-
-          🤖 Automated update from release workflow"
-
-      - name: Install 1Password CLI
-        uses: 1password/install-cli-action@v2
-
-      - name: Push to Homebrew tap
+      - name: Upload recovered assets to existing release
         env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve-release-source.outputs.release_tag }}
         run: |
-          cd homebrew-terraphim
-
-          # Get token from 1Password
-          HOMEBREW_TAP_TOKEN=$(op read "op://TerraphimPlatform/homebrew-tap-token/token" 2>/dev/null || echo "")
-
-          if [ -n "$HOMEBREW_TAP_TOKEN" ]; then
-            git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/terraphim/homebrew-terraphim.git"
-            git push origin main
-            echo "✅ Homebrew formulas updated successfully"
-          else
-            echo "⚠️  homebrew-tap-token not found in 1Password - skipping push"
-            echo "Ensure token exists at: op://TerraphimPlatform/homebrew-tap-token/token"
-          fi
-
-
+          gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY" --clobber

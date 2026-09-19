@@ -7,6 +7,8 @@ pub mod config;
 pub mod downloader;
 pub mod notification;
 pub mod platform;
+pub mod policy;
+pub mod r2;
 pub mod rollback;
 pub mod scheduler;
 pub mod signature;
@@ -19,8 +21,17 @@ use self_update::version::bump_is_greater;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
 use tempfile::NamedTempFile;
-use tracing::{error, info, warn};
+use tracing::{error, info};
+
+/// Timeout for the R2 manifest fetch.
+///
+/// Kept short so the documented GitHub fallback stays snappy when the R2
+/// bucket is unreachable. Mirrors the "only fall back if R2 is unreachable"
+/// contract.
+const R2_MANIFEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Represents the status of an update operation
 #[derive(Debug, Clone)]
@@ -39,6 +50,14 @@ pub enum UpdateStatus {
     },
     /// Update failed with error
     Failed(String),
+    /// The running binary is managed by a system package manager, so
+    /// Terraphim's self-updater is intentionally disabled.
+    PackageManaged {
+        /// Package manager responsible for this binary.
+        manager: policy::PackageManager,
+        /// Operator-facing update command.
+        update_command: String,
+    },
 }
 
 /// Compare two version strings to determine if the first is newer than the second
@@ -81,6 +100,17 @@ impl fmt::Display for UpdateStatus {
             UpdateStatus::Failed(error) => {
                 write!(f, "[ERROR] Update failed: {}", error)
             }
+            UpdateStatus::PackageManaged {
+                manager,
+                update_command,
+            } => {
+                write!(
+                    f,
+                    "[OK] Managed by {}; run `{}` to update",
+                    manager.name(),
+                    update_command
+                )
+            }
         }
     }
 }
@@ -98,17 +128,32 @@ pub struct UpdaterConfig {
     pub current_version: String,
     /// Whether to show download progress
     pub show_progress: bool,
+    /// Base URL of the R2 update bucket (manifest + binaries).
+    ///
+    /// Per the documented update contract (<https://terraphim.ai/releases/>)
+    /// the self-update backend is served from our R2 bucket with Ed25519
+    /// signature verification, and GitHub Releases is the fallback. The
+    /// manifest lives at `{r2_base_url}/{bin_name}/manifest.json`.
+    pub r2_base_url: String,
+    /// Whether to fall back to GitHub Releases when R2 is unreachable.
+    ///
+    /// Defaults to `true` to honour the documented contract. Set to `false`
+    /// (e.g. in air-gapped environments with a mirror) to fail hard on R2.
+    pub github_fallback: bool,
 }
 
 impl UpdaterConfig {
     /// Create a new updater config for Terraphim AI binaries
     pub fn new(bin_name: impl Into<String>) -> Self {
+        let bin_name = bin_name.into();
         Self {
-            bin_name: bin_name.into(),
+            bin_name,
             repo_owner: "terraphim".to_string(),
             repo_name: "terraphim-ai".to_string(),
             current_version: cargo_crate_version!().to_string(),
             show_progress: true,
+            r2_base_url: r2::DEFAULT_R2_BASE_URL.to_string(),
+            github_fallback: true,
         }
     }
 
@@ -123,70 +168,190 @@ impl UpdaterConfig {
         self.show_progress = show;
         self
     }
+
+    /// Override the R2 base URL (e.g. for staging mirrors or tests).
+    pub fn with_r2_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.r2_base_url = base_url.into();
+        self
+    }
+
+    /// Toggle GitHub Releases fallback when R2 is unreachable.
+    pub fn with_github_fallback(mut self, enabled: bool) -> Self {
+        self.github_fallback = enabled;
+        self
+    }
 }
+
+type PolicyDetector = Arc<dyn Fn() -> policy::UpdatePolicy + Send + Sync>;
 
 /// Updater client for Terraphim AI binaries
 pub struct TerraphimUpdater {
     config: UpdaterConfig,
+    policy_detector: PolicyDetector,
 }
 
 impl TerraphimUpdater {
     /// Create a new updater instance
     pub fn new(config: UpdaterConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            policy_detector: Arc::new(policy::detect_update_policy_default),
+        }
+    }
+
+    #[cfg(test)]
+    fn new_with_policy_detector(
+        config: UpdaterConfig,
+        detect_policy: impl Fn() -> policy::UpdatePolicy + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            config,
+            policy_detector: Arc::new(detect_policy),
+        }
+    }
+
+    // Keep the package-managed gate centralized in the update library:
+    // terraphim_server's CLI helpers construct `UpdaterConfig` and enter through
+    // these public updater/free-function paths, so a second main.rs-only gate
+    // would be redundant and easier for future call sites to bypass.
+    fn managed_status(&self) -> Option<UpdateStatus> {
+        Self::managed_status_with_detector(&self.policy_detector)
+    }
+
+    fn managed_status_with_detector(detect_policy: &PolicyDetector) -> Option<UpdateStatus> {
+        match detect_policy() {
+            policy::UpdatePolicy::PackageManaged {
+                manager,
+                update_command,
+            } => Some(UpdateStatus::PackageManaged {
+                manager,
+                update_command,
+            }),
+            policy::UpdatePolicy::SelfManaged => None,
+        }
     }
 
     /// Check if an update is available without installing
+    ///
+    /// Honours the documented update contract: consult the R2 manifest first
+    /// and only fall back to GitHub Releases when R2 is unreachable
+    /// (see [`UpdaterConfig::github_fallback`]).
     pub async fn check_update(&self) -> Result<UpdateStatus> {
+        if let Some(status) = self.managed_status() {
+            return Ok(status);
+        }
+
         info!(
             "Checking for updates: {} v{}",
             self.config.bin_name, self.config.current_version
         );
 
-        // Clone data for the blocking task
-        let repo_owner = self.config.repo_owner.clone();
-        let repo_name = self.config.repo_name.clone();
+        // Snapshot config for the blocking task.
         let bin_name = self.config.bin_name.clone();
         let current_version = self.config.current_version.clone();
+        let r2_base_url = self.config.r2_base_url.clone();
+        let github_fallback = self.config.github_fallback;
+        let repo_owner = self.config.repo_owner.clone();
+        let repo_name = self.config.repo_name.clone();
         let show_progress = self.config.show_progress;
+        let policy_detector = Arc::clone(&self.policy_detector);
 
-        // Move self_update operations to a blocking task to avoid runtime conflicts
         let result = tokio::task::spawn_blocking(move || {
-            // Normalize binary name for asset lookup (underscores to hyphens)
-            let bin_name_for_asset = bin_name.replace('_', "-");
+            if let Some(status) = Self::managed_status_with_detector(&policy_detector) {
+                return Ok::<UpdateStatus, anyhow::Error>(status);
+            }
 
-            // Check if update is available
-            let mut builder = self_update::backends::github::Update::configure();
-            builder.repo_owner(&repo_owner);
-            builder.repo_name(&repo_name);
-            builder.bin_name(&bin_name_for_asset); // Use hyphenated name for asset lookup
-            builder.current_version(&current_version);
-            builder.show_download_progress(show_progress);
+            // R2-first: if the signed manifest is reachable and authentic, it
+            // is authoritative. Unauthenticated bytes (missing/invalid
+            // detached signature) are a hard error and never reach version
+            // evaluation.
+            match r2::try_fetch_signed_manifest(&r2_base_url, &bin_name, R2_MANIFEST_TIMEOUT) {
+                Ok(manifest) => {
+                    return Self::evaluate_version(&manifest.release_version, &current_version);
+                }
+                Err(e) => {
+                    if !github_fallback {
+                        return Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Failed(format!(
+                            "R2 manifest unavailable and GitHub fallback disabled: {}",
+                            e
+                        )));
+                    }
+                    info!("Falling back to GitHub for update check");
+                }
+            }
 
-            // Set custom install path to preserve underscore naming
-            builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
+            // GitHub fallback (unchanged behaviour).
+            if let Some(status) = Self::managed_status_with_detector(&policy_detector) {
+                return Ok::<UpdateStatus, anyhow::Error>(status);
+            }
+            Self::check_via_github(
+                &repo_owner,
+                &repo_name,
+                &bin_name,
+                &current_version,
+                show_progress,
+                &policy_detector,
+            )
+        })
+        .await;
 
-            match builder.build() {
-                Ok(updater) => {
-                    // This will check without updating
-                    match updater.get_latest_release() {
-                        Ok(release) => {
-                            let latest_version = release.version.clone();
+        match result {
+            Ok(update_result) => match update_result {
+                Ok(status) => {
+                    Self::log_status(&status);
+                    Ok(status)
+                }
+                Err(e) => {
+                    error!("Blocking task failed: {}", e);
+                    Ok(UpdateStatus::Failed(format!("Blocking task error: {}", e)))
+                }
+            },
+            Err(e) => {
+                error!("Failed to spawn blocking task: {}", e);
+                Ok(UpdateStatus::Failed(format!("Task spawn error: {}", e)))
+            }
+        }
+    }
 
-                            // Compare versions using semver
-                            match is_newer_version_static(&latest_version, &current_version) {
-                                Ok(true) => {
-                                    Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Available {
-                                        current_version,
-                                        latest_version,
-                                    })
-                                }
-                                Ok(false) => Ok::<UpdateStatus, anyhow::Error>(
-                                    UpdateStatus::UpToDate(current_version),
-                                ),
-                                Err(e) => Err(e),
-                            }
-                        }
+    /// Compare a candidate version against the current version, producing an
+    /// [`UpdateStatus::Available`] / [`UpdateStatus::UpToDate`] result.
+    fn evaluate_version(latest_version: &str, current_version: &str) -> Result<UpdateStatus> {
+        match is_newer_version_static(latest_version, current_version) {
+            Ok(true) => Ok(UpdateStatus::Available {
+                current_version: current_version.to_string(),
+                latest_version: latest_version.to_string(),
+            }),
+            Ok(false) => Ok(UpdateStatus::UpToDate(current_version.to_string())),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Pure GitHub-Releases version check (the pre-R2 behaviour, now fallback).
+    fn check_via_github(
+        repo_owner: &str,
+        repo_name: &str,
+        bin_name: &str,
+        current_version: &str,
+        show_progress: bool,
+        policy_detector: &PolicyDetector,
+    ) -> Result<UpdateStatus> {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
+            return Ok(status);
+        }
+
+        let bin_name_for_asset = bin_name.replace('_', "-");
+
+        let mut builder = self_update::backends::github::Update::configure();
+        builder.repo_owner(repo_owner);
+        builder.repo_name(repo_name);
+        builder.bin_name(&bin_name_for_asset);
+        builder.current_version(current_version);
+        builder.show_download_progress(show_progress);
+        builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
+
+        match builder.build() {
+            Ok(updater) => match updater.get_latest_release() {
+                Ok(release) => Self::evaluate_version(&release.version, current_version),
                 Err(e) => {
                     let err_msg = e.to_string();
                     if err_msg.contains("403") {
@@ -198,79 +363,71 @@ impl TerraphimUpdater {
                         Ok(UpdateStatus::Failed(format!("Check failed: {}", err_msg)))
                     }
                 }
-                    }
-                }
-                Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
-            }
-        })
-        .await;
-
-        match result {
-            Ok(update_result) => {
-                match update_result {
-                    Ok(status) => {
-                        // Log the result for debugging
-                        match &status {
-                            UpdateStatus::Available {
-                                current_version,
-                                latest_version,
-                            } => {
-                                info!(
-                                    "Update available: {} -> {}",
-                                    current_version, latest_version
-                                );
-                            }
-                            UpdateStatus::UpToDate(version) => {
-                                info!("Already up to date: {}", version);
-                            }
-                            UpdateStatus::Updated {
-                                from_version,
-                                to_version,
-                            } => {
-                                info!(
-                                    "Successfully updated from {} to {}",
-                                    from_version, to_version
-                                );
-                            }
-                            UpdateStatus::Failed(error) => {
-                                error!("Update check failed: {}", error);
-                            }
-                        }
-                        Ok(status)
-                    }
-                    Err(e) => {
-                        error!("Blocking task failed: {}", e);
-                        Ok(UpdateStatus::Failed(format!("Blocking task error: {}", e)))
-                    }
-                }
-            }
-            Err(e) => {
-                error!("Failed to spawn blocking task: {}", e);
-                Ok(UpdateStatus::Failed(format!("Task spawn error: {}", e)))
-            }
+            },
+            Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
         }
     }
 
-    /// Update the binary to the latest version
+    /// Log a status for operational visibility (shared by all check paths).
+    fn log_status(status: &UpdateStatus) {
+        match status {
+            UpdateStatus::Available {
+                current_version,
+                latest_version,
+            } => info!(
+                "Update available: {} -> {}",
+                current_version, latest_version
+            ),
+            UpdateStatus::UpToDate(version) => info!("Already up to date: {}", version),
+            UpdateStatus::Updated {
+                from_version,
+                to_version,
+            } => info!(
+                "Successfully updated from {} to {}",
+                from_version, to_version
+            ),
+            UpdateStatus::Failed(error) => error!("Update check failed: {}", error),
+            UpdateStatus::PackageManaged {
+                manager,
+                update_command,
+            } => info!(
+                "Package-managed install ({}); run `{}` to update",
+                manager.name(),
+                update_command
+            ),
+        }
+    }
+
+    /// Update the binary to the latest version.
+    ///
+    /// Honours the documented update contract: download from R2 with Ed25519
+    /// verification when the manifest is reachable, falling back to GitHub
+    /// Releases otherwise (see [`UpdaterConfig::github_fallback`]).
     pub async fn update(&self) -> Result<UpdateStatus> {
+        if let Some(status) = self.managed_status() {
+            return Ok(status);
+        }
+
         info!(
             "Updating {} from version {}",
             self.config.bin_name, self.config.current_version
         );
 
-        // Clone data for the blocking task
-        let repo_owner = self.config.repo_owner.clone();
-        let repo_name = self.config.repo_name.clone();
+        // Snapshot config for the blocking task.
         let bin_name = self.config.bin_name.clone();
         let current_version = self.config.current_version.clone();
+        let r2_base_url = self.config.r2_base_url.clone();
+        let github_fallback = self.config.github_fallback;
+        let repo_owner = self.config.repo_owner.clone();
+        let repo_name = self.config.repo_name.clone();
         let show_progress = self.config.show_progress;
+        let policy_detector = Arc::clone(&self.policy_detector);
 
-        // Decode the embedded public key for signature verification
+        // Decode the embedded public key for signature verification (shared by
+        // both the R2 and GitHub paths).
         let key_bytes = base64::engine::general_purpose::STANDARD
             .decode(signature::get_embedded_public_key())
             .context("Failed to decode public key")?;
-
-        // Convert to array (must be exactly 32 bytes for Ed25519)
         if key_bytes.len() != 32 {
             return Err(anyhow!(
                 "Invalid public key length: {} bytes (expected 32)",
@@ -280,86 +437,244 @@ impl TerraphimUpdater {
         let mut key_array = [0u8; 32];
         key_array.copy_from_slice(&key_bytes);
 
-        // Move self_update operations to a blocking task to avoid runtime conflicts
         let result = tokio::task::spawn_blocking(move || {
-            // Normalize binary name for asset lookup (underscores to hyphens)
-            let bin_name_for_asset = bin_name.replace('_', "-");
-
-            // Build the updater with signature verification enabled
-            let mut builder = self_update::backends::github::Update::configure();
-            builder.repo_owner(&repo_owner);
-            builder.repo_name(&repo_name);
-            builder.bin_name(&bin_name_for_asset); // Use hyphenated name for asset lookup
-            builder.current_version(&current_version);
-            builder.show_download_progress(show_progress);
-            builder.verifying_keys(vec![key_array]); // Enable signature verification
-
-            // Set custom install path to preserve underscore naming
-            builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
-
-            match builder.build() {
-                Ok(updater) => match updater.update() {
-                    Ok(status) => match status {
-                        self_update::Status::UpToDate(version) => {
-                            Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::UpToDate(version))
-                        }
-                        self_update::Status::Updated(version) => {
-                            Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Updated {
-                                from_version: current_version,
-                                to_version: version,
-                            })
-                        }
-                    },
-                    Err(e) => Ok(UpdateStatus::Failed(format!("Update failed: {}", e))),
-                },
-                Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
+            if let Some(status) = Self::managed_status_with_detector(&policy_detector) {
+                return Ok::<UpdateStatus, anyhow::Error>(status);
             }
+
+            // R2-first: download + verify + install from the signed manifest.
+            match Self::update_via_r2(
+                &r2_base_url,
+                &repo_owner,
+                &repo_name,
+                &bin_name,
+                &current_version,
+                show_progress,
+                &policy_detector,
+            ) {
+                Ok(status) => return Ok::<UpdateStatus, anyhow::Error>(status),
+                Err(e) => {
+                    if !github_fallback {
+                        return Ok(UpdateStatus::Failed(format!(
+                            "R2 update unavailable and GitHub fallback disabled: {}",
+                            e
+                        )));
+                    }
+                    info!("R2 update unavailable, falling back to GitHub: {}", e);
+                }
+            }
+
+            // GitHub fallback (self_update, Ed25519 via verifying_keys).
+            if let Some(status) = Self::managed_status_with_detector(&policy_detector) {
+                return Ok::<UpdateStatus, anyhow::Error>(status);
+            }
+            Self::update_via_github(
+                &repo_owner,
+                &repo_name,
+                &bin_name,
+                &current_version,
+                show_progress,
+                key_array,
+                &policy_detector,
+            )
         })
         .await;
 
         match result {
-            Ok(update_result) => {
-                match update_result {
-                    Ok(status) => {
-                        // Log the result for debugging
-                        match &status {
-                            UpdateStatus::Updated {
-                                from_version,
-                                to_version,
-                            } => {
-                                info!(
-                                    "Successfully updated from {} to {}",
-                                    from_version, to_version
-                                );
-                            }
-                            UpdateStatus::UpToDate(version) => {
-                                info!("Already up to date: {}", version);
-                            }
-                            UpdateStatus::Available {
-                                current_version,
-                                latest_version,
-                            } => {
-                                info!(
-                                    "Update available: {} -> {}",
-                                    current_version, latest_version
-                                );
-                            }
-                            UpdateStatus::Failed(error) => {
-                                error!("Update failed: {}", error);
-                            }
-                        }
-                        Ok(status)
-                    }
-                    Err(e) => {
-                        error!("Blocking task failed: {}", e);
-                        Ok(UpdateStatus::Failed(format!("Blocking task error: {}", e)))
-                    }
+            Ok(update_result) => match update_result {
+                Ok(status) => {
+                    Self::log_status(&status);
+                    Ok(status)
                 }
-            }
+                Err(e) => {
+                    error!("Blocking task failed: {}", e);
+                    Ok(UpdateStatus::Failed(format!("Blocking task error: {}", e)))
+                }
+            },
             Err(e) => {
                 error!("Failed to spawn blocking task: {}", e);
                 Ok(UpdateStatus::Failed(format!("Task spawn error: {}", e)))
             }
+        }
+    }
+
+    /// R2-first update: fetch the *signed* canonical manifest, pick the exact
+    /// platform asset, download the payload from the immutable GitHub release
+    /// it names, verify payload SHA-256 and the embedded Ed25519 archive
+    /// signature, and install.
+    ///
+    /// Returns `Ok(UpdateStatus)` on a completed decision (including
+    /// `UpToDate` and `Failed`), and `Err` only when the R2 backend itself is
+    /// unreachable or unauthenticated — which signals the caller to fall back
+    /// to GitHub.
+    fn update_via_r2(
+        r2_base_url: &str,
+        repo_owner: &str,
+        repo_name: &str,
+        bin_name: &str,
+        current_version: &str,
+        show_progress: bool,
+        policy_detector: &PolicyDetector,
+    ) -> Result<UpdateStatus> {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
+            return Ok(status);
+        }
+
+        let manifest = r2::fetch_signed_manifest(r2_base_url, bin_name, R2_MANIFEST_TIMEOUT)?;
+
+        // No update available? Report UpToDate without touching the network again.
+        match is_newer_version_static(&manifest.release_version, current_version) {
+            Ok(true) => {}
+            Ok(false) => return Ok(UpdateStatus::UpToDate(current_version.to_string())),
+            Err(e) => {
+                return Ok(UpdateStatus::Failed(format!(
+                    "Version comparison failed: {}",
+                    e
+                )));
+            }
+        }
+
+        let targets = Self::get_target_triples_with_fallback()?;
+        // The manifest's component namespace uses the hyphenated binary name
+        // (terraphim-agent / terraphim-grep), matching GitHub asset naming.
+        let component = bin_name.replace('_', "-");
+        let asset = manifest.select_asset(&component, &targets).ok_or_else(|| {
+            anyhow!(
+                "signed R2 manifest for {} has no tar.gz asset for component {} matching any of {:?}",
+                bin_name,
+                component,
+                targets
+            )
+        })?;
+
+        // The download URL is constructed from trusted repository coordinates
+        // plus the authenticated tag and validated asset name — never taken
+        // verbatim from manifest content.
+        let download_url = r2::github_release_asset_url(
+            repo_owner,
+            repo_name,
+            &manifest.release_tag,
+            &asset.name,
+        )?;
+
+        info!(
+            "Downloading R2-designated update {} for {} from {}",
+            manifest.release_version, asset.target, download_url
+        );
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
+            return Ok(status);
+        }
+
+        let temp_archive = NamedTempFile::new()?;
+        let download_config = crate::downloader::DownloadConfig {
+            show_progress,
+            ..Default::default()
+        };
+        crate::downloader::download_with_retry(
+            &download_url,
+            temp_archive.path(),
+            Some(download_config),
+        )?;
+
+        let archive_path = temp_archive.path().to_path_buf();
+
+        // Exact payload integrity: the downloaded bytes must match the digest
+        // carried by the cryptographically authenticated manifest.
+        let archive_bytes = fs::read(&archive_path).context("Failed to read downloaded archive")?;
+        if let Err(e) = r2::verify_payload_sha256(&archive_bytes, &asset.sha256) {
+            return Ok(UpdateStatus::Failed(format!(
+                "R2 payload integrity check failed: {}",
+                e
+            )));
+        }
+
+        // Verify the Ed25519 signature before installing. Signed .tar.gz archives
+        // carry the signature embedded (zipsign); unsigned archives are rejected.
+        let verification = crate::signature::verify_archive_signature(&archive_path, None)?;
+        if let Some(status) = Self::gate_archive_verification(verification, "R2") {
+            return Ok(status);
+        }
+
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
+            return Ok(status);
+        }
+        match Self::install_verified_archive(&archive_path, bin_name) {
+            Ok(_) => Ok(UpdateStatus::Updated {
+                from_version: current_version.to_string(),
+                to_version: manifest.release_version,
+            }),
+            Err(e) => Ok(UpdateStatus::Failed(format!("R2 install failed: {}", e))),
+        }
+    }
+
+    /// Shared fail-closed gate for archive signature verification outcomes.
+    ///
+    /// Returns `None` only for a cryptographically valid archive (proceed to
+    /// install); every other outcome — invalid, missing signature, or
+    /// verifier error — yields `UpdateStatus::Failed`. Both the R2 path and
+    /// the manual GitHub verification path route through this gate so the
+    /// policy cannot drift between arms.
+    fn gate_archive_verification(
+        result: crate::signature::VerificationResult,
+        channel: &str,
+    ) -> Option<UpdateStatus> {
+        match result {
+            crate::signature::VerificationResult::Valid => {
+                info!("{} archive signature verified, installing", channel);
+                None
+            }
+            crate::signature::VerificationResult::Invalid { reason } => Some(UpdateStatus::Failed(
+                format!("{} archive signature invalid: {}", channel, reason),
+            )),
+            crate::signature::VerificationResult::MissingSignature => {
+                Some(UpdateStatus::Failed(format!(
+                    "{} archive has no embedded signature; unsigned archives are rejected (fail closed)",
+                    channel
+                )))
+            }
+            crate::signature::VerificationResult::Error(msg) => Some(UpdateStatus::Failed(
+                format!("{} signature verification error: {}", channel, msg),
+            )),
+        }
+    }
+
+    /// Pure GitHub-Releases update (the pre-R2 behaviour, now fallback).
+    fn update_via_github(
+        repo_owner: &str,
+        repo_name: &str,
+        bin_name: &str,
+        current_version: &str,
+        show_progress: bool,
+        key_array: [u8; 32],
+        policy_detector: &PolicyDetector,
+    ) -> Result<UpdateStatus> {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
+            return Ok(status);
+        }
+
+        let bin_name_for_asset = bin_name.replace('_', "-");
+
+        let mut builder = self_update::backends::github::Update::configure();
+        builder.repo_owner(repo_owner);
+        builder.repo_name(repo_name);
+        builder.bin_name(&bin_name_for_asset);
+        builder.current_version(current_version);
+        builder.show_download_progress(show_progress);
+        builder.verifying_keys(vec![key_array]); // Enable signature verification
+        builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
+
+        match builder.build() {
+            Ok(updater) => match updater.update() {
+                Ok(status) => match status {
+                    self_update::Status::UpToDate(version) => Ok(UpdateStatus::UpToDate(version)),
+                    self_update::Status::Updated(version) => Ok(UpdateStatus::Updated {
+                        from_version: current_version.to_string(),
+                        to_version: version,
+                    }),
+                },
+                Err(e) => Ok(UpdateStatus::Failed(format!("Update failed: {}", e))),
+            },
+            Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
         }
     }
 
@@ -383,6 +698,10 @@ impl TerraphimUpdater {
     /// - Rejects updates with missing signatures
     /// - Only installs verified binaries
     pub async fn update_with_verification(&self) -> Result<UpdateStatus> {
+        if let Some(status) = self.managed_status() {
+            return Ok(status);
+        }
+
         info!(
             "Updating {} from version {} with signature verification",
             self.config.bin_name, self.config.current_version
@@ -394,15 +713,21 @@ impl TerraphimUpdater {
         let bin_name = self.config.bin_name.clone();
         let current_version = self.config.current_version.clone();
         let show_progress = self.config.show_progress;
+        let policy_detector = Arc::clone(&self.policy_detector);
 
         // Move self_update operations to a blocking task
         let result = tokio::task::spawn_blocking(move || {
+            if let Some(status) = Self::managed_status_with_detector(&policy_detector) {
+                return Ok(status);
+            }
+
             Self::update_with_verification_blocking(
                 &repo_owner,
                 &repo_name,
                 &bin_name,
                 &current_version,
                 show_progress,
+                &policy_detector,
             )
         })
         .await;
@@ -424,6 +749,16 @@ impl TerraphimUpdater {
                     }
                     UpdateStatus::Failed(error) => {
                         error!("Update with verification failed: {}", error);
+                    }
+                    UpdateStatus::PackageManaged {
+                        manager,
+                        update_command,
+                    } => {
+                        info!(
+                            "Package-managed install ({}); run `{}` to update",
+                            manager.name(),
+                            update_command
+                        );
                     }
                     _ => {}
                 }
@@ -447,7 +782,12 @@ impl TerraphimUpdater {
         bin_name: &str,
         current_version: &str,
         show_progress: bool,
+        policy_detector: &PolicyDetector,
     ) -> Result<UpdateStatus> {
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
+            return Ok(status);
+        }
+
         info!(
             "Starting verified update flow for {} v{}",
             bin_name, current_version
@@ -466,6 +806,9 @@ impl TerraphimUpdater {
             };
 
         let latest_version = &release.version;
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
+            return Ok(status);
+        }
 
         // Step 2: Download archive to temp location
         let temp_archive = match Self::download_release_archive(
@@ -485,6 +828,9 @@ impl TerraphimUpdater {
         };
 
         let archive_path = temp_archive.path().to_path_buf();
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
+            return Ok(status);
+        }
 
         // Step 3: Verify signature BEFORE installation
         info!("Verifying signature for archive {:?}", archive_path);
@@ -498,25 +844,20 @@ impl TerraphimUpdater {
             crate::signature::VerificationResult::Valid => {
                 info!("Signature verification passed - proceeding with installation");
             }
-            crate::signature::VerificationResult::Invalid { reason } => {
-                let error_msg = format!("Signature verification failed: {}", reason);
-                error!("{}", error_msg);
-                return Ok(UpdateStatus::Failed(error_msg));
-            }
-            crate::signature::VerificationResult::MissingSignature => {
-                warn!(
-                    "No signature found in archive - proceeding without verification. \
-                       Archives will be signed in a future release."
-                );
-            }
-            crate::signature::VerificationResult::Error(msg) => {
-                let error_msg = format!("Verification error: {}", msg);
-                error!("{}", error_msg);
-                return Ok(UpdateStatus::Failed(error_msg));
+            other => {
+                // Fail closed through the shared gate: Invalid, MissingSignature
+                // and Error all reject the archive instead of installing it.
+                if let Some(status) = Self::gate_archive_verification(other, "GitHub") {
+                    error!("{:?}", status);
+                    return Ok(status);
+                }
             }
         }
 
         // Step 4: Install the verified archive
+        if let Some(status) = Self::managed_status_with_detector(policy_detector) {
+            return Ok(status);
+        }
         match Self::install_verified_archive(&archive_path, bin_name) {
             Ok(_) => {
                 info!("Successfully installed verified update");
@@ -951,12 +1292,33 @@ pub async fn update_binary_silent(bin_name: impl Into<String>) -> Result<UpdateS
 /// };
 /// ```
 pub async fn check_for_updates_auto(bin_name: &str, current_version: &str) -> Result<UpdateStatus> {
+    check_for_updates_auto_with_detector(
+        bin_name,
+        current_version,
+        Arc::new(policy::detect_update_policy_default),
+    )
+    .await
+}
+
+async fn check_for_updates_auto_with_detector(
+    bin_name: &str,
+    current_version: &str,
+    policy_detector: PolicyDetector,
+) -> Result<UpdateStatus> {
+    if let Some(status) = TerraphimUpdater::managed_status_with_detector(&policy_detector) {
+        return Ok(status);
+    }
+
     info!("Checking for updates: {} v{}", bin_name, current_version);
 
     let bin_name = bin_name.to_string();
     let current_version = current_version.to_string();
 
     let result = tokio::task::spawn_blocking(move || {
+        if let Some(status) = TerraphimUpdater::managed_status_with_detector(&policy_detector) {
+            return Ok::<UpdateStatus, anyhow::Error>(status);
+        }
+
         // Normalize binary name for asset lookup (underscores to hyphens)
         let bin_name_for_asset = bin_name.replace('_', "-");
 
@@ -1096,6 +1458,16 @@ pub async fn start_update_scheduler(
             }),
             UpdateStatus::UpToDate(_) => Ok(UpdateCheckResult::UpToDate),
             UpdateStatus::Failed(error) => Ok(UpdateCheckResult::Failed { error }),
+            UpdateStatus::PackageManaged {
+                manager,
+                update_command,
+            } => Ok(UpdateCheckResult::Failed {
+                error: format!(
+                    "Package-managed install ({}); run `{}` to update",
+                    manager.name(),
+                    update_command
+                ),
+            }),
             _ => Ok(UpdateCheckResult::UpToDate),
         }
     });
@@ -1219,7 +1591,210 @@ pub fn rollback(backup_path: &Path, target_path: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use std::io::Write;
-    use tempfile::NamedTempFile;
+    use tempfile::{NamedTempFile, TempDir};
+
+    const MANAGED_BIN_NAME: &str = "terraphim_server";
+    const POISON_R2_URL: &str = "not a usable update URL";
+
+    fn write_test_file(path: &Path, contents: &[u8]) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent dirs");
+        }
+        fs::write(path, contents).expect("write test file");
+    }
+
+    fn install_test_binary(root: &Path, bin_name: &str, receipt: Option<&[u8]>) -> PathBuf {
+        let prefix = root.join("usr");
+        let exe = prefix.join("bin").join(bin_name);
+        write_test_file(&exe, b"binary");
+        if let Some(contents) = receipt {
+            write_test_file(
+                &prefix
+                    .join("share/terraphim/package-manager.d")
+                    .join(bin_name),
+                contents,
+            );
+        }
+        exe
+    }
+
+    fn updater_for_executable(config: UpdaterConfig, exe: PathBuf) -> TerraphimUpdater {
+        TerraphimUpdater::new_with_policy_detector(config, move || {
+            policy::detect_update_policy(&exe)
+        })
+    }
+
+    fn package_managed_updater(config: UpdaterConfig) -> (TempDir, TerraphimUpdater) {
+        let root = tempfile::tempdir().expect("tempdir");
+        let exe = install_test_binary(root.path(), MANAGED_BIN_NAME, Some(b"dpkg\n"));
+        let updater = updater_for_executable(config, exe);
+        (root, updater)
+    }
+
+    fn install_destination_candidates(bin_name: &str) -> Vec<PathBuf> {
+        let dir = std::env::current_exe()
+            .expect("current_exe")
+            .parent()
+            .expect("parent")
+            .to_path_buf();
+        vec![dir.join(bin_name), dir.join(bin_name.replace('_', "-"))]
+    }
+
+    fn assert_package_managed(status: UpdateStatus) {
+        assert!(
+            matches!(status, UpdateStatus::PackageManaged { .. }),
+            "expected PackageManaged, got {status:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn package_managed_check_update_makes_zero_requests() {
+        let config = UpdaterConfig::new(MANAGED_BIN_NAME)
+            .with_r2_base_url(POISON_R2_URL)
+            .with_github_fallback(false);
+        let (_root, updater) = package_managed_updater(config);
+
+        let status = updater.check_update().await.expect("check_update");
+
+        assert_package_managed(status);
+    }
+
+    #[tokio::test]
+    async fn alias_receipt_uses_normal_self_managed_check_behavior() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let exe = install_test_binary(root.path(), "terraphim-server", Some(b"rpm\n"));
+        let config = UpdaterConfig::new(MANAGED_BIN_NAME)
+            .with_r2_base_url(POISON_R2_URL)
+            .with_github_fallback(false);
+        let updater = updater_for_executable(config, exe);
+
+        let status = updater.check_update().await.expect("check_update");
+
+        assert!(
+            matches!(status, UpdateStatus::Failed(_)),
+            "alias receipt must not short-circuit SelfManaged behavior, got {status:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn package_managed_update_makes_zero_requests_and_zero_writes() {
+        let bin_name = format!("{MANAGED_BIN_NAME}_managed_update_{}", std::process::id());
+        let destinations = install_destination_candidates(&bin_name);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "precondition: {destination:?} must not exist"
+            );
+        }
+        let config = UpdaterConfig::new(&bin_name)
+            .with_r2_base_url(POISON_R2_URL)
+            .with_github_fallback(false);
+        let (_root, updater) = package_managed_updater(config);
+
+        let status = updater.update().await.expect("update");
+
+        assert_package_managed(status);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "update must not write {destination:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn package_managed_check_and_update_makes_zero_requests_and_zero_writes() {
+        let bin_name = format!("{MANAGED_BIN_NAME}_managed_full_{}", std::process::id());
+        let destinations = install_destination_candidates(&bin_name);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "precondition: {destination:?} must not exist"
+            );
+        }
+        let config = UpdaterConfig::new(&bin_name)
+            .with_r2_base_url(POISON_R2_URL)
+            .with_github_fallback(false);
+        let (_root, updater) = package_managed_updater(config);
+
+        let status = updater.check_and_update().await.expect("check_and_update");
+
+        assert_package_managed(status);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "check_and_update must not write {destination:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn stale_self_managed_result_is_redetected_before_request() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let exe = install_test_binary(root.path(), MANAGED_BIN_NAME, None);
+        let config = UpdaterConfig::new(MANAGED_BIN_NAME)
+            .with_r2_base_url(POISON_R2_URL)
+            .with_github_fallback(false);
+        let updater = updater_for_executable(config, exe);
+        assert!(updater.managed_status().is_none());
+        write_test_file(
+            &root
+                .path()
+                .join("usr/share/terraphim/package-manager.d")
+                .join(MANAGED_BIN_NAME),
+            b"rpm\n",
+        );
+
+        let status = updater.check_update().await.expect("check_update");
+
+        assert_package_managed(status);
+    }
+
+    #[tokio::test]
+    async fn package_managed_update_with_verification_makes_zero_writes() {
+        let bin_name = format!("{MANAGED_BIN_NAME}_verify_{}", std::process::id());
+        let destinations = install_destination_candidates(&bin_name);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "precondition: {destination:?} must not exist"
+            );
+        }
+        let config = UpdaterConfig::new(&bin_name);
+        let (_root, updater) = package_managed_updater(config);
+
+        let status =
+            tokio::time::timeout(Duration::from_secs(5), updater.update_with_verification())
+                .await
+                .expect("update_with_verification must short-circuit")
+                .expect("update_with_verification");
+
+        assert_package_managed(status);
+        for destination in &destinations {
+            assert!(
+                !destination.exists(),
+                "update_with_verification must not write {destination:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn startup_auto_check_with_managed_detector_short_circuits() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let exe = install_test_binary(root.path(), MANAGED_BIN_NAME, Some(b"homebrew\n"));
+        let detector: PolicyDetector =
+            Arc::new(move || policy::detect_update_policy(exe.as_path()));
+
+        let status = tokio::time::timeout(
+            Duration::from_secs(5),
+            check_for_updates_auto_with_detector(MANAGED_BIN_NAME, "0.0.1", detector),
+        )
+        .await
+        .expect("startup check must short-circuit")
+        .expect("startup check");
+
+        assert_package_managed(status);
+    }
 
     #[test]
     fn test_version_comparison() {
@@ -1416,6 +1991,62 @@ mod tests {
 
         let failed = UpdateStatus::Failed("test error".to_string());
         assert!(failed.to_string().contains("test error"));
+    }
+
+    // ------------------------------------------------------------------
+    // P2-4 RED: both archive-verification arms must fail closed.
+    //
+    // `MissingSignature` (and any non-Valid result) must produce
+    // `UpdateStatus::Failed`; only a cryptographically valid archive may
+    // proceed to install. A single shared gate keeps the R2 and GitHub
+    // manual-verification arms coherent.
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_archive_verification_gate_valid_proceeds() {
+        let gate = TerraphimUpdater::gate_archive_verification(
+            crate::signature::VerificationResult::Valid,
+            "test",
+        );
+        assert!(gate.is_none(), "valid signatures must proceed to install");
+    }
+
+    #[test]
+    fn test_archive_verification_gate_missing_signature_fails_closed() {
+        let gate = TerraphimUpdater::gate_archive_verification(
+            crate::signature::VerificationResult::MissingSignature,
+            "test",
+        );
+        match gate {
+            Some(UpdateStatus::Failed(msg)) => {
+                assert!(
+                    msg.to_lowercase().contains("signature"),
+                    "failure must mention the signature: {}",
+                    msg
+                );
+            }
+            other => panic!("MissingSignature must fail closed, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_archive_verification_gate_invalid_fails_closed() {
+        let gate = TerraphimUpdater::gate_archive_verification(
+            crate::signature::VerificationResult::Invalid {
+                reason: "bad".to_string(),
+            },
+            "test",
+        );
+        assert!(matches!(gate, Some(UpdateStatus::Failed(_))));
+    }
+
+    #[test]
+    fn test_archive_verification_gate_error_fails_closed() {
+        let gate = TerraphimUpdater::gate_archive_verification(
+            crate::signature::VerificationResult::Error("boom".to_string()),
+            "test",
+        );
+        assert!(matches!(gate, Some(UpdateStatus::Failed(_))));
     }
 
     #[test]

@@ -1,0 +1,960 @@
+name: Release Coordinator
+
+# Central release coordinator (Gitea issue terraphim/terraphim-ai#3336).
+#
+# This workflow owns the single lifecycle for a release:
+#
+#   plan -> source landing -> sign/package production -> CI verify ->
+#     [approval] -> release creation -> publication -> verification ->
+#     handoff-downstream -> dispatch acceptance -> terminal proof verification
+#
+# It never builds anything: it only stages already-downloaded, immutable
+# producer artifacts (from the exact terraphim-ai and terraphim-clients
+# workflow runs frozen at plan time), embeds a real Ed25519 signature
+# (zipsign) into each staged asset that requires one, verifies them against
+# .release/release-manifest.schema.json plus business invariants and the
+# embedded signature, and gates every central mutation (GitHub release, R2
+# stable manifest) on an explicit approval value bound to the verified
+# manifest SHA-256 digest -- which is computed over the *signed* bytes, so
+# approval binds exactly what gets published. Downstream channels
+# (Homebrew/AUR/Omarchy) are only dispatched after BOTH central channels
+# have recorded a success outcome, and each dispatch outcome is recorded
+# honestly (never fabricated) even when a target repo/token is absent.
+#
+# Default (promote=false) is a rehearsal: plan + stage + sign + verify only.
+# This performs zero central or downstream mutation, matching issue #3382's
+# pre-approval rehearsal / clean-abort contract. Re-running this workflow
+# with the same inputs is idempotent: staged asset bytes are content
+# addressed and never overwritten, so a partial failure (e.g. one central
+# channel succeeds and the other fails transiently) can be resumed by
+# re-running with promote=true and resume_run_id=<the failed run> without
+# rebuilding or re-staging anything -- resume detects a status of
+# 'promoting' or later and skips straight past plan/stage/sign/verify to
+# reuse the already-frozen manifest digest.
+#
+# For standard vX.Y.Z releases this workflow is the only publisher.
+# release-comprehensive.yml produces durable CI artifacts and managed
+# packages but is explicitly barred from creating the release or updating
+# Homebrew; release-sign.yml is verification-only.  A coordinator-owned
+# draft is reconciled to the exact approved inventory and remains invisible
+# until every byte verifies.  Publication and terminal verification are
+# recorded as separate durable events before R2's stable manifest is touched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version without v prefix, e.g. 1.2.3'
+        required: true
+        type: string
+      release_tag:
+        description: 'Release tag, e.g. v1.2.3 (must equal v<release_version>)'
+        required: true
+        type: string
+      terraphim_ai_run_id:
+        description: 'Completed terraphim-ai producer workflow run ID to stage artifacts from'
+        required: true
+        type: string
+      terraphim_ai_sha:
+        description: 'Frozen terraphim-ai source commit SHA (must match release_tag peel)'
+        required: true
+        type: string
+      terraphim_ai_tree_sha:
+        description: 'Frozen terraphim-ai tree SHA'
+        required: true
+        type: string
+      terraphim_clients_run_id:
+        description: 'Completed terraphim-clients producer workflow run ID to stage artifacts from'
+        required: true
+        type: string
+      terraphim_clients_sha:
+        description: 'Frozen terraphim-clients source commit SHA (must match release_tag peel)'
+        required: true
+        type: string
+      terraphim_clients_tree_sha:
+        description: 'Frozen terraphim-clients tree SHA'
+        required: true
+        type: string
+      manifest_artifact_name:
+        description: >-
+          Name of a workflow artifact (uploaded out of band by operator
+          tooling before dispatch) containing the candidate manifest.json
+          describing the two producer artifact directories above.
+        required: true
+        type: string
+      manifest_run_id:
+        description: 'Workflow run ID that manifest_artifact_name was uploaded from (operator tooling run, not this run)'
+        required: true
+        type: string
+      resume_run_id:
+        description: 'Optional: prior release-coordinator run ID to resume staged/verified/promoting state from'
+        required: false
+        default: ''
+        type: string
+      promote:
+        description: 'Perform central promotion. false (default) = rehearsal only: plan+stage+sign+verify, zero mutation.'
+        required: false
+        default: false
+        type: boolean
+      approval:
+        description: 'Approval value; must exactly equal the verified manifest SHA-256 digest to authorize promotion.'
+        required: false
+        default: ''
+        type: string
+      r2_bucket:
+        description: 'R2 bucket to publish the stable manifest to (required when promote=true)'
+        required: false
+        default: ''
+        type: string
+      aur_target_repo:
+        description: 'owner/repo to dispatch the AUR downstream channel to (empty = fail closed, no dispatch)'
+        required: false
+        default: ''
+        type: string
+      omarchy_target_repo:
+        description: 'owner/repo to dispatch the Omarchy downstream channel to (empty = fail closed, no dispatch)'
+        required: false
+        default: ''
+        type: string
+      homebrew_proof_run_id:
+        description: 'Optional downstream run ID containing the correlated Homebrew terminal proof artifact'
+        required: false
+        default: ''
+        type: string
+      aur_proof_run_id:
+        description: 'Optional downstream run ID containing the correlated AUR terminal proof artifact'
+        required: false
+        default: ''
+        type: string
+      omarchy_proof_run_id:
+        description: 'Optional downstream run ID containing the correlated Omarchy terminal proof artifact'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-coordinator-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+env:
+  COORDINATOR: .github/scripts/release/release_coordinator.py
+  STATE_DIR: release-coordinator-state
+  HOMEBREW_TAP_REPO: terraphim/homebrew-terraphim
+
+jobs:
+  plan-stage-verify:
+    name: Plan, stage, sign, verify (rehearsal-safe -- zero central/downstream mutation)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      manifest_sha256: ${{ steps.resolve_digest.outputs.manifest_sha256 }}
+    steps:
+      - name: Checkout coordinator tooling
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Install manifest validator dependencies
+        run: python3 -m pip install --require-hashes -r scripts/requirements-release-manifest.txt
+
+      - name: Install zipsign
+        run: |
+          set -euo pipefail
+          cargo install zipsign@0.2.1 --locked
+          zipsign --version
+
+      - name: Validate workflow inputs (fail closed on malformed values)
+        id: validate
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          TERRAPHIM_AI_SHA: ${{ inputs.terraphim_ai_sha }}
+          TERRAPHIM_AI_TREE_SHA: ${{ inputs.terraphim_ai_tree_sha }}
+          TERRAPHIM_AI_RUN_ID: ${{ inputs.terraphim_ai_run_id }}
+          TERRAPHIM_CLIENTS_SHA: ${{ inputs.terraphim_clients_sha }}
+          TERRAPHIM_CLIENTS_TREE_SHA: ${{ inputs.terraphim_clients_tree_sha }}
+          TERRAPHIM_CLIENTS_RUN_ID: ${{ inputs.terraphim_clients_run_id }}
+          MANIFEST_ARTIFACT_NAME: ${{ inputs.manifest_artifact_name }}
+          MANIFEST_RUN_ID: ${{ inputs.manifest_run_id }}
+          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]] || fail "invalid release_version: $RELEASE_VERSION"
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "invalid release_tag (expected vX.Y.Z): $RELEASE_TAG"
+          [[ "$TERRAPHIM_AI_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "invalid terraphim_ai_sha (expected 40 lowercase hex): $TERRAPHIM_AI_SHA"
+          [[ "$TERRAPHIM_AI_TREE_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "invalid terraphim_ai_tree_sha (expected 40 lowercase hex): $TERRAPHIM_AI_TREE_SHA"
+          [[ "$TERRAPHIM_AI_RUN_ID" =~ ^[0-9]+$ ]] || fail "invalid terraphim_ai_run_id (expected digits): $TERRAPHIM_AI_RUN_ID"
+          [[ "$TERRAPHIM_CLIENTS_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "invalid terraphim_clients_sha (expected 40 lowercase hex): $TERRAPHIM_CLIENTS_SHA"
+          [[ "$TERRAPHIM_CLIENTS_TREE_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "invalid terraphim_clients_tree_sha (expected 40 lowercase hex): $TERRAPHIM_CLIENTS_TREE_SHA"
+          [[ "$TERRAPHIM_CLIENTS_RUN_ID" =~ ^[0-9]+$ ]] || fail "invalid terraphim_clients_run_id (expected digits): $TERRAPHIM_CLIENTS_RUN_ID"
+          [[ "$MANIFEST_ARTIFACT_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || fail "invalid manifest_artifact_name (expected [A-Za-z0-9._-]+): $MANIFEST_ARTIFACT_NAME"
+          [[ "$MANIFEST_RUN_ID" =~ ^[0-9]+$ ]] || fail "invalid manifest_run_id (expected digits): $MANIFEST_RUN_ID"
+          [[ -z "$RESUME_RUN_ID" || "$RESUME_RUN_ID" =~ ^[0-9]+$ ]] || fail "invalid resume_run_id (expected empty or digits): $RESUME_RUN_ID"
+          echo "all plan-stage-verify inputs are well-formed"
+
+      - name: Resolve and verify immutable release tag peel (terraphim-ai)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          EXPECTED_SHA: ${{ inputs.terraphim_ai_sha }}
+        run: |
+          set -euo pipefail
+          OBJECT_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
+          OBJECT_SHA="$(jq -r '.object.sha' <<<"$OBJECT_JSON")"
+          OBJECT_TYPE="$(jq -r '.object.type' <<<"$OBJECT_JSON")"
+          while [[ "$OBJECT_TYPE" == "tag" ]]; do
+            TAG_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${OBJECT_SHA}")"
+            OBJECT_SHA="$(jq -r '.object.sha' <<<"$TAG_JSON")"
+            OBJECT_TYPE="$(jq -r '.object.type' <<<"$TAG_JSON")"
+          done
+          if [[ "$OBJECT_TYPE" != "commit" || "$OBJECT_SHA" != "$EXPECTED_SHA" ]]; then
+            echo "::error::Immutable tag contract violated: '$RELEASE_TAG' peels to '$OBJECT_SHA' ($OBJECT_TYPE), expected commit '$EXPECTED_SHA'"
+            exit 1
+          fi
+
+      - name: Resolve and verify immutable release tag peel (terraphim-clients)
+        env:
+          GH_TOKEN: ${{ secrets.TERRAPHIM_ORG_GITHUB_TOKEN || secrets.CLIENTS_REPO_TOKEN || github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          EXPECTED_SHA: ${{ inputs.terraphim_clients_sha }}
+        run: |
+          set -euo pipefail
+          OBJECT_JSON="$(gh api "repos/terraphim/terraphim-clients/git/ref/tags/${RELEASE_TAG}")"
+          OBJECT_SHA="$(jq -r '.object.sha' <<<"$OBJECT_JSON")"
+          OBJECT_TYPE="$(jq -r '.object.type' <<<"$OBJECT_JSON")"
+          while [[ "$OBJECT_TYPE" == "tag" ]]; do
+            TAG_JSON="$(gh api "repos/terraphim/terraphim-clients/git/tags/${OBJECT_SHA}")"
+            OBJECT_SHA="$(jq -r '.object.sha' <<<"$TAG_JSON")"
+            OBJECT_TYPE="$(jq -r '.object.type' <<<"$TAG_JSON")"
+          done
+          if [[ "$OBJECT_TYPE" != "commit" || "$OBJECT_SHA" != "$EXPECTED_SHA" ]]; then
+            echo "::error::Immutable tag contract violated: terraphim-clients '$RELEASE_TAG' peels to '$OBJECT_SHA' ($OBJECT_TYPE), expected commit '$EXPECTED_SHA'"
+            exit 1
+          fi
+
+      - name: Resume prior coordinator state (optional)
+        if: inputs.resume_run_id != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-coordinator-state-${{ inputs.release_tag }}
+          path: ${{ env.STATE_DIR }}
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
+
+      - name: Determine resume mode
+        id: resume_mode
+        run: |
+          set -euo pipefail
+          if [[ -f "$STATE_DIR/state.json" ]]; then
+            status="$(python3 -c "import json;print(json.load(open('$STATE_DIR/state.json'))['status'])")"
+          else
+            status="none"
+          fi
+          echo "Resumed status: $status"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          case "$status" in
+            verified|promoting|promoted)
+              echo "skip_stage_verify=true" >> "$GITHUB_OUTPUT"
+              ;;
+            failed|superseded)
+              echo "::error::cannot resume terminal coordinator status: $status"
+              exit 1
+              ;;
+            *)
+              echo "skip_stage_verify=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Write frozen sources
+        if: steps.resume_mode.outputs.skip_stage_verify != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/coordinator-inputs"
+          python3 - <<'PYEOF'
+          import json, os
+          sources = {
+              "terraphim-ai": {
+                  "gitea_sha": os.environ["TERRAPHIM_AI_SHA"],
+                  "github_sha": os.environ["TERRAPHIM_AI_SHA"],
+                  "tree_sha": os.environ["TERRAPHIM_AI_TREE_SHA"],
+                  "workflow_run_id": int(os.environ["TERRAPHIM_AI_RUN_ID"]),
+              },
+              "terraphim-clients": {
+                  "gitea_sha": os.environ["TERRAPHIM_CLIENTS_SHA"],
+                  "github_sha": os.environ["TERRAPHIM_CLIENTS_SHA"],
+                  "tree_sha": os.environ["TERRAPHIM_CLIENTS_TREE_SHA"],
+                  "workflow_run_id": int(os.environ["TERRAPHIM_CLIENTS_RUN_ID"]),
+              },
+          }
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "coordinator-inputs", "sources.json"), "w") as fh:
+              json.dump(sources, fh, indent=2)
+          PYEOF
+        env:
+          TERRAPHIM_AI_SHA: ${{ inputs.terraphim_ai_sha }}
+          TERRAPHIM_AI_TREE_SHA: ${{ inputs.terraphim_ai_tree_sha }}
+          TERRAPHIM_AI_RUN_ID: ${{ inputs.terraphim_ai_run_id }}
+          TERRAPHIM_CLIENTS_SHA: ${{ inputs.terraphim_clients_sha }}
+          TERRAPHIM_CLIENTS_TREE_SHA: ${{ inputs.terraphim_clients_tree_sha }}
+          TERRAPHIM_CLIENTS_RUN_ID: ${{ inputs.terraphim_clients_run_id }}
+
+      - name: Coordinator plan (freeze version/tag/sources)
+        id: plan
+        if: steps.resume_mode.outputs.skip_stage_verify != 'true'
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          python3 "$COORDINATOR" plan \
+            --state-dir "$STATE_DIR" \
+            --release-version "$RELEASE_VERSION" \
+            --release-tag "$RELEASE_TAG" \
+            --sources-file "$RUNNER_TEMP/coordinator-inputs/sources.json" \
+            | tee "$RUNNER_TEMP/plan.json"
+          echo "generation=$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/plan.json'))['generation'])")" >> "$GITHUB_OUTPUT"
+
+      - name: Download terraphim-ai producer artifacts (immutable, already built)
+        if: steps.resume_mode.outputs.skip_stage_verify != 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.terraphim_ai_run_id }}
+          path: ${{ runner.temp }}/producer-artifacts/terraphim-ai
+          merge-multiple: true
+
+      - name: Download terraphim-clients producer artifacts (immutable, already built)
+        if: steps.resume_mode.outputs.skip_stage_verify != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.TERRAPHIM_ORG_GITHUB_TOKEN || secrets.CLIENTS_REPO_TOKEN || github.token }}
+          TERRAPHIM_CLIENTS_RUN_ID: ${{ inputs.terraphim_clients_run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/producer-artifacts/terraphim-clients"
+          gh run download "$TERRAPHIM_CLIENTS_RUN_ID" \
+            --repo terraphim/terraphim-clients \
+            --dir "$RUNNER_TEMP/producer-artifacts/terraphim-clients"
+          # gh run download nests each named artifact in its own directory;
+          # stage expects a single flat directory of files.
+          find "$RUNNER_TEMP/producer-artifacts/terraphim-clients" -mindepth 2 -type f -exec mv -t "$RUNNER_TEMP/producer-artifacts/terraphim-clients" {} +
+          find "$RUNNER_TEMP/producer-artifacts/terraphim-clients" -mindepth 1 -type d -empty -delete
+
+      - name: Download candidate manifest
+        if: steps.resume_mode.outputs.skip_stage_verify != 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ inputs.manifest_artifact_name }}
+          path: ${{ runner.temp }}/manifest
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.manifest_run_id }}
+
+      - name: Coordinator stage (terraphim-ai artifacts, no rebuild)
+        id: stage_ai
+        if: steps.resume_mode.outputs.skip_stage_verify != 'true'
+        env:
+          PLAN_GENERATION: ${{ steps.plan.outputs.generation }}
+        run: |
+          set -euo pipefail
+          python3 "$COORDINATOR" stage \
+            --state-dir "$STATE_DIR" \
+            --manifest "$RUNNER_TEMP/manifest/manifest.json" \
+            --artifact-dir "$RUNNER_TEMP/producer-artifacts/terraphim-ai" \
+            --source-repo terraphim-ai \
+            --expected-generation "$PLAN_GENERATION" \
+            | tee "$RUNNER_TEMP/stage_ai.json"
+          echo "generation=$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/stage_ai.json'))['generation'])")" >> "$GITHUB_OUTPUT"
+
+      - name: Coordinator stage (terraphim-clients artifacts, no rebuild)
+        id: stage_clients
+        if: steps.resume_mode.outputs.skip_stage_verify != 'true'
+        env:
+          STAGE_AI_GENERATION: ${{ steps.stage_ai.outputs.generation }}
+        run: |
+          set -euo pipefail
+          python3 "$COORDINATOR" stage \
+            --state-dir "$STATE_DIR" \
+            --manifest "$RUNNER_TEMP/manifest/manifest.json" \
+            --artifact-dir "$RUNNER_TEMP/producer-artifacts/terraphim-clients" \
+            --source-repo terraphim-clients \
+            --expected-generation "$STAGE_AI_GENERATION" \
+            | tee "$RUNNER_TEMP/stage_clients.json"
+          echo "generation=$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/stage_clients.json'))['generation'])")" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch zipsign signing key
+        id: signing_key
+        if: steps.resume_mode.outputs.skip_stage_verify != 'true'
+        env:
+          ZIPSIGN_PRIVATE_KEY: ${{ secrets.ZIPSIGN_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$ZIPSIGN_PRIVATE_KEY" ]]; then
+            echo "::error::ZIPSIGN_PRIVATE_KEY secret is not set; failing closed (no unsigned assets may be verified/published)"
+            exit 1
+          fi
+          KEY_FILE="$RUNNER_TEMP/zipsign-private.key"
+          umask 077
+          printf '%s' "$ZIPSIGN_PRIVATE_KEY" > "$KEY_FILE"
+          echo "key_file=$KEY_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Coordinator sign-assets (real zipsign Ed25519 signature)
+        id: sign
+        if: steps.resume_mode.outputs.skip_stage_verify != 'true'
+        env:
+          SIGNING_KEY_FILE: ${{ steps.signing_key.outputs.key_file }}
+          STAGE_CLIENTS_GENERATION: ${{ steps.stage_clients.outputs.generation }}
+        run: |
+          set -euo pipefail
+          python3 "$COORDINATOR" sign-assets \
+            --state-dir "$STATE_DIR" \
+            --private-key-file "$SIGNING_KEY_FILE" \
+            --expected-generation "$STAGE_CLIENTS_GENERATION" \
+            | tee "$RUNNER_TEMP/sign.json"
+          echo "generation=$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/sign.json'))['generation'])")" >> "$GITHUB_OUTPUT"
+
+      - name: Coordinator verify (schema + business invariants + signature + digest freeze)
+        id: verify
+        if: steps.resume_mode.outputs.skip_stage_verify != 'true'
+        env:
+          SIGNING_KEY_FILE: ${{ steps.signing_key.outputs.key_file }}
+          SIGN_GENERATION: ${{ steps.sign.outputs.generation }}
+        run: |
+          set -euo pipefail
+          python3 "$COORDINATOR" verify \
+            --state-dir "$STATE_DIR" \
+            --private-key-file "$SIGNING_KEY_FILE" \
+            --expected-generation "$SIGN_GENERATION" \
+            | tee "$RUNNER_TEMP/verify.json"
+
+      - name: Resolve frozen manifest digest (resume-safe)
+        id: resolve_digest
+        env:
+          SKIP_STAGE_VERIFY: ${{ steps.resume_mode.outputs.skip_stage_verify }}
+          RESUMED_STATUS: ${{ steps.resume_mode.outputs.status }}
+        run: |
+          set -euo pipefail
+          if [[ "$SKIP_STAGE_VERIFY" == "true" ]]; then
+            digest="$(python3 -c "import json;print(json.load(open('$STATE_DIR/state.json'))['manifest_sha256'])")"
+            echo "Resuming from status '${RESUMED_STATUS}'; reusing frozen manifest_sha256 without re-staging or re-verifying."
+          else
+            digest="$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/verify.json'))['manifest_sha256'])")"
+          fi
+          echo "manifest_sha256=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload frozen coordinator state (rehearsal artifact)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-coordinator-state-${{ inputs.release_tag }}
+          path: ${{ env.STATE_DIR }}
+          include-hidden-files: true
+          retention-days: 90
+          overwrite: true
+
+      - name: Rehearsal summary
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          MANIFEST_SHA256: ${{ steps.resolve_digest.outputs.manifest_sha256 }}
+        run: |
+          {
+            echo "### Release Coordinator: rehearsal complete"
+            echo ""
+            echo "- release_tag: \`${RELEASE_TAG}\`"
+            echo "- manifest_sha256: \`${MANIFEST_SHA256}\`"
+            echo ""
+            echo "No central or downstream mutation has occurred. To promote, re-run this workflow with \`promote=true\` and \`approval=<manifest_sha256 above>\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  central-promote:
+    name: Central promotion (github_release + r2_stable_manifest) -- approval-gated
+    needs: plan-stage-verify
+    if: inputs.promote == true
+    runs-on: ubuntu-latest
+    environment: release-promotion
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout coordinator tooling
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Install manifest validator dependencies
+        run: python3 -m pip install --require-hashes -r scripts/requirements-release-manifest.txt
+
+      - name: Install pinned zipsign
+        run: |
+          set -euo pipefail
+          cargo install zipsign@0.2.1 --locked
+          zipsign --version
+
+      - name: Validate workflow inputs (fail closed on malformed values)
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          APPROVAL: ${{ inputs.approval }}
+          R2_BUCKET: ${{ inputs.r2_bucket }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "invalid release_tag (expected vX.Y.Z): $RELEASE_TAG"
+          [[ "$APPROVAL" =~ ^[0-9a-f]{64}$ ]] || fail "invalid approval (expected 64 lowercase hex chars): $APPROVAL"
+          [[ -n "$R2_BUCKET" ]] || fail "r2_bucket is required when promote=true"
+          echo "all central-promote inputs are well-formed"
+
+      - name: Download frozen coordinator state
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-coordinator-state-${{ inputs.release_tag }}
+          path: ${{ env.STATE_DIR }}
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+
+      - name: Inspect central resume status
+        id: central_state
+        run: |
+          set -euo pipefail
+          status="$(python3 -c "import json; print(json.load(open('$STATE_DIR/state.json'))['status'])")"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Derive manifest verifying key
+        env:
+          ZIPSIGN_PRIVATE_KEY: ${{ secrets.ZIPSIGN_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          [[ -n "$ZIPSIGN_PRIVATE_KEY" ]] || { echo "::error::ZIPSIGN_PRIVATE_KEY is required"; exit 1; }
+          private_key="$RUNNER_TEMP/zipsign-private.key"
+          verifying_key="$RUNNER_TEMP/zipsign-verifying.key"
+          umask 077
+          printf '%s' "$ZIPSIGN_PRIVATE_KEY" > "$private_key"
+          zipsign gen-key --extract -f "$private_key" "$verifying_key"
+          echo "VERIFYING_KEY_FILE=$verifying_key" >> "$GITHUB_ENV"
+
+      - name: Record approval bound to verified manifest digest
+        id: approve
+        if: steps.central_state.outputs.status != 'promoted'
+        env:
+          APPROVED_BY: ${{ github.actor }}
+          APPROVAL: ${{ inputs.approval }}
+        run: |
+          set -euo pipefail
+          python3 "$COORDINATOR" approve \
+            --state-dir "$STATE_DIR" \
+            --approved-by "$APPROVED_BY" \
+            --manifest-sha256 "$APPROVAL" \
+            | tee "$RUNNER_TEMP/approve.json"
+          echo "generation=$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/approve.json'))['generation'])")" >> "$GITHUB_OUTPUT"
+
+      - name: Begin central promotion (fails closed without a bound approval)
+        id: promote_begin
+        if: steps.central_state.outputs.status != 'promoted'
+        env:
+          APPROVE_GENERATION: ${{ steps.approve.outputs.generation }}
+        run: |
+          set -euo pipefail
+          python3 "$COORDINATOR" promote-begin \
+            --state-dir "$STATE_DIR" \
+            --expected-generation "$APPROVE_GENERATION" \
+            | tee "$RUNNER_TEMP/promote_begin.json"
+          echo "generation=$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/promote_begin.json'))['generation'])")" >> "$GITHUB_OUTPUT"
+
+      - name: Create or recover coordinator-owned GitHub draft
+        id: release_create
+        if: steps.central_state.outputs.status != 'promoted'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          APPROVAL: ${{ inputs.approval }}
+          ASSETS_DIR: ${{ env.STATE_DIR }}/assets
+          MANIFEST_FILE: ${{ env.STATE_DIR }}/manifest.json
+          MANIFEST_SIGNATURE_FILE: ${{ env.STATE_DIR }}/manifest.json.sig
+          MODE: create
+          RELEASE_EVIDENCE_FILE: ${{ runner.temp }}/release-create.json
+        run: |
+          set -euo pipefail
+          .github/scripts/release/github-publish-release.sh
+
+      - name: Record release creation outcome
+        if: always() && steps.promote_begin.outcome == 'success'
+        run: |
+          set -euo pipefail
+          generation="$(python3 -c "import json; print(json.load(open('$STATE_DIR/state.json'))['generation'])")"
+          outcome="${{ steps.release_create.outcome == 'success' && 'success' || 'failure' }}"
+          evidence="$(if [[ -f "$RUNNER_TEMP/release-create.json" ]]; then jq -c . "$RUNNER_TEMP/release-create.json"; else printf '{}'; fi)"
+          python3 "$COORDINATOR" record-phase \
+            --state-dir "$STATE_DIR" \
+            --phase release_creation \
+            --outcome "$outcome" \
+            --evidence "$evidence" \
+            --expected-generation "$generation"
+
+      - name: Reconcile exact approved package inventory into draft
+        id: package_reconcile
+        if: steps.release_create.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          APPROVAL: ${{ inputs.approval }}
+          ASSETS_DIR: ${{ env.STATE_DIR }}/assets
+          MANIFEST_FILE: ${{ env.STATE_DIR }}/manifest.json
+          MANIFEST_SIGNATURE_FILE: ${{ env.STATE_DIR }}/manifest.json.sig
+          MODE: reconcile
+        run: |
+          set -euo pipefail
+          .github/scripts/release/github-publish-release.sh
+
+      - name: Record exact release reconciliation outcome
+        if: always() && steps.release_create.outcome == 'success'
+        env:
+          APPROVAL: ${{ inputs.approval }}
+        run: |
+          set -euo pipefail
+          generation="$(python3 -c "import json; print(json.load(open('$STATE_DIR/state.json'))['generation'])")"
+          outcome="${{ steps.package_reconcile.outcome == 'success' && 'success' || 'failure' }}"
+          python3 "$COORDINATOR" record-phase \
+            --state-dir "$STATE_DIR" \
+            --phase release_reconciliation \
+            --outcome "$outcome" \
+            --evidence "$APPROVAL" \
+            --expected-generation "$generation"
+
+      - name: Publish GitHub release atomically from verified draft
+        id: github_publish
+        if: steps.package_reconcile.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          APPROVAL: ${{ inputs.approval }}
+          ASSETS_DIR: ${{ env.STATE_DIR }}/assets
+          MANIFEST_FILE: ${{ env.STATE_DIR }}/manifest.json
+          MANIFEST_SIGNATURE_FILE: ${{ env.STATE_DIR }}/manifest.json.sig
+          MODE: publish
+        run: .github/scripts/release/github-publish-release.sh
+
+      - name: Record GitHub publication outcome
+        if: always() && steps.promote_begin.outcome == 'success'
+        run: |
+          set -euo pipefail
+          generation="$(python3 -c "import json; print(json.load(open('$STATE_DIR/state.json'))['generation'])")"
+          outcome="${{ steps.github_publish.outcome == 'success' && 'success' || 'failure' }}"
+          python3 "$COORDINATOR" record-publication --state-dir "$STATE_DIR" \
+            --channel github_release --outcome "$outcome" --expected-generation "$generation"
+
+      - name: Verify published GitHub release inventory and bytes
+        id: github_verify
+        if: steps.github_publish.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          APPROVAL: ${{ inputs.approval }}
+          ASSETS_DIR: ${{ env.STATE_DIR }}/assets
+          MANIFEST_FILE: ${{ env.STATE_DIR }}/manifest.json
+          MANIFEST_SIGNATURE_FILE: ${{ env.STATE_DIR }}/manifest.json.sig
+          MODE: verify
+        run: .github/scripts/release/github-publish-release.sh
+
+      - name: Record GitHub terminal verification outcome
+        if: always() && steps.github_publish.outcome == 'success'
+        run: |
+          set -euo pipefail
+          generation="$(python3 -c "import json; print(json.load(open('$STATE_DIR/state.json'))['generation'])")"
+          outcome="${{ steps.github_verify.outcome == 'success' && 'success' || 'failure' }}"
+          python3 "$COORDINATOR" record-verification --state-dir "$STATE_DIR" \
+            --channel github_release --outcome "$outcome" --expected-generation "$generation"
+
+      - name: Publish detached-signed R2 stable manifest
+        id: r2_publish
+        if: steps.github_verify.outcome == 'success'
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+          R2_BUCKET: ${{ inputs.r2_bucket }}
+          MANIFEST_FILE: ${{ env.STATE_DIR }}/manifest.json
+          MANIFEST_SIGNATURE_FILE: ${{ env.STATE_DIR }}/manifest.json.sig
+          VERIFYING_KEY_FILE: ${{ env.VERIFYING_KEY_FILE }}
+          STATE_FILE: ${{ env.STATE_DIR }}/state.json
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          EXPECTED_SHA256: ${{ inputs.approval }}
+          MODE: publish
+        run: .github/scripts/release/r2-publish-manifest.sh
+
+      - name: Record R2 publication outcome
+        if: always() && steps.github_verify.outcome == 'success'
+        run: |
+          set -euo pipefail
+          generation="$(python3 -c "import json; print(json.load(open('$STATE_DIR/state.json'))['generation'])")"
+          outcome="${{ steps.r2_publish.outcome == 'success' && 'success' || 'failure' }}"
+          python3 "$COORDINATOR" record-publication --state-dir "$STATE_DIR" \
+            --channel r2_stable_manifest --outcome "$outcome" --expected-generation "$generation"
+
+      - name: Verify R2 readback and detached signature
+        id: r2_verify
+        if: steps.r2_publish.outcome == 'success'
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+          R2_BUCKET: ${{ inputs.r2_bucket }}
+          MANIFEST_FILE: ${{ env.STATE_DIR }}/manifest.json
+          MANIFEST_SIGNATURE_FILE: ${{ env.STATE_DIR }}/manifest.json.sig
+          VERIFYING_KEY_FILE: ${{ env.VERIFYING_KEY_FILE }}
+          STATE_FILE: ${{ env.STATE_DIR }}/state.json
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          EXPECTED_SHA256: ${{ inputs.approval }}
+          MODE: verify
+        run: .github/scripts/release/r2-publish-manifest.sh
+
+      - name: Record R2 terminal verification outcome
+        if: always() && steps.r2_publish.outcome == 'success'
+        run: |
+          set -euo pipefail
+          generation="$(python3 -c "import json; print(json.load(open('$STATE_DIR/state.json'))['generation'])")"
+          outcome="${{ steps.r2_verify.outcome == 'success' && 'success' || 'failure' }}"
+          python3 "$COORDINATOR" record-verification --state-dir "$STATE_DIR" \
+            --channel r2_stable_manifest --outcome "$outcome" --expected-generation "$generation"
+
+      - name: Upload updated coordinator state
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-coordinator-state-${{ inputs.release_tag }}
+          path: ${{ env.STATE_DIR }}
+          include-hidden-files: true
+          retention-days: 90
+          overwrite: true
+
+      - name: Fail the job if either central channel did not succeed
+        if: always()
+        run: |
+          python3 - "$STATE_DIR/state.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as state_file:
+              state = json.load(state_file)
+          if state.get("status") != "promoted":
+              raise SystemExit(
+                  "central promotion incomplete: "
+                  f"status={state.get('status')!r} "
+                  f"channels={state.get('central_channels')!r}"
+              )
+          PY
+
+  verify-release-signatures:
+    name: Independent post-publish signature verification (read-only)
+    needs: central-promote
+    # GitHub suppresses `release: [published]` workflow runs for
+    # GITHUB_TOKEN-published releases, so the coordinator invokes the
+    # read-only verifier explicitly after promotion. The callee declares
+    # `permissions: contents: read` and performs no mutation; this call
+    # grants no new token permissions.
+    if: needs.central-promote.result == 'success' && inputs.promote == true
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-sign.yml
+    with:
+      release_tag: ${{ inputs.release_tag }}
+    secrets: inherit
+
+  downstream-handoff:
+    name: Downstream handoff (Homebrew/AUR/Omarchy) -- only after both central channels succeed
+    needs: central-promote
+    if: needs.central-promote.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout coordinator tooling
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Validate workflow inputs (fail closed on malformed values)
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          AUR_TARGET_REPO: ${{ inputs.aur_target_repo }}
+          OMARCHY_TARGET_REPO: ${{ inputs.omarchy_target_repo }}
+          HOMEBREW_PROOF_RUN_ID: ${{ inputs.homebrew_proof_run_id }}
+          AUR_PROOF_RUN_ID: ${{ inputs.aur_proof_run_id }}
+          OMARCHY_PROOF_RUN_ID: ${{ inputs.omarchy_proof_run_id }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "invalid release_tag (expected vX.Y.Z): $RELEASE_TAG"
+          [[ -z "$AUR_TARGET_REPO" || "$AUR_TARGET_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || fail "invalid aur_target_repo (expected owner/repo): $AUR_TARGET_REPO"
+          [[ -z "$OMARCHY_TARGET_REPO" || "$OMARCHY_TARGET_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || fail "invalid omarchy_target_repo (expected owner/repo): $OMARCHY_TARGET_REPO"
+          for run_id in "$HOMEBREW_PROOF_RUN_ID" "$AUR_PROOF_RUN_ID" "$OMARCHY_PROOF_RUN_ID"; do
+            [[ -z "$run_id" || "$run_id" =~ ^[0-9]+$ ]] || fail "invalid downstream proof run ID: $run_id"
+          done
+          echo "all downstream-handoff inputs are well-formed"
+
+      - name: Download promoted coordinator state
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-coordinator-state-${{ inputs.release_tag }}
+          path: ${{ env.STATE_DIR }}
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+
+      - name: Emit downstream handoff record (fails closed unless promoted)
+        run: python3 "$COORDINATOR" handoff-downstream --state-dir "$STATE_DIR"
+
+      - name: Upload downstream handoff record
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-coordinator-downstream-handoff-${{ inputs.release_tag }}
+          path: ${{ env.STATE_DIR }}/downstream-handoff.json
+          retention-days: 90
+
+      - name: Dispatch downstream channel workflows (real, authenticated, digest-bound; fail closed if target/token absent)
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        env:
+          HOMEBREW_TAP_REPO: ${{ env.HOMEBREW_TAP_REPO }}
+          AUR_TARGET_REPO: ${{ inputs.aur_target_repo }}
+          OMARCHY_TARGET_REPO: ${{ inputs.omarchy_target_repo }}
+          DISPATCH_TOKEN_CONFIGURED: ${{ (secrets.TERRAPHIM_ORG_GITHUB_TOKEN != '' && secrets.TERRAPHIM_ORG_GITHUB_TOKEN != null) || (secrets.DESKTOP_REPO_TOKEN != '' && secrets.DESKTOP_REPO_TOKEN != null) || (secrets.CLIENTS_REPO_TOKEN != '' && secrets.CLIENTS_REPO_TOKEN != null) }}
+        with:
+          github-token: ${{ secrets.TERRAPHIM_ORG_GITHUB_TOKEN || secrets.DESKTOP_REPO_TOKEN || secrets.CLIENTS_REPO_TOKEN || github.token }}
+          script: |
+            const fs = require('fs');
+            const { execFileSync } = require('child_process');
+            const handoff = JSON.parse(fs.readFileSync(`${process.env.STATE_DIR}/downstream-handoff.json`, 'utf8'));
+            console.log(`Dispatching downstream handoff for ${handoff.release_tag} (manifest ${handoff.manifest_sha256})`);
+
+            const channelTargetRepo = {
+              homebrew_tap_pr: process.env.HOMEBREW_TAP_REPO || '',
+              aur_terraphim_clients_bin: process.env.AUR_TARGET_REPO || '',
+              omarchy_terraphim_clients_bin: process.env.OMARCHY_TARGET_REPO || '',
+            };
+
+            const dispatchTokenConfigured = process.env.DISPATCH_TOKEN_CONFIGURED === 'true';
+
+            const recordErrors = [];
+            const state = JSON.parse(fs.readFileSync(`${process.env.STATE_DIR}/state.json`, 'utf8'));
+            for (const entry of handoff.channels) {
+              const targetRepo = channelTargetRepo[entry.channel] || '';
+              let outcome = 'failure';
+              let detail = '';
+
+              if (state.downstream_channels?.[entry.channel]?.dispatch?.outcome === 'accepted') {
+                console.log(`- ${entry.channel}: dispatch already accepted; idempotent resume`);
+                continue;
+              }
+
+              if (!targetRepo) {
+                detail = 'target repo not configured; fail-closed, no dispatch attempted';
+                console.log(`- ${entry.channel}: SKIPPED (${detail})`);
+              } else if (!dispatchTokenConfigured) {
+                detail = 'no dispatch token configured (TERRAPHIM_ORG_GITHUB_TOKEN/DESKTOP_REPO_TOKEN/CLIENTS_REPO_TOKEN all unset); fail-closed, no dispatch attempted';
+                console.log(`- ${entry.channel}: SKIPPED (${detail})`);
+              } else {
+                const [owner, repo] = targetRepo.split('/');
+                try {
+                  await github.rest.repos.createDispatchEvent({
+                    owner,
+                    repo,
+                    event_type: 'terraphim-release',
+                    client_payload: {
+                      schema_version: handoff.schema_version,
+                      release_tag: handoff.release_tag,
+                      manifest_sha256: handoff.manifest_sha256,
+                      correlation_id: handoff.correlation_id,
+                      channel: entry.channel,
+                      assets: entry.assets.map((a) => ({ name: a.name, sha256: a.sha256 })),
+                    },
+                  });
+                  outcome = 'accepted';
+                  detail = `repository_dispatch accepted by ${targetRepo}; terminal proof still required`;
+                  console.log(`- ${entry.channel}: ACCEPTED (${detail})`);
+                } catch (err) {
+                  detail = `repository_dispatch to ${targetRepo} failed: ${err.message}`;
+                  console.log(`- ${entry.channel}: FAILURE (${detail})`);
+                }
+              }
+
+              try {
+                const current = JSON.parse(fs.readFileSync(`${process.env.STATE_DIR}/state.json`, 'utf8'));
+                execFileSync('python3', [
+                  process.env.COORDINATOR,
+                  'record-downstream-channel',
+                  '--state-dir', process.env.STATE_DIR,
+                  '--channel', entry.channel,
+                  '--outcome', outcome,
+                  '--detail', detail,
+                  '--expected-generation', String(current.generation),
+                ], { stdio: 'inherit' });
+              } catch (err) {
+                recordErrors.push(`${entry.channel}: ${err.message}`);
+              }
+            }
+            if (recordErrors.length) {
+              core.setFailed(`downstream outcome recording failures: ${recordErrors.join('; ')}`);
+            }
+
+      - name: Verify terminal downstream publication proofs
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.TERRAPHIM_ORG_GITHUB_TOKEN || secrets.DESKTOP_REPO_TOKEN || secrets.CLIENTS_REPO_TOKEN || github.token }}
+          HOMEBREW_PROOF_RUN_ID: ${{ inputs.homebrew_proof_run_id }}
+          AUR_PROOF_RUN_ID: ${{ inputs.aur_proof_run_id }}
+          OMARCHY_PROOF_RUN_ID: ${{ inputs.omarchy_proof_run_id }}
+          AUR_TARGET_REPO: ${{ inputs.aur_target_repo }}
+          OMARCHY_TARGET_REPO: ${{ inputs.omarchy_target_repo }}
+        run: |
+          set -euo pipefail
+          handoff="$STATE_DIR/downstream-handoff.json"
+          correlation_id="$(python3 -c "import json; print(json.load(open('$handoff'))['correlation_id'])")"
+          channels=(homebrew_tap_pr aur_terraphim_clients_bin omarchy_terraphim_clients_bin)
+          repos=("$HOMEBREW_TAP_REPO" "$AUR_TARGET_REPO" "$OMARCHY_TARGET_REPO")
+          run_ids=("$HOMEBREW_PROOF_RUN_ID" "$AUR_PROOF_RUN_ID" "$OMARCHY_PROOF_RUN_ID")
+          missing=0
+          for index in "${!channels[@]}"; do
+            channel="${channels[$index]}"
+            repo="${repos[$index]}"
+            run_id="${run_ids[$index]}"
+            if [[ -z "$repo" || -z "$run_id" ]]; then
+              echo "::error::$channel has no target repo or terminal proof run ID"
+              missing=$((missing + 1))
+              continue
+            fi
+            proof_dir="$RUNNER_TEMP/downstream-proof/$channel"
+            mkdir -p "$proof_dir"
+            gh run download "$run_id" --repo "$repo" \
+              --name "terraphim-release-proof-$correlation_id-$channel" --dir "$proof_dir"
+            proof_file="$proof_dir/proof.json"
+            [[ -f "$proof_file" ]] || { echo "::error::missing proof.json for $channel"; missing=$((missing + 1)); continue; }
+            generation="$(python3 -c "import json; print(json.load(open('$STATE_DIR/state.json'))['generation'])")"
+            python3 "$COORDINATOR" verify-downstream-proof --state-dir "$STATE_DIR" \
+              --channel "$channel" --proof "$proof_file" --expected-generation "$generation"
+          done
+          [[ "$missing" -eq 0 ]] || exit 1
+
+      - name: Upload final coordinator state (downstream outcomes recorded)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-coordinator-state-${{ inputs.release_tag }}
+          path: ${{ env.STATE_DIR }}
+          include-hidden-files: true
+          retention-days: 90
+          overwrite: true

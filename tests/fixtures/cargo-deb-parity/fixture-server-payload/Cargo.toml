@@ -1,0 +1,31 @@
+[package]
+name = "fixture_server_payload"
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+# Standalone crate (own workspace root, not a member of the repo workspace).
+
+# Minimal standalone crate (not a workspace member) used by
+# .github/scripts/nfpm/tests/test_cargo_deb_staging.sh to prove that
+# cargo-deb can wrap exact prebuilt bytes per target triple:
+#   cargo deb --no-build --no-strip --target <triple> --output <dir>
+# It mirrors the asset shape of terraphim_server [package.metadata.deb]:
+# the asset path references target/release/<bin> while the staged bytes
+# live under target/<triple>/release/<bin>.
+[[bin]]
+name = "fixture_server_payload"
+path = "src/main.rs"
+
+[workspace]
+
+[package.metadata.deb]
+maintainer = "Terraphim Contributors <team@terraphim.ai>"
+copyright = "2024, Terraphim Contributors"
+extended-description = "Fixture proving cargo-deb wraps exact staged bytes per target triple."
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/fixture_server_payload", "usr/bin/", "755"],
+]

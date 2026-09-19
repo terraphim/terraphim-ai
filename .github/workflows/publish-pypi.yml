@@ -63,8 +63,8 @@ jobs:
 
       - name: Validate version format
         run: |
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=$(echo "${{ github.ref }}" | sed 's#refs/tags/python-v##; s#refs/tags/pypi-v##; s#refs/tags/v##')
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=$(echo "$GITHUB_REF" | sed 's#refs/tags/python-v##; s#refs/tags/pypi-v##; s#refs/tags/v##')
             if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "Invalid version format: $VERSION"
               exit 1
@@ -272,23 +272,25 @@ jobs:
             exit 1
           fi
 
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Determine version
         id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="$INPUT_VERSION"
           if [[ -z "$VERSION" ]]; then
             # Extract version from tag
-            if [[ "${{ github.ref }}" == refs/tags/python-v* ]]; then
+            if [[ "$GITHUB_REF" == refs/tags/python-v* ]]; then
               VERSION=${GITHUB_REF#refs/tags/python-v}
-            elif [[ "${{ github.ref }}" == refs/tags/pypi-v* ]]; then
+            elif [[ "$GITHUB_REF" == refs/tags/pypi-v* ]]; then
               VERSION=${GITHUB_REF#refs/tags/pypi-v}
-            elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
               VERSION=${GITHUB_REF#refs/tags/v}
             fi
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "📦 Publishing version: $VERSION"
 
       - name: Download all artifacts
@@ -310,23 +312,27 @@ jobs:
       - name: Run publish script
         env:
           PYPI_TOKEN: ${{ steps.token.outputs.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          REPOSITORY: ${{ inputs.repository }}
         run: |
-          # Prepare script arguments
-          ARGS="--version ${{ steps.version.outputs.version }} --token $PYPI_TOKEN --use-existing-dist"
+          # Prepare script arguments (array: no word-splitting of the token
+          # or version, no glob expansion)
+          args=(--version "$VERSION" --token "$PYPI_TOKEN" --use-existing-dist)
 
-          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            ARGS="$ARGS --dry-run"
+          if [[ "$DRY_RUN" == "true" ]]; then
+            args+=(--dry-run)
           fi
 
-          if [[ "${{ inputs.repository }}" == "testpypi" ]]; then
-            ARGS="$ARGS --repository testpypi"
+          if [[ "$REPOSITORY" == "testpypi" ]]; then
+            args+=(--repository testpypi)
           fi
 
           # Run publish script
-          ./scripts/publish-pypi.sh $ARGS
+          ./scripts/publish-pypi.sh "${args[@]}"
 
       - name: Verify published packages
-        if: inputs.dry_run != 'true'
+        if: inputs.dry_run == false
         run: |
           PACKAGE_NAME="terraphim-automata"
           PACKAGE_VERSION="${{ steps.version.outputs.version }}"
@@ -341,7 +347,10 @@ jobs:
           echo "📊 Package verification complete"
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'
+        # Bare vX.Y.Z releases are owned exclusively by release-coordinator.yml.
+        # Python package publication still runs for bare and component-prefixed
+        # tags; only component-prefixed tags may create a Python GitHub release.
+        if: (startsWith(github.ref, 'refs/tags/python-v') || startsWith(github.ref, 'refs/tags/pypi-v')) && inputs.dry_run == false
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
@@ -386,7 +395,7 @@ jobs:
           prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
 
       - name: Notify completion
-        if: inputs.dry_run != 'true'
+        if: inputs.dry_run == false
         run: |
           echo "🎉 PyPI publishing workflow completed successfully!"
           echo "📦 Package: terrraphim-automata"

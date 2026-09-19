@@ -12,6 +12,12 @@ jobs:
   eval:
     name: Evaluate agent changes
     runs-on: ubuntu-latest
+    # Cargo fetches from the private terraphim registry in both the baseline
+    # and candidate captures; bind the registry token at job level so every
+    # step inherits it. On fork PRs GitHub withholds secrets (the binding is
+    # then empty) -- that security behaviour is intentional and unchanged.
+    env:
+      CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
     steps:
       - name: Checkout base branch (baseline)
         uses: actions/checkout@v4
