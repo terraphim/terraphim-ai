@@ -1,0 +1,11 @@
+date:: 2004
+place:: "Helsingor, Denmark"
+conference-name:: "12th Annual Conference of the International Group for Lean Construction, 3-5 August 2004"
+title:: @Making do - the eighth category of waste
+item-type:: [[conferencePaper]]
+original-title:: Making do - the eighth category of waste
+authors:: [[Koskela L. J., Howell G.]]
+links:: [Local library](zotero://select/library/items/UATVDTQW), [Web library](https://www.zotero.org/users/6520516/items/UATVDTQW)
+
+- [[Abstract]]
+	- The seminal authors on the Toyota Production System present a list of seven wastes. Even if many subsequent authors have suggested additions to this list, it is usually presented in its original form. This paper contends that there is a very common, generic type of waste that should be added to the list, because it can be justified using the same conceptualizations as used by the seminal authors. Making-do as a waste refers to a situation where a task is started without all its standard inputs, or the execution of a task is continued although the availability of at least one standard input has ceased. The term input refers not only to materials, but to all other inputs such as machinery, tools, personnel, external conditions, instructions etc. Especially in production situations where there are several uncertain inflows to the task, making-do is a common phenomenon, and requires explicit attention. In conceptual analysis, making-do is the opposite of buffering. In buffering, materials are waiting for being processed. In making-do, the waiting time of one type of material – or other inputs – is negative: processing is started before the material has arrived. However, both forms of waste are used for accommodating the impacts of variability in production. Making-do is applied especially for maintaining a high utilization rate or for avoiding schedule slippage. Thus, making-do is another penalty due to variability, and it should be added to the conceptual arsenal of queueing-theory based analysis of production (Factory Physics).

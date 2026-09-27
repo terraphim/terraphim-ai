@@ -1,0 +1,16 @@
+date:: [[Mon, 07.11.2022]]
+publisher:: "Information Today, Inc."
+title:: @The Accidental Taxonomist, Third Edition
+item-type:: [[book]]
+original-title:: "The Accidental Taxonomist, Third Edition"
+language:: English
+edition:: 3rd edition
+authors:: [[Heather Hedden]]
+library-catalog:: Amazon
+links:: [Local library](zotero://select/library/items/8GTMJFH6), [Web library](https://www.zotero.org/users/6520516/items/8GTMJFH6)
+num-pages:: 502
+
+- [[Abstract]]
+	- The Accidental Taxonomist is the most comprehensive guide available to the art and science of building information taxonomies. Heather Hedden—a leading taxonomy expert and instructor—walks readers through the process, displaying her trademark ability to present highly technical information in straightforward, comprehensive English.In this fully revised third edition, Hedden adds an entirely new chapter on ontologies, emphasizes the SKOS model of concepts over the traditional thesaurus model of terms, and provides new insights into taxonomy development techniques. She presents fresh survey data; new screenshots and examples; and updated information on software, career opportunities, and resources for taxonomists. Drawing on numerous real-world examples, she explains how to create concepts and relationships, design taxonomy structures, select taxonomy management software, create taxonomies for manual vs. automated tagging, plan and manage taxonomy projects, adapt taxonomies to various user interfaces, and more."This book has been a big help throughout my career, and I am delighted to see this fully updated edition, which takes account of how far the taxonomy field has come in just a few years. Everyone who works with taxonomies will find indispensable knowledge and guidance in this terrific resource." —Helen Lippell, author, Taxonomies: Practical Approaches to Developing and Managing Vocabularies for Digital Information, and Program Chair, Taxonomy Boot Camp London"Hedden's Accidental Taxonomist is the go-to source for new taxonomists and an essential reference for experienced professionals. The field of taxonomy continues to benefit from the distillation of her comprehensive experience in this third edition." —Gary Carlson, Principal, Factor"The Accidental Taxonomist is the formative book for the study and application of taxonomy in business, and Hedden's continued leadership in this edition is essential for professionals and practitioners of all things data, information, and knowledge." —John Horodyski, Executive Director, Salt Flats, Adjunct Professor, and author, Metadata Matters"With the fields of knowledge, information, and data management colliding, Hedden's book is more important than ever. Taxonomies are a key foundational element for the most exciting solutions in the field, all the way up to artificial intelligence, and The Accidental Taxonomist will help you understand how." —Zach Wahl, Founder and CEO, Enterprise Knowledge
+- [[Attachments]]
+	- [Amazon.com Link](https://www.amazon.com/dp/B0BH9D3HR3)

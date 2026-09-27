@@ -184,3 +184,8 @@ paper.html
 paper.docx
 paper.pdf
 paper.typ
+
+# Alex (2026-09-27): corpus IS tracked in git - citable, hash-pinned evaluation data.
+# Negation overrides the derived-artefact ignore above; scanner-reviewed placeholder
+# in terraphim-docs/openrouter-integration.md is documented in corpus PROVENANCE.md.
+!paper/corpus/terraphim-docs/

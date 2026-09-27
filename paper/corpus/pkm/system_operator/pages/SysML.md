@@ -1,0 +1,4 @@
+type:: [[skill]]
+widerskill:: [[MBSE]]
+
+-

@@ -1,0 +1,881 @@
+{
+  "name": "Terraphim Engineer",
+  "data": {
+    "adm": {
+      "id": 100,
+      "nterm": "ADM"
+    },
+    "kls quality framework": {
+      "id": 101,
+      "nterm": "KLS quality framework"
+    },
+    "krogstie lindland sindre": {
+      "id": 101,
+      "nterm": "KLS quality framework"
+    },
+    "conceptual model quality": {
+      "id": 101,
+      "nterm": "KLS quality framework"
+    },
+    "kls framework": {
+      "id": 101,
+      "nterm": "KLS quality framework"
+    },
+    "model quality assessment": {
+      "id": 101,
+      "nterm": "KLS quality framework"
+    },
+    "togaf": {
+      "id": 102,
+      "nterm": "TOGAF"
+    },
+    "terraphim ai": {
+      "id": 103,
+      "nterm": "Terraphim AI"
+    },
+    "claude code": {
+      "id": 103,
+      "nterm": "Terraphim AI"
+    },
+    "claude opus 4.5": {
+      "id": 103,
+      "nterm": "Terraphim AI"
+    },
+    "acceptable solution space": {
+      "id": 104,
+      "nterm": "acceptable solution space"
+    },
+    "acceptable output space": {
+      "id": 104,
+      "nterm": "acceptable solution space"
+    },
+    "agent solution envelope": {
+      "id": 104,
+      "nterm": "acceptable solution space"
+    },
+    "agent constraint space": {
+      "id": 104,
+      "nterm": "acceptable solution space"
+    },
+    "acceptable agent solutions": {
+      "id": 104,
+      "nterm": "acceptable solution space"
+    },
+    "agentic engineering": {
+      "id": 105,
+      "nterm": "agentic engineering"
+    },
+    "agent-native software development": {
+      "id": 105,
+      "nterm": "agentic engineering"
+    },
+    "agentic software engineering": {
+      "id": 105,
+      "nterm": "agentic engineering"
+    },
+    "ai agent engineering": {
+      "id": 105,
+      "nterm": "agentic engineering"
+    },
+    "agent-driven development": {
+      "id": 105,
+      "nterm": "agentic engineering"
+    },
+    "agentshield": {
+      "id": 106,
+      "nterm": "agentshield"
+    },
+    "architecture metamodel": {
+      "id": 107,
+      "nterm": "architecture metamodel"
+    },
+    "bigbox-disk-cleanup": {
+      "id": 108,
+      "nterm": "bigbox-disk-cleanup"
+    },
+    "bigbox disk cleanup": {
+      "id": 108,
+      "nterm": "bigbox-disk-cleanup"
+    },
+    "disk space incident": {
+      "id": 108,
+      "nterm": "bigbox-disk-cleanup"
+    },
+    "docker ci prune": {
+      "id": 108,
+      "nterm": "bigbox-disk-cleanup"
+    },
+    "odilo ci cache": {
+      "id": 108,
+      "nterm": "bigbox-disk-cleanup"
+    },
+    "buildx cache volumes": {
+      "id": 108,
+      "nterm": "bigbox-disk-cleanup"
+    },
+    "dlt-rust-ci-cache": {
+      "id": 108,
+      "nterm": "bigbox-disk-cleanup"
+    },
+    "github actions runner cleanup": {
+      "id": 108,
+      "nterm": "bigbox-disk-cleanup"
+    },
+    "self-hosted runner disk leak": {
+      "id": 108,
+      "nterm": "bigbox-disk-cleanup"
+    },
+    "bun": {
+      "id": 109,
+      "nterm": "bun"
+    },
+    "npm": {
+      "id": 109,
+      "nterm": "bun"
+    },
+    "yarn": {
+      "id": 109,
+      "nterm": "bun"
+    },
+    "pnpm": {
+      "id": 109,
+      "nterm": "bun"
+    },
+    "npx": {
+      "id": 109,
+      "nterm": "bun"
+    },
+    "bun_install": {
+      "id": 110,
+      "nterm": "bun_install"
+    },
+    "npm install": {
+      "id": 110,
+      "nterm": "bun_install"
+    },
+    "yarn install": {
+      "id": 110,
+      "nterm": "bun_install"
+    },
+    "pnpm install": {
+      "id": 110,
+      "nterm": "bun_install"
+    },
+    "npm i": {
+      "id": 110,
+      "nterm": "bun_install"
+    },
+    "yarn add": {
+      "id": 110,
+      "nterm": "bun_install"
+    },
+    "pnpm add": {
+      "id": 110,
+      "nterm": "bun_install"
+    },
+    "bun_run": {
+      "id": 111,
+      "nterm": "bun_run"
+    },
+    "npm run": {
+      "id": 111,
+      "nterm": "bun_run"
+    },
+    "yarn run": {
+      "id": 111,
+      "nterm": "bun_run"
+    },
+    "pnpm run": {
+      "id": 111,
+      "nterm": "bun_run"
+    },
+    "bunx": {
+      "id": 112,
+      "nterm": "bunx"
+    },
+    "pnpx": {
+      "id": 112,
+      "nterm": "bunx"
+    },
+    "yarn dlx": {
+      "id": 112,
+      "nterm": "bunx"
+    },
+    "caam-credential-rotation": {
+      "id": 113,
+      "nterm": "caam-credential-rotation"
+    },
+    "change request": {
+      "id": 114,
+      "nterm": "change request"
+    },
+    "claude-mem": {
+      "id": 115,
+      "nterm": "claude-mem"
+    },
+    "content asset": {
+      "id": 116,
+      "nterm": "content asset"
+    },
+    "learning content": {
+      "id": 116,
+      "nterm": "content asset"
+    },
+    "instructional resource": {
+      "id": 116,
+      "nterm": "content asset"
+    },
+    "training material": {
+      "id": 116,
+      "nterm": "content asset"
+    },
+    "educational asset": {
+      "id": 116,
+      "nterm": "content asset"
+    },
+    "context engineering": {
+      "id": 117,
+      "nterm": "context engineering"
+    },
+    "context complexity": {
+      "id": 117,
+      "nterm": "context engineering"
+    },
+    "semantic scope management": {
+      "id": 117,
+      "nterm": "context engineering"
+    },
+    "context management": {
+      "id": 117,
+      "nterm": "context engineering"
+    },
+    "decision context": {
+      "id": 117,
+      "nterm": "context engineering"
+    },
+    "context rot": {
+      "id": 118,
+      "nterm": "context rot"
+    },
+    "context decay": {
+      "id": 118,
+      "nterm": "context rot"
+    },
+    "agent context degradation": {
+      "id": 118,
+      "nterm": "context rot"
+    },
+    "session rot": {
+      "id": 118,
+      "nterm": "context rot"
+    },
+    "long-session drift": {
+      "id": 118,
+      "nterm": "context rot"
+    },
+    "conversation rot": {
+      "id": 118,
+      "nterm": "context rot"
+    },
+    "docker compose": {
+      "id": 119,
+      "nterm": "docker compose"
+    },
+    "docker-compose": {
+      "id": 119,
+      "nterm": "docker compose"
+    },
+    "domain model": {
+      "id": 120,
+      "nterm": "domain model"
+    },
+    "reconciled domain model": {
+      "id": 120,
+      "nterm": "domain model"
+    },
+    "domain ontology": {
+      "id": 120,
+      "nterm": "domain model"
+    },
+    "conceptual model": {
+      "id": 120,
+      "nterm": "domain model"
+    },
+    "entity model": {
+      "id": 120,
+      "nterm": "domain model"
+    },
+    "engagement signal": {
+      "id": 121,
+      "nterm": "engagement signal"
+    },
+    "engagement metric": {
+      "id": 121,
+      "nterm": "engagement signal"
+    },
+    "participation signal": {
+      "id": 121,
+      "nterm": "engagement signal"
+    },
+    "interaction indicator": {
+      "id": 121,
+      "nterm": "engagement signal"
+    },
+    "learner engagement": {
+      "id": 121,
+      "nterm": "engagement signal"
+    },
+    "enterprise architecture": {
+      "id": 122,
+      "nterm": "enterprise architecture"
+    },
+    "evaluation artefact": {
+      "id": 123,
+      "nterm": "evaluation artefact"
+    },
+    "assessment evidence": {
+      "id": 123,
+      "nterm": "evaluation artefact"
+    },
+    "evaluation evidence": {
+      "id": 123,
+      "nterm": "evaluation artefact"
+    },
+    "proficiency artefact": {
+      "id": 123,
+      "nterm": "evaluation artefact"
+    },
+    "competency evidence": {
+      "id": 123,
+      "nterm": "evaluation artefact"
+    },
+    "everything-claude-code": {
+      "id": 124,
+      "nterm": "everything-claude-code"
+    },
+    "gepa research": {
+      "id": 125,
+      "nterm": "gepa research"
+    },
+    "heredoc-quoted-cat-eof": {
+      "id": 126,
+      "nterm": "heredoc-quoted-cat-eof"
+    },
+    "$(cat <<eof": {
+      "id": 126,
+      "nterm": "heredoc-quoted-cat-eof"
+    },
+    "judge-checklist": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "scores": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "reasoning": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "improvements": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "verdict": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "semantic score": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "pragmatic score": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "syntactic score": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "average score": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "task_id": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "model": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "timestamp": {
+      "id": 127,
+      "nterm": "judge-checklist"
+    },
+    "judge-pragmatic": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "actionable": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "useful": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "actionability": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "practical": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "enables action": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "addresses goal": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "fit for purpose": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "goal-oriented": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "task completion": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "meets requirements": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "usable": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "practical value": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "decision-enabling": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "implementable": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "addresses the task": {
+      "id": 128,
+      "nterm": "judge-pragmatic"
+    },
+    "judge-semantic": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "factual correctness": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "domain accuracy": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "correct terminology": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "factual": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "accurate": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "domain terminology": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "no contradictions": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "technical accuracy": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "subject matter accuracy": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "domain knowledge": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "correct facts": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "terminological accuracy": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "semantically correct": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "factually accurate": {
+      "id": 129,
+      "nterm": "judge-semantic"
+    },
+    "judge-syntactic": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "internally consistent": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "well-structured": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "format compliance": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "structural completeness": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "no broken references": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "consistent structure": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "valid format": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "complete structure": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "properly formatted": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "structural integrity": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "consistent formatting": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "syntactically correct": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "well-formed": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "structurally sound": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "complete and consistent": {
+      "id": 130,
+      "nterm": "judge-syntactic"
+    },
+    "judge-verdicts": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "accept": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "improve": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "reject": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "escalate": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "accepted": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "rejected": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "pass": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "fail": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "needs improvement": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "quality gate": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "quality check": {
+      "id": 131,
+      "nterm": "judge-verdicts"
+    },
+    "learning path": {
+      "id": 132,
+      "nterm": "learning path"
+    },
+    "learning journey": {
+      "id": 132,
+      "nterm": "learning path"
+    },
+    "capability development path": {
+      "id": 132,
+      "nterm": "learning path"
+    },
+    "skill development track": {
+      "id": 132,
+      "nterm": "learning path"
+    },
+    "training path": {
+      "id": 132,
+      "nterm": "learning path"
+    },
+    "metaprompting": {
+      "id": 133,
+      "nterm": "metaprompting"
+    },
+    "meta-prompt": {
+      "id": 133,
+      "nterm": "metaprompting"
+    },
+    "prompt generation": {
+      "id": 133,
+      "nterm": "metaprompting"
+    },
+    "prompt engineering pipeline": {
+      "id": 133,
+      "nterm": "metaprompting"
+    },
+    "recursive prompting": {
+      "id": 133,
+      "nterm": "metaprompting"
+    },
+    "parallel agent workflow": {
+      "id": 134,
+      "nterm": "parallel agent workflow"
+    },
+    "multi-agent parallelism": {
+      "id": 134,
+      "nterm": "parallel agent workflow"
+    },
+    "parallel agents": {
+      "id": 134,
+      "nterm": "parallel agent workflow"
+    },
+    "agent manager pattern": {
+      "id": 134,
+      "nterm": "parallel agent workflow"
+    },
+    "concurrent agent sessions": {
+      "id": 134,
+      "nterm": "parallel agent workflow"
+    },
+    "agent fan-out": {
+      "id": 134,
+      "nterm": "parallel agent workflow"
+    },
+    "preference centre": {
+      "id": 135,
+      "nterm": "preference centre"
+    },
+    "push notification architecture": {
+      "id": 136,
+      "nterm": "push notification architecture"
+    },
+    "readiness signal": {
+      "id": 137,
+      "nterm": "readiness signal"
+    },
+    "readiness declaration": {
+      "id": 137,
+      "nterm": "readiness signal"
+    },
+    "capability readiness": {
+      "id": 137,
+      "nterm": "readiness signal"
+    },
+    "workforce readiness": {
+      "id": 137,
+      "nterm": "readiness signal"
+    },
+    "competency signal": {
+      "id": 137,
+      "nterm": "readiness signal"
+    },
+    "skill gap": {
+      "id": 138,
+      "nterm": "skill gap"
+    },
+    "capability gap": {
+      "id": 138,
+      "nterm": "skill gap"
+    },
+    "competency gap": {
+      "id": 138,
+      "nterm": "skill gap"
+    },
+    "skills deficit": {
+      "id": 138,
+      "nterm": "skill gap"
+    },
+    "training gap": {
+      "id": 138,
+      "nterm": "skill gap"
+    },
+    "specification vs plan": {
+      "id": 139,
+      "nterm": "specification vs plan"
+    },
+    "spec vs plan": {
+      "id": 139,
+      "nterm": "specification vs plan"
+    },
+    "plan vs spec": {
+      "id": 139,
+      "nterm": "specification vs plan"
+    },
+    "specification and plan": {
+      "id": 139,
+      "nterm": "specification vs plan"
+    },
+    "agent plan first": {
+      "id": 139,
+      "nterm": "specification vs plan"
+    },
+    "plan-first agentic workflow": {
+      "id": 139,
+      "nterm": "specification vs plan"
+    },
+    "team lead model": {
+      "id": 140,
+      "nterm": "team lead model"
+    },
+    "team-lead model": {
+      "id": 140,
+      "nterm": "team lead model"
+    },
+    "engineer as team lead": {
+      "id": 140,
+      "nterm": "team lead model"
+    },
+    "agentic team lead": {
+      "id": 140,
+      "nterm": "team lead model"
+    },
+    "delegation model": {
+      "id": 140,
+      "nterm": "team lead model"
+    },
+    "80/20 agent delegation": {
+      "id": 140,
+      "nterm": "team lead model"
+    },
+    "uv": {
+      "id": 141,
+      "nterm": "uv"
+    },
+    "pip": {
+      "id": 141,
+      "nterm": "uv"
+    },
+    "pip3": {
+      "id": 141,
+      "nterm": "uv"
+    },
+    "pipx": {
+      "id": 141,
+      "nterm": "uv"
+    },
+    "pyenv": {
+      "id": 141,
+      "nterm": "uv"
+    },
+    "python -m pip": {
+      "id": 141,
+      "nterm": "uv"
+    },
+    "pip install": {
+      "id": 141,
+      "nterm": "uv"
+    },
+    "pip3 install": {
+      "id": 141,
+      "nterm": "uv"
+    },
+    "uv_add": {
+      "id": 142,
+      "nterm": "uv_add"
+    },
+    "pip add": {
+      "id": 142,
+      "nterm": "uv_add"
+    },
+    "pipx install": {
+      "id": 142,
+      "nterm": "uv_add"
+    },
+    "uv add": {
+      "id": 142,
+      "nterm": "uv_add"
+    },
+    "value evidence pack": {
+      "id": 143,
+      "nterm": "value evidence pack"
+    },
+    "value realisation evidence": {
+      "id": 143,
+      "nterm": "value evidence pack"
+    },
+    "roi evidence pack": {
+      "id": 143,
+      "nterm": "value evidence pack"
+    },
+    "capability value report": {
+      "id": 143,
+      "nterm": "value evidence pack"
+    },
+    "outcome evidence": {
+      "id": 143,
+      "nterm": "value evidence pack"
+    }
+  }
+}

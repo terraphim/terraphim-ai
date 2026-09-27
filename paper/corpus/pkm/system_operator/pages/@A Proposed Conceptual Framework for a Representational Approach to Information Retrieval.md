@@ -1,0 +1,9 @@
+links:: [Local library](zotero://select/library/items/63MJIM49), [Web library](https://www.zotero.org/users/6520516/items/63MJIM49)
+authors:: [[Jimmy Lin]]
+tags:: [[Computer Science - Computation and Language]], [[Computer Science - Information Retrieval]]
+date:: [[Tue, 28.12.2021]]
+item-type:: [[preprint]]
+title:: @A Proposed Conceptual Framework for a Representational Approach to Information Retrieval
+
+- [[Abstract]]
+	- This paper outlines a conceptual framework for understanding recent developments in information retrieval and natural language processing that attempts to integrate dense and sparse retrieval methods. I propose a representational approach that breaks the core text retrieval problem into a logical scoring model and a physical retrieval model. The scoring model is defined in terms of encoders, which map queries and documents into a representational space, and a comparison function that computes query-document scores. The physical retrieval model defines how a system produces the top-$k$ scoring documents from an arbitrarily large corpus with respect to a query. The scoring model can be further analyzed along two dimensions: dense vs. sparse representations and supervised (learned) vs. unsupervised approaches. I show that many recently proposed retrieval methods, including multi-stage ranking designs, can be seen as different parameterizations in this framework, and that a unified view suggests a number of open research questions, providing a roadmap for future work. As a bonus, this conceptual framework establishes connections to sentence similarity tasks in natural language processing and information access "technologies" prior to the dawn of computing.

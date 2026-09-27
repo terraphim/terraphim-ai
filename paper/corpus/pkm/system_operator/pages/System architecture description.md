@@ -1,0 +1,5 @@
+type:: [[Business object]]
+source:: [[@Digital Systems Engineering Process Model Version: 1.0]]
+documentation:: Description of the selected system architecture, typically presented in a set of architectural views (e.g., views from architecture frameworks), models (e.g., logical and physical models, although there are other kinds of models that might be useful), and architectural characteristics (e.g., physical dimensions, environment resistance, execution efficiency, operability, reliability, maintainability, modularity, robustness, safeguard, understandability, etc.) (ISO/IEC/IEEE 42010, 2010). Architecturally significant system elements are identified and defined to some degree in this artifact. (Other system elements might need to be added during the design definition process as the design is fleshed out).
+
+-
