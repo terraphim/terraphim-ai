@@ -1,0 +1,5 @@
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83
+Apple M3 Pro
+rustc 1.96.1 (31fca3adb 2026-06-26)
