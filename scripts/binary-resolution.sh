@@ -1,11 +1,34 @@
 #!/bin/bash
-# Binary Resolution Engine for Terraphim AI Installer
-# Resolves the best binary asset for a given tool, version, and platform
+# Binary Resolution Engine for the Terraphim installer.
+#
+# Resolution is manifest-driven. The public release channel publishes one
+# manifest per binary at:
+#
+#   https://downloads.terraphim.ai/<binary>/stable-v2.json
+#   https://downloads.terraphim.ai/<binary>/stable.json
+#
+# stable-v2.json is a strict object-valued manifest:
+#
+#   { "version", "released_at", "notes_url",
+#     "assets": { "<target>": {"path","sha256","size"} } }
+#
+# stable.json is the legacy pointer: identical shape except that each asset is
+# a bare repository-relative path string with no digest. It is read only when
+# the strict manifest is unavailable, and a release resolved that way reports
+# an empty checksum so the caller runs unverified rather than failing.
+#
+# Resolution never consults GitHub Releases. The v1 release line's GitHub
+# assets are version-less bare binaries published under terraphim/terraphim-ai;
+# the current line publishes version-and-target archives through the channel
+# below. Keeping one home for resolution removes that mismatch entirely.
 
-# Configuration (loaded from main installer or defaults)
-GITHUB_API_BASE="${GITHUB_API_BASE:-https://api.github.com/repos/terraphim/terraphim-ai}"
-GITHUB_RELEASES="${GITHUB_RELEASES:-https://github.com/terraphim/terraphim-ai/releases/download}"
+# Configuration (overridable by the caller; see scripts/install.sh)
+TERRAPHIM_CHANNEL_BASE="${TERRAPHIM_CHANNEL_BASE:-https://downloads.terraphim.ai}"
+TERRAPHIM_RELEASES_REPO="${TERRAPHIM_RELEASES_REPO:-terraphim/terraphim-clients}"
 DEFAULT_VERSION="${DEFAULT_VERSION:-latest}"
+
+# The channel serves every client binary; anything else is a caller error.
+TERRAPHIM_SUPPORTED_BINARIES=("terraphim-agent" "terraphim-cli" "terraphim-grep")
 
 # Colors
 RED='\033[0;31m'
@@ -14,392 +37,277 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-log_info() {
-    echo -e "${BLUE}ℹ${NC} $*"
-}
+log_info() { echo -e "${BLUE}i${NC} $*"; }
+log_warn() { echo -e "${YELLOW}!${NC} $*"; }
+log_error() { echo -e "${RED}x${NC} $*"; }
+log_success() { echo -e "${GREEN}+${NC} $*"; }
 
-log_warn() {
-    echo -e "${YELLOW}⚠${NC} $*"
-}
-
-log_error() {
-    echo -e "${RED}✗${NC} $*"
-}
-
-log_success() {
-    echo -e "${GREEN}✓${NC} $*"
-}
-
-# Get the latest release version from GitHub API
-get_latest_version() {
-    log_info "Fetching latest release version..."
-
-    local api_response
-    local version
-
-    # Try to get latest release
-    api_response=$(curl -s "${GITHUB_API_BASE}/releases/latest" 2>/dev/null)
-
-    if [[ $? -ne 0 || -z "$api_response" ]]; then
-        log_error "Failed to fetch latest release from GitHub API"
-        return 1
-    fi
-
-    # Extract tag name
-    version=$(echo "$api_response" | grep '"tag_name":' | sed -E 's/.*"tag_name":\s*"([^"]*).*/\1/')
-
-    if [[ -z "$version" ]]; then
-        log_error "Could not extract version from GitHub API response"
-        return 1
-    fi
-
-    # Remove 'v' prefix if present
-    version=${version#v}
-
-    log_success "Latest version: $version"
-    echo "$version"
-}
-
-# Get a specific version from GitHub API
-get_version_info() {
-    local version=$1
-
-    log_info "Fetching info for version: $version"
-
-    local api_response
-    local version_tag="v${version#v}"
-
-    # Get release info
-    api_response=$(curl -s "${GITHUB_API_BASE}/releases/tags/$version_tag" 2>/dev/null)
-
-    if [[ $? -ne 0 || -z "$api_response" ]]; then
-        log_error "Failed to fetch version $version from GitHub API"
-        return 1
-    fi
-
-    echo "$api_response"
-}
-
-# List all available assets for a release
-list_release_assets() {
-    local version=$1
-
-    log_info "Listing assets for version: $version"
-
-    local api_response
-    api_response=$(get_version_info "$version")
-
-    if [[ $? -ne 0 ]]; then
-        return 1
-    fi
-
-    # Extract asset names
-    echo "$api_response" | grep '"name":' | sed -E 's/.*"name":\s*"([^"]*).*/\1/' | sort
-}
-
-# Generate possible asset names for a tool on current platform
-generate_asset_names() {
-    local tool=$1
-    local os=${OS:-"$(uname -s | tr '[:upper:]' '[:lower:]')"}
-    local arch=${ARCH:-"$(uname -m)"}
-
-    # Normalize OS and arch
-    case $os in
-        linux*) os="linux" ;;
-        darwin*) os="macos" ;;
-        cygwin*|mingw*|msys*) os="windows" ;;
+# Map uname output onto the target triples the channel publishes.
+normalise_os() {
+    case "${1:-$(uname -s)}" in
+        Linux|linux*)              echo "linux" ;;
+        Darwin|darwin*)            echo "macos" ;;
+        CYGWIN*|MINGW*|MSYS*|cygwin*|mingw*|msys*|windows*) echo "windows" ;;
+        *)                         echo "unknown" ;;
     esac
+}
 
-    case $arch in
-        x86_64|amd64) arch="x86_64" ;;
-        aarch64|arm64) arch="aarch64" ;;
-        armv7*|armv6*) arch="armv7" ;;
+normalise_arch() {
+    case "${1:-$(uname -m)}" in
+        x86_64|amd64)      echo "x86_64" ;;
+        aarch64|arm64)     echo "aarch64" ;;
+        armv7*|armv6*|arm) echo "armv7" ;;
+        *)                 echo "unknown" ;;
     esac
-
-    local assets=()
-
-    # Priority order for asset names
-    if [[ "$os" == "macos" ]]; then
-        # macOS universal binaries first
-        assets+=("${tool}-universal-apple-darwin")
-        assets+=("${tool}-macos-universal")
-        # Then architecture-specific
-        assets+=("${tool}-macos-${arch}")
-        assets+=("${tool}-darwin-${arch}")
-    elif [[ "$os" == "windows" ]]; then
-        # Windows executables
-        assets+=("${tool}-windows-${arch}.exe")
-        assets+=("${tool}-${os}-${arch}.exe")
-        assets+=("${tool}-${arch}-pc-windows-msvc.exe")
-    else
-        # Linux and other Unix-like
-        assets+=("${tool}-${os}-${arch}")
-        assets+=("${tool}-${os}-${arch}-musl")
-        assets+=("${tool}-${arch}-unknown-linux-gnu")
-    fi
-
-    # Generic fallbacks
-    assets+=("${tool}-${arch}")
-    assets+=("${tool}")
-
-    # Print all possible names (highest priority first)
-    printf '%s\n' "${assets[@]}"
 }
 
-# Check if an asset exists in a release
-asset_exists() {
-    local asset_name=$1
-    local version=$2
+# Order matters: the first target present in the manifest wins.
+# x86_64 macOS prefers the architecture-specific archive over the universal
+# one because it is roughly half the download.
+generate_target_candidates() {
+    local os arch
+    os=$(normalise_os)
+    arch=$(normalise_arch)
 
-    log_info "Checking if asset exists: $asset_name"
-
-    local api_response
-    local version_tag="v${version#v}"
-
-    # Get release info
-    api_response=$(curl -s "${GITHUB_API_BASE}/releases/tags/$version_tag" 2>/dev/null)
-
-    if [[ $? -ne 0 || -z "$api_response" ]]; then
-        log_warn "Failed to get release info for $version"
-        return 1
-    fi
-
-    # Check if asset exists in the release
-    if echo "$api_response" | grep -q "\"name\":\s*\"$asset_name\""; then
-        log_success "Asset found: $asset_name"
-        return 0
-    else
-        log_info "Asset not found: $asset_name"
-        return 1
-    fi
+    case "$os" in
+        macos)
+            case "$arch" in
+                aarch64) echo "aarch64-apple-darwin"; echo "universal-apple-darwin" ;;
+                x86_64)  echo "x86_64-apple-darwin";  echo "universal-apple-darwin" ;;
+            esac
+            ;;
+        linux)
+            case "$arch" in
+                x86_64)  echo "x86_64-unknown-linux-gnu";  echo "x86_64-unknown-linux-musl" ;;
+                aarch64) echo "aarch64-unknown-linux-musl" ;;
+            esac
+            ;;
+        windows)
+            case "$arch" in
+                x86_64) echo "x86_64-pc-windows-msvc" ;;
+            esac
+            ;;
+    esac
 }
 
-# Get download URL for an asset
-get_asset_url() {
-    local asset_name=$1
-    local version=$2
-
-    local version_tag="v${version#v}"
-    echo "${GITHUB_RELEASES}/$version_tag/$asset_name"
-}
-
-# Get checksum for an asset (if available)
-get_asset_checksum() {
-    local asset_name=$1
-    local version=$2
-
-    # Look for checksum file
-    local checksum_file="checksums.txt"
-    local checksum_url="${GITHUB_RELEASES}/v${version#v}/$checksum_file"
-
-    log_info "Fetching checksums for verification..."
-
-    local checksums
-    checksums=$(curl -s "$checksum_url" 2>/dev/null)
-
-    if [[ $? -ne 0 || -z "$checksums" ]]; then
-        log_warn "No checksum file found for version $version"
-        return 1
-    fi
-
-    # Extract checksum for the specific asset
-    local checksum
-    checksum=$(echo "$checksums" | grep "$asset_name" | head -1 | awk '{print $1}')
-
-    if [[ -n "$checksum" ]]; then
-        echo "$checksum"
-        return 0
-    else
-        log_warn "No checksum found for $asset_name"
-        return 1
-    fi
-}
-
-# Resolve the best asset for a tool and version
-resolve_best_asset() {
-    local tool=$1
-    local version=${2:-"$DEFAULT_VERSION"}
-
-    log_info "Resolving best asset for $tool (version: $version)"
-
-    # Get version if 'latest'
-    if [[ "$version" == "latest" ]]; then
-        version=$(get_latest_version)
-        if [[ $? -ne 0 ]]; then
-            log_error "Failed to get latest version"
-            return 1
-        fi
-    fi
-
-    log_info "Resolved version: $version"
-
-    # Generate possible asset names
-    local asset_names
-    readarray -t asset_names < <(generate_asset_names "$tool")
-
-    log_info "Trying asset names in priority order:"
-    for name in "${asset_names[@]}"; do
-        log_info "  - $name"
+is_supported_binary() {
+    local candidate
+    for candidate in "${TERRAPHIM_SUPPORTED_BINARIES[@]}"; do
+        [[ "$candidate" == "$1" ]] && return 0
     done
-
-    # Try each asset name
-    for asset_name in "${asset_names[@]}"; do
-        if asset_exists "$asset_name" "$version"; then
-            local asset_url
-            asset_url=$(get_asset_url "$asset_name" "$version")
-
-            log_success "Resolved asset: $asset_name"
-            log_info "Download URL: $asset_url"
-
-            # Get checksum if available
-            local checksum
-            checksum=$(get_asset_checksum "$asset_name" "$version" 2>/dev/null || true)
-
-            if [[ -n "$checksum" ]]; then
-                log_info "Checksum: $checksum"
-            fi
-
-            # Output in a format that can be easily parsed
-            echo "ASSET_NAME=$asset_name"
-            echo "ASSET_URL=$asset_url"
-            [[ -n "$checksum" ]] && echo "ASSET_CHECKSUM=$checksum"
-            echo "ASSET_VERSION=$version"
-
-            return 0
-        fi
-    done
-
-    # No binary found, recommend source compilation
-    log_warn "No pre-built binary found for $tool on this platform"
-    log_warn "Will need to build from source"
-
-    echo "ASSET_NAME=source"
-    echo "ASSET_URL=source"
-    echo "ASSET_CHECKSUM="
-    echo "ASSET_VERSION=$version"
-
     return 1
 }
 
-# Resolve binary URL (simplified function for main installer compatibility)
-resolve_binary_url() {
-    local tool=$1
+# Fetch a manifest into a caller-owned file. Returns non-zero on any failure so
+# the caller can fall back without inspecting partial output.
+fetch_manifest() {
+    local binary=$1 version=$2 destination=$3
+    local url="${TERRAPHIM_CHANNEL_BASE}/${binary}/stable-v2.json"
+
+    # Version selection is a manifest lookup: the channel only ever serves the
+    # current stable release, so asking for anything else is a hard error
+    # rather than a silent substitution.
+    log_info "Reading manifest: $url"
+
+    if ! curl --silent --show-error --fail --location \
+              --retry 2 --retry-delay 1 --max-time 30 \
+              --output "$destination" "$url" 2>/dev/null; then
+        return 1
+    fi
+    [[ -s "$destination" ]] || return 1
+
+    if [[ "$version" != "latest" ]]; then
+        local manifest_version
+        manifest_version=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["version"])' "$destination" 2>/dev/null || true)
+        if [[ -z "$manifest_version" ]]; then
+            return 1
+        fi
+        if [[ "$manifest_version" != "${version#v}" ]]; then
+            log_error "Channel serves ${binary} ${manifest_version}, not ${version#v}"
+            log_error "Requested versions are not archived; see https://github.com/${TERRAPHIM_RELEASES_REPO}/releases"
+            return 2
+        fi
+    fi
+
+    return 0
+}
+
+# Read a single field out of a manifest. Never trusts the file's shape.
+manifest_field() {
+    local file=$1 expression=$2
+    python3 -c 'import json,sys
+try:
+    data = json.load(open(sys.argv[1]))
+except Exception:
+    raise SystemExit(1)
+value = eval(sys.argv[2], {"__builtins__": {}}, {"data": data})
+print("" if value is None else value)' "$file" "$expression" 2>/dev/null
+}
+
+# Resolve the best asset for the current platform.
+#
+# Prints four ASSET_* lines for the caller to read, and a human-readable
+# summary on stderr. Exit codes:
+#   0  resolved against the strict manifest (checksum available)
+#   0  resolved against the legacy manifest (ASSET_CHECKSUM empty)
+#   1  channel unreachable, or no published asset matches this platform
+#   2  the requested version is not the one the channel serves
+resolve_best_asset() {
+    local binary=$1
     local version=${2:-"$DEFAULT_VERSION"}
 
-    log_info "Resolving binary URL for $tool (version: $version)"
+    if ! is_supported_binary "$binary"; then
+        log_error "Unknown binary: $binary"
+        log_error "Published binaries: ${TERRAPHIM_SUPPORTED_BINARIES[*]}"
+        return 2
+    fi
 
-    # Parse the output of resolve_best_asset
-    local resolution_output
-    resolution_output=$(resolve_best_asset "$tool" "$version")
+    local tmpdir
+    tmpdir=$(mktemp -d) || return 1
+    trap 'rm -rf "$tmpdir"' RETURN
 
-    if [[ $? -eq 0 ]]; then
-        local asset_url
-        asset_url=$(echo "$resolution_output" | grep "^ASSET_URL=" | cut -d'=' -f2-)
-        echo "$asset_url"
+    local strict="$tmpdir/stable-v2.json"
+    local legacy="$tmpdir/stable.json"
+    local manifest="" source_kind=""
+
+    local status=0
+    fetch_manifest "$binary" "$version" "$strict" || status=$?
+    if [[ $status -eq 2 ]]; then
+        return 2
+    fi
+
+    if [[ $status -eq 0 ]]; then
+        manifest="$strict"
+        source_kind="strict"
     else
+        log_warn "Strict manifest unavailable; falling back to the legacy pointer"
+        local legacy_url="${TERRAPHIM_CHANNEL_BASE}/${binary}/stable.json"
+        if ! curl --silent --show-error --fail --location \
+                  --retry 2 --retry-delay 1 --max-time 30 \
+                  --output "$legacy" "$legacy_url" 2>/dev/null || [[ ! -s "$legacy" ]]; then
+            log_error "No manifest for ${binary} at ${TERRAPHIM_CHANNEL_BASE}/${binary}/"
+            return 1
+        fi
+        manifest="$legacy"
+        source_kind="legacy"
+
+        if [[ "$version" != "latest" ]]; then
+            local legacy_version
+            legacy_version=$(manifest_field "$legacy" 'data["version"]')
+            if [[ "$legacy_version" != "${version#v}" ]]; then
+                log_error "Channel serves ${binary} ${legacy_version}, not ${version#v}"
+                return 2
+            fi
+        fi
+    fi
+
+    local resolved_version
+    resolved_version=$(manifest_field "$manifest" 'data["version"]')
+    if [[ -z "$resolved_version" ]]; then
+        log_error "Manifest for ${binary} has no version field"
+        return 1
+    fi
+
+    local target=""
+    while IFS= read -r candidate; do
+        [[ -n "$candidate" ]] || continue
+        if [[ "$(manifest_field "$manifest" "data['assets'].get('$candidate')")" != "" ]]; then
+            target="$candidate"
+            break
+        fi
+    done < <(generate_target_candidates)
+
+    if [[ -z "$target" ]]; then
+        log_error "No published ${binary} archive matches $(normalise_os)/$(normalise_arch)"
+        log_error "Published targets: $(manifest_field "$manifest" "' '.join(sorted(data['assets']))")"
+        return 1
+    fi
+
+    local asset_path checksum=""
+    if [[ "$source_kind" == "strict" ]]; then
+        asset_path=$(manifest_field "$manifest" "data['assets']['$target']['path']")
+        checksum=$(manifest_field "$manifest" "data['assets']['$target']['sha256']")
+    else
+        asset_path=$(manifest_field "$manifest" "data['assets']['$target']")
+    fi
+
+    if [[ -z "$asset_path" || "$asset_path" == /* || "$asset_path" == *".."* ]]; then
+        log_error "Manifest for ${binary} carries an unsafe asset path: ${asset_path}"
+        return 1
+    fi
+
+    target_url="${TERRAPHIM_CHANNEL_BASE}/${asset_path}"
+    asset_name=$(basename "$asset_path")
+
+    log_success "Resolved ${binary} ${resolved_version} for ${target}"
+    log_info "Manifest: ${source_kind}"
+    log_info "Download: ${target_url}"
+    [[ -n "$checksum" ]] && log_info "SHA-256:  ${checksum}"
+
+    echo "ASSET_NAME=${asset_name}"
+    echo "ASSET_URL=${target_url}"
+    echo "ASSET_CHECKSUM=${checksum}"
+    echo "ASSET_VERSION=${resolved_version}"
+    echo "ASSET_TARGET=${target}"
+    echo "ASSET_MANIFEST=${source_kind}"
+
+    return 0
+}
+
+# Installer-compatible shim: emit only the URL.
+resolve_binary_url() {
+    local binary=$1
+    local version=${2:-"$DEFAULT_VERSION"}
+
+    local output
+    output=$(resolve_best_asset "$binary" "$version" 2>/dev/null) || {
         echo "source"
-    fi
+        return 1
+    }
+    echo "$output" | grep '^ASSET_URL=' | cut -d'=' -f2-
 }
 
-# Get asset size for progress reporting
-get_asset_size() {
-    local asset_url=$1
+# Freshness of the channel's pointer, for diagnostics and acceptance runs.
+channel_status() {
+    local binary=${1:-terraphim-agent}
+    local tmpdir
+    tmpdir=$(mktemp -d) || return 1
+    trap 'rm -rf "$tmpdir"' RETURN
 
-    log_info "Getting asset size for: $asset_url"
-
-    # Use HEAD request to get content-length
-    local size
-    size=$(curl -s -I "$asset_url" | grep -i "content-length" | cut -d' ' -f2- | tr -d '\r\n')
-
-    if [[ -n "$size" && "$size" =~ ^[0-9]+$ ]]; then
-        echo "$size"
-        return 0
-    else
-        echo "0"
+    local manifest="$tmpdir/stable-v2.json"
+    if ! fetch_manifest "$binary" latest "$manifest"; then
+        log_error "Channel manifest unreachable for ${binary}"
         return 1
     fi
+
+    log_info "Binary:    ${binary}"
+    log_info "Version:   $(manifest_field "$manifest" 'data["version"]')"
+    log_info "Released:  $(manifest_field "$manifest" 'data["released_at"]')"
+    log_info "Targets:   $(manifest_field "$manifest" "' '.join(sorted(data['assets']))")"
 }
 
-# Verify that an asset is suitable for the current platform
-verify_asset_compatibility() {
-    local asset_name=$1
-    local os=${OS:-"$(uname -s | tr '[:upper:]' '[:lower:]')"}
-    local arch=${ARCH:-"$(uname -m)"}
-
-    log_info "Verifying asset compatibility: $asset_name"
-
-    # Check OS compatibility
-    local os_compatible=false
-    case $os in
-        linux*)
-            if [[ "$asset_name" =~ linux ]]; then
-                os_compatible=true
-            fi
-            ;;
-        darwin*)
-            if [[ "$asset_name" =~ (darwin|macos) ]]; then
-                os_compatible=true
-            fi
-            ;;
-        cygwin*|mingw*|msys*)
-            if [[ "$asset_name" =~ windows ]] || [[ "$asset_name" =~ \.exe$ ]]; then
-                os_compatible=true
-            fi
-            ;;
-    esac
-
-    # Check architecture compatibility
-    local arch_compatible=false
-    case $arch in
-        x86_64|amd64)
-            if [[ "$asset_name" =~ (x86_64|amd64|x64) ]]; then
-                arch_compatible=true
-            fi
-            ;;
-        aarch64|arm64)
-            if [[ "$asset_name" =~ (aarch64|arm64|arm) ]]; then
-                arch_compatible=true
-            fi
-            ;;
-        armv7*)
-            if [[ "$asset_name" =~ armv7 ]]; then
-                arch_compatible=true
-            fi
-            ;;
-    esac
-
-    if [[ "$os_compatible" == true && "$arch_compatible" == true ]]; then
-        log_success "Asset is compatible with current platform"
-        return 0
-    else
-        log_error "Asset is not compatible with current platform"
-        log_error "OS compatible: $os_compatible, Arch compatible: $arch_compatible"
-        return 1
-    fi
-}
-
-# Main function for testing
 main() {
-    local tool=${1:-"terraphim-agent"}
+    local binary=${1:-"terraphim-agent"}
     local version=${2:-"latest"}
 
-    echo "=== Binary Resolution Test ==="
-    echo "Tool: $tool"
+    echo "=== Terraphim Binary Resolution ==="
+    echo "Binary:  $binary"
     echo "Version: $version"
-    echo "==========================="
+    echo "Channel: $TERRAPHIM_CHANNEL_BASE"
+    echo "==================================="
 
-    resolve_best_asset "$tool" "$version"
+    resolve_best_asset "$binary" "$version"
+    local status=$?
 
     echo
-    echo "Testing compatibility check..."
-    if verify_asset_compatibility "terraphim-agent-linux-x86_64"; then
-        echo "Compatibility check passed"
+    if [[ $status -eq 0 ]]; then
+        log_success "Resolution succeeded"
     else
-        echo "Compatibility check failed"
+        log_error "Resolution failed (exit ${status})"
     fi
+    return $status
 }
 
-# If script is executed directly, run main
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
 fi
