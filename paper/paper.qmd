@@ -1,0 +1,212 @@
+---
+title: "Deterministic Semantic Search: Symbolic Graph Embeddings as a Measurable Alternative to Learned Graph Embeddings"
+subtitle: "A systems evaluation of Aho–Corasick concept extraction, integer-rank co-occurrence graphs, and hybrid TF-IDF scoring in Terraphim"
+author:
+  - name: Alexander Mikhalev
+    orcid: 0000-0000-0000-0000
+    email: alex@terraphim.ai
+    affiliations:
+      - name: Terraphim AI
+date: 2026-09-26
+lang: en-GB
+format:
+  typst:
+    papersize: a4
+    margin:
+      x: "2.2cm"
+      y: "2.2cm"
+    number-sections: true
+    columns: 1
+  html:
+    theme: cosmo
+    toc: true
+    number-sections: true
+  pdf:
+    documentclass: article
+    papersize: a4
+    geometry: margin=2.2cm
+    colorlinks: true
+bibliography: references.bib
+# TODO W3/W6: add venue CSL (e.g. elsevier-with-titles.csl) when venue locked
+execute:
+  echo: false
+abstract: |
+  TODO — one paragraph, drafted last (W5). Frame: neural embeddings dominate
+  semantic search, yet production systems need determinism, auditability,
+  sub-millisecond latency, and online updates. We describe and evaluate
+  Terraphim's deterministic pipeline — Aho–Corasick concept extraction over a
+  curated thesaurus, integer-rank co-occurrence graphs ("embeddings" in the
+  project's 2023 sense), hybrid TF-IDF re-scoring, and symbolic set-based
+  embeddings — and measure the cost/benefit boundary against learned graph
+  embeddings (Cleora as cited baseline).
+keywords: [semantic search, knowledge graph, graph embeddings, determinism, explainability, Rust, Aho-Corasick]
+---
+
+<!--
+EVIDENCE DISCIPLINE: every empirical claim in prose must cite
+- docs/research/paper-bench-evidence-20260926/ (criterion logs), or
+- E4–E8 results in docs/research/paper-results-<date>/ (to be generated), or
+- a listed reference.
+Placeholders marked TODO below follow the writing order from
+docs/plans/design-paper-terraphim-graph-embeddings.md (W1 system → W2 eval →
+W3 related → W4 discussion → W5 intro/abstract last).
+-->
+
+# Read me first: the one-minute version {.unnumbered}
+
+<!--
+House style from terraphim-skills/evals/jev-eval/report. For an academic
+article this becomes a boxed "Contributions at a glance" panel; keep it
+honest and specific. TODO (W5).
+-->
+
+> **Research question.** What do deterministic graph-based rankings cost and
+> buy, compared with learned graph embeddings, in a production semantic
+> search system?
+>
+> **Answer.** TODO — fill only from E4–E8 results.
+
+# Introduction
+
+<!--
+TODO (W5, drafted last).
+- Genesis narrative with receipts: 2023 forum post on embedding optimisation
+  [@terraphim2023embeddings] with before/after measurements and video
+  [@terraphim2023video]; positioning [@terraphim2023difference].
+- Terminology evolution: 2023 "graph embeddings" = deterministic rank graph;
+  the field's usage (learned vectors); this paper's bridge and comparison.
+- Contributions (3 bullets): (1) system description of a production
+  deterministic pipeline; (2) measured trade-offs: ranking quality, latency,
+  memory, update economics, determinism; (3) open artefacts: corpus hash,
+  benchmark suite, reproduction scripts.
+-->
+
+## Research questions
+
+- **RQ1 (quality)**: How does pure graph-rank scoring compare with the hybrid
+  rank+TF-IDF scorer on ranking quality (MAP@10, nDCG@10)?
+- **RQ2 (latency)**: What is the end-to-end query latency profile (p50/p95/p99)?
+- **RQ3 (update economics)**: What does an online rank update cost vs
+  re-embedding?
+- **RQ4 (determinism)**: Is the pipeline replayable (byte-identical ranks)?
+- **RQ5 (memory)**: What is the footprint of integer ranks vs $d$-dim float
+  vectors?
+
+# Background and related work
+
+<!--
+TODO (W3).
+- Aho–Corasick automata [@aho1975]; FST autocomplete.
+- TF-IDF [@sparckjones1972], BM25 family [@robertson2009bm25].
+- Graph embeddings: DeepWalk [@perozzi2014deepwalk], node2vec
+  [@grover2016node2vec], Cleora [@bien2021cleora].
+- Entity linking / KG-grounded IR (TAGME, GENRE) — position the thesaurus
+  approach against them.
+- Interpretable/explainable IR; reciprocal rank fusion [@cormack2009rrf].
+- Positioning table: Terraphim vs each family (from research doc).
+-->
+
+# System description
+
+<!--
+TODO (W1). Sections:
+1. Thesaurus → automaton (offline). Source: terraphim_automata (matcher.rs
+   word-boundary guard, MIN_FIND_PATTERN_LENGTH=2 — genuinely publishable
+   engineering detail; cite line-verified behaviour + tests).
+2. Indexing: document → sentence split → AC match → co-occurrence edges;
+   integer rank increments (node/edge/doc). Source: terraphim_rolegraph.
+3. Query path: AC match → node IDs → rank sums; hybrid re-scoring with
+   TFIDFScorer (QueryScorer::Tfidf). Sources: terraphim_types::score,
+   rolegraph TF-IDF unit tests.
+4. Symbolic embeddings: IS-A transitive closures + Jaccard similarity
+   (symbolic_embeddings.rs, 749 LOC). Benchmarked: build 38 ms @1k → 5.4 s
+   @10k nodes; similarity cold 38.5 ms / warm 8.2 ns.
+5. Complexity table per stage (all O() claims must match measured curves).
+Include pipeline figure (figures/pipeline.svg, TODO from mermaid).
+-->
+
+# Evaluation
+
+<!--
+TODO (W2). Setup: corpus terraphim-docs (130 md files), hash ec54d56b…,
+provenance paper/corpus/PROVENANCE.md; machine specs from machine.txt;
+criterion 2–3 s settings for E1 indicative numbers; full runs E4–E8 for
+paper numbers with RUN_MANIFEST.json per table/figure.
+-->
+
+## E1 — pipeline verification (done)
+
+Unit + integration tests green across `terraphim_automata` and
+`terraphim_rolegraph`; hybrid path exercised by 5 dedicated TF-IDF unit
+tests. Indicative criterion sweep (see
+`docs/research/paper-bench-evidence-20260926/`): autocomplete 1.6–2.8 µs;
+FST exact match 631 ns; index build ~linear; end-to-end query 0.8–2.7 ms.
+
+## RQ1 — ranking quality (E3/E4)
+
+<!--
+TODO: judgements.tsv (≥50 queries, LLM-assisted pooling + 20% human
+spot-check); MAP@10/nDCG@10 with bootstrap CIs; arm 1 (pure rank) vs arm 2
+(hybrid). Metrics refs: [@jarvelin2002ndcg].
+-->
+
+## RQ2 — latency (E5)
+
+<!--
+TODO: percentiles from criterion benches + full query path; table
+AC-match-only vs full query. Existing indicative: query 0.8–2.7 ms.
+-->
+
+## RQ3 — update economics (E6)
+
+<!--
+TODO: incremental rank update (O(1) increments) vs Cleora re-embed wall-clock
+(citation-based unless E9 approved).
+-->
+
+## RQ4 — determinism (E8)
+
+<!--
+TODO: 3× full pipeline replay; diff = ∅; report SHA256 of rank tables.
+-->
+
+## RQ5 — memory (E7)
+
+<!--
+TODO: peak RSS; ints vs floats accounting (O(N+E) ints vs O(N·d) floats).
+-->
+
+# Discussion
+
+<!--
+TODO (W4). When counts suffice; the long-tail limitation; symbolic
+embeddings as a third point on the determinism–expressiveness axis;
+threats: LLM-assisted judgements, single corpus, untuned cited baseline,
+indicative vs full benchmark settings.
+-->
+
+# Conclusion and future work
+
+<!--
+TODO (W5). Future: α-blend tuning; ANN enrichment; Cleora arm as measured
+comparison; corpus growth.
+-->
+
+# Artefact availability
+
+<!--
+TODO (W6). Corpus SHA256SUMS + CORPUS_HASH; reproduction script
+scripts/paper/reproduce-all.sh; pinned commits (terraphim-ai
+2d363b8a…, terraphim-core …, terraphim-service …); known repro trap:
+symbolic_embedding_bench requires --features medical.
+-->
+
+# Acknowledgements
+
+AI assistance: research planning, experiment scaffolding, and drafting
+support were provided by Kokoro (OpenClaw); all content reviewed and approved
+by the author. Discourse excerpts [@terraphim2023embeddings;
+@terraphim2023difference; @terraphim2023architecture] © the author.
+
+::: {#refs}
+:::

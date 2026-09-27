@@ -174,3 +174,13 @@ pr_review_files/
 pr_gate_result*.rs
 reconcile_impl_new.rs
 reconcile_impl_old.rs
+
+# Paper corpus copies: derived artefact, regenerable from pinned commit (see paper/corpus/PROVENANCE.md)
+paper/corpus/terraphim-docs/
+
+# Paper render outputs: regenerable via quarto render (source of truth: paper.qmd)
+paper/paper_files/
+paper.html
+paper.docx
+paper.pdf
+paper.typ
