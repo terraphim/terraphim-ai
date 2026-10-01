@@ -28,6 +28,11 @@ on:
       - "tests/workflow_release_sign_test.py"
       - "tests/updater_r2_manifest_contract_test.py"
       - "crates/terraphim_update/**"
+      - "config/homebrew/**"
+      - "scripts/generate-homebrew-formulas.py"
+      - "scripts/homebrew-outbox.sh"
+      - "tests/homebrew_formulas_test.py"
+      - "tests/fixtures/homebrew/**"
   push:
     paths:
       - ".github/actionlint.yaml"
@@ -55,6 +60,11 @@ on:
       - "tests/workflow_release_sign_test.py"
       - "tests/updater_r2_manifest_contract_test.py"
       - "crates/terraphim_update/**"
+      - "config/homebrew/**"
+      - "scripts/generate-homebrew-formulas.py"
+      - "scripts/homebrew-outbox.sh"
+      - "tests/homebrew_formulas_test.py"
+      - "tests/fixtures/homebrew/**"
 
 permissions:
   contents: read
@@ -80,6 +90,9 @@ jobs:
 
       - name: Run unit tests
         run: python -m unittest tests.release_manifest_validator_test
+
+      - name: Homebrew formula generator contract
+        run: python -m unittest tests.homebrew_formulas_test
 
       - name: Validate valid fixtures
         run: |
