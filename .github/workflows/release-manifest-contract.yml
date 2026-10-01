@@ -26,6 +26,11 @@ on:
       - "tests/workflow_release_coordinator_sequence_test.py"
       - "tests/workflow_release_recovery_contract_test.py"
       - "tests/workflow_release_sign_test.py"
+      - "config/homebrew/**"
+      - "scripts/generate-homebrew-formulas.py"
+      - "scripts/homebrew-outbox.sh"
+      - "tests/homebrew_formulas_test.py"
+      - "tests/fixtures/homebrew/**"
   push:
     paths:
       - ".github/actionlint.yaml"
@@ -51,6 +56,11 @@ on:
       - "tests/workflow_release_coordinator_sequence_test.py"
       - "tests/workflow_release_recovery_contract_test.py"
       - "tests/workflow_release_sign_test.py"
+      - "config/homebrew/**"
+      - "scripts/generate-homebrew-formulas.py"
+      - "scripts/homebrew-outbox.sh"
+      - "tests/homebrew_formulas_test.py"
+      - "tests/fixtures/homebrew/**"
 
 permissions:
   contents: read
@@ -76,6 +86,9 @@ jobs:
 
       - name: Run unit tests
         run: python -m unittest tests.release_manifest_validator_test
+
+      - name: Homebrew formula generator contract
+        run: python -m unittest tests.homebrew_formulas_test
 
       - name: Validate valid fixtures
         run: |
