@@ -264,3 +264,55 @@ state. All mutating commands also take an exclusive lock on
   requires either a format-appropriate signing mechanism to be added to
   the coordinator first, or that format to be added to
   `SIGNATURE_EXEMPT_FORMATS` with its own out-of-band provenance story.
+
+
+## Rehearsal evidence aggregation (#3382)
+
+The coordinator's rehearsal (`plan` -> `stage` -> `verify`) proves the two
+central channels and freezes the manifest digest. Each downstream channel and
+verification lane owns its own runtime evidence; aggregate it into a single
+rehearsal report without re-running or copying any of it:
+
+```bash
+python3 scripts/rehearse-managed-release.py \
+  --state-dir ./state \
+  --evidence ./rehearsal-evidence.json \
+  --evidence-root ./evidence \
+  --output ./state/rehearsal-report.json
+```
+
+The evidence bundle is bound to the frozen release:
+
+```json
+{
+  "schema_version": "1.0.0",
+  "release_tag": "vX.Y.Z",
+  "manifest_sha256": "<the verified coordinator digest>",
+  "channels": {
+    "homebrew_tap_pr": [{"name": "...", "path": "homebrew/...", "sha256": "..."}],
+    "aur_terraphim_clients_bin": [{"...": "..."}],
+    "omarchy_terraphim_clients_bin": [{"...": "..."}]
+  },
+  "verifications": {
+    "deb_rpm_native": [{"...": "..."}],
+    "updater_zero_network_write": [{"...": "..."}]
+  }
+}
+```
+
+- Every channel in the frozen manifest's `downstream_channels` and every
+  verification lane must have at least one regular, non-empty evidence file
+  whose SHA-256 matches the declared digest; the report stores only the
+  relative path, digest and size.
+- The coordinator state must be `verified`; a report over any other state
+  fails closed.
+- A channel may be recorded as explicitly deferred (`--deferred-channel
+  <channel> <reason>`, e.g. while AUR account registration is paused). The
+  report then has status `deferred` and withholds the `approval` digest, so
+  a deferred rehearsal can never authorize promotion. Add
+  `--require-complete` to fail the step on any deferred channel.
+- Re-running over unchanged inputs is byte-identical (`--check` fails on
+  drift), so the report is safe to commit or upload as a rehearsal artifact.
+
+Only a `pass` report's `approval` value may be supplied to the coordinator's
+`promote` dispatch.

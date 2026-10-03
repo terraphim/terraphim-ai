@@ -20,6 +20,8 @@ on:
       - "scripts/validate-release-manifest.py"
       - "tests/fixtures/release-manifest/**"
       - "tests/release_manifest_validator_test.py"
+      - "scripts/rehearse-managed-release.py"
+      - "tests/rehearsal_report_test.py"
       - "tests/release_coordinator_test.py"
       - "tests/release_control_mutation_test.py"
       - "tests/workflow_release_coordinator_contract_test.py"
@@ -50,6 +52,8 @@ on:
       - "scripts/validate-release-manifest.py"
       - "tests/fixtures/release-manifest/**"
       - "tests/release_manifest_validator_test.py"
+      - "scripts/rehearse-managed-release.py"
+      - "tests/rehearsal_report_test.py"
       - "tests/release_coordinator_test.py"
       - "tests/release_control_mutation_test.py"
       - "tests/workflow_release_coordinator_contract_test.py"
@@ -201,3 +205,6 @@ jobs:
 
       - name: Run GitHub release publication shell contract tests
         run: bash .github/scripts/release/tests/test_github_publish_release.sh
+
+      - name: Managed-release rehearsal evidence aggregation
+        run: python -m unittest -v tests.rehearsal_report_test
