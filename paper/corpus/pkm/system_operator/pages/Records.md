@@ -1,0 +1,5 @@
+type:: [[Business object]]
+source:: [[@Digital Systems Engineering Process Model Version: 1.0]]
+documentation:: Records from all applicable life cycle processes, including business or mission analysis record, stakeholder needs and requirements definition record, system requirements definition record, architecture definition record, design definition record, system analysis record, implementation record, integration record, verification record, transition record, validation record, operation record, maintenance record, disposal record, project planning record, project assessment and control record, decision record, risk record, configuration management record, information management record, measurement record, quality assurance record, acquisition record, supply record, life cycle model management record, infrastructure management record, portfolio management record, human resource management record, and QM record.
+
+-

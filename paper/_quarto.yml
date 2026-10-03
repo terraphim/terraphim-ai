@@ -1,0 +1,6 @@
+project:
+  type: default
+  execute-dir: project
+
+title: "Deterministic Semantic Search — Terraphim Graph Embeddings"
+author: "Alexander Mikhalev"

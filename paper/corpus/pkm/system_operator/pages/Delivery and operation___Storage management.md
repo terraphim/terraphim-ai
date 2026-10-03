@@ -1,0 +1,14 @@
+type:: [[skill]]
+source:: [[@The global skills and competency framework for a digital world]]
+documentation:: Planning, implementing and optimising the technologies and processes used for data storage.
+sfiacode:: [[STMG]]
+sfiaskill:: [[Storage management]]
+sfiacategory:: [[Delivery and operation]]
+sfiasubcategory:: [[Technology management]]
+sfiaguidancenotes:: Storage management includes managing local or external storage such as direct access storage (DAS), network access storage (NAS), storage area networks (SAN) and cloud-based storage. Storage management technologies  and processes includes — but are not limited to — virtualisation, replication, mirroring, security, compression, traffic analysis, process automation, storage provisioning and related techniques. Activities may include — but are not limited to: backup, archiving and recovery of data; ensuring compliance with regulatory and security requirements; addressing business goals based on information value, data classification, recovery point and recovery time objectives.
+sfialevel3description:: Performs regular high-performance, scalable backups and restores on a schedule and tracks offsite storage. Implements documented configurations for allocation of storage, installation and maintenance of secure storage systems using the agreed operational procedures. Identifies operational problems and contributes to their resolution. Uses standard management and reporting tools to collect and report on storage utilisation, performance and backup statistics.
+sfialevel4description:: Prepares and maintains operational procedures for storage management. Monitors capacity, performance, availability and other operational metrics. Takes appropriate action to ensure corrective and proactive maintenance of storage and backup systems to protect and secure business information. Creates reports and proposals for improvement. Contributes to the planning and implementation of new installations and scheduled maintenance and changes of existing systems.
+sfialevel5description:: Develops standards and guidelines for implementing data protection and disaster recovery functionality for all business applications and business data. Provides expert advice and guidance to implement and improve storage management. Manages storage and backup systems to provide agreed service levels. Creates, improves and supports storage management services with optimal utilisation of storage resources, ensuring security, availability and integrity of data.
+sfialevel6description:: Develops strategies for managing storage and data based on the level of criticality of the information. Ensures compliance with regulatory and security requirements. Aligns investments in storage management with business goals and data management policies.
+
+-

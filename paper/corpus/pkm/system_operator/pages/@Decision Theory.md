@@ -1,0 +1,16 @@
+tags:: [[decision theory: causal]], [[epistemic utility arguments for probabilism]], [[possible worlds]], [[probabilities]], [[imprecise]], [[probability]], [[interpretations of]], [[rational choice]], [[normative: expected utility]], [[social choice theory]], [[statistics]], [[philosophy of]]
+date:: 2020
+publisher:: "Metaphysics Research Lab, Stanford University"
+title:: @Decision Theory
+book-title:: The Stanford Encyclopedia of Philosophy
+item-type:: [[bookSection]]
+access-date:: 2022-02-17T11:36:59Z
+original-title:: Decision Theory
+url:: https://plato.stanford.edu/archives/win2020/entries/decision-theory/
+edition:: Winter 2020
+authors:: [[Katie Steele]], [[H. Orri Stefánsson]]
+library-catalog:: Stanford Encyclopedia of Philosophy
+links:: [Local library](zotero://select/library/items/3ZIPW2UJ), [Web library](https://www.zotero.org/users/6520516/items/3ZIPW2UJ)
+
+- [[Abstract]]
+	- Decision theory is concerned with the reasoning underlying an agent’s choices, whether this is a mundane choice between taking the bus or getting a taxi, or a more far-reaching choice about whether to pursue a demanding political career. (Note that “agent” here stands for an entity, usually an individual person, that is capable of deliberation and action.) Standard thinking is that what an agent chooses to do on any given occasion is completely determined byher beliefs and desires or values, but this is not uncontroversial, as will be noted below. In any case, decision theory is as much a theory of beliefs, desires and other relevant attitudes as it is a theory of choice; what matters is how these various attitudes (call them“preference attitudes”) cohere together., The focus of this entry is normative decision theory. That is, the main question of interest is what criteria an agent’s preference attitudes should satisfy in any generic circumstances. This amounts to a minimal account of rationality, one that sets aside more substantial questions about appropriate desires and reasonable beliefs, given the situation at hand. The key issue for a minimal account is the treatment of uncertainty. The orthodox normative decision theory, expected utility (EU) theory, essentially says that, in situations of uncertainty, one should prefer the option with greatest expected desirability or value. (Note that in this context,“desirability” and “value” should be understood as desirability/value according to the agent in question.) This simple maxim will be the focus of much of our discussion. The structure of this entry is as follows: Section 1 discusses the basic notion of “preferences over prospects”, which lies at the heart of decision theory. Section 2 describes the development of normative decision theory in terms of ever more powerful and flexible measures of preferences. Section 3 discusses the two best-known versions of EU theory. Section 4 considers the broader significance of EU theory for practical action, inference, and valuing. Section 5 turns to prominent challenges to EU theory, while Section 6 addresses sequential decisions, and how this richer setting bears on debates about rational preferences.

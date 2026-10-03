@@ -1,0 +1,15 @@
+tags:: [[Contracts]], [[Costs]], [[Environmental management]], [[Large-scale systems]], [[Project management]], [[Research and development management]], [[Risk management]], [[Scheduling]], [[Systems engineering and theory]], [[Uncertainty]]
+date:: 2003
+conference-name:: IEMC '03 Proceedings. Managing Technologically Driven Organizations: The Human Side of Innovation and Change
+proceedings-title:: IEMC '03 Proceedings. Managing Technologically Driven Organizations: The Human Side of Innovation and Change
+doi:: 10.1109/IEMC.2003.1252282
+title:: @The project management - Systems Engineering dichotomy
+pages:: 306-310
+item-type:: [[conferencePaper]]
+original-title:: The project management - Systems Engineering dichotomy
+authors:: [[D. Watt]], [[K. Willey]]
+library-catalog:: IEEE Xplore
+links:: [Local library](zotero://select/library/items/CH345VJF), [Web library](https://www.zotero.org/users/6520516/items/CH345VJF)
+
+- [[Abstract]]
+	- Considerable attention has been drawn by many researchers toward the System Development Life Cycle and how best to manage the development of a Large Scale Systems within a competitive environment. The success in developing these systems is dependent upon many factors of influence both within the organisation delivering the system, and the market sector within which that organisation operates. These factors alone create an environment of extreme competition and uncertainty. Coupled to this is the uncertainty associated with the overall project objectives in understanding explicitly what is to be delivered and when. Technology may further complicate this situation, particularly when it is unprecedented. Given the high levels of uncertainty, the dynamic environments, and the competitive pressures within which organisations have to operate, there is a continued practice to accept contracts based on pre-defined cost, schedule, and ill defined specifications. In doing so, enormous commitment in terms of expected cost, anticipated effort, required resources, and agreed design solution is undertaken at great risk. This approach is perceived as being one of necessity in order to remain competitive. However, it fails to appreciate the causes and consequences of uncertainty and attempts to manage it through standard risk management practices. This creates enormous tension within the contracting organisation after contract award and effectively establishes a dichotomy between the program management and System Engineering functions. The perception of value, as viewed from the program office functional domain is another contributing factor. There are several important issues associated with establishing and managing the development of Large Scale Systems. Important among these is an environment of extreme uncertainty and the competing viewpoints from which the client and contracting organisations perceive value. This paper provides the foundation for continued research that will focus on developing models that better reflect the determination of perceived value across the life cycle of Large Scale Complex Engineering Systems.

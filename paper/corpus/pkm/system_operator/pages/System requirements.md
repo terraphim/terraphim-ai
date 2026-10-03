@@ -1,0 +1,5 @@
+type:: [[Business object]]
+source:: [[@Digital Systems Engineering Process Model Version: 1.0]]
+documentation:: What the system needs to do, how well, and under what conditions, as required to meet project and design constraints. Includes types of requirements such as functional, performance, interface, behavior (e.g., states and modes, stimulus responses, fault and failure handling), operational conditions (e.g., safety, dependability, human factors, environmental conditions), transportation, storage, physical constraints, realization, integration, verification, validation, production, maintenance, disposal constraints, and regulation. System requirements may be captured in a document called the System Requirements Specification (SyRS) or just System Specification. This includes the requirements at any level in the system hierarchy.
+
+-

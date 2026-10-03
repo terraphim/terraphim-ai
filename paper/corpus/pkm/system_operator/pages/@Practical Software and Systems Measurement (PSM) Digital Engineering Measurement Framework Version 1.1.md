@@ -1,0 +1,16 @@
+date:: 2022
+publisher:: INCOSE
+title:: @Practical Software and Systems Measurement (PSM) Digital Engineering Measurement Framework Version 1.1
+item-type:: [[document]]
+call-number:: INCOSE-TP-2022-002-01
+original-title:: Practical Software and Systems Measurement (PSM) Digital Engineering Measurement Framework Version 1.1
+short-title:: PSM Digital Engineering Measurement Framework
+authors:: [[Joseph M. Bradley]], [[Cheryl Jones]]
+links:: [Local library](zotero://select/library/items/V9LRY89F), [Web library](https://www.zotero.org/users/6520516/items/V9LRY89F)
+
+- [[Abstract]]
+	- Stakeholders and subject matter experts from across industry, government, and academia have come together here to work collaboratively on this consensus measurement framework to 1) help enterprises transition from traditional document and artifact-based development to a digital model-based future, and 2) to better assess the measurable impacts and benefits they aspire to achieve.
+	  A successful measurement program depends on establishing a clear context and operational definitions for the measures to be collected. The context is defined as a set of work activities and measurement concepts defined in Section 2. Common definitions are listed in Section 3. The Digital Engineering (DE) measurement framework was developed using an approach based on Practical Software and Systems Measurement (PSM)1, detailing common information needs to 
+	  derive an initial set of digital engineering measures. Sections 4 and 5 describe this process. The 
+	  derivation of these measures is documented in an “Information Categories-Measurable Concepts Measures” (ICM) Table, in Section 7. The information needs address goals and the project (or product) and enterprise perspectives (i.e., What do we want to know with respect to the goals?) to provide insight and drive decision-making. The ICM identifies an initial set of measures to address these information needs. For the highest priority measures, sample measurement specifications have been developed to describe these measures in detail along with guidance for their use. These are provided in Section 8. 
+	  This initial DE measurement framework proposed by our team of representative stakeholder experts is intended to help projects and enterprises establish an initial path toward a measurably effective transition and implementation of digital engineering processes, tools, methods and measures. This document represents the first of several steps along this path, which will be a long and challenging, but rewarding journey. Our industry will learn, iterate, and evolve as we go. It does not address, at this time, some of the broader aspects of DE transformation such as enterprise adoption, but will in a later version. A discussion of next steps is included in Section 6. We hope enterprises across a variety of application domains will find this initial measurement guidance useful to assess the effectiveness of their respective digital engineering transformation initiatives.
