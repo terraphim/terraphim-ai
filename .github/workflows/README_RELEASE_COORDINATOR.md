@@ -264,6 +264,9 @@ state. All mutating commands also take an exclusive lock on
   requires either a format-appropriate signing mechanism to be added to
   the coordinator first, or that format to be added to
   `SIGNATURE_EXEMPT_FORMATS` with its own out-of-band provenance story.
+  `deb`, `rpm` and `pkg.tar.zst` are exempt: the coordinator stages and
+  publishes them unchanged, and the detached manifest signature (verified in
+  `verify`) binds their exact SHA-256. `exe`/`dmg` remain fail-closed.
 
 
 ## Rehearsal evidence aggregation (#3382)
