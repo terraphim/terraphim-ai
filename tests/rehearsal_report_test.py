@@ -216,6 +216,23 @@ class FailClosedTests(RehearsalFixture):
 
 
 class DeferredChannelTests(RehearsalFixture):
+    def test_manifest_declared_deferral_withholds_approval(self):
+        self.manifest["deferred_channels"] = [
+            {"channel": "aur_terraphim_clients_bin", "reason": "AUR registration paused"}
+        ]
+        manifest_path = self.state_dir / "manifest.json"
+        manifest_path.write_text(json.dumps(self.manifest, sort_keys=True))
+        self.digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        self.state["manifest_sha256"] = self.digest
+        (self.state_dir / "state.json").write_text(json.dumps(self.state, sort_keys=True))
+        self.evidence["manifest_sha256"] = self.digest
+        proc, output = self.run_agg()
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        report = json.loads(output.read_text())
+        self.assertEqual(report["status"], "deferred")
+        self.assertIsNone(report["approval"])
+        self.assertEqual(report["channels"]["aur_terraphim_clients_bin"]["status"], "deferred")
+
     def test_deferred_channel_withholds_approval(self):
         proc, output = self.run_agg(
             "--deferred-channel", "aur_terraphim_clients_bin", "AUR registration paused"
