@@ -313,6 +313,36 @@ class ReleaseManifestValidatorTest(unittest.TestCase):
         self.assertIn("products", result.stderr + result.stdout)
 
 
+class DeferredChannelContractTest(ReleaseManifestValidatorTest):
+    """A downstream channel may be explicitly deferred with a reason; central
+    channels may not, and deferrals are unique and non-blank (Gitea #3382)."""
+
+    def test_downstream_channel_may_be_deferred(self) -> None:
+        data = valid_manifest()
+        data["deferred_channels"] = [
+            {"channel": "aur_terraphim_clients_bin", "reason": "AUR registration paused"}
+        ]
+        self.assert_accepted(data)
+
+    def test_central_channel_cannot_be_deferred(self) -> None:
+        data = valid_manifest()
+        data["deferred_channels"] = [{"channel": "github_release", "reason": "nope"}]
+        self.assert_rejected(data, "is not one of")
+
+    def test_duplicate_deferral_is_rejected(self) -> None:
+        data = valid_manifest()
+        data["deferred_channels"] = [
+            {"channel": "homebrew_tap_pr", "reason": "a"},
+            {"channel": "homebrew_tap_pr", "reason": "b"},
+        ]
+        self.assert_rejected(data, "duplicate")
+
+    def test_deferral_requires_a_reason(self) -> None:
+        data = valid_manifest()
+        data["deferred_channels"] = [{"channel": "omarchy_terraphim_clients_bin"}]
+        self.assert_rejected(data, "reason")
+
+
 def load_fixture_schema() -> dict[str, Any]:
     return json.JSONDecoder().decode(SCHEMA.read_text(encoding="utf-8"))
 

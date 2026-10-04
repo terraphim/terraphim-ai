@@ -103,6 +103,9 @@
     "created_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "deferred_channels": {
+      "$ref": "#/$defs/deferred_channels"
     }
   },
   "$defs": {
@@ -302,6 +305,34 @@
           "aur_terraphim_clients_bin",
           "omarchy_terraphim_clients_bin"
         ]
+      }
+    },
+    "deferred_channels": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "channel",
+          "reason"
+        ],
+        "properties": {
+          "channel": {
+            "enum": [
+              "homebrew_tap_pr",
+              "aur_terraphim_clients_bin",
+              "omarchy_terraphim_clients_bin"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "deferred_since": {
+            "type": "string"
+          }
+        }
       }
     }
   }

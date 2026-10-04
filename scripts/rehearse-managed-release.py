@@ -164,6 +164,13 @@ def aggregate(args: argparse.Namespace) -> dict[str, Any]:
         if channel not in channels:
             raise RehearsalError(f"cannot defer unknown channel {channel!r}")
 
+    for entry in manifest.get("deferred_channels") or []:
+        channel = entry.get("channel")
+        reason = entry.get("reason") or ""
+        if channel not in channels:
+            raise RehearsalError(f"manifest defers unknown channel {channel!r}")
+        deferred.setdefault(channel, reason or "deferred in the release manifest")
+
     channels_evidence = evidence.get("channels") or {}
     verifications_evidence = evidence.get("verifications") or {}
     if not isinstance(channels_evidence, dict) or not isinstance(verifications_evidence, dict):

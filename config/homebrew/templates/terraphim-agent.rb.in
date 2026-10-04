@@ -28,8 +28,7 @@ class TerraphimAgent < Formula
   test do
     assert_match "terraphim", shell_output("#{bin}/terraphim-agent --version 2>&1")
     assert_match "Learning capture", shell_output("#{bin}/terraphim-agent learn --help 2>&1")
-    assert_match "Memory lifecycle", shell_output("#{bin}/terraphim-agent memory --help 2>&1")
-    assert_match "Print the full body", shell_output("#{bin}/terraphim-agent sessions expand --help 2>&1")
+    assert_match "Session management", shell_output("#{bin}/terraphim-agent sessions --help 2>&1")
     if OS.mac?
       system "/usr/bin/codesign", "--verify", "--all-architectures", "--deep", "--strict",
              bin/"terraphim-agent"

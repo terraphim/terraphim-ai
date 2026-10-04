@@ -138,6 +138,21 @@ def validate_business_invariants(manifest: Any) -> None:
         if source["gitea_sha"] != source["github_sha"]:
             raise ValidationError(f"sources.{repo}: Gitea SHA must match GitHub SHA")
 
+    downstream_channels = set(data["downstream_channels"])
+    seen_deferred: set[str] = set()
+    for index, entry in enumerate(data.get("deferred_channels") or []):
+        path = f"deferred_channels[{index}]"
+        channel = entry["channel"]
+        if channel not in downstream_channels:
+            raise ValidationError(
+                f"{path}.channel: only downstream channels may be deferred, got {channel!r}"
+            )
+        if channel in seen_deferred:
+            raise ValidationError(f"{path}.channel: duplicate deferred channel {channel!r}")
+        seen_deferred.add(channel)
+        if not entry["reason"].strip():
+            raise ValidationError(f"{path}.reason: must not be blank")
+
     seen_names: set[str] = set()
     seen_hashes: set[str] = set()
     for index, asset in enumerate(data["assets"]):
