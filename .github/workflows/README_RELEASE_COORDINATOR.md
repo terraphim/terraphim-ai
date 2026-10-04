@@ -319,3 +319,35 @@ The evidence bundle is bound to the frozen release:
 
 Only a `pass` report's `approval` value may be supplied to the coordinator's
 `promote` dispatch.
+
+## Publishing managed DEB/RPM packages
+
+The clients producer builds the managed DEB/RPM packages and uploads them as
+`client-managed-packages-<target>` artifacts on the same run as the signed
+archives. The coordinator stage step downloads **all** artifacts of that run,
+so the packages are already present in the `terraphim-clients`
+producer-artifact directory. Including them as manifest assets is therefore
+enough to stage, verify and publish them to the GitHub release and the R2
+stable channel:
+
+    {
+      "name": "terraphim-agent_1.21.16-1_amd64.deb",
+      "component": "terraphim-agent",
+      "format": "deb",
+      "target": "x86_64-unknown-linux-musl",
+      "arch": "x86_64",
+      "os": "linux",
+      "source_repo": "terraphim-clients",
+      "source_sha": "<clients git sha>",
+      "sha256": "<sha256>",
+      "size_bytes": 12345678,
+      "signature": "detached-manifest-signature"
+    }
+
+`deb`, `rpm` and `pkg.tar.zst` are signature-exempt: the coordinator stages
+and publishes them unchanged and never routes them through zipsign. Because
+the manifest schema still requires a non-empty `signature` string for every
+non-`rb` format, use a constant marker such as
+`detached-manifest-signature`. Their integrity is bound by the detached
+manifest signature (verified in `verify`), not by that field. `exe`/`dmg`
+remain fail-closed.
