@@ -75,11 +75,16 @@ DOWNSTREAM_CHANNEL_OS = {
     "omarchy_terraphim_clients_bin": frozenset({"linux"}),
 }
 
-SIGNATURE_EXEMPT_FORMATS = frozenset({"rb"})
+SIGNATURE_EXEMPT_FORMATS = frozenset({"rb", "deb", "rpm", "pkg.tar.zst"})
 SIGNED_MARKER = "zipsign-embedded-ed25519"
 
-# zipsign (https://github.com/Kijewski/zipsign) only understands these two
-# container formats -- it is not a general-purpose signer. The release
+# zipsign (https://github.com/Kijewski/zipsign) only understands the two
+# container formats below -- it is not a general-purpose signer. Formats the
+# coordinator must publish but zipsign cannot sign (deb, rpm, pkg.tar.zst) are
+# signature-exempt: they are staged and published unchanged, and their
+# integrity is covered by the detached manifest signature (verified in
+# 'verify'), which binds their exact SHA-256. They are NEVER routed through
+# zipsign. The release
 # manifest schema's `format` enum also allows deb/rpm/pkg.tar.zst/exe/dmg,
 # none of which zipsign can sign or verify: `zipsign sign tar` embeds a
 # signature by appending to the byte stream unconditionally, with no

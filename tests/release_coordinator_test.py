@@ -1271,9 +1271,9 @@ class SigningContract(CoordinatorFixture):
         than silently producing that corrupted, falsely-successful asset."""
         self.plan()
         manifest = self.build_manifest()
-        manifest["assets"][0]["format"] = "deb"
+        manifest["assets"][0]["format"] = "exe"
         manifest["assets"][0]["signature"] = (
-            "terraphim-server-1.2.3-linux-x86_64.deb.sig"
+            "terraphim-server-1.2.3-linux-x86_64.exe.sig"
         )
         deb_manifest = self.work / "deb-format-manifest.json"
         write_json(deb_manifest, manifest)
@@ -1286,7 +1286,7 @@ class SigningContract(CoordinatorFixture):
 
         result = self.sign()
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("no signing/verification support for format 'deb'", result.stderr)
+        self.assertIn("no signing/verification support for format 'exe'", result.stderr)
 
         # Fail closed means untouched -- not silently corrupted like the
         # bug this test guards against.
@@ -1295,9 +1295,9 @@ class SigningContract(CoordinatorFixture):
     def test_verify_fails_closed_for_a_zipsign_unsupported_format(self) -> None:
         self.plan()
         manifest = self.build_manifest()
-        manifest["assets"][0]["format"] = "rpm"
+        manifest["assets"][0]["format"] = "dmg"
         manifest["assets"][0]["signature"] = (
-            "terraphim-server-1.2.3-linux-x86_64.rpm.sig"
+            "terraphim-server-1.2.3-linux-x86_64.dmg.sig"
         )
         rpm_manifest = self.work / "rpm-format-manifest.json"
         write_json(rpm_manifest, manifest)
@@ -1306,7 +1306,36 @@ class SigningContract(CoordinatorFixture):
 
         result = self.verify()
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("no signing/verification support for format 'rpm'", result.stderr)
+        self.assertIn("no signing/verification support for format 'dmg'", result.stderr)
+
+    def test_deb_and_rpm_are_signature_exempt_and_unchanged(self) -> None:
+        """deb/rpm cannot be signed by zipsign, so they are signature-exempt:
+        sign-assets must skip them (never corrupt them), and verify must
+        accept them, with integrity covered by the detached manifest
+        signature. This is what lets the coordinator publish the managed
+        DEB/RPM packages built by the release workflow (Gitea #314)."""
+        self.plan()
+        manifest = self.build_manifest()
+        manifest["assets"][0]["format"] = "deb"
+        manifest["assets"][0]["signature"] = "terraphim-server-1.2.3-linux-x86_64.deb.sig"
+        manifest["assets"][1]["format"] = "rpm"
+        manifest["assets"][1]["signature"] = "terraphim-agent-1.2.3-linux-x86_64.rpm.sig"
+        exempt_manifest = self.work / "exempt-manifest.json"
+        write_json(exempt_manifest, manifest)
+        self.stage_both_producers(manifest=exempt_manifest)
+
+        deb_path = self.state_dir / "assets" / "terraphim-server-1.2.3-linux-x86_64.tar.gz"
+        rpm_path = self.state_dir / "assets" / "terraphim-agent-1.2.3-linux-x86_64.tar.gz"
+        before = (deb_path.read_bytes(), rpm_path.read_bytes())
+
+        signed = self.sign()
+        self.assertEqual(signed.returncode, 0, signed.stderr)
+        self.assertEqual(deb_path.read_bytes(), before[0])
+        self.assertEqual(rpm_path.read_bytes(), before[1])
+
+        verified = self.verify()
+        self.assertEqual(verified.returncode, 0, verified.stderr)
+
 
     def test_sign_assets_still_works_for_the_zip_format_via_the_correct_zipsign_subcommand(
         self,
