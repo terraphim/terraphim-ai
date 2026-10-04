@@ -172,6 +172,18 @@ pub struct StepState {
     pub log_index: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub log_length: Option<i64>,
+    // started_at/stopped_at are optional step timestamps sent alongside the step's
+    // terminal state in the per-step UpdateTask request. They are independent
+    // from the task-level started_at/stopped_at on TaskState: a step can begin
+    // long after the task begins (after checkout or matrix dependencies) and
+    // end before the workflow as a whole does. Server-side, the Gitea actions
+    // runner handler merges these into the per-step row that drives the UI's
+    // step timeline; the fields are optional so older runner builds that
+    // don't fill them still serialize cleanly to the same wire shape.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stopped_at: Option<String>,
 }
 
 /// `UpdateTask` response.
@@ -305,5 +317,34 @@ mod wire_contract_tests {
         let obj = v.as_object().unwrap();
         assert!(!obj.contains_key("ephemeral"), "must not send ephemeral");
         assert_eq!(obj.len(), 4, "exactly token/name/version/labels");
+    }
+
+    #[test]
+    fn step_state_timestamps_serialise_camelcase_and_omit_when_absent() {
+        let with_times = StepState {
+            id: 2,
+            result: 1,
+            log_index: Some(10),
+            log_length: Some(4),
+            started_at: Some("2026-10-02T15:00:00Z".into()),
+            stopped_at: Some("2026-10-02T15:00:07Z".into()),
+        };
+        let v = serde_json::to_value(&with_times).unwrap();
+        assert_eq!(v["startedAt"], "2026-10-02T15:00:00Z");
+        assert_eq!(v["stoppedAt"], "2026-10-02T15:00:07Z");
+        assert!(v.get("started_at").is_none(), "wire names are camelCase");
+
+        // Older behaviour: no timestamps means no extra keys on the wire.
+        let without = StepState {
+            id: 2,
+            result: 1,
+            log_index: None,
+            log_length: None,
+            started_at: None,
+            stopped_at: None,
+        };
+        let obj = serde_json::to_value(&without).unwrap();
+        let obj = obj.as_object().unwrap();
+        assert_eq!(obj.len(), 2, "only id and result: {obj:?}");
     }
 }
