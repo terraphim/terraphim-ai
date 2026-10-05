@@ -8290,6 +8290,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_lab"
+version = "0.1.0"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "a3adca63f7462aa12c0436b319a9f409c71880de40b9703c4934696ff72dc7cd"
+dependencies = [
+ "ahash 0.8.12",
+ "markdown",
+ "serde",
+ "serde_json",
+ "terraphim_alternatives",
+ "terraphim_automata 2.1.0",
+ "terraphim_types",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "terraphim_llm_runner"
 version = "1.21.3"
 dependencies = [
@@ -8335,6 +8351,7 @@ dependencies = [
  "serde_json",
  "terraphim_alternatives",
  "terraphim_automata 2.1.0",
+ "terraphim_lab",
  "terraphim_types",
  "thiserror 1.0.69",
 ]

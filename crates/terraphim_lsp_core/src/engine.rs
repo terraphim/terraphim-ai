@@ -95,6 +95,29 @@ pub struct AlternativeSet {
     pub replacements: Vec<Replacement>,
 }
 
+/// Where the current form of a matched term sits among its concept's terms:
+/// the data behind an `[i/n]` inlay hint.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SynonymPosition {
+    /// The matched term.
+    pub term: TermMatch,
+    /// One-based position of the matched form in the concept's terms, in
+    /// [`ConceptIndex::synonyms_of`] order (concept name first, then the
+    /// other synonyms sorted), the same order the alternatives are offered
+    /// in.
+    pub index: usize,
+    /// Number of terms of the concept, the matched form included. Always at
+    /// least 2: a concept with a single term has nothing to cycle to.
+    pub count: usize,
+}
+
+impl SynonymPosition {
+    /// The hint text, `[i/n]`.
+    pub fn label(&self) -> String {
+        format!("[{}/{}]", self.index, self.count)
+    }
+}
+
 /// Term analysis and synonym alternatives for one thesaurus.
 ///
 /// Build it once per thesaurus load: it compiles the matcher and inverts the
@@ -245,6 +268,40 @@ impl KgEngine {
     pub fn alternatives_for(&self, text: &str, term: &TermMatch) -> Option<AlternativeSet> {
         self.alternatives_at(text, term.range.start.byte)
             .filter(|set| set.term.range == term.range)
+    }
+
+    /// The `[i/n]` position of every matched term with alternatives, in
+    /// document order.
+    ///
+    /// Terms of single-term concepts are skipped (`n` would be 1, with
+    /// nothing to cycle to), as are terms missing from the concept index.
+    /// The annotation block is excluded, as for [`KgEngine::analyse`].
+    ///
+    /// ```
+    /// use terraphim_lsp_core::KgEngine;
+    ///
+    /// let engine = KgEngine::from_json(r#"{"name": "demo", "data": {
+    ///     "eraser": {"id": 1, "nterm": "eraser"},
+    ///     "rubber": {"id": 1, "nterm": "eraser"}
+    /// }}"#)?;
+    /// let hints = engine.synonym_positions("A rubber.");
+    /// assert_eq!(hints[0].label(), "[2/2]");
+    /// # Ok::<(), terraphim_lsp_core::CoreError>(())
+    /// ```
+    pub fn synonym_positions(&self, text: &str) -> Vec<SynonymPosition> {
+        self.analyse(text)
+            .matches
+            .into_iter()
+            .filter_map(|term| {
+                let terms = self.index.synonyms_of(term.concept_id);
+                let position = terms.iter().position(|t| t.as_str() == term.term)?;
+                (terms.len() > 1).then(|| SynonymPosition {
+                    term,
+                    index: position + 1,
+                    count: terms.len(),
+                })
+            })
+            .collect()
     }
 
     /// Positioned matches in `body`, in the shape `terraphim_automata`'s
