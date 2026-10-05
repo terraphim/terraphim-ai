@@ -1,15 +1,18 @@
 //! Language Server Protocol (LSP) support for Terraphim knowledge graphs.
 //!
-//! Provides LSP hover, completion, diagnostics and synonym code actions for
-//! KG markdown files, enabling editor support for authoring Terraphim
-//! knowledge-graph content. The analysis itself lives in the pure,
+//! Provides LSP hover, completion, diagnostics (with faded ghosted text),
+//! synonym code actions, `[i/n]` inlay hints and `workspace/executeCommand`
+//! commands for KG markdown files, enabling editor support for authoring
+//! Terraphim knowledge-graph content. The analysis itself lives in the pure,
 //! WASM-buildable [`terraphim_lsp_core`] crate, re-exported as [`core`].
 
+pub mod commands;
 pub mod completion;
 mod convert;
 pub mod diagnostics;
 pub mod kg_analysis;
 pub mod server;
+pub mod settings;
 
 pub use server::TerraphimLspServer;
 pub use terraphim_lsp_core as core;

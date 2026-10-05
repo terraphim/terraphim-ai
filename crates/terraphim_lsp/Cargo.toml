@@ -18,12 +18,16 @@ terraphim_lsp_core = { path = "../terraphim_lsp_core", version = "1.21.3", regis
 terraphim_types = { version = "1.22.2", registry = "terraphim" }
 tower-lsp = "0.20"
 tokio = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
 env_logger = "0.11"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
+futures = "0.3"
+# Reads back the blocks the add-alternative command writes.
+terraphim_alternatives = { version = "0.1", registry = "terraphim" }
 
 [[bin]]
 name = "terraphim-lsp"

@@ -193,7 +193,10 @@ async fn initialize_advertises_code_actions() {
         Some(CodeActionProviderCapability::Options(options)) => {
             assert_eq!(
                 options.code_action_kinds,
-                Some(vec![CodeActionKind::REFACTOR_REWRITE])
+                Some(vec![
+                    CodeActionKind::REFACTOR_REWRITE,
+                    CodeActionKind::QUICKFIX
+                ])
             );
         }
         other => panic!("expected code action options, got {other:?}"),

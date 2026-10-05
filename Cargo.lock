@@ -8333,8 +8333,11 @@ name = "terraphim_lsp"
 version = "1.21.3"
 dependencies = [
  "env_logger",
+ "futures",
  "log",
+ "serde",
  "serde_json",
+ "terraphim_alternatives",
  "terraphim_lsp_core",
  "terraphim_types",
  "tokio",
