@@ -64,6 +64,22 @@ class HomebrewFormulaTests(unittest.TestCase):
                 ["terraphim-agent.rb"],
             )
 
+    def test_formulas_write_and_test_the_package_manager_receipt(self):
+        # terraphim_update only defers to `brew upgrade` when the keg holds
+        # share/terraphim/package-manager.d/<binary> containing exactly
+        # "homebrew"; without it self-update targets the Cellar binary
+        # (terraphim-clients#352).
+        with tempfile.TemporaryDirectory() as tmp:
+            GEN.generate(manifest(), Path(tmp))
+            for name in FORMULAS:
+                component = name.removesuffix(".rb")
+                text = (Path(tmp) / name).read_text()
+                install = text.split("  def install\n", 1)[1].split("\n  end\n", 1)[0]
+                test_block = text.split("  test do\n", 1)[1]
+                receipt = f'share/"terraphim/package-manager.d"/"{component}"'
+                self.assertIn(f'({receipt}).write "homebrew\\n"', install, name)
+                self.assertIn(f'assert_equal "homebrew\\n", ({receipt}).read', test_block, name)
+
     def test_components_without_a_spec_are_ignored(self):
         with tempfile.TemporaryDirectory() as tmp:
             written = GEN.generate(manifest(), Path(tmp))

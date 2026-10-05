@@ -23,10 +23,15 @@ class TerraphimGrep < Formula
 
   def install
     bin.install "terraphim-grep"
+    # Marks this keg as Homebrew-managed so `terraphim-grep update` defers to
+    # `brew upgrade` instead of overwriting the Cellar binary.
+    (share/"terraphim/package-manager.d").mkpath
+    (share/"terraphim/package-manager.d"/"terraphim-grep").write "homebrew\n"
   end
 
   test do
     assert_match "terraphim", shell_output("#{bin}/terraphim-grep --version 2>&1")
+    assert_equal "homebrew\n", (share/"terraphim/package-manager.d"/"terraphim-grep").read
     assert_match "Intelligent hybrid grep", shell_output("#{bin}/terraphim-grep --help 2>&1")
     if OS.mac?
       system "/usr/bin/codesign", "--verify", "--all-architectures", "--deep", "--strict",
