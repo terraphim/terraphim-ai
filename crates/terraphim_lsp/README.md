@@ -61,7 +61,10 @@ drops the current Lab marks and trim hints (their ranges would be stale)
 until the next save or command. Lab runs use the blocking thread pool and
 hold no document lock; results computed for a version the client has
 already replaced are dropped, and a command whose run was overtaken by an
-edit fails with `ContentModified`.
+edit fails with `ContentModified`. A per-document generation (bumped by
+edits, Lab commands, clears and settings changes) keeps runs that finish
+out of order from overwriting newer Lab or trim state; a superseded
+command recomputes from the current state.
 
 ## Commands
 

@@ -87,6 +87,11 @@ struct OpenDocument {
     trim: Vec<CoreDiagnostic>,
     /// The trim status card for the current text, `535 → 480 words · −10%`.
     trim_status: Option<String>,
+    /// Bumped whenever what the Lab results depend on changes: the text,
+    /// the requested actions, the trim level or the Lab settings. A Lab run
+    /// installs its results only if the generation it snapshotted is still
+    /// current, so runs finishing out of order never overwrite newer state.
+    generation: u64,
 }
 
 /// A snapshot of one document for a Lab run.
@@ -94,8 +99,21 @@ struct OpenDocument {
 struct LabJob {
     text: String,
     version: i32,
+    generation: u64,
     actions: Vec<LabAction>,
     trim_level: Option<TrimLevel>,
+}
+
+/// What became of a Lab run's results.
+#[derive(Debug)]
+enum Installed {
+    /// Installed; the updated document.
+    Yes(OpenDocument),
+    /// Dropped: the document was edited (now at this version) or closed.
+    Edited(Option<i32>),
+    /// Dropped: the requested Lab state changed on the same version; a
+    /// newer run covers it.
+    Superseded,
 }
 
 /// The results of a [`LabJob`].
@@ -226,6 +244,7 @@ impl TerraphimLspServer {
         let document = documents.entry(uri.clone()).or_default();
         document.text = text.to_string();
         document.version = version;
+        document.generation += 1;
         document.lab.clear();
         document.trim.clear();
         document.trim_status = None;
@@ -241,6 +260,7 @@ impl TerraphimLspServer {
         LabJob {
             text: document.text.clone(),
             version: document.version,
+            generation: document.generation,
             actions,
             trim_level: document.trim_level,
         }
@@ -256,28 +276,29 @@ impl TerraphimLspServer {
             .ok()
     }
 
-    /// Install `results` computed for `version` of `uri`, unless the
-    /// document changed (or closed) meanwhile: then they are dropped, since
-    /// their ranges would be stale, and the next save or command recomputes.
-    /// Returns the updated document when installed.
-    async fn install_lab(
-        &self,
-        uri: &Url,
-        version: i32,
-        results: LabResults,
-    ) -> Option<OpenDocument> {
+    /// Install the results of `job` for `uri`, unless the document was
+    /// edited or closed, or its requested Lab state changed, since the job
+    /// was snapshotted: then they are dropped.
+    async fn install_lab(&self, uri: &Url, job: &LabJob, results: LabResults) -> Installed {
         let mut documents = self.documents.write().await;
-        let document = documents.get_mut(uri)?;
-        if document.version != version {
-            return None;
+        let Some(document) = documents.get_mut(uri) else {
+            return Installed::Edited(None);
+        };
+        if document.version != job.version {
+            return Installed::Edited(Some(document.version));
+        }
+        if document.generation != job.generation {
+            return Installed::Superseded;
         }
         document.lab = results.lab;
         document.trim = results.trim;
         document.trim_status = results.trim_status;
-        Some(document.clone())
+        Installed::Yes(document.clone())
     }
 
-    /// Recompute the Lab results of an open document, then publish.
+    /// Recompute the Lab results of an open document, then publish. Results
+    /// overtaken by an edit or a newer request are dropped; whatever
+    /// overtook them recomputes.
     async fn refresh_lab_and_publish(&self, uri: &Url) {
         let job = {
             let documents = self.documents.read().await;
@@ -286,11 +307,10 @@ impl TerraphimLspServer {
         let Some(job) = job else {
             return;
         };
-        let version = job.version;
-        let Some(results) = self.run_lab_job(job).await else {
+        let Some(results) = self.run_lab_job(job.clone()).await else {
             return;
         };
-        if let Some(document) = self.install_lab(uri, version, results).await {
+        if let Installed::Yes(document) = self.install_lab(uri, &job, results).await {
             self.publish(uri, &document).await;
         }
     }
@@ -314,43 +334,82 @@ impl TerraphimLspServer {
 
     /// Apply `update` to the requested Lab state of the open document `uri`
     /// (if it is still at `version`), recompute its Lab results outside the
-    /// lock and publish. If the document changes while the results are
-    /// computed, they are dropped and the request fails with
-    /// `ContentModified`, so a command result always matches the installed
-    /// state.
+    /// lock and publish.
+    ///
+    /// The command result always matches the installed state:
+    /// - if the document is edited while the results are computed, they are
+    ///   dropped and the request fails with `ContentModified`;
+    /// - if another Lab command changes the requested state of the same
+    ///   version meanwhile, the run is superseded and this command
+    ///   recomputes from the newer state (which includes its own change)
+    ///   until its results are the ones installed.
     async fn update_lab(
         &self,
         uri: &Url,
         version: Option<i32>,
         update: impl FnOnce(&mut OpenDocument),
     ) -> Result<OpenDocument> {
+        let job = self.begin_lab_update(uri, version, update).await?;
+        self.finish_lab_update(uri, job).await
+    }
+
+    /// The first half of [`Self::update_lab`]: check the version, apply
+    /// `update`, bump the generation and snapshot the job, under a brief
+    /// lock.
+    async fn begin_lab_update(
+        &self,
+        uri: &Url,
+        version: Option<i32>,
+        update: impl FnOnce(&mut OpenDocument),
+    ) -> Result<LabJob> {
         if self.lab_config.is_none() {
             return Err(commands::invalid_params("the Lab engine is unavailable"));
         }
-        let job = {
-            let mut documents = self.documents.write().await;
-            let document = documents
-                .get_mut(uri)
-                .ok_or_else(|| commands::invalid_params(format!("{uri} is not open")))?;
-            if let Some(version) = version
-                && version != document.version
-            {
-                return Err(commands::content_modified(version, document.version));
+        let mut documents = self.documents.write().await;
+        let document = documents
+            .get_mut(uri)
+            .ok_or_else(|| commands::invalid_params(format!("{uri} is not open")))?;
+        if let Some(version) = version
+            && version != document.version
+        {
+            return Err(commands::content_modified(version, document.version));
+        }
+        update(document);
+        document.generation += 1;
+        Ok(self.lab_job(document))
+    }
+
+    /// The second half of [`Self::update_lab`]: compute without a lock,
+    /// install (recomputing while superseded) and publish.
+    async fn finish_lab_update(&self, uri: &Url, mut job: LabJob) -> Result<OpenDocument> {
+        loop {
+            let results = self
+                .run_lab_job(job.clone())
+                .await
+                .ok_or_else(|| commands::invalid_params("the Lab run failed"))?;
+            match self.install_lab(uri, &job, results).await {
+                Installed::Yes(document) => {
+                    self.publish(uri, &document).await;
+                    return Ok(document);
+                }
+                Installed::Edited(Some(held)) => {
+                    return Err(commands::content_modified(job.version, held));
+                }
+                Installed::Edited(None) => {
+                    return Err(commands::invalid_params(format!("{uri} is not open")));
+                }
+                Installed::Superseded => {
+                    let documents = self.documents.read().await;
+                    let document = documents
+                        .get(uri)
+                        .ok_or_else(|| commands::invalid_params(format!("{uri} is not open")))?;
+                    if document.version != job.version {
+                        return Err(commands::content_modified(job.version, document.version));
+                    }
+                    job = self.lab_job(document);
+                }
             }
-            update(document);
-            self.lab_job(document)
-        };
-        let computed = job.version;
-        let results = self
-            .run_lab_job(job)
-            .await
-            .ok_or_else(|| commands::invalid_params("the Lab run failed"))?;
-        let Some(updated) = self.install_lab(uri, computed, results).await else {
-            let held = self.checked_document(uri, None).await?.version;
-            return Err(commands::content_modified(computed, held));
-        };
-        self.publish(uri, &updated).await;
-        Ok(updated)
+        }
     }
 
     /// A workspace edit applying `edits` to version `version` of `uri`.
@@ -596,6 +655,7 @@ impl TerraphimLspServer {
                 .get_mut(uri)
                 .ok_or_else(|| commands::invalid_params(format!("{uri} is not open")))?;
             clear(document);
+            document.generation += 1;
             document.clone()
         };
         self.publish(uri, &cleared).await;
@@ -683,6 +743,11 @@ impl LanguageServer for TerraphimLspServer {
 
     async fn did_change_configuration(&self, params: DidChangeConfigurationParams) {
         self.set_settings(ServerSettings::from_value(Some(&params.settings)));
+        // The configured Lab actions may have changed: runs in flight with
+        // the old settings must not install.
+        for document in self.documents.write().await.values_mut() {
+            document.generation += 1;
+        }
         // Ghost hints may have been switched on or off.
         let documents: Vec<(Url, String)> = self
             .documents
@@ -901,33 +966,142 @@ mod tests {
 
     const LAB_DOC: &str = include_str!("../../terraphim_lsp_core/tests/fixtures/lab_doc.md");
 
-    /// A change landing while a Lab run is in flight wins: the run's
-    /// results, computed for the old version, are never installed.
+    const URI: &str = "file:///tmp/race.md";
+
+    fn server_without_thesaurus() -> (LspService<TerraphimLspServer>, tower_lsp::ClientSocket) {
+        LspService::new(TerraphimLspServer::new_with_empty_thesaurus)
+    }
+
+    fn uri() -> Url {
+        Url::parse(URI).unwrap()
+    }
+
+    async fn installed(server: &TerraphimLspServer) -> OpenDocument {
+        server.documents.read().await[&uri()].clone()
+    }
+
+    fn request(action: LabAction) -> impl FnOnce(&mut OpenDocument) {
+        move |document: &mut OpenDocument| document.lab_actions.push(action)
+    }
+
+    /// The steps of a Lab command are driven one by one, so these tests do
+    /// not depend on scheduling: an edit landing between snapshot and
+    /// install always wins.
+    #[tokio::test]
+    async fn an_edit_during_a_lab_command_wins() {
+        let (service, _socket) = server_without_thesaurus();
+        let server = service.inner();
+        server.store_document(&uri(), LAB_DOC, 1).await;
+        let job = server
+            .begin_lab_update(&uri(), Some(1), request(LabAction::HedgesAndFiller))
+            .await
+            .unwrap();
+        let edited = LAB_DOC.replacen("I think ", "", 1);
+        server.store_document(&uri(), &edited, 2).await;
+        let error = server.finish_lab_update(&uri(), job).await.unwrap_err();
+        assert_eq!(error.code, tower_lsp::jsonrpc::ErrorCode::ContentModified);
+        let document = installed(server).await;
+        assert!(document.lab.is_empty(), "stale results never installed");
+        assert_eq!(document.text, edited);
+        assert_eq!(document.lab_actions, [LabAction::HedgesAndFiller]);
+        // The next save computes for the new version.
+        server.refresh_lab_and_publish(&uri()).await;
+        let hedges = installed(server).await.lab.len();
+        assert_eq!(hedges, 4, "perhaps, quite, really, basically");
+    }
+
     #[tokio::test]
     async fn results_for_a_superseded_version_are_dropped() {
-        let (service, _socket) = LspService::new(TerraphimLspServer::new_with_empty_thesaurus);
+        let (service, _socket) = server_without_thesaurus();
         let server = service.inner();
-        let uri = Url::parse("file:///tmp/race.md").unwrap();
-        server.store_document(&uri, LAB_DOC, 1).await;
-        // The command takes its snapshot...
+        server.store_document(&uri(), LAB_DOC, 1).await;
         let job = {
             let mut documents = server.documents.write().await;
-            let document = documents.get_mut(&uri).unwrap();
+            let document = documents.get_mut(&uri()).unwrap();
             document.lab_actions = vec![LabAction::HedgesAndFiller];
             server.lab_job(document)
         };
-        // ...the user types before the run finishes...
-        let edited = LAB_DOC.replacen("I think ", "", 1);
-        server.store_document(&uri, &edited, 2).await;
-        let results = server.run_lab_job(job).await.expect("Lab engine");
+        server.store_document(&uri(), "Edited.", 2).await;
+        let results = server.run_lab_job(job.clone()).await.expect("Lab engine");
         assert!(!results.lab.is_empty(), "the run itself found marks");
-        // ...so the stale results are dropped, not installed.
-        assert!(server.install_lab(&uri, 1, results).await.is_none());
-        let documents = server.documents.read().await;
-        let document = &documents[&uri];
-        assert!(document.lab.is_empty());
-        assert_eq!(document.lab_actions, [LabAction::HedgesAndFiller]);
-        assert_eq!(document.text, edited);
+        assert!(matches!(
+            server.install_lab(&uri(), &job, results).await,
+            Installed::Edited(Some(2))
+        ));
+        assert!(installed(server).await.lab.is_empty());
+    }
+
+    /// Two Lab commands on the same version finishing in the wrong order:
+    /// the older snapshot is rejected, never installed over the newer
+    /// requested state.
+    #[tokio::test]
+    async fn an_older_snapshot_never_overwrites_newer_lab_state() {
+        let (service, _socket) = server_without_thesaurus();
+        let server = service.inner();
+        server.store_document(&uri(), LAB_DOC, 1).await;
+        let trim_job = server
+            .begin_lab_update(&uri(), Some(1), |document| {
+                document.trim_level = Some(TrimLevel::Slight);
+            })
+            .await
+            .unwrap();
+        let mark_job = server
+            .begin_lab_update(&uri(), Some(1), request(LabAction::LongSentences))
+            .await
+            .unwrap();
+        assert_eq!(trim_job.version, mark_job.version);
+        assert!(trim_job.actions.is_empty(), "snapshotted before the mark");
+        assert_eq!(mark_job.trim_level, Some(TrimLevel::Slight));
+
+        // The stale trim-only snapshot finishes last: rejected outright.
+        let mark_results = server.run_lab_job(mark_job.clone()).await.unwrap();
+        let trim_results = server.run_lab_job(trim_job.clone()).await.unwrap();
+        assert!(matches!(
+            server.install_lab(&uri(), &mark_job, mark_results).await,
+            Installed::Yes(_)
+        ));
+        assert!(matches!(
+            server.install_lab(&uri(), &trim_job, trim_results).await,
+            Installed::Superseded
+        ));
+        let document = installed(server).await;
+        assert_eq!(document.lab.len(), 1, "the long-sentence mark survives");
+        assert_eq!(document.trim.len(), 5);
+
+        // Through the command path, a superseded run recomputes from the
+        // current state, so its result is what is installed.
+        let finished = server.finish_lab_update(&uri(), trim_job).await.unwrap();
+        assert_eq!(finished.lab_actions, [LabAction::LongSentences]);
+        assert_eq!(finished.lab.len(), 1);
+        assert_eq!(finished.trim_level, Some(TrimLevel::Slight));
+        assert_eq!(finished.trim.len(), 5);
+    }
+
+    /// Clearing while a preview is in flight: the preview never comes back.
+    #[tokio::test]
+    async fn a_clear_supersedes_a_preview_in_flight() {
+        let (service, _socket) = server_without_thesaurus();
+        let server = service.inner();
+        server.store_document(&uri(), LAB_DOC, 1).await;
+        let job = server
+            .begin_lab_update(&uri(), None, |document| {
+                document.trim_level = Some(TrimLevel::Half);
+            })
+            .await
+            .unwrap();
+        server
+            .clear_overlay(&uri(), |document| {
+                document.trim_level = None;
+                document.trim.clear();
+            })
+            .await
+            .unwrap();
+        let results = server.run_lab_job(job.clone()).await.unwrap();
+        assert!(matches!(
+            server.install_lab(&uri(), &job, results).await,
+            Installed::Superseded
+        ));
+        assert!(installed(server).await.trim.is_empty());
     }
 
     #[test]

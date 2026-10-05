@@ -28,7 +28,11 @@
 //! If the document changes while `terraphim.lab.mark` or
 //! `terraphim.trim.preview` is computing, the results are dropped (never
 //! published) and the command fails with `ContentModified`; the requested
-//! action or level is kept for the next save or command.
+//! action or level is kept for the next save or command. If another Lab
+//! command (or a clear) changes the requested state of the same version
+//! meanwhile, the earlier run is superseded and never installed; the
+//! superseded command recomputes from the current state, so every command
+//! result matches what is installed.
 
 use serde::Deserialize;
 use serde_json::Value;
