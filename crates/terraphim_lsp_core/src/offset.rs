@@ -155,8 +155,8 @@ impl<'a> Utf16Cursor<'a> {
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize,
 )]
 pub struct LinePosition {
-    /// Zero-based line number. Lines are separated by `\n`; a `\r` before it
-    /// counts as part of the line's content.
+    /// Zero-based line number. Lines end at `\n` or `\r\n`; the line break
+    /// is never part of the line's content.
     pub line: u32,
     /// Zero-based UTF-16 code-unit column within the line.
     pub character: u32,
@@ -187,6 +187,9 @@ impl<'a> LineIndex<'a> {
         let byte = floor_char_boundary(self.text, byte);
         let line = self.line_starts.partition_point(|&start| start <= byte) - 1;
         let line_start = self.line_starts[line];
+        // An offset inside a line break (between `\r` and `\n`) maps to the
+        // end of the line's content, the same place `byte_offset` clamps to.
+        let byte = byte.min(self.content_end(line));
         LinePosition {
             line: saturating_u32(line),
             character: saturating_u32(utf16_len(&self.text[line_start..byte])),
@@ -196,7 +199,7 @@ impl<'a> LineIndex<'a> {
     /// The byte offset of `position`.
     ///
     /// Following the LSP rules, a column past the end of the line resolves to
-    /// the end of the line (before its `\n`), and a line past the last one
+    /// the end of the line (before its `\n` or `\r\n`), and a line past the last one
     /// resolves to the end of the text. A column between the halves of a
     /// surrogate pair moves back to the start of that character.
     pub fn byte_offset(&self, position: LinePosition) -> usize {
@@ -204,12 +207,24 @@ impl<'a> LineIndex<'a> {
         let Some(&line_start) = self.line_starts.get(line) else {
             return self.text.len();
         };
-        let line_end = self
-            .line_starts
-            .get(line + 1)
-            .map_or(self.text.len(), |next| next - 1);
-        let line_text = &self.text[line_start..line_end];
+        let line_text = &self.text[line_start..self.content_end(line)];
         line_start + TextOffset::from_utf16(line_text, position.character as usize).byte
+    }
+
+    /// End of line `line`'s content: before its `\n`, or before the `\r` of
+    /// a `\r\n` line end. `line` must be a valid line index.
+    fn content_end(&self, line: usize) -> usize {
+        match self.line_starts.get(line + 1) {
+            Some(&next) => {
+                let newline = next - 1;
+                if self.text[..newline].ends_with('\r') {
+                    newline - 1
+                } else {
+                    newline
+                }
+            }
+            None => self.text.len(),
+        }
     }
 
     /// The [`TextOffset`] of `position` (see [`LineIndex::byte_offset`]).
@@ -307,7 +322,7 @@ mod tests {
     fn line_index_round_trips() {
         let text = "line one\nli😀ne two\r\nthird";
         let index = LineIndex::new(text);
-        for byte in [0, 3, 8, 9, 11, 15, 22, 23, text.len()] {
+        for byte in [0, 3, 8, 9, 11, 15, 21, 23, text.len()] {
             let position = index.position(byte);
             assert_eq!(index.byte_offset(position), byte, "{byte}: {position:?}");
         }
@@ -316,6 +331,51 @@ mod tests {
             LinePosition {
                 line: 1,
                 character: 4
+            }
+        );
+    }
+
+    #[test]
+    fn crlf_line_ends_are_not_line_content() {
+        let text = "ab\r\ncd\r\n";
+        let index = LineIndex::new(text);
+        let past_line_end = LinePosition {
+            line: 0,
+            character: 100,
+        };
+        // Clamps before the `\r`, not between `\r` and `\n`.
+        assert_eq!(index.byte_offset(past_line_end), 2);
+        assert_eq!(
+            index.byte_offset(LinePosition {
+                line: 1,
+                character: 2
+            }),
+            6
+        );
+        // Offsets inside the line break map to the end of the content.
+        for byte in [2, 3] {
+            assert_eq!(
+                index.position(byte),
+                LinePosition {
+                    line: 0,
+                    character: 2
+                },
+                "{byte}"
+            );
+        }
+        assert_eq!(
+            index.position(4),
+            LinePosition {
+                line: 1,
+                character: 0
+            }
+        );
+        // The empty last line after the final CRLF.
+        assert_eq!(
+            index.position(text.len()),
+            LinePosition {
+                line: 2,
+                character: 0
             }
         );
     }

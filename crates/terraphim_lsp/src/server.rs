@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
@@ -35,7 +36,17 @@ pub struct TerraphimLspServer {
     client: Client,
     thesaurus: Thesaurus,
     engine: KgEngine,
-    documents: Arc<RwLock<HashMap<Url, String>>>,
+    documents: Arc<RwLock<HashMap<Url, OpenDocument>>>,
+    /// Whether the client accepts `WorkspaceEdit.documentChanges`
+    /// (`workspace.workspaceEdit.documentChanges`), read at `initialize`.
+    versioned_edits: AtomicBool,
+}
+
+/// An open document: its full text and the version the client last sent.
+#[derive(Debug, Clone)]
+struct OpenDocument {
+    text: String,
+    version: i32,
 }
 
 /// The code-action kind of the synonym replacements.
@@ -64,6 +75,7 @@ impl TerraphimLspServer {
             thesaurus,
             engine,
             documents: Arc::new(RwLock::new(HashMap::new())),
+            versioned_edits: AtomicBool::new(false),
         }
     }
 
@@ -94,11 +106,56 @@ impl TerraphimLspServer {
 
     /// The current text of an open document.
     async fn document_text(&self, uri: &Url) -> Option<String> {
-        self.documents.read().await.get(uri).cloned()
+        self.documents
+            .read()
+            .await
+            .get(uri)
+            .map(|document| document.text.clone())
+    }
+
+    /// Record the latest text and version of a document.
+    async fn store_document(&self, uri: &Url, text: &str, version: i32) {
+        self.documents.write().await.insert(
+            uri.clone(),
+            OpenDocument {
+                text: text.to_string(),
+                version,
+            },
+        );
+    }
+
+    /// A workspace edit applying `edits` to version `version` of `uri`.
+    ///
+    /// Clients that accept `documentChanges` get a versioned
+    /// `TextDocumentEdit`, so a stale action is rejected instead of applied
+    /// to text it was not computed for; others get plain `changes`.
+    fn workspace_edit(&self, uri: &Url, version: i32, edits: Vec<TextEdit>) -> WorkspaceEdit {
+        if !self.versioned_edits.load(Ordering::Relaxed) {
+            return WorkspaceEdit {
+                changes: Some(HashMap::from([(uri.clone(), edits)])),
+                ..WorkspaceEdit::default()
+            };
+        }
+        WorkspaceEdit {
+            document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {
+                text_document: OptionalVersionedTextDocumentIdentifier {
+                    uri: uri.clone(),
+                    version: Some(version),
+                },
+                edits: edits.into_iter().map(OneOf::Left).collect(),
+            }])),
+            ..WorkspaceEdit::default()
+        }
     }
 
     /// "Replace with X" code actions for the KG term at `position`.
-    fn replacement_actions(&self, uri: &Url, text: &str, position: Position) -> Vec<CodeAction> {
+    fn replacement_actions(
+        &self,
+        uri: &Url,
+        document: &OpenDocument,
+        position: Position,
+    ) -> Vec<CodeAction> {
+        let text = document.text.as_str();
         let index = LineIndex::new(text);
         let offset = convert::byte_offset(&index, position);
         let Some(set) = self.engine.alternatives_at(text, offset) else {
@@ -115,10 +172,7 @@ impl TerraphimLspServer {
                 CodeAction {
                     title: format!("Replace with {}", replacement.text),
                     kind: Some(REPLACE_KIND),
-                    edit: Some(WorkspaceEdit {
-                        changes: Some(HashMap::from([(uri.clone(), edits)])),
-                        ..WorkspaceEdit::default()
-                    }),
+                    edit: Some(self.workspace_edit(uri, document.version, edits)),
                     ..CodeAction::default()
                 }
             })
@@ -137,7 +191,15 @@ impl TerraphimLspServer {
 
 #[tower_lsp::async_trait]
 impl LanguageServer for TerraphimLspServer {
-    async fn initialize(&self, _params: InitializeParams) -> Result<InitializeResult> {
+    async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
+        let versioned_edits = params
+            .capabilities
+            .workspace
+            .and_then(|workspace| workspace.workspace_edit)
+            .and_then(|workspace_edit| workspace_edit.document_changes)
+            .unwrap_or(false);
+        self.versioned_edits
+            .store(versioned_edits, Ordering::Relaxed);
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
@@ -181,21 +243,17 @@ impl LanguageServer for TerraphimLspServer {
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let uri = params.text_document.uri;
         let text = params.text_document.text;
-        self.documents
-            .write()
-            .await
-            .insert(uri.clone(), text.clone());
+        self.store_document(&uri, &text, params.text_document.version)
+            .await;
         self.publish_diagnostics(&uri, &text).await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let uri = params.text_document.uri;
+        let version = params.text_document.version;
         if let Some(change) = params.content_changes.into_iter().last() {
             let text = change.text;
-            self.documents
-                .write()
-                .await
-                .insert(uri.clone(), text.clone());
+            self.store_document(&uri, &text, version).await;
             self.publish_diagnostics(&uri, &text).await;
         }
     }
@@ -249,11 +307,11 @@ impl LanguageServer for TerraphimLspServer {
             return Ok(None);
         }
         let uri = params.text_document.uri;
-        let Some(text) = self.document_text(&uri).await else {
+        let Some(document) = self.documents.read().await.get(&uri).cloned() else {
             return Ok(None);
         };
         let actions: Vec<CodeActionOrCommand> = self
-            .replacement_actions(&uri, &text, params.range.start)
+            .replacement_actions(&uri, &document, params.range.start)
             .into_iter()
             .map(CodeActionOrCommand::CodeAction)
             .collect();
@@ -264,12 +322,8 @@ impl LanguageServer for TerraphimLspServer {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
 
-        let text = {
-            let documents = self.documents.read().await;
-            match documents.get(&uri) {
-                Some(text) => text.clone(),
-                None => return Ok(None),
-            }
+        let Some(text) = self.document_text(&uri).await else {
+            return Ok(None);
         };
 
         let word = word_at_position(&text, position);
@@ -288,9 +342,8 @@ impl LanguageServer for TerraphimLspServer {
     ) -> Result<DocumentDiagnosticReportResult> {
         let uri = &params.text_document.uri;
         let text = {
-            let documents = self.documents.read().await;
-            match documents.get(uri) {
-                Some(text) => text.clone(),
+            match self.document_text(uri).await {
+                Some(text) => text,
                 None => {
                     return Ok(DocumentDiagnosticReportResult::Report(
                         DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
