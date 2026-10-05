@@ -12,7 +12,19 @@ offers:
   thesaurus terms.
 - **`textDocument/completion`** - Suggest knowledge-graph terms at the cursor.
 - **`textDocument/diagnostic`** - Warn about terms in the document that are not
-  present in the thesaurus.
+  present in the thesaurus, and report a malformed trailing
+  `terraphim-alternatives` annotation block (one diagnostic per document).
+- **`textDocument/codeAction`** - On a KG term, one "Replace with X" action
+  (`refactor.rewrite`) per other synonym of its concept. The current form is
+  excluded, the original capitalisation is kept, and a preceding `a`/`an` is
+  fixed in the same `WorkspaceEdit`.
+
+The analysis lives in [`terraphim_lsp_core`](../terraphim_lsp_core), a pure
+crate with no LSP or async dependencies that also builds for
+`wasm32-unknown-unknown`; terraphim-editor runs the same code in-process.
+It is re-exported as `terraphim_lsp::core`. The trailing annotation block is
+never analysed. Positions are converted with UTF-16 columns, so multi-byte
+and astral text map to the right characters.
 
 ## Installation
 
@@ -73,7 +85,11 @@ Editor LSP request
         │
         ├── hover ──────► kg_analysis ──────► Hover response
         ├── completion ─► completion.rs ────► CompletionItem[]
-        └── diagnostic ─► diagnostics.rs ───► Diagnostic[]
+        ├── diagnostic ─► diagnostics.rs ───► Diagnostic[]
+        └── codeAction ─► KgEngine::alternatives_at ─► CodeAction[]
+                │
+                ▼
+        terraphim_lsp_core (KgEngine: CompiledMatcher + ConceptIndex)
 ```
 
 Open documents are tracked in memory. On every `did_open` and `did_change` the

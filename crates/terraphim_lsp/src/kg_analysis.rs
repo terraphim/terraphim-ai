@@ -1,31 +1,25 @@
 //! Knowledge-graph analysis helpers for Terraphim LSP.
 //!
-//! Analyses a markdown document against a thesaurus, returning matched
-//! KG terms with byte positions and a list of unrecognised words.
+//! Term matching, concept ids and the annotation-block boundary come from
+//! [`terraphim_lsp_core`]; this module adds the server-only list of
+//! unrecognised words used for diagnostics.
 
 use std::collections::HashSet;
 
-use terraphim_automata::{Matched, find_matches};
-use terraphim_types::Thesaurus;
+use terraphim_lsp_core::{Diagnostic, KgEngine};
 
-/// Result of analysing a document against a knowledge graph thesaurus.
+pub use terraphim_lsp_core::TermMatch;
+
+/// Result of analysing a document against a knowledge graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct KgAnalysis {
-    /// Terms from the thesaurus found in the document.
+    /// Terms from the thesaurus found in the document body, with concept id,
+    /// normalised concept name and byte plus UTF-16 ranges.
     pub matched_terms: Vec<TermMatch>,
-    /// Words in the document that did not match any thesaurus entry.
+    /// Words in the body that did not match any thesaurus entry.
     pub unknown_terms: Vec<String>,
-}
-
-/// A single knowledge-graph term match inside a document.
-#[derive(Debug, Clone, PartialEq)]
-pub struct TermMatch {
-    /// The matched term text.
-    pub term: String,
-    /// Byte offset range `(start, end)` inside the document.
-    pub range: (usize, usize),
-    /// Optional definition/description from the thesaurus.
-    pub description: Option<String>,
+    /// Problems found by the core, such as a malformed annotation block.
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 impl KgAnalysis {
@@ -34,79 +28,70 @@ impl KgAnalysis {
         Self {
             matched_terms: Vec::new(),
             unknown_terms: Vec::new(),
+            diagnostics: Vec::new(),
         }
     }
 
-    /// Returns true if no terms were matched and no unknown terms were found.
+    /// Returns true if nothing was matched, no unknown terms were found and
+    /// there are no diagnostics.
     pub fn is_empty(&self) -> bool {
-        self.matched_terms.is_empty() && self.unknown_terms.is_empty()
+        self.matched_terms.is_empty()
+            && self.unknown_terms.is_empty()
+            && self.diagnostics.is_empty()
     }
 }
 
-/// Analyse a markdown document against a knowledge graph thesaurus.
+/// Analyse a markdown document with a knowledge-graph engine.
 ///
-/// Returns matched terms with byte positions and a list of unknown words.
-/// The current implementation matches whole thesaurus entries using
-/// `terraphim_automata::find_matches`. Unknown terms are extracted as the
-/// set of whitespace-separated words that were not part of any match.
-pub fn analyse_kg_document(text: &str, thesaurus: &Thesaurus) -> KgAnalysis {
-    if text.trim().is_empty() || thesaurus.is_empty() {
+/// Matching is delegated to [`KgEngine::analyse`], which excludes a trailing
+/// `terraphim-alternatives` annotation block. Unknown terms are the
+/// whitespace-separated words of the body that were not part of any match.
+pub fn analyse_kg_document(text: &str, engine: &KgEngine) -> KgAnalysis {
+    if text.trim().is_empty() {
         return KgAnalysis::empty();
     }
 
-    let matches = match find_matches(text, thesaurus, true) {
-        Ok(matches) => matches,
-        Err(err) => {
-            log::warn!("KG analysis find_matches failed: {}", err);
-            return KgAnalysis::empty();
-        }
-    };
-
-    let mut matched_terms: Vec<TermMatch> = Vec::with_capacity(matches.len());
-    let mut matched_words: HashSet<String> = HashSet::new();
-
-    for Matched {
-        term,
-        normalized_term,
-        pos,
-    } in matches
-    {
-        if let Some((start, end)) = pos {
-            // Record each word of the matched term as known.
-            for word in term.split_whitespace() {
-                matched_words.insert(word.to_lowercase());
-            }
-
-            matched_terms.push(TermMatch {
-                term: term.clone(),
-                range: (start, end),
-                description: Some(normalized_term.display().to_string()).filter(|s| !s.is_empty()),
-            });
-        }
+    let analysis = engine.analyse(text);
+    if engine.concept_index().is_empty() {
+        // No knowledge graph loaded: every word would be "unknown", which is
+        // noise. Block diagnostics do not depend on the graph, so keep them.
+        return KgAnalysis {
+            diagnostics: analysis.diagnostics,
+            ..KgAnalysis::empty()
+        };
     }
+
+    let body = &text[..analysis.body_end.byte];
+    let matched_words: HashSet<String> = analysis
+        .matches
+        .iter()
+        .flat_map(|m| m.term.split_whitespace().map(str::to_lowercase))
+        .collect();
+    let matched_spans: Vec<String> = analysis
+        .matches
+        .iter()
+        .map(|m| m.text.to_lowercase())
+        .collect();
 
     // Treat any non-empty whitespace-separated token that was not part of a
     // match as an unknown term. This is intentionally simple: multi-word
     // unknown phrases are not reconstructed here.
-    let unknown_terms: Vec<String> = text
+    let unknown_terms = body
         .split_whitespace()
         .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()))
         .filter(|word| {
             let lower = word.to_lowercase();
             !lower.is_empty()
                 && !matched_words.contains(&lower)
-                && !matched_terms.iter().any(|m| {
-                    m.range.0 <= text.len()
-                        && m.range.1 <= text.len()
-                        && text[m.range.0..m.range.1].to_lowercase().contains(&lower)
-                })
+                && !matched_spans.iter().any(|span| span.contains(&lower))
         })
         .map(String::from)
         .collect();
 
     KgAnalysis {
-        matched_terms,
+        matched_terms: analysis.matches,
         unknown_terms,
+        diagnostics: analysis.diagnostics,
     }
 }
 
@@ -115,42 +100,39 @@ mod tests {
     use super::*;
     use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
-    fn sample_thesaurus() -> Thesaurus {
+    fn sample_engine() -> KgEngine {
         let mut thesaurus = Thesaurus::new("programming".to_string());
         thesaurus.insert(
             NormalizedTermValue::from("rust"),
-            NormalizedTerm::with_auto_id(NormalizedTermValue::from("rust programming language"))
+            NormalizedTerm::new(1, NormalizedTermValue::from("rust programming language"))
                 .with_url("https://rust-lang.org".to_string()),
         );
         thesaurus.insert(
             NormalizedTermValue::from("async"),
-            NormalizedTerm::with_auto_id(NormalizedTermValue::from("asynchronous programming")),
+            NormalizedTerm::new(2, NormalizedTermValue::from("asynchronous programming")),
         );
         thesaurus.insert(
             NormalizedTermValue::from("tokio"),
-            NormalizedTerm::with_auto_id(NormalizedTermValue::from("tokio async runtime")),
+            NormalizedTerm::new(3, NormalizedTermValue::from("tokio async runtime")),
         );
-        thesaurus
+        KgEngine::new(&thesaurus).expect("sample thesaurus compiles")
     }
 
     #[test]
     fn test_empty_text_returns_empty() {
-        let thesaurus = sample_thesaurus();
-        let analysis = analyse_kg_document("", &thesaurus);
+        let analysis = analyse_kg_document("", &sample_engine());
         assert!(analysis.is_empty());
     }
 
     #[test]
     fn test_empty_thesaurus_returns_empty() {
-        let thesaurus = Thesaurus::new("empty".to_string());
-        let analysis = analyse_kg_document("rust is great", &thesaurus);
+        let analysis = analyse_kg_document("rust is great", &KgEngine::empty());
         assert!(analysis.is_empty());
     }
 
     #[test]
     fn test_matched_terms_found() {
-        let thesaurus = sample_thesaurus();
-        let analysis = analyse_kg_document("rust and tokio are great", &thesaurus);
+        let analysis = analyse_kg_document("rust and tokio are great", &sample_engine());
         let terms: Vec<String> = analysis
             .matched_terms
             .iter()
@@ -161,36 +143,64 @@ mod tests {
     }
 
     #[test]
+    fn test_matches_keep_concept_id_and_nterm() {
+        let analysis = analyse_kg_document("tokio rocks", &sample_engine());
+        let tokio = &analysis.matched_terms[0];
+        assert_eq!(tokio.concept_id, 3);
+        assert_eq!(tokio.nterm, "tokio async runtime");
+    }
+
+    #[test]
     fn test_unknown_terms_found() {
-        let thesaurus = sample_thesaurus();
-        let analysis = analyse_kg_document("rust and xyz are great", &thesaurus);
+        let analysis = analyse_kg_document("rust and xyz are great", &sample_engine());
         assert!(analysis.unknown_terms.contains(&"xyz".to_string()));
     }
 
     #[test]
     fn test_positions_are_populated() {
-        let thesaurus = sample_thesaurus();
-        let analysis = analyse_kg_document("rust is great", &thesaurus);
+        let analysis = analyse_kg_document("rust is great", &sample_engine());
         let rust_match = analysis
             .matched_terms
             .iter()
             .find(|m| m.term == "rust")
             .expect("rust should match");
-        assert_eq!(rust_match.range, (0, 4));
+        assert_eq!(rust_match.range.bytes(), 0..4);
+    }
+
+    #[test]
+    fn test_annotation_block_is_not_analysed() {
+        let text = "rust\n\n```terraphim-alternatives\n{\"version\": 1, \"spans\": [], \"overflow\": \"tokio zzz\"}\n```\n";
+        let analysis = analyse_kg_document(text, &sample_engine());
+        assert_eq!(analysis.matched_terms.len(), 1);
+        assert!(
+            analysis.unknown_terms.is_empty(),
+            "{:?}",
+            analysis.unknown_terms
+        );
+        assert!(analysis.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn test_malformed_annotation_block_yields_one_diagnostic() {
+        let text = "rust\n\n```terraphim-alternatives\n{\"version\": 1}\n";
+        let analysis = analyse_kg_document(text, &sample_engine());
+        assert_eq!(analysis.diagnostics.len(), 1);
+        assert_eq!(analysis.matched_terms.len(), 1);
     }
 
     #[test]
     fn test_analyse_never_panics_on_arbitrary_input() {
-        let thesaurus = sample_thesaurus();
+        let engine = sample_engine();
         let inputs = [
             "!@#$%^&*()",
             "rust\n\ntokio\tasync",
             "",
             "RUST",
             "a b c d e f g",
+            "😀 rust é",
         ];
         for input in inputs {
-            let _ = analyse_kg_document(input, &thesaurus);
+            let _ = analyse_kg_document(input, &engine);
         }
     }
 }
