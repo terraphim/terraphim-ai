@@ -173,6 +173,73 @@ class HomebrewOutboxTests(unittest.TestCase):
                     name,
                 )
 
+    def test_dispatch_updates_an_existing_branch_from_a_fresh_clone(self):
+        # A re-dispatch for the same release runs in a fresh single-branch
+        # checkout of the tap, so it has no remote-tracking ref for the
+        # automation branch an earlier run pushed. The push must still update
+        # that branch rather than fail with "stale info".
+        self._dispatch_from_fresh_clone(branch_exists=True)
+
+    def test_dispatch_creates_the_branch_on_a_first_run(self):
+        self._dispatch_from_fresh_clone(branch_exists=False)
+
+    def _dispatch_from_fresh_clone(self, branch_exists):
+        git_env = dict(
+            os.environ,
+            GIT_AUTHOR_NAME="t",
+            GIT_AUTHOR_EMAIL="t@example.invalid",
+            GIT_COMMITTER_NAME="t",
+            GIT_COMMITTER_EMAIL="t@example.invalid",
+        )
+
+        def git(*args, cwd):
+            subprocess.run(["git", *args], cwd=cwd, check=True, env=git_env, capture_output=True)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            remote = tmp / "remote.git"
+            git("init", "-q", "--bare", "-b", "main", str(remote), cwd=tmp)
+            seed = tmp / "seed"
+            git("clone", "-q", str(remote), str(seed), cwd=tmp)
+            (seed / "Formula").mkdir()
+            (seed / "Formula" / ".keep").write_text("")
+            git("add", "-A", cwd=seed)
+            git("commit", "-qm", "init", cwd=seed)
+            git("push", "-q", "origin", "HEAD:main", cwd=seed)
+            branch = "automation/homebrew-1.21.16"
+            if branch_exists:
+                git("checkout", "-q", "-b", branch, cwd=seed)
+                git("commit", "-q", "--allow-empty", "-m", "earlier run", cwd=seed)
+                git("push", "-q", "origin", branch, cwd=seed)
+
+            tap = tmp / "tap"
+            git("clone", "-q", "--single-branch", "--branch", "main", str(remote), str(tap), cwd=tmp)
+            result = subprocess.run(
+                ["bash", str(OUTBOX), "--manifest", str(FIXTURE), "--tap-dir", str(tap),
+                 "--dispatch", "--no-pr"],
+                capture_output=True,
+                text=True,
+                env=dict(git_env, HOME=str(tmp)),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            for name in FORMULAS:
+                pushed = subprocess.run(
+                    ["git", "show", f"{branch}:Formula/{name}"],
+                    cwd=remote, check=True, capture_output=True, text=True,
+                ).stdout
+                self.assertEqual(pushed, (EXPECTED / name).read_text(), name)
+
+    def test_missing_option_value_prints_usage(self):
+        for option in ("--manifest", "--tap-dir", "--repo", "--base", "--head"):
+            result = subprocess.run(
+                ["bash", str(OUTBOX), option], capture_output=True, text=True
+            )
+            self.assertEqual(result.returncode, 2, option)
+            self.assertIn(f"missing value for {option}", result.stderr)
+            self.assertIn("Usage:", result.stderr)
+            self.assertNotIn("unbound variable", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,25 +17,37 @@ GENERATOR="$ROOT/scripts/generate-homebrew-formulas.py"
 MANIFEST=""
 TAP_DIR=""
 DISPATCH=0
+OPEN_PR=1
 BASE="main"
 HEAD=""
 REPO="terraphim/homebrew-terraphim"
 
 usage() {
   cat >&2 <<'EOF'
-Usage: homebrew-outbox.sh --manifest FILE --tap-dir DIR [--dispatch]
+Usage: homebrew-outbox.sh --manifest FILE --tap-dir DIR [--dispatch [--no-pr]]
                           [--repo OWNER/NAME] [--base BRANCH] [--head BRANCH]
 EOF
 }
 
+# Fail with usage, not a `set -u` unbound-variable error, when an option that
+# takes a value is the last argument or is followed by another option.
+need_value() {
+  if [[ $# -lt 2 || "$2" == --* ]]; then
+    echo "homebrew-outbox: missing value for $1" >&2
+    usage
+    exit 2
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --manifest) MANIFEST="$2"; shift 2 ;;
-    --tap-dir) TAP_DIR="$2"; shift 2 ;;
+    --manifest) need_value "$@"; MANIFEST="$2"; shift 2 ;;
+    --tap-dir) need_value "$@"; TAP_DIR="$2"; shift 2 ;;
     --dispatch) DISPATCH=1; shift ;;
-    --repo) REPO="$2"; shift 2 ;;
-    --base) BASE="$2"; shift 2 ;;
-    --head) HEAD="$2"; shift 2 ;;
+    --no-pr) OPEN_PR=0; shift ;;
+    --repo) need_value "$@"; REPO="$2"; shift 2 ;;
+    --base) need_value "$@"; BASE="$2"; shift 2 ;;
+    --head) need_value "$@"; HEAD="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) usage; exit 2 ;;
   esac
@@ -78,7 +90,17 @@ fi
 git -C "$TAP_DIR" -c user.name="terraphim-release-bot" \
   -c user.email="release@terraphim.ai" \
   commit -m "chore: bump terraphim formulas to $TAG"
-git -C "$TAP_DIR" push -u origin "$HEAD" --force-with-lease
+# A re-dispatch runs in a fresh (often single-branch) checkout with no
+# remote-tracking ref for a branch an earlier run pushed, so a bare
+# --force-with-lease rejects the push as "stale info". Lease against the tip
+# the remote reports right now instead (empty = the branch must not exist).
+REMOTE_TIP="$(git -C "$TAP_DIR" ls-remote origin "refs/heads/$HEAD" | cut -f1)"
+git -C "$TAP_DIR" push -u origin "$HEAD" --force-with-lease="refs/heads/$HEAD:$REMOTE_TIP"
+
+if [[ "$OPEN_PR" != "1" ]]; then
+  echo "homebrew-outbox: pushed $HEAD; --no-pr given, not opening a PR"
+  exit 0
+fi
 
 EXISTING="$(gh pr list --repo "$REPO" --head "$HEAD" --state open --json url --jq '.[0].url // empty' 2>/dev/null || true)"
 if [[ -n "$EXISTING" ]]; then
