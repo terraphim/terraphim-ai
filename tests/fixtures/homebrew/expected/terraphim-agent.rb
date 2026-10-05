@@ -23,10 +23,15 @@ class TerraphimAgent < Formula
 
   def install
     bin.install "terraphim-agent"
+    # Marks this keg as Homebrew-managed so `terraphim-agent update` defers to
+    # `brew upgrade` instead of overwriting the Cellar binary.
+    (share/"terraphim/package-manager.d").mkpath
+    (share/"terraphim/package-manager.d"/"terraphim-agent").write "homebrew\n"
   end
 
   test do
     assert_match "terraphim", shell_output("#{bin}/terraphim-agent --version 2>&1")
+    assert_equal "homebrew\n", (share/"terraphim/package-manager.d"/"terraphim-agent").read
     assert_match "Learning capture", shell_output("#{bin}/terraphim-agent learn --help 2>&1")
     assert_match "Session management", shell_output("#{bin}/terraphim-agent sessions --help 2>&1")
     if OS.mac?
