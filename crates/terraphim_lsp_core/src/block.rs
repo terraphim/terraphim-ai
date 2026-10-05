@@ -1,4 +1,4 @@
-//! Locating the trailing `terraphim-alternatives` annotation block.
+//! The trailing `terraphim-alternatives` annotation block.
 //!
 //! terraphim-editor persists what the knowledge graph cannot derive (human
 //! alternatives, ghost flags, overflow) in a fenced block at the end of the
@@ -12,35 +12,30 @@
 //! ```
 //! ~~~
 //!
-//! KG analysis must never see that block, or JSON keys and stored
-//! alternatives would show up as matches. [`split_annotation_block`] finds
-//! where the body ends so analysis can stop there.
+//! KG analysis must never see that block, or stored alternatives would show
+//! up as matches. [`split_annotation_block`] finds where the body ends so
+//! analysis can stop there.
 //!
-//! # Boundary with the editor's parser
+//! # One parser
 //!
-//! The *location* rules are byte-for-byte those of terraphim-editor's
-//! `terraphim_alternatives::block` module (the last line equal to
-//! ```` ```terraphim-alternatives ```` after trimming trailing whitespace opens
-//! the block; up to two newlines before it are a separator), so
-//! [`BlockSplit::body_end`] always equals the length of the body the editor
-//! parses, and `body + block == text`.
-//!
-//! Validation here stops at what any client can report without knowing the
-//! schema: a missing closing fence, text after the closing fence, and JSON
-//! that does not parse. Schema version, field types, ids and overlapping
-//! spans remain the editor parser's job. A malformed block is still excluded
-//! from analysis, yields exactly one [`Diagnostic`], and the body is left
-//! unchanged: this crate never edits or rewrites the block.
+//! Locating and validating the block is delegated entirely to the editor's
+//! own parser, `terraphim_alternatives::parse`, so the editor and every LSP
+//! client agree byte for byte: [`BlockSplit::body_end`] is the length of the
+//! body that parser returns (`body + block == text`), and any
+//! `terraphim_alternatives::BlockError` (fences, JSON, schema version, field
+//! types, duplicate ids, overlapping spans or ghosts, invalid anchors)
+//! yields exactly one [`Diagnostic`], with one [`DiagnosticCode`] per
+//! `BlockErrorKind` and the parser's message. A malformed block is still
+//! excluded from analysis and the body is left unchanged: this crate never
+//! edits or rewrites the block.
 
 use serde::{Deserialize, Serialize};
+use terraphim_alternatives::parse;
 
 use crate::diagnostic::{Diagnostic, DiagnosticCode, Severity};
 use crate::offset::{TextOffset, TextRange};
 
-/// Info string identifying the annotation block's opening fence.
-pub const FENCE_INFO: &str = "terraphim-alternatives";
-
-const FENCE: &str = "```";
+pub use terraphim_alternatives::FENCE_INFO;
 
 /// Where the analysable body of a document ends and the annotation block,
 /// if any, begins.
@@ -60,8 +55,8 @@ pub struct AnnotationBlock {
     pub range: TextRange,
     /// The opening fence line, without its line break.
     pub opening_fence: TextRange,
-    /// Why the block is malformed, or `None` when it is well-formed (as far
-    /// as this crate checks; see the module documentation).
+    /// Why the editor's parser rejects the block, or `None` when it accepts
+    /// it.
     pub problem: Option<Diagnostic>,
 }
 
@@ -72,127 +67,67 @@ pub struct AnnotationBlock {
 /// ```
 /// use terraphim_lsp_core::split_annotation_block;
 ///
-/// let text = "A choice.\n\n```terraphim-alternatives\n{\"version\": 1}\n```\n";
+/// let text = "A choice.\n\n```terraphim-alternatives\n\
+///             {\"version\": 1, \"spans\": [], \"ghosts\": [], \"overflow\": \"notes\"}\n```\n";
 /// let split = split_annotation_block(text);
 /// assert_eq!(&text[..split.body_end.byte], "A choice.");
 /// assert!(split.block.unwrap().problem.is_none());
 /// ```
 pub fn split_annotation_block(text: &str) -> BlockSplit {
-    let Some(open_start) = find_opening_fence(text) else {
+    let (body_len, error) = match parse(text) {
+        Ok(document) => (document.body.len(), None),
+        Err(error) => (error.body.len(), Some(error)),
+    };
+    if body_len >= text.len() && error.is_none() {
+        // The parser found no block: the whole text is body.
         return BlockSplit {
             body_end: TextOffset::from_byte(text, text.len()),
             block: None,
         };
-    };
-    let body_end = strip_separator(&text[..open_start]);
-    let open_line_end = text[open_start..]
-        .find('\n')
-        .map_or(text.len(), |newline| open_start + newline);
-    let problem = check_block(text, open_start).map(|(code, message)| Diagnostic {
-        range: TextRange::from_bytes(text, open_start, open_line_end),
+    }
+
+    // The block starts with the separator newlines the parser stripped from
+    // the body; the opening fence is its first non-blank line.
+    let raw_block = &text[body_len..];
+    let fence_start =
+        body_len + (raw_block.len() - raw_block.trim_start_matches(['\r', '\n']).len());
+    let fence_line = text[fence_start..]
+        .split('\n')
+        .next()
+        .unwrap_or_default()
+        .trim_end_matches('\r');
+    let opening_fence = TextRange::from_bytes(text, fence_start, fence_start + fence_line.len());
+    let problem = error.map(|error| Diagnostic {
+        range: opening_fence,
         severity: Severity::Warning,
-        code,
-        message,
+        code: DiagnosticCode::for_block_error(&error.kind),
+        message: error.kind.to_string(),
     });
 
     BlockSplit {
-        body_end: TextOffset::from_byte(text, body_end),
+        body_end: TextOffset::from_byte(text, body_len),
         block: Some(AnnotationBlock {
-            range: TextRange::from_bytes(text, body_end, text.len()),
-            opening_fence: TextRange::from_bytes(text, open_start, open_line_end),
+            range: TextRange::from_bytes(text, body_len, text.len()),
+            opening_fence,
             problem,
         }),
     }
-}
-
-/// The first structural problem of the block opening at `open_start`.
-fn check_block(text: &str, open_start: usize) -> Option<(DiagnosticCode, String)> {
-    let truncated = || {
-        Some((
-            DiagnosticCode::AnnotationBlockTruncated,
-            "annotation block is truncated: no closing fence".to_string(),
-        ))
-    };
-    let Some(newline) = text[open_start..].find('\n') else {
-        return truncated();
-    };
-    let content_start = open_start + newline + 1;
-
-    let mut line_start = content_start;
-    let mut close = None;
-    for line in text[content_start..].split_inclusive('\n') {
-        if is_fence_line(line, FENCE) {
-            close = Some((line_start, line_start + line.len()));
-            break;
-        }
-        line_start += line.len();
-    }
-    let Some((close_start, close_end)) = close else {
-        return truncated();
-    };
-    if !text[close_end..].trim().is_empty() {
-        return Some((
-            DiagnosticCode::AnnotationBlockNotTrailing,
-            "annotation block is not at the end of the document".to_string(),
-        ));
-    }
-    let json = &text[content_start..close_start];
-    serde_json::from_str::<serde::de::IgnoredAny>(json)
-        .err()
-        .map(|error| {
-            (
-                DiagnosticCode::AnnotationBlockInvalidJson,
-                format!(
-                    "annotation block is not valid JSON (line {}, column {}): {error}",
-                    error.line(),
-                    error.column()
-                ),
-            )
-        })
-}
-
-/// Byte offset of the start of the last opening-fence line, if any.
-fn find_opening_fence(text: &str) -> Option<usize> {
-    let opening = format!("{FENCE}{FENCE_INFO}");
-    let mut found = None;
-    let mut line_start = 0;
-    for line in text.split_inclusive('\n') {
-        if is_fence_line(line, &opening) {
-            found = Some(line_start);
-        }
-        line_start += line.len();
-    }
-    found
-}
-
-fn is_fence_line(line: &str, fence: &str) -> bool {
-    line.trim_end() == fence
-}
-
-/// Length of `before` once the separator is removed: exactly `"\n\n"` when
-/// present (so bodies ending in `\r\n` survive), otherwise up to two
-/// hand-written newlines (`\n` or `\r\n`).
-fn strip_separator(before: &str) -> usize {
-    if let Some(stripped) = before.strip_suffix("\n\n") {
-        return stripped.len();
-    }
-    let mut end = before.len();
-    for _ in 0..2 {
-        let rest = &before[..end];
-        if let Some(stripped) = rest.strip_suffix('\n') {
-            end = stripped.strip_suffix('\r').unwrap_or(stripped).len();
-        } else {
-            break;
-        }
-    }
-    end
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const BLOCK: &str = "```terraphim-alternatives\n{\"version\": 1, \"spans\": []}\n```\n";
+    const BLOCK: &str = "```terraphim-alternatives\n{\"version\": 1, \"spans\": [], \"ghosts\": [], \"overflow\": \"stash\"}\n```\n";
+
+    fn problem_code(text: &str) -> DiagnosticCode {
+        split_annotation_block(text)
+            .block
+            .expect("block located")
+            .problem
+            .expect("block rejected")
+            .code
+    }
 
     #[test]
     fn text_without_block_is_all_body() {
@@ -218,63 +153,83 @@ mod tests {
 
     #[test]
     fn crlf_body_and_lenient_fences() {
-        let text = "body\r\n\r\n```terraphim-alternatives  \r\n{}\r\n```\r\n  \n";
+        let text = "body\r\n\r\n```terraphim-alternatives  \r\n{\"version\": 1, \"spans\": [], \"overflow\": \"x\"}\r\n```\r\n  \n";
         let split = split_annotation_block(text);
         assert_eq!(&text[..split.body_end.byte], "body");
-        assert_eq!(split.block.unwrap().problem, None);
+        let block = split.block.unwrap();
+        assert_eq!(block.problem, None);
+        assert_eq!(
+            &text[block.opening_fence.bytes()],
+            "```terraphim-alternatives  "
+        );
     }
 
     #[test]
-    fn last_opening_fence_wins() {
-        let text = format!("```terraphim-alternatives\nnot it\n```\nbody\n\n{BLOCK}");
-        let split = split_annotation_block(&text);
-        assert!(text[..split.body_end.byte].ends_with("body"));
-    }
-
-    #[test]
-    fn truncated_block() {
-        let text = "body\n\n```terraphim-alternatives\n{\"version\": 1}\n";
-        let block = split_annotation_block(text).block.unwrap();
-        let problem = block.problem.unwrap();
-        assert_eq!(problem.code, DiagnosticCode::AnnotationBlockTruncated);
-        assert_eq!(&text[problem.range.bytes()], "```terraphim-alternatives");
-    }
-
-    #[test]
-    fn opening_fence_on_last_line_is_truncated() {
-        let text = "body\n```terraphim-alternatives";
+    fn an_empty_example_block_is_body_text() {
+        // The editor's guard rule: a block with no annotations that the
+        // writer did not produce is documentation, not annotations.
+        let text = "Docs:\n\n```terraphim-alternatives\n{\"version\": 1, \"spans\": [], \"ghosts\": []}\n```\n";
         let split = split_annotation_block(text);
-        assert_eq!(&text[..split.body_end.byte], "body");
-        let problem = split.block.unwrap().problem.unwrap();
-        assert_eq!(problem.code, DiagnosticCode::AnnotationBlockTruncated);
+        assert_eq!(split.body_end.byte, text.len());
+        assert!(split.block.is_none());
     }
 
     #[test]
-    fn text_after_the_block() {
+    fn body_matches_the_editor_parser_even_when_malformed() {
         let text = format!("body\n\n{BLOCK}trailing words\n");
-        let problem = split_annotation_block(&text)
-            .block
-            .unwrap()
-            .problem
-            .unwrap();
-        assert_eq!(problem.code, DiagnosticCode::AnnotationBlockNotTrailing);
+        let error = terraphim_alternatives::parse(&text).unwrap_err();
+        let split = split_annotation_block(&text);
+        assert_eq!(split.body_end.byte, error.body.len());
+        assert_eq!(&text[split.body_end.byte..], error.raw_block);
     }
 
     #[test]
-    fn invalid_json() {
-        let text = "body\n\n```terraphim-alternatives\n{\"version\": 1,\n```\n";
+    fn structural_problems() {
+        let truncated = "body\n\n```terraphim-alternatives\n{\"version\": 1}\n";
+        assert_eq!(
+            problem_code(truncated),
+            DiagnosticCode::AnnotationBlockTruncated
+        );
+        let fence_only = "body\n```terraphim-alternatives";
+        assert_eq!(
+            problem_code(fence_only),
+            DiagnosticCode::AnnotationBlockTruncated
+        );
+        let trailing = format!("body\n\n{BLOCK}trailing words\n");
+        assert_eq!(
+            problem_code(&trailing),
+            DiagnosticCode::AnnotationBlockNotTrailing
+        );
+        let bad_json = "body\n\n```terraphim-alternatives\n{\"version\": 1,\n```\n";
+        assert_eq!(
+            problem_code(bad_json),
+            DiagnosticCode::AnnotationBlockInvalidJson
+        );
+    }
+
+    #[test]
+    fn schema_problems_the_json_check_alone_missed() {
+        let block = |json: &str| format!("body\n\n```terraphim-alternatives\n{json}\n```\n");
+        assert_eq!(
+            problem_code(&block("{\"spans\": []}")),
+            DiagnosticCode::AnnotationBlockMissingVersion
+        );
+        assert_eq!(
+            problem_code(&block("{\"version\": 99, \"spans\": []}")),
+            DiagnosticCode::AnnotationBlockUnknownVersion
+        );
+        assert_eq!(
+            problem_code(&block("{\"version\": 1, \"spans\": 3}")),
+            DiagnosticCode::AnnotationBlockInvalidSchema
+        );
+    }
+
+    #[test]
+    fn diagnostic_sits_on_the_opening_fence_with_the_parser_message() {
+        let text = "body\n\n```terraphim-alternatives\n{\"spans\": []}\n```\n";
         let problem = split_annotation_block(text).block.unwrap().problem.unwrap();
-        assert_eq!(problem.code, DiagnosticCode::AnnotationBlockInvalidJson);
-        assert!(problem.message.contains("line 2"), "{}", problem.message);
-    }
-
-    #[test]
-    fn separator_stripping_matches_the_editor() {
-        assert_eq!(strip_separator("body\n\n"), 4);
-        assert_eq!(strip_separator("body\r\n\n"), 5, "writer separator wins");
-        assert_eq!(strip_separator("body\r\n\r\n"), 4);
-        assert_eq!(strip_separator("body\n"), 4);
-        assert_eq!(strip_separator("body"), 4);
-        assert_eq!(strip_separator("body\n\n\n"), 5);
+        assert_eq!(&text[problem.range.bytes()], "```terraphim-alternatives");
+        assert_eq!(problem.severity, Severity::Warning);
+        assert!(problem.message.contains("version"), "{}", problem.message);
     }
 }

@@ -5441,7 +5441,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -8039,6 +8039,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_alternatives"
+version = "0.1.0"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "0df6c3174acfaead521ce412f4eb27519474e35a704bb6b5f21fe7ff2b5df0ac"
+dependencies = [
+ "serde",
+ "serde_json",
+ "terraphim_automata 2.1.0",
+ "terraphim_types",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "terraphim_automata"
 version = "1.21.0"
 source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
@@ -8320,6 +8333,7 @@ dependencies = [
  "criterion",
  "serde",
  "serde_json",
+ "terraphim_alternatives",
  "terraphim_automata 2.1.0",
  "terraphim_types",
  "thiserror 1.0.69",

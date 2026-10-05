@@ -1,13 +1,13 @@
 //! The KG engine: term analysis and synonym alternatives over one thesaurus.
 
 use serde::{Deserialize, Serialize};
+use terraphim_alternatives::{article_for, preceding_article, respell};
 use terraphim_automata::{
     CompiledMatcher, ConceptIndex, Matched, MatcherBuilder, MatcherOptions, TerraphimAutomataError,
     alternatives_in, load_thesaurus_from_json,
 };
 use terraphim_types::Thesaurus;
 
-use crate::article::{article_for, preceding_article, respell};
 use crate::block::{AnnotationBlock, split_annotation_block};
 use crate::case::Capitalisation;
 use crate::diagnostic::Diagnostic;

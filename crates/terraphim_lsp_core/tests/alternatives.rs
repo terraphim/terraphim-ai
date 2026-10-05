@@ -259,13 +259,27 @@ fn edits_are_sorted_and_non_overlapping() {
     }
 }
 
-const WELL_FORMED_BLOCK: &str = "```terraphim-alternatives\n{\"version\": 1, \"spans\": [{\"alts\": [\"choice\", \"judgment\"]}]}\n```\n";
+/// A schema-v1 span over "choice" in the body "A choice." with a human
+/// alternative "judgment": a KG term that must not be matched in the block.
+const SPAN: &str = r#"{"id": "s1", "kind": "word", "anchor": {"start": 2, "end": 8, "text": "choice"}, "active": 0, "alts": [{"text": "choice", "source": "original"}, {"text": "judgment", "source": "human"}]}"#;
+
+/// An annotation block holding `json`.
+fn block(json: &str) -> String {
+    format!("```terraphim-alternatives\n{json}\n```\n")
+}
+
+fn well_formed_block() -> String {
+    block(&format!(
+        r#"{{"version": 1, "spans": [{SPAN}], "ghosts": [], "overflow": "an eraser"}}"#
+    ))
+}
 
 #[test]
 fn matches_inside_the_annotation_block_are_ignored() {
     let engine = engine();
     let body = "A choice.";
-    let text = format!("{body}\n\n{WELL_FORMED_BLOCK}");
+    let text = format!("{body}\n\n{}", well_formed_block());
+    terraphim_alternatives::parse(&text).expect("the editor accepts the block");
     let analysis = engine.analyse(&text);
     assert_eq!(analysis.matches.len(), 1);
     assert_eq!(analysis.matches[0].range.start.byte, 2);
@@ -274,14 +288,19 @@ fn matches_inside_the_annotation_block_are_ignored() {
     let block = analysis.block.expect("block located");
     assert!(block.problem.is_none());
 
-    let inside_block = text.rfind("judgment").unwrap();
-    assert!(engine.alternatives_at(&text, inside_block).is_none());
+    for needle in ["judgment", "eraser"] {
+        let inside_block = text.rfind(needle).unwrap();
+        assert!(
+            engine.alternatives_at(&text, inside_block).is_none(),
+            "{needle}"
+        );
+    }
 }
 
 #[test]
 fn malformed_block_yields_one_diagnostic_and_the_body_is_unchanged() {
     let engine = engine();
-    let body = "A choice is a judgment.";
+    let body = "A choice.";
     let malformed = [
         (
             format!(
@@ -290,17 +309,52 @@ fn malformed_block_yields_one_diagnostic_and_the_body_is_unchanged() {
             DiagnosticCode::AnnotationBlockTruncated,
         ),
         (
-            format!("{body}\n\n{WELL_FORMED_BLOCK}a choice after the block\n"),
+            format!(
+                "{body}\n\n{}a choice after the block\n",
+                well_formed_block()
+            ),
             DiagnosticCode::AnnotationBlockNotTrailing,
         ),
         (
             format!("{body}\n\n```terraphim-alternatives\n{{\"version\": 1, choice\n```\n"),
             DiagnosticCode::AnnotationBlockInvalidJson,
         ),
+        // Schema-level problems only the editor's parser detects.
+        (
+            format!(
+                "{body}\n\n{}",
+                block(r#"{"spans": [], "overflow": "a choice"}"#)
+            ),
+            DiagnosticCode::AnnotationBlockMissingVersion,
+        ),
+        (
+            format!(
+                "{body}\n\n{}",
+                block(r#"{"version": 2, "overflow": "a choice"}"#)
+            ),
+            DiagnosticCode::AnnotationBlockUnknownVersion,
+        ),
+        (
+            format!(
+                "{body}\n\n{}",
+                block(r#"{"version": 1, "spans": "choice"}"#)
+            ),
+            DiagnosticCode::AnnotationBlockInvalidSchema,
+        ),
+        (
+            format!(
+                "{body}\n\n{}",
+                block(&format!(r#"{{"version": 1, "spans": [{SPAN}, {SPAN}]}}"#))
+            ),
+            DiagnosticCode::AnnotationBlockDuplicateId,
+        ),
     ];
     let body_only = engine.analyse(body);
     for (text, code) in malformed {
+        let error = terraphim_alternatives::parse(&text).expect_err("the editor rejects it");
         let analysis = engine.analyse(&text);
+        // Same body as the editor's recovery path keeps.
+        assert_eq!(&text[..analysis.body_end.byte], error.body, "{text}");
         assert_eq!(analysis.diagnostics.len(), 1, "{text}");
         assert_eq!(analysis.diagnostics[0].code, code, "{text}");
         // The body is exactly the text before the block, analysed as if the

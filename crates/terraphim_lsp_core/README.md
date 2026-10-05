@@ -19,13 +19,16 @@ concept's id, so the synonyms are the alternatives for a matched word.
   (lower, Sentence, Title Words, ALL CAPS; capitals are only ever added) and
   switch a preceding `a`/`an` in the same set of edits.
 - `split_annotation_block(text)`: locates the trailing
-  `terraphim-alternatives` fenced block so it is never analysed. A malformed
-  block (no closing fence, text after it, or invalid JSON) yields exactly one
-  diagnostic; the body is never modified. Schema validation stays with
-  terraphim-editor's block parser.
+  `terraphim-alternatives` fenced block so it is never analysed. Any error
+  from terraphim-editor's block parser (fences, JSON, schema version and
+  types, duplicate ids, overlapping spans or ghosts, invalid anchors) yields
+  exactly one diagnostic, with one code per `BlockErrorKind`; the body is
+  never modified.
 
 Matching and the concept -> synonyms index are `terraphim_automata`'s
-`CompiledMatcher` and `ConceptIndex`. All API types are plain data with serde
+`CompiledMatcher` and `ConceptIndex`. The block parser and the `a`/`an` rules
+are used directly from terraphim-editor's `terraphim_alternatives` crate, so
+the editor and LSP clients cannot drift apart. All API types are plain data with serde
 derives, so they pass through `wasm-bindgen` as JSON.
 
 ## Example

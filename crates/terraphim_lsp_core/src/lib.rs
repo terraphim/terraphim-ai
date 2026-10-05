@@ -21,8 +21,10 @@
 //!
 //! Matching and the concept -> synonyms index come from
 //! [`terraphim_automata`] ([`terraphim_automata::CompiledMatcher`] and
-//! [`terraphim_automata::ConceptIndex`]); this crate adds positions,
-//! casing, articles and the block boundary on top.
+//! [`terraphim_automata::ConceptIndex`]). The annotation-block parser and
+//! the `a`/`an` rules are terraphim-editor's own, from
+//! [`terraphim_alternatives`], so the editor and LSP clients cannot drift
+//! apart. This crate adds positions, casing and edits on top.
 //!
 //! Every type that crosses the API is plain data with serde derives, so it
 //! can pass through `wasm-bindgen` as JSON. Offsets are relative to the text
@@ -51,14 +53,12 @@
 //! # Ok::<(), terraphim_lsp_core::CoreError>(())
 //! ```
 
-mod article;
 mod block;
 mod case;
 mod diagnostic;
 mod engine;
 mod offset;
 
-pub use article::{Article, article_for};
 pub use block::{AnnotationBlock, BlockSplit, FENCE_INFO, split_annotation_block};
 pub use case::Capitalisation;
 pub use diagnostic::{Diagnostic, DiagnosticCode, Severity};
@@ -66,6 +66,8 @@ pub use engine::{
     AlternativeSet, Analysis, CoreError, KgEngine, Replacement, TermMatch, TextEdit, apply_edits,
 };
 pub use offset::{LineIndex, LinePosition, TextOffset, TextRange, utf16_len};
+/// The editor's a/an rules, re-exported from `terraphim_alternatives`.
+pub use terraphim_alternatives::{Article, article_for};
 
 /// Re-exported so callers can build a thesaurus without a direct dependency.
 pub use terraphim_types::Thesaurus;

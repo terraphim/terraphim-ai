@@ -21,6 +21,9 @@ publish = ["terraphim"]
 [dependencies]
 terraphim_automata = { version = "2.1.0", registry = "terraphim", default-features = false }
 terraphim_types = { version = "1.22.2", registry = "terraphim", default-features = false }
+# The editor's annotation-block parser and a/an rules, used directly so
+# both sides agree byte for byte (terraphim/terraphim-editor#67).
+terraphim_alternatives = { version = "0.1", registry = "terraphim" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

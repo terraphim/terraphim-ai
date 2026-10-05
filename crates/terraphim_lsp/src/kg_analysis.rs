@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_annotation_block_is_not_analysed() {
-        let text = "rust\n\n```terraphim-alternatives\n{\"tokio\": \"zzz\"}\n```\n";
+        let text = "rust\n\n```terraphim-alternatives\n{\"version\": 1, \"spans\": [], \"overflow\": \"tokio zzz\"}\n```\n";
         let analysis = analyse_kg_document(text, &sample_engine());
         assert_eq!(analysis.matched_terms.len(), 1);
         assert!(
