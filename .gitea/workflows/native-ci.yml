@@ -43,6 +43,13 @@ jobs:
       # --offline forces cargo to use the on-disk cache only. fmt keeps its
       # established form: cargo fmt does not accept --offline (Refs f2ca532e3).
       - run: CARGO_HTTP_TIMEOUT=600 cargo fmt --all -- --check
+      # Top up the cache from Cargo.lock before the --offline steps, so a lock
+      # change (new crate, new version, terraphim registry crate) no longer
+      # needs a rust-ci.ext4 rebuild (Refs #3431). --locked fails rather than
+      # rewriting the lockfile. native-clippy on the same terraphim-native
+      # runner already resolves both registries online, so the resolver issue
+      # above no longer applies; the --offline steps below stay unchanged.
+      - run: CARGO_HTTP_TIMEOUT=600 CARGO_NET_RETRY=5 cargo fetch --locked
       - run: CARGO_HTTP_TIMEOUT=600 cargo clippy --workspace --offline --all-targets -- -D warnings
       - run: CARGO_HTTP_TIMEOUT=600 cargo build --workspace --offline
       # Deliberate scope: the workspace `--lib` command remains the stable baseline.
