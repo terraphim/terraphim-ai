@@ -741,23 +741,45 @@ impl LanguageServer for TerraphimLspServer {
         Ok(())
     }
 
+    /// Apply new settings to every open document:
+    ///
+    /// - Lab findings of actions that are neither configured any more nor
+    ///   requested by command are removed at once. Command-requested actions
+    ///   and trim previews stay until their `*.clear` command: the settings
+    ///   only describe the automatic actions.
+    /// - With `lab.trigger` `save`, newly configured actions are computed
+    ///   now, through the same generation-checked path as a save; with
+    ///   `command` they wait for the next Lab command.
+    /// - Every document is republished, so ghost hints follow
+    ///   `ghostDiagnostics`, and inlay hints are refreshed.
     async fn did_change_configuration(&self, params: DidChangeConfigurationParams) {
-        self.set_settings(ServerSettings::from_value(Some(&params.settings)));
-        // The configured Lab actions may have changed: runs in flight with
-        // the old settings must not install.
-        for document in self.documents.write().await.values_mut() {
-            document.generation += 1;
-        }
-        // Ghost hints may have been switched on or off.
-        let documents: Vec<(Url, String)> = self
-            .documents
-            .read()
-            .await
+        let old = self.settings();
+        let new = ServerSettings::from_value(Some(&params.settings));
+        self.set_settings(new.clone());
+        let added = new
+            .lab
+            .actions
             .iter()
-            .map(|(uri, document)| (uri.clone(), document.text.clone()))
-            .collect();
-        for (uri, _) in documents {
-            self.publish_open(&uri).await;
+            .any(|action| !old.lab.actions.contains(action));
+        let recompute = added && new.lab.trigger == LabTrigger::Save;
+        let uris: Vec<Url> = {
+            let mut documents = self.documents.write().await;
+            for document in documents.values_mut() {
+                // Runs in flight with the old settings must not install.
+                document.generation += 1;
+                let requested = &document.lab_actions;
+                document.lab.retain(|finding| {
+                    new.lab.actions.contains(&finding.action) || requested.contains(&finding.action)
+                });
+            }
+            documents.keys().cloned().collect()
+        };
+        for uri in uris {
+            if recompute {
+                self.refresh_lab_and_publish(&uri).await;
+            } else {
+                self.publish_open(&uri).await;
+            }
         }
         if self.inlay_hint_refresh.load(Ordering::Relaxed)
             && let Err(error) = self.client.inlay_hint_refresh().await

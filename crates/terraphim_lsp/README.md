@@ -66,6 +66,13 @@ edits, Lab commands, clears and settings changes) keeps runs that finish
 out of order from overwriting newer Lab or trim state; a superseded
 command recomputes from the current state.
 
+On `didChangeConfiguration`, marks of actions that are no longer configured
+(and were not requested by command) disappear at once; newly configured
+actions are computed immediately with the `save` trigger and on the next
+command with `command`. Command-requested actions and trim previews stay
+until their `*.clear` command. Ghost hints follow `ghostDiagnostics` and
+inlay hints are refreshed.
+
 ## Commands
 
 Each takes one JSON object. `version`, when given, must match the server's

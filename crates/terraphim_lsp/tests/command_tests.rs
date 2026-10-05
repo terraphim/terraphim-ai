@@ -606,6 +606,78 @@ async fn the_command_trigger_never_runs_lab_actions_by_itself() {
     );
 }
 
+async fn configure(server: &TerraphimLspServer, settings: Value) {
+    server
+        .did_change_configuration(DidChangeConfigurationParams { settings })
+        .await;
+}
+
+#[tokio::test]
+async fn removing_a_configured_action_clears_its_marks_at_once() {
+    let options = json!({"lab": {"actions": ["long_sentences"]}});
+    let (service, _socket) = open_server(LAB_DOC, client(Some(options))).await;
+    let server = service.inner();
+    execute(
+        server,
+        commands::LAB_MARK,
+        json!({"uri": uri(), "action": "hedges_and_filler"}),
+    )
+    .await
+    .unwrap();
+    execute(
+        server,
+        commands::TRIM_PREVIEW,
+        json!({"uri": uri(), "level": "slight"}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        with_code(&diagnostics(server).await, "lab-long-sentence").len(),
+        1
+    );
+    configure(server, json!({"lab": {"actions": []}})).await;
+    let all = diagnostics(server).await;
+    assert!(with_code(&all, "lab-long-sentence").is_empty());
+    // Command-requested marks and the trim preview stay until cleared.
+    assert_eq!(with_code(&all, "lab-hedge").len(), 2);
+    assert_eq!(with_code(&all, "trim-candidate").len(), 5);
+}
+
+#[tokio::test]
+async fn adding_an_action_under_the_save_trigger_computes_it_now() {
+    let (service, _socket) = open_server(LAB_DOC, client(None)).await;
+    let server = service.inner();
+    assert!(with_code(&diagnostics(server).await, "lab-long-sentence").is_empty());
+    configure(server, json!({"lab": {"actions": ["long_sentences"]}})).await;
+    assert_eq!(
+        with_code(&diagnostics(server).await, "lab-long-sentence").len(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn adding_an_action_under_the_command_trigger_waits_for_a_command() {
+    let (service, _socket) = open_server(LAB_DOC, client(None)).await;
+    let server = service.inner();
+    configure(
+        server,
+        json!({"lab": {"actions": ["long_sentences"], "trigger": "command"}}),
+    )
+    .await;
+    assert!(with_code(&diagnostics(server).await, "lab-long-sentence").is_empty());
+    execute(
+        server,
+        commands::LAB_MARK,
+        json!({"uri": uri(), "action": "off_tone"}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        with_code(&diagnostics(server).await, "lab-long-sentence").len(),
+        1
+    );
+}
+
 // ----------------------------------------------------------------- trim --
 
 #[tokio::test]
