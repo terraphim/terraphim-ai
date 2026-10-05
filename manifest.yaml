@@ -157,6 +157,7 @@ components:
       - crates/terraphim_github_runner/Cargo.toml
       - crates/terraphim_github_runner_server/Cargo.toml
       - crates/terraphim_lsp/Cargo.toml
+      - crates/terraphim_lsp_core/Cargo.toml
       - crates/terraphim_rlm/Cargo.toml
       - crates/terraphim_rolegraph_py/Cargo.toml
       - crates/terraphim_sessions/Cargo.toml
@@ -187,6 +188,7 @@ components:
     source_paths:
       - .terraphim/kg
       - crates/terraphim_lsp
+      - crates/terraphim_lsp_core
       - crates/terraphim_mcp_search
       - crates/terraphim_sessions
     source_of_truth_for:

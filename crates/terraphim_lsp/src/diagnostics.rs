@@ -1,115 +1,89 @@
 //! Diagnostic helpers for Terraphim LSP.
 //!
-//! Converts [`KgAnalysis`] results into LSP diagnostics, surfacing unknown
-//! terms as warnings.
+//! Converts [`KgAnalysis`] results into LSP diagnostics: unknown terms as
+//! warnings, plus the core's own diagnostics (a malformed annotation block).
 
-use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
+use terraphim_lsp_core::LineIndex;
+use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Range};
 
+use crate::convert;
 use crate::kg_analysis::KgAnalysis;
 
 /// Build LSP diagnostics from a KG analysis result.
 ///
-/// Unknown terms are reported as warnings at their first occurrence in the
-/// document. Matched terms do not produce diagnostics.
+/// Unknown terms are reported as warnings at the start of the document.
+/// Matched terms do not produce diagnostics. Prefer
+/// [`build_diagnostics_with_positions`], which locates each term.
 pub fn build_diagnostics(analysis: &KgAnalysis) -> Vec<Diagnostic> {
     analysis
         .unknown_terms
         .iter()
-        .map(|term| Diagnostic {
-            range: Range {
-                start: Position {
-                    line: 0,
-                    character: 0,
-                },
-                end: Position {
-                    line: 0,
-                    character: 0,
-                },
-            },
-            severity: Some(DiagnosticSeverity::WARNING),
-            code: None,
-            code_description: None,
-            source: Some("terraphim-lsp".to_string()),
-            message: format!("Unknown term: {}", term),
-            related_information: None,
-            tags: None,
-            data: None,
-        })
+        .map(|term| unknown_term_diagnostic(term, Range::default()))
         .collect()
 }
 
-/// Build diagnostics with byte-offset ranges mapped to LSP positions.
+/// Build diagnostics with ranges mapped to LSP positions.
 ///
-/// This richer variant locates each unknown term in the document text and
-/// reports the diagnostic at the term's actual range. Unknown terms whose
-/// positions cannot be located fall back to the start of the document.
+/// Each unknown term is reported at its first occurrence in the document;
+/// terms that cannot be located are skipped. Core diagnostics (such as a
+/// malformed annotation block) are always included.
 pub fn build_diagnostics_with_positions(analysis: &KgAnalysis, text: &str) -> Vec<Diagnostic> {
-    analysis
-        .unknown_terms
+    let index = LineIndex::new(text);
+    let unknown = analysis.unknown_terms.iter().filter_map(|term| {
+        let range = find_term_range(text, &index, term)?;
+        Some(unknown_term_diagnostic(term, range))
+    });
+    let core = analysis
+        .diagnostics
         .iter()
-        .filter_map(|term| {
-            let range = find_term_range(text, term)?;
-            Some(Diagnostic {
-                range,
-                severity: Some(DiagnosticSeverity::WARNING),
-                code: None,
-                code_description: None,
-                source: Some("terraphim-lsp".to_string()),
-                message: format!("Unknown term: {}", term),
-                related_information: None,
-                tags: None,
-                data: None,
-            })
-        })
-        .collect()
+        .map(|diagnostic| convert::diagnostic(&index, diagnostic));
+    unknown.chain(core).collect()
 }
 
-/// Locate the first occurrence of a term in the document and return its LSP
-/// range. Returns `None` if the term cannot be found.
-fn find_term_range(text: &str, term: &str) -> Option<Range> {
-    let lower = term.to_lowercase();
-    let text_lower = text.to_lowercase();
-    let byte_start = text_lower.find(&lower)?;
-    let byte_end = byte_start + term.len();
-
-    Some(Range {
-        start: byte_offset_to_position(text, byte_start),
-        end: byte_offset_to_position(text, byte_end),
-    })
-}
-
-/// Convert a byte offset in a UTF-8 document to an LSP position.
-fn byte_offset_to_position(text: &str, byte_offset: usize) -> Position {
-    let mut line = 0u32;
-    let mut character = 0u32;
-
-    for (idx, ch) in text.char_indices() {
-        if idx >= byte_offset {
-            break;
-        }
-        if ch == '\n' {
-            line += 1;
-            character = 0;
-        } else {
-            character += ch.len_utf16() as u32;
-        }
+fn unknown_term_diagnostic(term: &str, range: Range) -> Diagnostic {
+    Diagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::WARNING),
+        code: None,
+        code_description: None,
+        source: Some(convert::SOURCE.to_string()),
+        message: format!("Unknown term: {}", term),
+        related_information: None,
+        tags: None,
+        data: None,
     }
+}
 
-    Position { line, character }
+/// Locate the first occurrence of a term in the document (ASCII
+/// case-insensitively) and return its LSP range.
+fn find_term_range(text: &str, index: &LineIndex<'_>, term: &str) -> Option<Range> {
+    let byte_start = text.char_indices().map(|(start, _)| start).find(|&start| {
+        text.get(start..start + term.len())
+            .is_some_and(|candidate| candidate.eq_ignore_ascii_case(term))
+    })?;
+    Some(convert::byte_range(
+        index,
+        byte_start,
+        byte_start + term.len(),
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kg_analysis::KgAnalysis;
+    use terraphim_lsp_core::KgEngine;
+    use tower_lsp::lsp_types::Position;
+
+    fn unknown(terms: &[&str]) -> KgAnalysis {
+        KgAnalysis {
+            unknown_terms: terms.iter().map(|t| t.to_string()).collect(),
+            ..KgAnalysis::empty()
+        }
+    }
 
     #[test]
     fn test_build_diagnostics_reports_unknown_terms() {
-        let analysis = KgAnalysis {
-            matched_terms: vec![],
-            unknown_terms: vec!["xyz".to_string()],
-        };
-        let diagnostics = build_diagnostics(&analysis);
+        let diagnostics = build_diagnostics(&unknown(&["xyz"]));
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].message, "Unknown term: xyz");
         assert_eq!(diagnostics[0].severity, Some(DiagnosticSeverity::WARNING));
@@ -117,11 +91,7 @@ mod tests {
 
     #[test]
     fn test_build_diagnostics_with_positions() {
-        let analysis = KgAnalysis {
-            matched_terms: vec![],
-            unknown_terms: vec!["xyz".to_string()],
-        };
-        let diagnostics = build_diagnostics_with_positions(&analysis, "rust and xyz");
+        let diagnostics = build_diagnostics_with_positions(&unknown(&["xyz"]), "rust and xyz");
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].range.start.line, 0);
         assert_eq!(diagnostics[0].range.start.character, 9);
@@ -129,10 +99,36 @@ mod tests {
     }
 
     #[test]
-    fn test_byte_offset_to_position_multiline() {
-        let text = "line one\nline two";
-        let pos = byte_offset_to_position(text, 14); // 't' in "two"
-        assert_eq!(pos.line, 1);
-        assert_eq!(pos.character, 5);
+    fn test_positions_count_utf16_units() {
+        let diagnostics = build_diagnostics_with_positions(&unknown(&["xyz"]), "😀 é\nab XYZ");
+        assert_eq!(diagnostics[0].range.start.line, 1);
+        assert_eq!(diagnostics[0].range.start.character, 3);
+        assert_eq!(diagnostics[0].range.end.character, 6);
+    }
+
+    #[test]
+    fn test_malformed_block_becomes_one_lsp_diagnostic() {
+        let text = "body\n\n```terraphim-alternatives\n{\n";
+        let analysis = KgAnalysis {
+            diagnostics: KgEngine::empty().analyse(text).diagnostics,
+            ..KgAnalysis::empty()
+        };
+        let diagnostics = build_diagnostics_with_positions(&analysis, text);
+        assert_eq!(diagnostics.len(), 1);
+        let block = &diagnostics[0];
+        assert_eq!(
+            block.range.start,
+            Position {
+                line: 2,
+                character: 0
+            }
+        );
+        assert_eq!(
+            block.code,
+            Some(tower_lsp::lsp_types::NumberOrString::String(
+                "annotation-block-truncated".to_string()
+            ))
+        );
+        assert_eq!(block.source.as_deref(), Some("terraphim-lsp"));
     }
 }
