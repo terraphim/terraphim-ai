@@ -114,16 +114,8 @@ fn one_action_marks_only_its_kinds() {
 fn crlf_documents_map_to_the_same_text() {
     let crlf = LAB_DOC.replace('\n', "\r\n");
     assert_eq!(
-        codes_and_texts(&crlf, &LabAction::ALL)
-            .into_iter()
-            .filter(|(code, _)| *code != DiagnosticCode::LabLongSentence
-                && *code != DiagnosticCode::LabConvolutedSentence)
-            .collect::<Vec<_>>(),
+        codes_and_texts(&crlf, &LabAction::ALL),
         codes_and_texts(LAB_DOC, &LabAction::ALL)
-            .into_iter()
-            .filter(|(code, _)| *code != DiagnosticCode::LabLongSentence
-                && *code != DiagnosticCode::LabConvolutedSentence)
-            .collect::<Vec<_>>()
     );
     let found = lab_findings(&crlf, &config(), &[LabAction::HedgesAndFiller]);
     let index = LineIndex::new(&crlf);
