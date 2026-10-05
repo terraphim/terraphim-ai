@@ -1,0 +1,51 @@
+{
+  "schema": "homebrew-formulas/1",
+  "formulas": [
+    {
+      "component": "terraphim-agent",
+      "file": "terraphim-agent.rb",
+      "template": "config/homebrew/templates/terraphim-agent.rb.in",
+      "format": "tar.gz",
+      "slots": {
+        "macos": {
+          "target": "universal-apple-darwin",
+          "os": "macos",
+          "arch": "universal"
+        },
+        "linux_arm": {
+          "target": "aarch64-unknown-linux-musl",
+          "os": "linux",
+          "arch": "aarch64"
+        },
+        "linux_intel": {
+          "target": "x86_64-unknown-linux-gnu",
+          "os": "linux",
+          "arch": "x86_64"
+        }
+      }
+    },
+    {
+      "component": "terraphim-grep",
+      "file": "terraphim-grep.rb",
+      "template": "config/homebrew/templates/terraphim-grep.rb.in",
+      "format": "tar.gz",
+      "slots": {
+        "macos": {
+          "target": "universal-apple-darwin",
+          "os": "macos",
+          "arch": "universal"
+        },
+        "linux_arm": {
+          "target": "aarch64-unknown-linux-musl",
+          "os": "linux",
+          "arch": "aarch64"
+        },
+        "linux_intel": {
+          "target": "x86_64-unknown-linux-gnu",
+          "os": "linux",
+          "arch": "x86_64"
+        }
+      }
+    }
+  ]
+}

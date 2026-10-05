@@ -1,0 +1,142 @@
+{
+  "schema_version": "1.0.0",
+  "release_version": "1.21.16",
+  "release_tag": "v1.21.16",
+  "sources": {
+    "terraphim-ai": {
+      "gitea_sha": "1111111111111111111111111111111111111111",
+      "github_sha": "1111111111111111111111111111111111111111",
+      "tree_sha": "2222222222222222222222222222222222222222",
+      "workflow_run_id": 33380001
+    },
+    "terraphim-clients": {
+      "gitea_sha": "3333333333333333333333333333333333333333",
+      "github_sha": "3333333333333333333333333333333333333333",
+      "tree_sha": "4444444444444444444444444444444444444444",
+      "workflow_run_id": 33360001
+    }
+  },
+  "assets": [
+    {
+      "name": "terraphim-server-1.21.16-universal-apple-darwin.tar.gz",
+      "component": "terraphim-server",
+      "format": "tar.gz",
+      "target": "universal-apple-darwin",
+      "arch": "universal",
+      "os": "macos",
+      "source_repo": "terraphim-ai",
+      "source_sha": "1111111111111111111111111111111111111111",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size_bytes": 44040192,
+      "signature": "terraphim-server-1.21.16-universal-apple-darwin.tar.gz.sig"
+    },
+    {
+      "name": "terraphim-server-1.21.16-x86_64-unknown-linux-gnu.tar.gz",
+      "component": "terraphim-server",
+      "format": "tar.gz",
+      "target": "x86_64-unknown-linux-gnu",
+      "arch": "x86_64",
+      "os": "linux",
+      "source_repo": "terraphim-ai",
+      "source_sha": "1111111111111111111111111111111111111111",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size_bytes": 45088768,
+      "signature": "terraphim-server-1.21.16-x86_64-unknown-linux-gnu.tar.gz.sig"
+    },
+    {
+      "name": "terraphim-agent-1.21.16-universal-apple-darwin.tar.gz",
+      "component": "terraphim-agent",
+      "format": "tar.gz",
+      "target": "universal-apple-darwin",
+      "arch": "universal",
+      "os": "macos",
+      "source_repo": "terraphim-clients",
+      "source_sha": "1111111111111111111111111111111111111111",
+      "sha256": "0a9e7eb47508d285f66966db7fd2bb36367ad847c0275a068796c7c382c107da",
+      "size_bytes": 12000000,
+      "signature": "terraphim-agent-1.21.16-universal-apple-darwin.tar.gz.sig"
+    },
+    {
+      "name": "terraphim-agent-1.21.16-aarch64-unknown-linux-musl.tar.gz",
+      "component": "terraphim-agent",
+      "format": "tar.gz",
+      "target": "aarch64-unknown-linux-musl",
+      "arch": "aarch64",
+      "os": "linux",
+      "source_repo": "terraphim-clients",
+      "source_sha": "1111111111111111111111111111111111111111",
+      "sha256": "f8530d963171e3f72b52b8b729653cafa5ae5e105e219f7ecec7b170037acaa7",
+      "size_bytes": 8845372,
+      "signature": "terraphim-agent-1.21.16-aarch64-unknown-linux-musl.tar.gz.sig"
+    },
+    {
+      "name": "terraphim-agent-1.21.16-x86_64-unknown-linux-gnu.tar.gz",
+      "component": "terraphim-agent",
+      "format": "tar.gz",
+      "target": "x86_64-unknown-linux-gnu",
+      "arch": "x86_64",
+      "os": "linux",
+      "source_repo": "terraphim-clients",
+      "source_sha": "1111111111111111111111111111111111111111",
+      "sha256": "b6dec5834b96fa3178680b0804f5e6ce47a2a201e7f70e1e859b67359dd00ad4",
+      "size_bytes": 11000000,
+      "signature": "terraphim-agent-1.21.16-x86_64-unknown-linux-gnu.tar.gz.sig"
+    },
+    {
+      "name": "terraphim-grep-1.21.16-universal-apple-darwin.tar.gz",
+      "component": "terraphim-grep",
+      "format": "tar.gz",
+      "target": "universal-apple-darwin",
+      "arch": "universal",
+      "os": "macos",
+      "source_repo": "terraphim-clients",
+      "source_sha": "1111111111111111111111111111111111111111",
+      "sha256": "5c97821855ae2d6fee5df00c2baa912c0b30df60f2bb3f351baec0b0d36ed3e0",
+      "size_bytes": 9000000,
+      "signature": "terraphim-grep-1.21.16-universal-apple-darwin.tar.gz.sig"
+    },
+    {
+      "name": "terraphim-grep-1.21.16-aarch64-unknown-linux-musl.tar.gz",
+      "component": "terraphim-grep",
+      "format": "tar.gz",
+      "target": "aarch64-unknown-linux-musl",
+      "arch": "aarch64",
+      "os": "linux",
+      "source_repo": "terraphim-clients",
+      "source_sha": "1111111111111111111111111111111111111111",
+      "sha256": "194d4cac04eccbfb998c4f060e44b286873510d354fd3a3a160bf63b2c5e025c",
+      "size_bytes": 6047035,
+      "signature": "terraphim-grep-1.21.16-aarch64-unknown-linux-musl.tar.gz.sig"
+    },
+    {
+      "name": "terraphim-grep-1.21.16-x86_64-unknown-linux-gnu.tar.gz",
+      "component": "terraphim-grep",
+      "format": "tar.gz",
+      "target": "x86_64-unknown-linux-gnu",
+      "arch": "x86_64",
+      "os": "linux",
+      "source_repo": "terraphim-clients",
+      "source_sha": "1111111111111111111111111111111111111111",
+      "sha256": "8f396e508aeecc8743052f2ef8f37c8ec1502b4c31de1f74c1f7efdbf42b27e6",
+      "size_bytes": 7000000,
+      "signature": "terraphim-grep-1.21.16-x86_64-unknown-linux-gnu.tar.gz.sig"
+    }
+  ],
+  "required_channels": [
+    "github_release",
+    "r2_stable_manifest",
+    "homebrew_tap_pr",
+    "aur_terraphim_clients_bin",
+    "omarchy_terraphim_clients_bin"
+  ],
+  "central_channels": [
+    "github_release",
+    "r2_stable_manifest"
+  ],
+  "downstream_channels": [
+    "homebrew_tap_pr",
+    "aur_terraphim_clients_bin",
+    "omarchy_terraphim_clients_bin"
+  ],
+  "created_at": "2026-09-25T00:00:00Z"
+}
