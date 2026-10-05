@@ -678,6 +678,33 @@ async fn adding_an_action_under_the_command_trigger_waits_for_a_command() {
     );
 }
 
+#[tokio::test]
+async fn switching_the_trigger_to_save_computes_the_configured_actions() {
+    let options = json!({"lab": {"actions": ["long_sentences"], "trigger": "command"}});
+    let (service, _socket) = open_server(LAB_DOC, client(Some(options))).await;
+    let server = service.inner();
+    assert!(with_code(&diagnostics(server).await, "lab-long-sentence").is_empty());
+    configure(
+        server,
+        json!({"lab": {"actions": ["long_sentences"], "trigger": "save"}}),
+    )
+    .await;
+    assert_eq!(
+        with_code(&diagnostics(server).await, "lab-long-sentence").len(),
+        1
+    );
+    // Back to "command": the installed marks are still valid and stay.
+    configure(
+        server,
+        json!({"lab": {"actions": ["long_sentences"], "trigger": "command"}}),
+    )
+    .await;
+    assert_eq!(
+        with_code(&diagnostics(server).await, "lab-long-sentence").len(),
+        1
+    );
+}
+
 // ----------------------------------------------------------------- trim --
 
 #[tokio::test]

@@ -69,7 +69,9 @@ command recomputes from the current state.
 On `didChangeConfiguration`, marks of actions that are no longer configured
 (and were not requested by command) disappear at once; newly configured
 actions are computed immediately with the `save` trigger and on the next
-command with `command`. Command-requested actions and trim previews stay
+command with `command`. Switching the trigger from `command` to `save`
+computes the configured actions at once; switching `save` to `command`
+keeps the marks already shown (the next edit drops them as usual). Command-requested actions and trim previews stay
 until their `*.clear` command. Ghost hints follow `ghostDiagnostics` and
 inlay hints are refreshed.
 

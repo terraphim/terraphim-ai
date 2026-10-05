@@ -26,7 +26,7 @@ use crate::completion::{build_completions, word_at_position};
 use crate::convert;
 use crate::diagnostics::{build_diagnostics_with_positions, ghost_diagnostics};
 use crate::kg_analysis::analyse_kg_document;
-use crate::settings::{LabTrigger, ServerSettings};
+use crate::settings::{LabSettings, LabTrigger, ServerSettings};
 
 /// Terraphim LSP server backed by a knowledge-graph thesaurus.
 ///
@@ -747,21 +747,20 @@ impl LanguageServer for TerraphimLspServer {
     ///   requested by command are removed at once. Command-requested actions
     ///   and trim previews stay until their `*.clear` command: the settings
     ///   only describe the automatic actions.
-    /// - With `lab.trigger` `save`, newly configured actions are computed
-    ///   now, through the same generation-checked path as a save; with
-    ///   `command` they wait for the next Lab command.
+    /// - With `lab.trigger` `save`, configured actions that have not been
+    ///   computed automatically (newly added ones, or all of them when the
+    ///   trigger switches from `command` to `save`) are computed now,
+    ///   through the same generation-checked path as a save; with `command`
+    ///   they wait for the next Lab command. Switching `save` to `command`
+    ///   keeps the installed marks: they are still valid for the current
+    ///   text, and the next edit drops them as usual.
     /// - Every document is republished, so ghost hints follow
     ///   `ghostDiagnostics`, and inlay hints are refreshed.
     async fn did_change_configuration(&self, params: DidChangeConfigurationParams) {
         let old = self.settings();
         let new = ServerSettings::from_value(Some(&params.settings));
         self.set_settings(new.clone());
-        let added = new
-            .lab
-            .actions
-            .iter()
-            .any(|action| !old.lab.actions.contains(action));
-        let recompute = added && new.lab.trigger == LabTrigger::Save;
+        let recompute = lab_recompute_needed(&old.lab, &new.lab);
         let uris: Vec<Url> = {
             let mut documents = self.documents.write().await;
             for document in documents.values_mut() {
@@ -971,6 +970,23 @@ impl LanguageServer for TerraphimLspServer {
     }
 }
 
+/// Whether a settings change from `old` to `new` must recompute Lab results
+/// now: only under the `save` trigger, and only if some configured action
+/// has not been computed automatically, because it was just added or
+/// because the trigger was `command` (configured actions were never run
+/// by themselves). Removing actions never needs a run (their marks are
+/// filtered out), and switching to `command` keeps what is installed.
+fn lab_recompute_needed(old: &LabSettings, new: &LabSettings) -> bool {
+    if new.trigger != LabTrigger::Save || new.actions.is_empty() {
+        return false;
+    }
+    old.trigger != LabTrigger::Save
+        || new
+            .actions
+            .iter()
+            .any(|action| !old.actions.contains(action))
+}
+
 /// Whether a requested code-action kind (`params.context.only`) includes
 /// `kind`: equal, or a dot-separated prefix of it (`refactor` includes
 /// `refactor.rewrite`).
@@ -1124,6 +1140,46 @@ mod tests {
             Installed::Superseded
         ));
         assert!(installed(server).await.trim.is_empty());
+    }
+
+    #[test]
+    fn lab_recompute_transition_table() {
+        use LabAction::{HedgesAndFiller as Hedges, LongSentences as Long};
+        use LabTrigger::{Command, Save};
+        let lab = |actions: &[LabAction], trigger| LabSettings {
+            actions: actions.to_vec(),
+            trigger,
+        };
+        // (old actions, old trigger, new actions, new trigger, recompute?)
+        let table = [
+            // Actions added.
+            (&[][..], Save, &[Long][..], Save, true),
+            (&[][..], Command, &[Long][..], Save, true),
+            (&[][..], Save, &[Long][..], Command, false),
+            (&[][..], Command, &[Long][..], Command, false),
+            (&[Long][..], Save, &[Long, Hedges][..], Save, true),
+            // Actions removed.
+            (&[Long, Hedges][..], Save, &[Long][..], Save, false),
+            (&[Long, Hedges][..], Command, &[Long][..], Save, true),
+            (&[Long][..], Command, &[][..], Save, false),
+            (&[Long][..], Save, &[][..], Command, false),
+            (&[Long, Hedges][..], Command, &[Long][..], Command, false),
+            // Actions unchanged.
+            (&[Long][..], Save, &[Long][..], Save, false),
+            (&[Long][..], Command, &[Long][..], Save, true),
+            (&[Long][..], Save, &[Long][..], Command, false),
+            (&[Long][..], Command, &[Long][..], Command, false),
+            (&[][..], Command, &[][..], Save, false),
+        ];
+        for (old_actions, old_trigger, new_actions, new_trigger, expected) in table {
+            let old = lab(old_actions, old_trigger);
+            let new = lab(new_actions, new_trigger);
+            assert_eq!(
+                lab_recompute_needed(&old, &new),
+                expected,
+                "{old:?} -> {new:?}"
+            );
+        }
     }
 
     #[test]
