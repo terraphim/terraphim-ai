@@ -23,6 +23,12 @@
 //! cleared. Their results are dropped on every edit (stale ranges are worse
 //! than none) and recomputed on save when `lab.trigger` is `save` (the
 //! default), or on the next command when it is `command`.
+//!
+//! Lab runs happen on the blocking pool without holding the document lock.
+//! If the document changes while `terraphim.lab.mark` or
+//! `terraphim.trim.preview` is computing, the results are dropped (never
+//! published) and the command fails with `ContentModified`; the requested
+//! action or level is kept for the next save or command.
 
 use serde::Deserialize;
 use serde_json::Value;

@@ -606,6 +606,33 @@ async fn the_command_trigger_never_runs_lab_actions_by_itself() {
     );
 }
 
+#[tokio::test]
+async fn a_change_during_a_lab_command_wins() {
+    // A large document so the Lab run (on the blocking pool) is still in
+    // flight when the change is handled.
+    let body = &LAB_DOC[..LAB_DOC.find("```").unwrap()];
+    let text = body.repeat(300);
+    let (service, _socket) = open_server(&text, client(None)).await;
+    let server = service.inner();
+    let edited = format!("Preface. {text}");
+    let (marked, ()) = tokio::join!(
+        execute(
+            server,
+            commands::LAB_MARK,
+            json!({"uri": uri(), "action": "hedges_and_filler", "version": 1}),
+        ),
+        change(server, &edited, 2),
+    );
+    // The command's results were computed for version 1: refused, not
+    // installed, so nothing stale is published.
+    assert_eq!(marked.unwrap_err().code, ErrorCode::ContentModified);
+    assert!(with_code(&diagnostics(server).await, "lab-hedge").is_empty());
+    // The requested action stays; the next save computes it for version 2.
+    save(server).await;
+    let hedges = with_code(&diagnostics(server).await, "lab-hedge").len();
+    assert_eq!(hedges, 2 * 300);
+}
+
 // ----------------------------------------------------------------- trim --
 
 #[tokio::test]

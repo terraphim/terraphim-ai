@@ -65,7 +65,7 @@ pub struct TerraphimLspServer {
     settings: std::sync::RwLock<ServerSettings>,
     /// The Lab engine's configuration (embedded default lists), or `None`
     /// if they failed to load.
-    lab_config: Option<LabConfig>,
+    lab_config: Option<Arc<LabConfig>>,
 }
 
 /// An open document: its full text, the version the client last sent, and
@@ -87,6 +87,45 @@ struct OpenDocument {
     trim: Vec<CoreDiagnostic>,
     /// The trim status card for the current text, `535 → 480 words · −10%`.
     trim_status: Option<String>,
+}
+
+/// A snapshot of one document for a Lab run.
+#[derive(Debug, Clone)]
+struct LabJob {
+    text: String,
+    version: i32,
+    actions: Vec<LabAction>,
+    trim_level: Option<TrimLevel>,
+}
+
+/// The results of a [`LabJob`].
+#[derive(Debug, Clone, Default)]
+struct LabResults {
+    lab: Vec<LabFinding>,
+    trim: Vec<CoreDiagnostic>,
+    trim_status: Option<String>,
+}
+
+impl LabJob {
+    /// Run the configured and requested actions and the trim preview. CPU
+    /// bound and whole-document; called on the blocking pool.
+    fn run(&self, config: &LabConfig) -> LabResults {
+        let lab = if self.actions.is_empty() {
+            Vec::new()
+        } else {
+            lab_findings(&self.text, config, &self.actions)
+        };
+        let preview = self
+            .trim_level
+            .map(|level| trim_preview(&self.text, config, level));
+        LabResults {
+            lab,
+            trim_status: preview.as_ref().map(|preview| preview.status.clone()),
+            trim: preview
+                .map(|preview| preview.diagnostics)
+                .unwrap_or_default(),
+        }
+    }
 }
 
 /// The code-action kind of the Lab fixes.
@@ -125,7 +164,8 @@ impl TerraphimLspServer {
                 .inspect_err(|error| {
                     log::error!("terraphim_lsp: Lab engine unavailable: {error}");
                 })
-                .ok(),
+                .ok()
+                .map(Arc::new),
         }
     }
 
@@ -191,40 +231,66 @@ impl TerraphimLspServer {
         document.trim_status = None;
     }
 
-    /// Recompute the Lab findings (configured plus requested actions) and
-    /// the trim preview of a document.
-    fn refresh_lab(&self, document: &mut OpenDocument) {
-        let Some(config) = &self.lab_config else {
-            return;
-        };
+    /// What a Lab run needs from a document, taken under a brief lock so
+    /// the (whole-document) computation runs without holding any lock.
+    fn lab_job(&self, document: &OpenDocument) -> LabJob {
         let mut actions = self.settings().lab.actions;
         actions.extend(document.lab_actions.iter().copied());
         actions.sort_unstable();
         actions.dedup();
-        document.lab = if actions.is_empty() {
-            Vec::new()
-        } else {
-            lab_findings(&document.text, config, &actions)
-        };
-        let preview = document
-            .trim_level
-            .map(|level| trim_preview(&document.text, config, level));
-        document.trim_status = preview.as_ref().map(|preview| preview.status.clone());
-        document.trim = preview
-            .map(|preview| preview.diagnostics)
-            .unwrap_or_default();
+        LabJob {
+            text: document.text.clone(),
+            version: document.version,
+            actions,
+            trim_level: document.trim_level,
+        }
+    }
+
+    /// Run a Lab job on the blocking pool. `None` when the Lab engine is
+    /// unavailable or the task failed.
+    async fn run_lab_job(&self, job: LabJob) -> Option<LabResults> {
+        let config = Arc::clone(self.lab_config.as_ref()?);
+        tokio::task::spawn_blocking(move || job.run(&config))
+            .await
+            .inspect_err(|error| log::error!("terraphim_lsp: Lab run failed: {error}"))
+            .ok()
+    }
+
+    /// Install `results` computed for `version` of `uri`, unless the
+    /// document changed (or closed) meanwhile: then they are dropped, since
+    /// their ranges would be stale, and the next save or command recomputes.
+    /// Returns the updated document when installed.
+    async fn install_lab(
+        &self,
+        uri: &Url,
+        version: i32,
+        results: LabResults,
+    ) -> Option<OpenDocument> {
+        let mut documents = self.documents.write().await;
+        let document = documents.get_mut(uri)?;
+        if document.version != version {
+            return None;
+        }
+        document.lab = results.lab;
+        document.trim = results.trim;
+        document.trim_status = results.trim_status;
+        Some(document.clone())
     }
 
     /// Recompute the Lab results of an open document, then publish.
     async fn refresh_lab_and_publish(&self, uri: &Url) {
-        let refreshed = {
-            let mut documents = self.documents.write().await;
-            documents.get_mut(uri).map(|document| {
-                self.refresh_lab(document);
-                document.clone()
-            })
+        let job = {
+            let documents = self.documents.read().await;
+            documents.get(uri).map(|document| self.lab_job(document))
         };
-        if let Some(document) = refreshed {
+        let Some(job) = job else {
+            return;
+        };
+        let version = job.version;
+        let Some(results) = self.run_lab_job(job).await else {
+            return;
+        };
+        if let Some(document) = self.install_lab(uri, version, results).await {
             self.publish(uri, &document).await;
         }
     }
@@ -246,17 +312,22 @@ impl TerraphimLspServer {
         }
     }
 
-    /// Apply `update` to the open document `uri` (if it is still at
-    /// `version`), recompute its Lab results and publish its diagnostics.
-    /// Returns the updated document.
+    /// Apply `update` to the requested Lab state of the open document `uri`
+    /// (if it is still at `version`), recompute its Lab results outside the
+    /// lock and publish. If the document changes while the results are
+    /// computed, they are dropped and the request fails with
+    /// `ContentModified`, so a command result always matches the installed
+    /// state.
     async fn update_lab(
         &self,
         uri: &Url,
         version: Option<i32>,
         update: impl FnOnce(&mut OpenDocument),
     ) -> Result<OpenDocument> {
-        let config_missing = self.lab_config.is_none();
-        let updated = {
+        if self.lab_config.is_none() {
+            return Err(commands::invalid_params("the Lab engine is unavailable"));
+        }
+        let job = {
             let mut documents = self.documents.write().await;
             let document = documents
                 .get_mut(uri)
@@ -267,12 +338,17 @@ impl TerraphimLspServer {
                 return Err(commands::content_modified(version, document.version));
             }
             update(document);
-            self.refresh_lab(document);
-            document.clone()
+            self.lab_job(document)
         };
-        if config_missing {
-            return Err(commands::invalid_params("the Lab engine is unavailable"));
-        }
+        let computed = job.version;
+        let results = self
+            .run_lab_job(job)
+            .await
+            .ok_or_else(|| commands::invalid_params("the Lab run failed"))?;
+        let Some(updated) = self.install_lab(uri, computed, results).await else {
+            let held = self.checked_document(uri, None).await?.version;
+            return Err(commands::content_modified(computed, held));
+        };
         self.publish(uri, &updated).await;
         Ok(updated)
     }
@@ -822,6 +898,37 @@ fn kind_includes(requested: &CodeActionKind, kind: &CodeActionKind) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const LAB_DOC: &str = include_str!("../../terraphim_lsp_core/tests/fixtures/lab_doc.md");
+
+    /// A change landing while a Lab run is in flight wins: the run's
+    /// results, computed for the old version, are never installed.
+    #[tokio::test]
+    async fn results_for_a_superseded_version_are_dropped() {
+        let (service, _socket) = LspService::new(TerraphimLspServer::new_with_empty_thesaurus);
+        let server = service.inner();
+        let uri = Url::parse("file:///tmp/race.md").unwrap();
+        server.store_document(&uri, LAB_DOC, 1).await;
+        // The command takes its snapshot...
+        let job = {
+            let mut documents = server.documents.write().await;
+            let document = documents.get_mut(&uri).unwrap();
+            document.lab_actions = vec![LabAction::HedgesAndFiller];
+            server.lab_job(document)
+        };
+        // ...the user types before the run finishes...
+        let edited = LAB_DOC.replacen("I think ", "", 1);
+        server.store_document(&uri, &edited, 2).await;
+        let results = server.run_lab_job(job).await.expect("Lab engine");
+        assert!(!results.lab.is_empty(), "the run itself found marks");
+        // ...so the stale results are dropped, not installed.
+        assert!(server.install_lab(&uri, 1, results).await.is_none());
+        let documents = server.documents.read().await;
+        let document = &documents[&uri];
+        assert!(document.lab.is_empty());
+        assert_eq!(document.lab_actions, [LabAction::HedgesAndFiller]);
+        assert_eq!(document.text, edited);
+    }
 
     #[test]
     fn requested_kinds_include_by_prefix() {

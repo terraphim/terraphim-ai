@@ -58,7 +58,10 @@ Passed as `initializationOptions` or through
 Lab marks are never computed per keystroke: each run parses the whole
 Markdown document, and marks flickering while typing would be noise. An edit
 drops the current Lab marks and trim hints (their ranges would be stale)
-until the next save or command.
+until the next save or command. Lab runs use the blocking thread pool and
+hold no document lock; results computed for a version the client has
+already replaced are dropped, and a command whose run was overtaken by an
+edit fails with `ContentModified`.
 
 ## Commands
 
