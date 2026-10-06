@@ -688,8 +688,17 @@ impl TerraphimLspServer {
             return;
         }
         let diagnostics = self.diagnostics_for(document);
+        self.send_push(uri.clone(), diagnostics, Some(document.version))
+            .await;
+    }
+
+    /// The only place `publishDiagnostics` is sent: nothing in pull mode.
+    async fn send_push(&self, uri: Url, diagnostics: Vec<Diagnostic>, version: Option<i32>) {
+        if self.pull_diagnostics.load(Ordering::Relaxed) {
+            return;
+        }
         self.client
-            .publish_diagnostics(uri.clone(), diagnostics, Some(document.version))
+            .publish_diagnostics(uri, diagnostics, version)
             .await;
     }
 
@@ -1075,14 +1084,16 @@ impl LanguageServer for TerraphimLspServer {
         }
     }
 
+    /// Forget the document. A push client gets an empty set, clearing what
+    /// was pushed. A pull client gets nothing: in the pull model the client
+    /// owns the results it pulled and stops pulling (and drops them) for a
+    /// closed document, so neither a push nor a refresh is needed.
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         self.documents
             .write()
             .await
             .remove(&params.text_document.uri);
-        self.client
-            .publish_diagnostics(params.text_document.uri, vec![], None)
-            .await;
+        self.send_push(params.text_document.uri, vec![], None).await;
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {

@@ -246,3 +246,34 @@ async fn pull_client_without_refresh_support_is_neither_pushed_nor_refreshed() {
     assert_eq!(count(&messages, "workspace/diagnostic/refresh"), 0);
     assert!(!pull(server).await.is_empty());
 }
+
+async fn close(server: &TerraphimLspServer) {
+    server
+        .did_close(DidCloseTextDocumentParams {
+            text_document: TextDocumentIdentifier { uri: uri() },
+        })
+        .await;
+}
+
+#[tokio::test]
+async fn close_clears_push_clients_and_sends_pull_clients_nothing() {
+    let (service, mut inbox, _) = start(capabilities(false, true)).await;
+    open(service.inner(), BROKEN).await;
+    inbox.drain().await;
+    close(service.inner()).await;
+    let messages = inbox.drain().await;
+    let pushes: Vec<&Value> = messages
+        .iter()
+        .filter(|(m, _)| m == "textDocument/publishDiagnostics")
+        .map(|(_, params)| params)
+        .collect();
+    assert_eq!(pushes.len(), 1, "{messages:?}");
+    assert!(pushes[0]["diagnostics"].as_array().unwrap().is_empty());
+
+    let (service, mut inbox, _) = start(capabilities(true, true)).await;
+    open(service.inner(), BROKEN).await;
+    close(service.inner()).await;
+    let messages = inbox.drain().await;
+    assert_eq!(count(&messages, "textDocument/publishDiagnostics"), 0);
+    assert_eq!(count(&messages, "workspace/diagnostic/refresh"), 0);
+}
