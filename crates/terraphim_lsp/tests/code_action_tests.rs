@@ -63,8 +63,9 @@ async fn open_server(
     (service, socket)
 }
 
-/// Request code actions at `position` from an open server.
-async fn request_actions(
+/// Request every code action at `position` from an open server, trim
+/// previews included.
+async fn request_all_actions(
     server: &TerraphimLspServer,
     position: Position,
     only: Option<Vec<CodeActionKind>>,
@@ -95,6 +96,21 @@ async fn request_actions(
             })
             .collect(),
     )
+}
+
+/// The synonym and fix actions at `position`: the trim previews, offered
+/// everywhere, are covered by their own tests below.
+async fn request_actions(
+    server: &TerraphimLspServer,
+    position: Position,
+    only: Option<Vec<CodeActionKind>>,
+) -> Option<Vec<CodeAction>> {
+    let actions: Vec<CodeAction> = request_all_actions(server, position, only)
+        .await?
+        .into_iter()
+        .filter(|action| action.kind != Some(trim_kind()))
+        .collect();
+    (!actions.is_empty()).then_some(actions)
 }
 
 /// Open `text` in a fresh server (whose client accepts versioned edits) and
@@ -195,7 +211,8 @@ async fn initialize_advertises_code_actions() {
                 options.code_action_kinds,
                 Some(vec![
                     CodeActionKind::REFACTOR_REWRITE,
-                    CodeActionKind::QUICKFIX
+                    CodeActionKind::QUICKFIX,
+                    trim_kind(),
                 ])
             );
         }
@@ -604,4 +621,222 @@ async fn crlf_hover_and_diagnostics_near_line_end() {
             },
         }
     );
+}
+
+// ------------------------------------------------------------------ trim --
+
+const LAB_DOC: &str = include_str!("../../terraphim_lsp_core/tests/fixtures/lab_doc.md");
+const TRIM_KIND: &str = "refactor.terraphim.trim";
+
+fn trim_kind() -> CodeActionKind {
+    CodeActionKind::new(TRIM_KIND)
+}
+
+#[tokio::test]
+async fn trim_actions_are_command_only_previews() {
+    let (service, _socket) = open_server(LAB_DOC, versioned_client()).await;
+    let actions = request_all_actions(service.inner(), Position::new(0, 0), None)
+        .await
+        .expect("actions");
+    let trims: Vec<&CodeAction> = actions
+        .iter()
+        .filter(|action| action.kind == Some(trim_kind()))
+        .collect();
+    assert_eq!(
+        titles_of(&trims),
+        [
+            "Trim preview: slight",
+            "Trim preview: tighten",
+            "Trim preview: sharper",
+            "Trim preview: half",
+            "Clear trim preview",
+        ],
+        "stateless menu (Zed caches it): always all levels and clear, never `original`"
+    );
+    let clear = trims.last().unwrap();
+    assert!(clear.edit.is_none());
+    assert_eq!(
+        clear.command.as_ref().unwrap().command,
+        "terraphim.trim.clear"
+    );
+    for (trim, level) in trims.iter().zip(["slight", "tighten", "sharper", "half"]) {
+        assert!(trim.edit.is_none(), "command-only so clients execute it");
+        let command = trim.command.as_ref().expect("command");
+        assert_eq!(command.command, "terraphim.trim.preview");
+        assert_eq!(command.title, trim.title);
+        assert_eq!(
+            command.arguments,
+            Some(vec![
+                serde_json::json!({"uri": uri(), "level": level, "version": 1})
+            ])
+        );
+    }
+}
+
+fn titles_of<'a>(actions: &[&'a CodeAction]) -> Vec<&'a str> {
+    actions.iter().map(|a| a.title.as_str()).collect()
+}
+
+#[tokio::test]
+async fn trim_actions_honour_the_only_filter() {
+    let (service, _socket) = open_server(LAB_DOC, versioned_client()).await;
+    let server = service.inner();
+    let at = Position::new(0, 0);
+    for only in [
+        vec![trim_kind()],
+        vec![CodeActionKind::REFACTOR],
+        vec![CodeActionKind::new("refactor.terraphim")],
+    ] {
+        let actions = request_all_actions(server, at, Some(only))
+            .await
+            .expect("trims");
+        assert_eq!(actions.len(), 5);
+        assert!(actions.iter().all(|a| a.kind == Some(trim_kind())));
+    }
+    for only in [
+        vec![CodeActionKind::QUICKFIX],
+        vec![CodeActionKind::REFACTOR_REWRITE],
+        vec![CodeActionKind::new("refactor.terraphim.tri")],
+    ] {
+        let actions = request_all_actions(server, at, Some(only)).await;
+        assert!(
+            actions.is_none_or(|a| a.iter().all(|a| a.kind != Some(trim_kind()))),
+            "excluded by `only`"
+        );
+    }
+    let all = request_all_actions(server, at, None)
+        .await
+        .expect("actions");
+    assert_eq!(
+        all.iter().filter(|a| a.kind == Some(trim_kind())).count(),
+        5
+    );
+}
+
+#[tokio::test]
+async fn trim_kind_is_advertised() {
+    let (service, _socket) = build_service();
+    let result = service
+        .inner()
+        .initialize(InitializeParams::default())
+        .await
+        .unwrap();
+    let Some(CodeActionProviderCapability::Options(options)) =
+        result.capabilities.code_action_provider
+    else {
+        panic!("code action options");
+    };
+    assert!(options.code_action_kinds.unwrap().contains(&trim_kind()));
+}
+
+async fn run(server: &TerraphimLspServer, action: &CodeAction) {
+    let command = action.command.clone().expect("command");
+    server
+        .execute_command(ExecuteCommandParams {
+            command: command.command,
+            arguments: command.arguments.unwrap_or_default(),
+            work_done_progress_params: Default::default(),
+        })
+        .await
+        .unwrap();
+}
+
+async fn trim_diagnostics(server: &TerraphimLspServer) -> usize {
+    let report = server
+        .diagnostic(DocumentDiagnosticParams {
+            text_document: TextDocumentIdentifier { uri: uri() },
+            identifier: None,
+            previous_result_id: None,
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        })
+        .await
+        .unwrap();
+    let DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(full)) = report
+    else {
+        panic!("expected a full report");
+    };
+    full.full_document_diagnostic_report
+        .items
+        .iter()
+        .filter(|d| d.code == Some(NumberOrString::String("trim-candidate".to_string())))
+        .count()
+}
+
+#[tokio::test]
+async fn executing_a_trim_action_previews_and_the_clear_action_removes_it() {
+    let (service, _socket) = open_server(LAB_DOC, versioned_client()).await;
+    let server = service.inner();
+    let at = Position::new(0, 0);
+    let only = || Some(vec![trim_kind()]);
+
+    let actions = request_all_actions(server, at, only()).await.unwrap();
+    assert_eq!(trim_diagnostics(server).await, 0);
+    let slight = actions
+        .iter()
+        .find(|a| a.title.ends_with("slight"))
+        .unwrap();
+    run(server, slight).await;
+    assert_eq!(trim_diagnostics(server).await, 5);
+
+    // The menu does not change with the active level.
+    let actions = request_all_actions(server, at, only()).await.unwrap();
+    assert_eq!(
+        titles(&actions),
+        [
+            "Trim preview: slight",
+            "Trim preview: tighten",
+            "Trim preview: sharper",
+            "Trim preview: half",
+            "Clear trim preview",
+        ]
+    );
+    let clear = actions.last().unwrap();
+    assert!(clear.edit.is_none());
+    assert_eq!(
+        clear.command.as_ref().unwrap().arguments,
+        Some(vec![serde_json::json!({"uri": uri()})])
+    );
+    // Re-previewing the active level is a no-op.
+    run(server, &actions[0]).await;
+    assert_eq!(trim_diagnostics(server).await, 5);
+    run(server, clear).await;
+    assert_eq!(trim_diagnostics(server).await, 0);
+    // Clearing with nothing active is harmless.
+    run(server, clear).await;
+    assert_eq!(trim_diagnostics(server).await, 0);
+    let again = request_all_actions(server, at, only()).await.unwrap();
+    assert_eq!(titles(&again), titles(&actions), "stateless menu");
+}
+
+#[tokio::test]
+async fn a_stale_trim_action_is_rejected_after_an_edit() {
+    let (service, _socket) = open_server(LAB_DOC, versioned_client()).await;
+    let server = service.inner();
+    let actions = request_all_actions(server, Position::new(0, 0), Some(vec![trim_kind()]))
+        .await
+        .unwrap();
+    server
+        .did_change(DidChangeTextDocumentParams {
+            text_document: VersionedTextDocumentIdentifier {
+                uri: uri(),
+                version: 2,
+            },
+            content_changes: vec![TextDocumentContentChangeEvent {
+                range: None,
+                range_length: None,
+                text: format!("{LAB_DOC}\nmore"),
+            }],
+        })
+        .await;
+    let command = actions[0].command.clone().unwrap();
+    let error = server
+        .execute_command(ExecuteCommandParams {
+            command: command.command,
+            arguments: command.arguments.unwrap(),
+            work_done_progress_params: Default::default(),
+        })
+        .await
+        .expect_err("version 1 is stale");
+    assert_eq!(error.code.code(), -32801);
 }

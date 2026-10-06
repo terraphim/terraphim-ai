@@ -16,6 +16,7 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{ClientSocket, LanguageServer, LspService};
 
 use terraphim_lsp::TerraphimLspServer;
+use terraphim_lsp::handshake::{InitializeHint, peek_initialize};
 use terraphim_types::Thesaurus;
 
 const THESAURUS_JSON: &str =
@@ -83,18 +84,28 @@ fn capabilities(pull: bool, refresh: bool) -> ClientCapabilities {
 async fn start(
     client: ClientCapabilities,
 ) -> (LspService<TerraphimLspServer>, Inbox, ServerCapabilities) {
-    let thesaurus: Thesaurus = serde_json::from_str(THESAURUS_JSON).unwrap();
-    let (mut service, socket) =
-        LspService::new(move |client| TerraphimLspServer::new(client, thesaurus.clone()));
-    let inbox = inbox(socket);
     let params = InitializeParams {
         capabilities: client,
         ..Default::default()
     };
-    let initialize = Request::build("initialize")
-        .params(serde_json::to_value(params).unwrap())
-        .id(1)
-        .finish();
+    start_raw(
+        serde_json::to_value(params).unwrap(),
+        InitializeHint::default(),
+    )
+    .await
+}
+
+/// Like [`start`], from raw `initialize` params as a real client sends them.
+async fn start_raw(
+    params: Value,
+    hint: InitializeHint,
+) -> (LspService<TerraphimLspServer>, Inbox, ServerCapabilities) {
+    let thesaurus: Thesaurus = serde_json::from_str(THESAURUS_JSON).unwrap();
+    let (mut service, socket) = LspService::new(move |client| {
+        TerraphimLspServer::new(client, thesaurus.clone()).with_refresh_hint(hint)
+    });
+    let inbox = inbox(socket);
+    let initialize = Request::build("initialize").params(params).id(1).finish();
     let response = service
         .ready()
         .await
@@ -276,4 +287,159 @@ async fn close_clears_push_clients_and_sends_pull_clients_nothing() {
     let messages = inbox.drain().await;
     assert_eq!(count(&messages, "textDocument/publishDiagnostics"), 0);
     assert_eq!(count(&messages, "workspace/diagnostic/refresh"), 0);
+}
+
+/// Run the command of the first trim code action titled `title`, exactly as
+/// a client that only knows code actions (Zed) would.
+async fn run_trim_action(server: &TerraphimLspServer, title: &str) {
+    let actions = server
+        .code_action(CodeActionParams {
+            text_document: TextDocumentIdentifier { uri: uri() },
+            range: Range::default(),
+            context: CodeActionContext {
+                diagnostics: vec![],
+                only: Some(vec![CodeActionKind::new("refactor.terraphim.trim")]),
+                trigger_kind: None,
+            },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        })
+        .await
+        .unwrap()
+        .expect("trim actions");
+    let command = actions
+        .into_iter()
+        .find_map(|action| match action {
+            CodeActionOrCommand::CodeAction(action) if action.title == title => action.command,
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("action {title:?}"));
+    server
+        .execute_command(ExecuteCommandParams {
+            command: command.command,
+            arguments: command.arguments.unwrap_or_default(),
+            work_done_progress_params: Default::default(),
+        })
+        .await
+        .unwrap();
+}
+
+fn trim_count(diagnostics: &[Diagnostic]) -> usize {
+    diagnostics
+        .iter()
+        .filter(|d| d.code == Some(NumberOrString::String("trim-candidate".to_string())))
+        .count()
+}
+
+#[tokio::test]
+async fn trim_actions_reach_pull_clients_through_refresh() {
+    let (service, mut inbox, _) = start(capabilities(true, true)).await;
+    let server = service.inner();
+    open(server, LAB_DOC).await;
+    inbox.drain().await;
+
+    run_trim_action(server, "Trim preview: slight").await;
+    let messages = inbox.drain().await;
+    assert_eq!(count(&messages, "textDocument/publishDiagnostics"), 0);
+    assert_eq!(count(&messages, "workspace/diagnostic/refresh"), 1);
+    assert_eq!(trim_count(&pull(server).await), 5);
+
+    run_trim_action(server, "Clear trim preview").await;
+    let messages = inbox.drain().await;
+    assert_eq!(count(&messages, "textDocument/publishDiagnostics"), 0);
+    assert_eq!(count(&messages, "workspace/diagnostic/refresh"), 1);
+    assert_eq!(trim_count(&pull(server).await), 0);
+}
+
+#[tokio::test]
+async fn trim_actions_reach_push_clients_through_publish() {
+    let (service, mut inbox, _) = start(capabilities(false, false)).await;
+    let server = service.inner();
+    open(server, LAB_DOC).await;
+    inbox.drain().await;
+
+    run_trim_action(server, "Trim preview: slight").await;
+    let messages = inbox.drain().await;
+    let last = messages
+        .iter()
+        .rfind(|(m, _)| m == "textDocument/publishDiagnostics")
+        .expect("a push");
+    let pushed: PublishDiagnosticsParams = serde_json::from_value(last.1.clone()).unwrap();
+    assert_eq!(trim_count(&pushed.diagnostics), 5);
+
+    run_trim_action(server, "Clear trim preview").await;
+    let messages = inbox.drain().await;
+    let last = messages
+        .iter()
+        .rfind(|(m, _)| m == "textDocument/publishDiagnostics")
+        .expect("a push");
+    let pushed: PublishDiagnosticsParams = serde_json::from_value(last.1.clone()).unwrap();
+    assert_eq!(trim_count(&pushed.diagnostics), 0);
+}
+
+/// Zed's `initialize` as sent on the wire: LSP 3.17 spells the workspace
+/// capability `diagnostics` (plural), which lsp-types 0.94 does not read.
+const ZED_INITIALIZE: &str = r#"{
+    "jsonrpc": "2.0", "id": 1, "method": "initialize",
+    "params": {
+    "processId": null,
+    "rootUri": null,
+    "capabilities": {
+        "textDocument": {"diagnostic": {"dynamicRegistration": false}},
+        "workspace": {"diagnostics": {"refreshSupport": true}}
+    }
+}}"#;
+
+/// What the stdio entry point does: read the hint from the raw frame, then
+/// start the service with the same params.
+async fn start_like_stdio(
+    initialize: &str,
+) -> (LspService<TerraphimLspServer>, Inbox, ServerCapabilities) {
+    let frame = format!("Content-Length: {}\r\n\r\n{initialize}", initialize.len());
+    let (hint, _) = peek_initialize(&mut frame.as_bytes()).await;
+    let params = serde_json::from_str::<Value>(initialize).unwrap()["params"].clone();
+    start_raw(params, hint).await
+}
+
+#[tokio::test]
+async fn zed_shaped_initialize_gets_refreshes_after_trim_and_lab() {
+    let (service, mut inbox, capabilities) = start_like_stdio(ZED_INITIALIZE).await;
+    assert!(capabilities.diagnostic_provider.is_some());
+    let server = service.inner();
+    open(server, LAB_DOC).await;
+    inbox.drain().await;
+
+    run_trim_action(server, "Trim preview: tighten").await;
+    let messages = inbox.drain().await;
+    assert_eq!(count(&messages, "workspace/diagnostic/refresh"), 1);
+    assert_eq!(count(&messages, "textDocument/publishDiagnostics"), 0);
+    assert!(trim_count(&pull(server).await) > 0);
+
+    lab_mark(server).await;
+    let messages = inbox.drain().await;
+    assert_eq!(count(&messages, "workspace/diagnostic/refresh"), 1);
+}
+
+#[tokio::test]
+async fn pull_clients_that_do_not_advertise_refresh_get_none() {
+    let absent = ZED_INITIALIZE.replace(
+        r#""workspace": {"diagnostics": {"refreshSupport": true}}"#,
+        r#""workspace": {}"#,
+    );
+    let explicit_false =
+        ZED_INITIALIZE.replace(r#""refreshSupport": true"#, r#""refreshSupport": false"#);
+    for initialize in [absent, explicit_false] {
+        let (service, mut inbox, _) = start_like_stdio(&initialize).await;
+        let server = service.inner();
+        open(server, LAB_DOC).await;
+        inbox.drain().await;
+        run_trim_action(server, "Trim preview: tighten").await;
+        let messages = inbox.drain().await;
+        assert_eq!(
+            count(&messages, "workspace/diagnostic/refresh"),
+            0,
+            "{initialize}"
+        );
+        assert_eq!(count(&messages, "textDocument/publishDiagnostics"), 0);
+    }
 }

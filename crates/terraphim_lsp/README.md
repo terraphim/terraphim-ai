@@ -15,7 +15,9 @@ offers:
   that advertise `textDocument.diagnostic` pull them (`textDocument/diagnostic`
   is advertised only to them) and get `workspace/diagnostic/refresh` when
   results change without an edit (Lab runs and clears, settings and
-  thesaurus changes), if they accept it; other clients get
+  thesaurus changes), only if they advertise it (the spec key
+  `workspace.diagnostics.refreshSupport`, read from the raw `initialize`
+  because lsp-types drops it; see `handshake.rs`); other clients get
   `textDocument/publishDiagnostics` pushes only. Report a malformed trailing `terraphim-alternatives` annotation block
   (one diagnostic per document) and fade ghosted text (code `ghosted`,
   severity Hint, tag `Unnecessary`; Zed fades it with
@@ -33,7 +35,14 @@ offers:
   (`refactor.rewrite`) per other synonym of its concept. The current form is
   excluded, the original capitalisation is kept, and a preceding `a`/`an` is
   fixed in the same `WorkspaceEdit`. On a Lab typo or punctuation mark,
-  "Apply fix: X" (`quickfix`) replacing exactly the marked range.
+  "Apply fix: X" (`quickfix`) replacing exactly the marked range. On any
+  open document, command-only trim actions (`refactor.terraphim.trim`, no
+  `edit`) for clients that cannot add palette commands, such as Zed:
+  "Trim preview: slight|tighten|sharper|half" run `terraphim.trim.preview`
+  with `{uri, level, version}`, and "Clear trim preview" runs
+  `terraphim.trim.clear`. The menu is stateless (Zed caches code actions until
+  the cursor moves): the active level is still listed and clear is always
+  offered; repeating either is a no-op.
 - **`textDocument/inlayHint`** - `[i/n]` after each KG term with
   alternatives: the current form is synonym `i` of `n`. Off by default.
 - **`workspace/executeCommand`** - see below.

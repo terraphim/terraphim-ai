@@ -26,6 +26,7 @@ use crate::commands::{self, AddAlternativeArgs, DocumentArgs, LabMarkArgs, TrimP
 use crate::completion::{build_completions, word_at_position};
 use crate::convert;
 use crate::diagnostics::{core_diagnostics, ghost_diagnostics, unknown_term_diagnostics};
+use crate::handshake::{self, InitializeHint};
 use crate::kg_analysis::analyse_kg_document;
 use crate::settings::{LabSettings, LabTrigger, ServerSettings};
 use crate::thesaurus::{
@@ -86,10 +87,14 @@ pub struct TerraphimLspServer {
     /// read at `initialize`. Then the server never pushes
     /// `publishDiagnostics`, so each diagnostic is shown once.
     pull_diagnostics: AtomicBool,
-    /// Whether the client accepts `workspace/diagnostic/refresh`, read at
-    /// `initialize`; used in pull mode when results change outside a
+    /// Whether the client accepts `workspace/diagnostic/refresh`, decided at
+    /// `initialize` from [`Self::refresh_hint`] and the typed params; used in pull mode when results change outside a
     /// client request (Lab runs, clears, settings and thesaurus changes).
     diagnostic_refresh: AtomicBool,
+    /// Whether the raw `initialize` advertised refresh support under the
+    /// spec key `workspace.diagnostics`, which the typed params drop (see
+    /// [`crate::handshake`]). Set by the stdio entry points.
+    refresh_hint: Option<bool>,
     /// Current settings. A std lock: it is never held across an `.await`.
     settings: std::sync::RwLock<ServerSettings>,
     /// The Lab engine's configuration (embedded default lists), or `None`
@@ -202,6 +207,11 @@ const FIX_KIND: CodeActionKind = CodeActionKind::QUICKFIX;
 /// The code-action kind of the synonym replacements.
 const REPLACE_KIND: CodeActionKind = CodeActionKind::REFACTOR_REWRITE;
 
+/// The code-action kind of the trim preview actions. Clients that cannot add
+/// palette commands (Zed) reach `terraphim.trim.preview` and
+/// `terraphim.trim.clear` through these command-only actions.
+const TRIM_KIND: CodeActionKind = CodeActionKind::new("refactor.terraphim.trim");
+
 impl TerraphimLspServer {
     /// Create a new LSP server instance tied to the given LSP client and
     /// knowledge-graph thesaurus.
@@ -245,6 +255,7 @@ impl TerraphimLspServer {
             inlay_hint_refresh: AtomicBool::new(false),
             pull_diagnostics: AtomicBool::new(false),
             diagnostic_refresh: AtomicBool::new(false),
+            refresh_hint: None,
             settings: std::sync::RwLock::new(ServerSettings::default()),
             lab_config: LabConfig::with_defaults()
                 .inspect_err(|error| {
@@ -262,31 +273,48 @@ impl TerraphimLspServer {
         Self::new(client, Thesaurus::new("empty".to_string()))
     }
 
+    /// Record whether the raw `initialize` advertised
+    /// `workspace/diagnostic/refresh` support under the spec key (see
+    /// [`crate::handshake`]). The stdio entry points set it; a server built
+    /// directly relies on the typed (legacy) key alone.
+    #[must_use]
+    pub fn with_refresh_hint(mut self, hint: InitializeHint) -> Self {
+        self.refresh_hint = hint.diagnostic_refresh;
+        self
+    }
+
     /// Run the LSP server over stdio using an empty thesaurus.
     ///
     /// This is the entry point for the `terraphim-lsp` binary. For programmatic
     /// use with a custom thesaurus, construct the server via [`LspService::new`]
     /// and [`Self::new`].
     pub async fn run_stdio() {
-        let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
-        let (service, socket) = LspService::new(Self::new_with_empty_thesaurus);
-        Server::new(stdin, stdout, socket).serve(service).await;
+        Self::serve_stdio(Self::new_with_empty_thesaurus).await;
     }
 
     /// Run the LSP server over stdio with the given thesaurus.
     pub async fn run_stdio_with_thesaurus(thesaurus: Thesaurus) {
-        let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
-        let (service, socket) = LspService::new(move |client| Self::new(client, thesaurus.clone()));
-        Server::new(stdin, stdout, socket).serve(service).await;
+        Self::serve_stdio(move |client| Self::new(client, thesaurus)).await;
     }
 
     /// Run the LSP server over stdio with launch options (see
     /// [`Self::with_launch_options`]). The `terraphim-lsp` binary uses this.
     pub async fn run_stdio_with_launch_options(launch: LaunchOptions) {
-        let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
+        Self::serve_stdio(move |client| Self::with_launch_options(client, launch)).await;
+    }
+
+    /// Serve stdio, first reading the raw `initialize` for the capabilities
+    /// the typed params lose ([`crate::handshake`]) and replaying it in
+    /// front of the rest of stdin.
+    async fn serve_stdio(build: impl FnOnce(Client) -> Self) {
+        let mut stdin = tokio::io::stdin();
+        let (hint, buffered) = handshake::peek_initialize(&mut stdin).await;
+        let input = tokio::io::AsyncReadExt::chain(std::io::Cursor::new(buffered), stdin);
         let (service, socket) =
-            LspService::new(move |client| Self::with_launch_options(client, launch.clone()));
-        Server::new(stdin, stdout, socket).serve(service).await;
+            LspService::new(move |client| build(client).with_refresh_hint(hint));
+        Server::new(input, tokio::io::stdout(), socket)
+            .serve(service)
+            .await;
     }
 
     /// The knowledge graph in use.
@@ -851,6 +879,53 @@ impl TerraphimLspServer {
         .await
     }
 
+    /// The command-only trim actions: one preview per level other than
+    /// `original`, and "Clear trim preview".
+    ///
+    /// The menu is stateless on purpose: Zed caches code actions per cursor
+    /// position and does not re-request them after `workspace/executeCommand`,
+    /// so a menu that hid the active level or the clear action would go
+    /// stale. Re-previewing the active level and clearing with nothing
+    /// active are harmless no-ops. None carries an `edit`, so the client runs
+    /// the command through `workspace/executeCommand`. Not offered without
+    /// the Lab engine, whose absence makes both commands fail.
+    fn trim_actions(&self, uri: &Url, document: &OpenDocument) -> Vec<CodeAction> {
+        if self.lab_config.is_none() {
+            return Vec::new();
+        }
+        let command_action = |title: String, command: &str, argument: Value| CodeAction {
+            title: title.clone(),
+            kind: Some(TRIM_KIND),
+            command: Some(Command {
+                title,
+                command: command.to_string(),
+                arguments: Some(vec![argument]),
+            }),
+            ..CodeAction::default()
+        };
+        let mut actions: Vec<CodeAction> = TrimLevel::ALL
+            .into_iter()
+            .filter(|level| *level != TrimLevel::Original)
+            .map(|level| {
+                let name = serde_json::to_value(level)
+                    .ok()
+                    .and_then(|name| name.as_str().map(str::to_owned))
+                    .unwrap_or_default();
+                command_action(
+                    format!("Trim preview: {name}"),
+                    commands::TRIM_PREVIEW,
+                    serde_json::json!({"uri": uri, "level": level, "version": document.version}),
+                )
+            })
+            .collect();
+        actions.push(command_action(
+            "Clear trim preview".to_string(),
+            commands::TRIM_CLEAR,
+            serde_json::json!({"uri": uri}),
+        ));
+        actions
+    }
+
     /// [`commands::TRIM_PREVIEW`]: fade the spans a trim level would cut.
     async fn trim_preview(&self, args: TrimPreviewArgs) -> Result<Option<Value>> {
         let level = args.level;
@@ -917,12 +992,18 @@ impl LanguageServer for TerraphimLspServer {
             .text_document
             .as_ref()
             .is_some_and(|text_document| text_document.diagnostic.is_some());
-        let diagnostic_refresh = params
-            .capabilities
-            .workspace
-            .as_ref()
-            .and_then(|workspace| workspace.diagnostic.as_ref())
-            .and_then(|diagnostic| diagnostic.refresh_support)
+        // The spec key is `workspace.diagnostics`; lsp-types only models the
+        // singular `workspace.diagnostic`, so the typed params carry the
+        // legacy key and `refresh_hint` the raw one. Absent means no
+        // refresh, as does an explicit `false`.
+        let diagnostic_refresh = self
+            .refresh_hint
+            .or(params
+                .capabilities
+                .workspace
+                .as_ref()
+                .and_then(|workspace| workspace.diagnostic.as_ref())
+                .and_then(|diagnostic| diagnostic.refresh_support))
             .unwrap_or(false);
         self.pull_diagnostics
             .store(pull_diagnostics, Ordering::Relaxed);
@@ -962,7 +1043,7 @@ impl LanguageServer for TerraphimLspServer {
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Options(
                     CodeActionOptions {
-                        code_action_kinds: Some(vec![REPLACE_KIND, FIX_KIND]),
+                        code_action_kinds: Some(vec![REPLACE_KIND, FIX_KIND, TRIM_KIND]),
                         resolve_provider: Some(false),
                         work_done_progress_options: WorkDoneProgressOptions::default(),
                     },
@@ -1139,8 +1220,9 @@ impl LanguageServer for TerraphimLspServer {
                 .as_ref()
                 .is_none_or(|only| only.iter().any(|requested| kind_includes(requested, kind)))
         };
-        let (fixes, replacements) = (wants(&FIX_KIND), wants(&REPLACE_KIND));
-        if !fixes && !replacements {
+        let (fixes, replacements, trims) =
+            (wants(&FIX_KIND), wants(&REPLACE_KIND), wants(&TRIM_KIND));
+        if !fixes && !replacements && !trims {
             return Ok(None);
         }
         let uri = params.text_document.uri;
@@ -1153,6 +1235,9 @@ impl LanguageServer for TerraphimLspServer {
         }
         if replacements {
             actions.extend(self.replacement_actions(&uri, &document, params.range.start));
+        }
+        if trims {
+            actions.extend(self.trim_actions(&uri, &document));
         }
         let actions: Vec<CodeActionOrCommand> = actions
             .into_iter()

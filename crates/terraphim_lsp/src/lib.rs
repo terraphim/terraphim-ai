@@ -10,6 +10,7 @@ pub mod commands;
 pub mod completion;
 mod convert;
 pub mod diagnostics;
+pub mod handshake;
 pub mod kg_analysis;
 pub mod server;
 pub mod settings;

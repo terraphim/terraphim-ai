@@ -98,7 +98,15 @@ async fn action_titles(server: &TerraphimLspServer) -> Vec<String> {
                 start: on_choice(),
                 end: on_choice(),
             },
-            context: CodeActionContext::default(),
+            // The KG-driven actions only; the trim previews do not depend
+            // on the thesaurus.
+            context: CodeActionContext {
+                only: Some(vec![
+                    CodeActionKind::REFACTOR_REWRITE,
+                    CodeActionKind::QUICKFIX,
+                ]),
+                ..CodeActionContext::default()
+            },
             work_done_progress_params: Default::default(),
             partial_result_params: Default::default(),
         })
