@@ -38,7 +38,8 @@ use crate::thesaurus::{
 ///
 /// - `textDocument/hover` - concept descriptions for matched KG terms
 /// - `textDocument/completion` - thesaurus term suggestions
-/// - `textDocument/diagnostic` (and pushed `publishDiagnostics`) - a
+/// - `textDocument/diagnostic` for clients that pull, pushed
+///   `publishDiagnostics` for the others (never both) - a
 ///   malformed `terraphim-alternatives` annotation block, faded
 ///   (`Unnecessary`) hints over ghosted text and, when the `unknownTerms`
 ///   setting is on, a warning on every unknown-word occurrence
@@ -81,6 +82,14 @@ pub struct TerraphimLspServer {
     /// Whether the client accepts `workspace/inlayHint/refresh`, read at
     /// `initialize`.
     inlay_hint_refresh: AtomicBool,
+    /// Whether the client pulls diagnostics (`textDocument.diagnostic`),
+    /// read at `initialize`. Then the server never pushes
+    /// `publishDiagnostics`, so each diagnostic is shown once.
+    pull_diagnostics: AtomicBool,
+    /// Whether the client accepts `workspace/diagnostic/refresh`, read at
+    /// `initialize`; used in pull mode when results change outside a
+    /// client request (Lab runs, clears, settings and thesaurus changes).
+    diagnostic_refresh: AtomicBool,
     /// Current settings. A std lock: it is never held across an `.await`.
     settings: std::sync::RwLock<ServerSettings>,
     /// The Lab engine's configuration (embedded default lists), or `None`
@@ -234,6 +243,8 @@ impl TerraphimLspServer {
             documents: Arc::new(RwLock::new(HashMap::new())),
             versioned_edits: AtomicBool::new(false),
             inlay_hint_refresh: AtomicBool::new(false),
+            pull_diagnostics: AtomicBool::new(false),
+            diagnostic_refresh: AtomicBool::new(false),
             settings: std::sync::RwLock::new(ServerSettings::default()),
             lab_config: LabConfig::with_defaults()
                 .inspect_err(|error| {
@@ -479,7 +490,13 @@ impl TerraphimLspServer {
             return;
         };
         if let Installed::Yes(document) = self.install_lab(uri, &job, results).await {
-            self.publish(uri, &document).await;
+            let had_work = !job.actions.is_empty() || job.trim_level.is_some();
+            if had_work || !self.pull_diagnostics.load(Ordering::Relaxed) {
+                // A pulling client already pulled for the edit or open; ask
+                // it again only when the Lab run could have changed the
+                // results.
+                self.publish(uri, &document).await;
+            }
         }
     }
 
@@ -663,20 +680,51 @@ impl TerraphimLspServer {
         diagnostics
     }
 
-    /// Publish a document's diagnostics to the client.
-    async fn publish(&self, uri: &Url, document: &OpenDocument) {
+    /// Push a document's diagnostics, unless the client pulls them: a
+    /// client that pulls re-requests after its own edits and opens, and
+    /// would show pushed diagnostics a second time.
+    async fn push(&self, uri: &Url, document: &OpenDocument) {
+        if self.pull_diagnostics.load(Ordering::Relaxed) {
+            return;
+        }
         let diagnostics = self.diagnostics_for(document);
         self.client
             .publish_diagnostics(uri.clone(), diagnostics, Some(document.version))
             .await;
     }
 
-    /// Publish the diagnostics of the open document `uri`.
-    async fn publish_open(&self, uri: &Url) {
+    /// Push the diagnostics of the open document `uri` (push mode only).
+    async fn push_open(&self, uri: &Url) {
         let document = self.documents.read().await.get(uri).cloned();
         if let Some(document) = document {
-            self.publish(uri, &document).await;
+            self.push(uri, &document).await;
         }
+    }
+
+    /// A document's diagnostics changed without a client edit (a Lab run,
+    /// a clear): push them, or in pull mode ask the client to pull again.
+    async fn publish(&self, uri: &Url, document: &OpenDocument) {
+        if self.pull_diagnostics.load(Ordering::Relaxed) {
+            self.request_diagnostic_refresh();
+        } else {
+            self.push(uri, document).await;
+        }
+    }
+
+    /// Send `workspace/diagnostic/refresh` when the client pulls and
+    /// accepts it. Spawned, so no handler waits on the client's reply.
+    fn request_diagnostic_refresh(&self) {
+        if !(self.pull_diagnostics.load(Ordering::Relaxed)
+            && self.diagnostic_refresh.load(Ordering::Relaxed))
+        {
+            return;
+        }
+        let client = self.client.clone();
+        tokio::spawn(async move {
+            if let Err(error) = client.workspace_diagnostic_refresh().await {
+                log::debug!("terraphim_lsp: diagnostic refresh failed: {error}");
+            }
+        });
     }
 
     /// "Apply fix: X" code actions for the Lab marks touching `range`.
@@ -855,6 +903,22 @@ impl LanguageServer for TerraphimLspServer {
             .and_then(|workspace| workspace.inlay_hint.as_ref())
             .and_then(|inlay_hint| inlay_hint.refresh_support)
             .unwrap_or(false);
+        let pull_diagnostics = params
+            .capabilities
+            .text_document
+            .as_ref()
+            .is_some_and(|text_document| text_document.diagnostic.is_some());
+        let diagnostic_refresh = params
+            .capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.diagnostic.as_ref())
+            .and_then(|diagnostic| diagnostic.refresh_support)
+            .unwrap_or(false);
+        self.pull_diagnostics
+            .store(pull_diagnostics, Ordering::Relaxed);
+        self.diagnostic_refresh
+            .store(diagnostic_refresh, Ordering::Relaxed);
         self.versioned_edits
             .store(versioned_edits, Ordering::Relaxed);
         self.inlay_hint_refresh
@@ -899,14 +963,16 @@ impl LanguageServer for TerraphimLspServer {
                     resolve_provider: Some(false),
                     ..CompletionOptions::default()
                 }),
-                diagnostic_provider: Some(DiagnosticServerCapabilities::Options(
-                    DiagnosticOptions {
+                // One diagnostics model per client: pull (advertised here,
+                // never pushed) when the client supports it, else push only.
+                diagnostic_provider: pull_diagnostics.then(|| {
+                    DiagnosticServerCapabilities::Options(DiagnosticOptions {
                         identifier: Some("terraphim-lsp".to_string()),
                         inter_file_dependencies: false,
                         workspace_diagnostics: false,
                         work_done_progress_options: WorkDoneProgressOptions::default(),
-                    },
-                )),
+                    })
+                }),
                 // Always advertised so hints can be switched on later through
                 // `workspace/didChangeConfiguration`; the server returns none
                 // while the `inlayHints` setting is off (the default).
@@ -944,9 +1010,10 @@ impl LanguageServer for TerraphimLspServer {
     ///   text, and the next edit drops them as usual.
     /// - A changed `thesaurus` path is loaded first, on the blocking pool;
     ///   a missing or invalid file is reported once.
-    /// - Every document is republished, so ghost hints and unknown-term
-    ///   warnings follow their settings and diagnostics follow the
-    ///   thesaurus, and inlay hints are refreshed.
+    /// - Every document is republished (pushed, or one
+    ///   `workspace/diagnostic/refresh` in pull mode), so ghost hints and
+    ///   unknown-term warnings follow their settings and diagnostics follow
+    ///   the thesaurus, and inlay hints are refreshed.
     async fn did_change_configuration(&self, params: DidChangeConfigurationParams) {
         let old = self.settings();
         let new = ServerSettings::from_value(Some(&params.settings));
@@ -969,9 +1036,10 @@ impl LanguageServer for TerraphimLspServer {
             if recompute {
                 self.refresh_lab_and_publish(&uri).await;
             } else {
-                self.publish_open(&uri).await;
+                self.push_open(&uri).await;
             }
         }
+        self.request_diagnostic_refresh();
         if self.inlay_hint_refresh.load(Ordering::Relaxed)
             && let Err(error) = self.client.inlay_hint_refresh().await
         {
@@ -987,7 +1055,7 @@ impl LanguageServer for TerraphimLspServer {
         if self.settings().lab.trigger == LabTrigger::Save {
             self.refresh_lab_and_publish(&uri).await;
         } else {
-            self.publish_open(&uri).await;
+            self.push_open(&uri).await;
         }
     }
 
@@ -1003,7 +1071,7 @@ impl LanguageServer for TerraphimLspServer {
         let version = params.text_document.version;
         if let Some(change) = params.content_changes.into_iter().last() {
             self.store_document(&uri, &change.text, version).await;
-            self.publish_open(&uri).await;
+            self.push_open(&uri).await;
         }
     }
 

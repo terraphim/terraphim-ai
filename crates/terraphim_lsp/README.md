@@ -11,8 +11,12 @@ offers:
 - **`textDocument/hover`** - Show concept descriptions when hovering over
   thesaurus terms.
 - **`textDocument/completion`** - Suggest knowledge-graph terms at the cursor.
-- **`textDocument/diagnostic`** (pulled, and pushed as `publishDiagnostics`)
-  - Report a malformed trailing `terraphim-alternatives` annotation block
+- **Diagnostics**, one model per client so nothing is shown twice: clients
+  that advertise `textDocument.diagnostic` pull them (`textDocument/diagnostic`
+  is advertised only to them) and get `workspace/diagnostic/refresh` when
+  results change without an edit (Lab runs and clears, settings and
+  thesaurus changes), if they accept it; other clients get
+  `textDocument/publishDiagnostics` pushes only. Report a malformed trailing `terraphim-alternatives` annotation block
   (one diagnostic per document) and fade ghosted text (code `ghosted`,
   severity Hint, tag `Unnecessary`; Zed fades it with
   `unnecessary_code_fade`). With the opt-in `unknownTerms` setting, also warn

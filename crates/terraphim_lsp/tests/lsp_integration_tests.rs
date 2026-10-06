@@ -166,7 +166,9 @@ async fn test_initialize_returns_capabilities() {
 
     assert!(response.capabilities.hover_provider.is_some());
     assert!(response.capabilities.completion_provider.is_some());
-    assert!(response.capabilities.diagnostic_provider.is_some());
+    // Push-only client: diagnostics are pushed, the pull provider is not
+    // advertised (see diagnostic_model_tests.rs).
+    assert!(response.capabilities.diagnostic_provider.is_none());
     match response.capabilities.text_document_sync {
         Some(TextDocumentSyncCapability::Options(options)) => {
             assert_eq!(options.change, Some(TextDocumentSyncKind::FULL));

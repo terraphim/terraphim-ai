@@ -292,7 +292,7 @@ mod tests {
             40..42,
         ];
         // An empty match covers no text, so it is dropped.
-        let with_empty = matches.iter().cloned().chain([20..20]);
+        let with_empty = matches.iter().cloned().chain(std::iter::once(20..20));
         let mut cursor = MatchCursor::new(with_empty);
         assert_eq!(cursor.matches, [0..7, 10..14, 30..40], "merged and sorted");
         for word in &words {
