@@ -19,11 +19,25 @@ pub enum Severity {
     Hint,
 }
 
+/// Extra presentation hints on a [`Diagnostic`]. Mirrors the LSP
+/// `DiagnosticTag`s this crate produces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiagnosticTag {
+    /// The text is unused or unnecessary: ghosted text, or a trim candidate.
+    /// Clients fade it (Zed's `unnecessary_code_fade`) rather than underline
+    /// it.
+    Unnecessary,
+}
+
 /// Stable machine-readable identity of a [`Diagnostic`].
 ///
 /// The annotation-block codes correspond one to one with
 /// `terraphim_alternatives::BlockErrorKind`, the editor's parser errors;
-/// see [`DiagnosticCode::for_block_error`].
+/// see [`DiagnosticCode::for_block_error`]. [`DiagnosticCode::Ghosted`]
+/// marks text the annotation block ghosts, the `Lab*` codes one Lab mark
+/// kind each (see [`crate::code_for_mark`]) and
+/// [`DiagnosticCode::TrimCandidate`] a span a trim level would cut.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DiagnosticCode {
@@ -49,6 +63,29 @@ pub enum DiagnosticCode {
     AnnotationBlockInvalidSpan,
     /// A ghost in the block breaks a structural rule.
     AnnotationBlockInvalidGhost,
+    /// Body text the annotation block ghosts: kept in the file, dimmed in
+    /// the editor and dropped on export. Tagged
+    /// [`DiagnosticTag::Unnecessary`].
+    Ghosted,
+    /// Lab: a misspelling from the typo list (has a fix).
+    LabTypo,
+    /// Lab: a punctuation or spacing slip (has a fix).
+    LabPunctuation,
+    /// Lab: one of the weakest sentences.
+    LabWeakSentence,
+    /// Lab: a sentence that runs long.
+    LabLongSentence,
+    /// Lab: a sentence with a heavy clause structure.
+    LabConvolutedSentence,
+    /// Lab: a word or phrase outside the role's register.
+    LabOffTone,
+    /// Lab: a hedge.
+    LabHedge,
+    /// Lab: filler.
+    LabFiller,
+    /// A span the previewed trim level would cut. Tagged
+    /// [`DiagnosticTag::Unnecessary`].
+    TrimCandidate,
 }
 
 impl DiagnosticCode {
@@ -87,6 +124,16 @@ impl DiagnosticCode {
             Self::AnnotationBlockOverlappingGhosts => "annotation-block-overlapping-ghosts",
             Self::AnnotationBlockInvalidSpan => "annotation-block-invalid-span",
             Self::AnnotationBlockInvalidGhost => "annotation-block-invalid-ghost",
+            Self::Ghosted => "ghosted",
+            Self::LabTypo => "lab-typo",
+            Self::LabPunctuation => "lab-punctuation",
+            Self::LabWeakSentence => "lab-weak-sentence",
+            Self::LabLongSentence => "lab-long-sentence",
+            Self::LabConvolutedSentence => "lab-convoluted-sentence",
+            Self::LabOffTone => "lab-off-tone",
+            Self::LabHedge => "lab-hedge",
+            Self::LabFiller => "lab-filler",
+            Self::TrimCandidate => "trim-candidate",
         }
     }
 }
@@ -102,6 +149,11 @@ pub struct Diagnostic {
     pub code: DiagnosticCode,
     /// Human-readable description.
     pub message: String,
+    /// Presentation hints, such as [`DiagnosticTag::Unnecessary`] for
+    /// ghosted text. Empty for most diagnostics, and omitted from the JSON
+    /// when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<DiagnosticTag>,
 }
 
 #[cfg(test)]
@@ -142,9 +194,21 @@ mod tests {
             },
         ];
         let mut seen = std::collections::HashSet::new();
-        for kind in &kinds {
-            let code = DiagnosticCode::for_block_error(kind);
-            assert!(seen.insert(code), "one code per kind: {kind:?}");
+        let block_codes = kinds.iter().map(DiagnosticCode::for_block_error);
+        let other_codes = [
+            DiagnosticCode::Ghosted,
+            DiagnosticCode::LabTypo,
+            DiagnosticCode::LabPunctuation,
+            DiagnosticCode::LabWeakSentence,
+            DiagnosticCode::LabLongSentence,
+            DiagnosticCode::LabConvolutedSentence,
+            DiagnosticCode::LabOffTone,
+            DiagnosticCode::LabHedge,
+            DiagnosticCode::LabFiller,
+            DiagnosticCode::TrimCandidate,
+        ];
+        for code in block_codes.chain(other_codes) {
+            assert!(seen.insert(code), "one code per kind: {code:?}");
             let json = serde_json::to_string(&code).unwrap();
             assert_eq!(json, format!("\"{}\"", code.as_str()));
         }

@@ -26,7 +26,8 @@ pub fn build_diagnostics(analysis: &KgAnalysis) -> Vec<Diagnostic> {
 ///
 /// Each unknown term is reported at its first occurrence in the document;
 /// terms that cannot be located are skipped. Core diagnostics (such as a
-/// malformed annotation block) are always included.
+/// malformed annotation block) are always included; ghost hints are not
+/// (see [`ghost_diagnostics`]).
 pub fn build_diagnostics_with_positions(analysis: &KgAnalysis, text: &str) -> Vec<Diagnostic> {
     let index = LineIndex::new(text);
     let unknown = analysis.unknown_terms.iter().filter_map(|term| {
@@ -38,6 +39,17 @@ pub fn build_diagnostics_with_positions(analysis: &KgAnalysis, text: &str) -> Ve
         .iter()
         .map(|diagnostic| convert::diagnostic(&index, diagnostic));
     unknown.chain(core).collect()
+}
+
+/// The analysis' ghost hints as LSP diagnostics: severity `Hint`, tagged
+/// `Unnecessary` so clients fade the ghosted text.
+pub fn ghost_diagnostics(analysis: &KgAnalysis, text: &str) -> Vec<Diagnostic> {
+    let index = LineIndex::new(text);
+    analysis
+        .ghosts
+        .iter()
+        .map(|diagnostic| convert::diagnostic(&index, diagnostic))
+        .collect()
 }
 
 fn unknown_term_diagnostic(term: &str, range: Range) -> Diagnostic {

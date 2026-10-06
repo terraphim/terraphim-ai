@@ -26,13 +26,25 @@
 //! types, duplicate ids, overlapping spans or ghosts, invalid anchors)
 //! yields exactly one [`Diagnostic`], with one [`DiagnosticCode`] per
 //! `BlockErrorKind` and the parser's message. A malformed block is still
-//! excluded from analysis and the body is left unchanged: this crate never
-//! edits or rewrites the block.
+//! excluded from analysis and the body is left unchanged. Analysis never
+//! edits the block; only the explicit add-alternative edit
+//! ([`crate::add_alternative`]) rewrites it, through the editor's own
+//! `terraphim_alternatives::write`.
+//!
+//! # Ghosts
+//!
+//! A well-formed block's ghosts are located in the body
+//! ([`AnnotationBlock::ghosts`]) so clients can fade them
+//! ([`AnnotationBlock::ghost_diagnostics`]). The parser does not check that
+//! anchors still match the body, so this crate does: a ghost whose stored
+//! offsets no longer hold its text is found again with the editor's own
+//! re-anchoring (`Document::reanchor`, on a copy; nothing is written), and a
+//! ghost that cannot be placed is left out rather than guessed at.
 
 use serde::{Deserialize, Serialize};
-use terraphim_alternatives::parse;
+use terraphim_alternatives::{Document, Ghost, parse, utf16_to_byte};
 
-use crate::diagnostic::{Diagnostic, DiagnosticCode, Severity};
+use crate::diagnostic::{Diagnostic, DiagnosticCode, DiagnosticTag, Severity};
 use crate::offset::{TextOffset, TextRange};
 
 pub use terraphim_alternatives::FENCE_INFO;
@@ -58,6 +70,44 @@ pub struct AnnotationBlock {
     /// Why the editor's parser rejects the block, or `None` when it accepts
     /// it.
     pub problem: Option<Diagnostic>,
+    /// Where the block's ghosts sit in the body, in body order. Empty when
+    /// the block is malformed; a ghost that cannot be located in the current
+    /// body is left out.
+    #[serde(default)]
+    pub ghosts: Vec<TextRange>,
+}
+
+/// Message of a [`DiagnosticCode::Ghosted`] diagnostic.
+pub const GHOSTED_MESSAGE: &str = "Ghosted: kept in the file, dropped on export";
+
+impl AnnotationBlock {
+    /// One [`Severity::Hint`] diagnostic per ghost, tagged
+    /// [`DiagnosticTag::Unnecessary`] with code [`DiagnosticCode::Ghosted`],
+    /// so LSP clients fade ghosted text the way the editor dims it.
+    ///
+    /// ```
+    /// use terraphim_lsp_core::{DiagnosticTag, split_annotation_block};
+    ///
+    /// let text = "Keep this. Drop this.\n\n```terraphim-alternatives\n\
+    ///     {\"version\": 1, \"spans\": [], \"ghosts\": [{\"id\": \"g1\", \
+    ///     \"anchor\": {\"start\": 11, \"end\": 21, \"text\": \"Drop this.\"}}]}\n```\n";
+    /// let block = split_annotation_block(text).block.unwrap();
+    /// let faded = block.ghost_diagnostics();
+    /// assert_eq!(&text[faded[0].range.bytes()], "Drop this.");
+    /// assert_eq!(faded[0].tags, [DiagnosticTag::Unnecessary]);
+    /// ```
+    pub fn ghost_diagnostics(&self) -> Vec<Diagnostic> {
+        self.ghosts
+            .iter()
+            .map(|&range| Diagnostic {
+                range,
+                severity: Severity::Hint,
+                code: DiagnosticCode::Ghosted,
+                message: GHOSTED_MESSAGE.to_string(),
+                tags: vec![DiagnosticTag::Unnecessary],
+            })
+            .collect()
+    }
 }
 
 /// Split `text` into its analysable body and trailing annotation block.
@@ -74,9 +124,9 @@ pub struct AnnotationBlock {
 /// assert!(split.block.unwrap().problem.is_none());
 /// ```
 pub fn split_annotation_block(text: &str) -> BlockSplit {
-    let (body_len, error) = match parse(text) {
-        Ok(document) => (document.body.len(), None),
-        Err(error) => (error.body.len(), Some(error)),
+    let (body_len, error, ghosts) = match parse(text) {
+        Ok(document) => (document.body.len(), None, ghost_ranges(text, document)),
+        Err(error) => (error.body.len(), Some(error), Vec::new()),
     };
     if body_len >= text.len() && error.is_none() {
         // The parser found no block: the whole text is body.
@@ -102,6 +152,7 @@ pub fn split_annotation_block(text: &str) -> BlockSplit {
         severity: Severity::Warning,
         code: DiagnosticCode::for_block_error(&error.kind),
         message: error.kind.to_string(),
+        tags: Vec::new(),
     });
 
     BlockSplit {
@@ -110,8 +161,43 @@ pub fn split_annotation_block(text: &str) -> BlockSplit {
             range: TextRange::from_bytes(text, body_len, text.len()),
             opening_fence,
             problem,
+            ghosts,
         }),
     }
+}
+
+/// The body ranges of `document`'s ghosts, as offsets into `text` (whose
+/// prefix is the body).
+fn ghost_ranges(text: &str, mut document: Document) -> Vec<TextRange> {
+    let body = document.body.as_str();
+    let all_placed = document
+        .annotations
+        .ghosts
+        .iter()
+        .all(|ghost| located(body, ghost).is_some());
+    if !all_placed {
+        // Only the ghosts are wanted; spans are re-anchored too but ignored.
+        // Unplaceable ghosts are removed from `document` by `reanchor`.
+        document.reanchor();
+    }
+    let body = document.body.as_str();
+    let mut ranges: Vec<TextRange> = document
+        .annotations
+        .ghosts
+        .iter()
+        .filter_map(|ghost| located(body, ghost))
+        .map(|(start, end)| TextRange::from_bytes(text, start, end))
+        .collect();
+    ranges.sort_by_key(|range| range.start);
+    ranges
+}
+
+/// The byte range of `ghost` in `body`, if its stored UTF-16 offsets still
+/// hold its text there.
+fn located(body: &str, ghost: &Ghost) -> Option<(usize, usize)> {
+    let start = utf16_to_byte(body, ghost.anchor.start)?;
+    let end = utf16_to_byte(body, ghost.anchor.end)?;
+    (start < end && body.get(start..end)? == ghost.anchor.text).then_some((start, end))
 }
 
 #[cfg(test)]

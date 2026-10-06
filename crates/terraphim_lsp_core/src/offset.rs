@@ -77,6 +77,15 @@ impl TextRange {
         }
     }
 
+    /// The range of UTF-16 code units `start..end` in `text` (see
+    /// [`TextOffset::from_utf16`]).
+    pub fn from_utf16(text: &str, start: usize, end: usize) -> Self {
+        Self {
+            start: TextOffset::from_utf16(text, start),
+            end: TextOffset::from_utf16(text, end),
+        }
+    }
+
     /// The byte range, for slicing the text the range was computed on.
     pub fn bytes(&self) -> std::ops::Range<usize> {
         self.start.byte..self.end.byte

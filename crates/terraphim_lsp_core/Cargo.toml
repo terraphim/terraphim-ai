@@ -24,6 +24,9 @@ terraphim_types = { version = "1.22.2", registry = "terraphim", default-features
 # The editor's annotation-block parser and a/an rules, used directly so
 # both sides agree byte for byte (terraphim/terraphim-editor#67).
 terraphim_alternatives = { version = "0.1", registry = "terraphim" }
+# The editor's Lab mark and trim engine, for Lab diagnostics and trim
+# candidates (terraphim/terraphim-editor#68).
+terraphim_lab = { version = "0.1", registry = "terraphim" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

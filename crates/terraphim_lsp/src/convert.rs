@@ -5,11 +5,11 @@
 //! map to the right columns.
 
 use terraphim_lsp_core::{
-    Diagnostic as CoreDiagnostic, LineIndex, LinePosition, Severity, TextEdit as CoreTextEdit,
-    TextRange,
+    Diagnostic as CoreDiagnostic, DiagnosticTag as CoreTag, LineIndex, LinePosition, Severity,
+    TextEdit as CoreTextEdit, TextRange,
 };
 use tower_lsp::lsp_types::{
-    Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range, TextEdit,
+    Diagnostic, DiagnosticSeverity, DiagnosticTag, NumberOrString, Position, Range, TextEdit,
 };
 
 /// Source name attached to every diagnostic this server publishes.
@@ -65,9 +65,22 @@ pub(crate) fn diagnostic(index: &LineIndex<'_>, diagnostic: &CoreDiagnostic) -> 
         source: Some(SOURCE.to_string()),
         message: diagnostic.message.clone(),
         related_information: None,
-        tags: None,
+        tags: (!diagnostic.tags.is_empty()).then(|| {
+            diagnostic
+                .tags
+                .iter()
+                .map(|tag| match tag {
+                    CoreTag::Unnecessary => DiagnosticTag::UNNECESSARY,
+                })
+                .collect()
+        }),
         data: None,
     }
+}
+
+/// The byte range of an LSP range.
+pub(crate) fn byte_range_of(index: &LineIndex<'_>, range: Range) -> std::ops::Range<usize> {
+    byte_offset(index, range.start)..byte_offset(index, range.end)
 }
 
 #[cfg(test)]

@@ -1,12 +1,18 @@
-//! Benchmarks for the KG core: engine build, document analysis and the
-//! alternatives lookup the editor runs on every cursor move.
+//! Benchmarks for the KG core: engine build, document analysis, the
+//! alternatives lookup the editor runs on every cursor move, inlay-hint
+//! data, the add-alternative block rewrite, and Lab marks and trim previews
+//! (which the server runs only on open, save or command, never per
+//! keystroke).
 //!
 //! Run with `cargo bench -p terraphim_lsp_core`.
 
 use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use terraphim_lsp_core::KgEngine;
+use terraphim_lsp_core::{
+    KgEngine, LabAction, LabConfig, TextRange, TrimLevel, add_alternative, lab_findings,
+    trim_preview,
+};
 
 const THESAURUS_JSON: &str = include_str!("../tests/fixtures/writing_thesaurus.json");
 const PARAGRAPH: &str = "Every choice is a judgment. A choice made in a café is an honour, \
@@ -32,6 +38,20 @@ fn bench_core(c: &mut Criterion) {
     });
     c.bench_function("alternatives_at_10kb", |b| {
         b.iter(|| engine.alternatives_at(black_box(&text), black_box(cursor)))
+    });
+    c.bench_function("synonym_positions_10kb", |b| {
+        b.iter(|| engine.synonym_positions(black_box(&text)))
+    });
+    let range = TextRange::from_bytes(&text, cursor, cursor + "honour".len());
+    c.bench_function("add_alternative_10kb", |b| {
+        b.iter(|| add_alternative(black_box(&text), range, "distinction", None).unwrap())
+    });
+    let lab = LabConfig::with_defaults().expect("embedded Lab lists");
+    c.bench_function("lab_findings_all_10kb", |b| {
+        b.iter(|| lab_findings(black_box(&text), &lab, &LabAction::ALL))
+    });
+    c.bench_function("trim_preview_sharper_10kb", |b| {
+        b.iter(|| trim_preview(black_box(&text), &lab, TrimLevel::Sharper))
     });
 }
 

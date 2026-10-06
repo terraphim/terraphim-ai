@@ -40,10 +40,17 @@ async fn test_initialize_returns_capabilities() {
     assert!(response.capabilities.hover_provider.is_some());
     assert!(response.capabilities.completion_provider.is_some());
     assert!(response.capabilities.diagnostic_provider.is_some());
-    assert_eq!(
-        response.capabilities.text_document_sync,
-        Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL))
-    );
+    match response.capabilities.text_document_sync {
+        Some(TextDocumentSyncCapability::Options(options)) => {
+            assert_eq!(options.change, Some(TextDocumentSyncKind::FULL));
+            assert_eq!(options.open_close, Some(true));
+            assert_eq!(
+                options.save,
+                Some(TextDocumentSyncSaveOptions::Supported(true))
+            );
+        }
+        other => panic!("expected sync options, got {other:?}"),
+    }
 }
 
 #[tokio::test]

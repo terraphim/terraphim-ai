@@ -17,7 +17,17 @@
 //!   preceding `a`/`an` in the same edit.
 //! - [`split_annotation_block`]: locating the trailing
 //!   `terraphim-alternatives` block so it is never analysed; a malformed
-//!   block yields exactly one [`Diagnostic`].
+//!   block yields exactly one [`Diagnostic`], and a well-formed one's ghosts
+//!   become [`DiagnosticTag::Unnecessary`] hints
+//!   ([`AnnotationBlock::ghost_diagnostics`]).
+//! - [`KgEngine::synonym_positions`]: the `[i/n]` position of each matched
+//!   form among its concept's terms, for inlay hints.
+//! - [`lab_findings`] / [`trim_preview`]: terraphim-editor's Lab marks
+//!   (from [`terraphim_lab`]) as diagnostics with one code per mark kind and
+//!   "Apply fix: X" fixes, and trim candidates at a level as faded hints.
+//! - [`add_alternative`]: record a human-written alternative for a body
+//!   range, as one edit that rewrites the trailing block with the editor's
+//!   own writer.
 //!
 //! Matching and the concept -> synonyms index come from
 //! [`terraphim_automata`] ([`terraphim_automata::CompiledMatcher`] and
@@ -53,21 +63,37 @@
 //! # Ok::<(), terraphim_lsp_core::CoreError>(())
 //! ```
 
+mod alternative;
 mod block;
 mod case;
 mod diagnostic;
 mod engine;
+mod lab;
 mod offset;
 
-pub use block::{AnnotationBlock, BlockSplit, FENCE_INFO, split_annotation_block};
+pub use alternative::{
+    AddAlternativeError, AlternativeAdded, add_alternative, add_alternative_utf16,
+};
+pub use block::{AnnotationBlock, BlockSplit, FENCE_INFO, GHOSTED_MESSAGE, split_annotation_block};
 pub use case::Capitalisation;
-pub use diagnostic::{Diagnostic, DiagnosticCode, Severity};
+pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticTag, Severity};
 pub use engine::{
-    AlternativeSet, Analysis, CoreError, KgEngine, Replacement, TermMatch, TextEdit, apply_edits,
+    AlternativeSet, Analysis, CoreError, KgEngine, Replacement, SynonymPosition, TermMatch,
+    TextEdit, apply_edits,
+};
+pub use lab::{
+    LabAction, LabFinding, LabFix, TrimPreview, code_for_mark, lab_findings, severity_for_mark,
+    trim_preview,
 };
 pub use offset::{LineIndex, LinePosition, TextOffset, TextRange, utf16_len};
+/// Span granularity for [`add_alternative`], re-exported from
+/// `terraphim_alternatives`.
+pub use terraphim_alternatives::SpanKind;
 /// The editor's a/an rules, re-exported from `terraphim_alternatives`.
 pub use terraphim_alternatives::{Article, article_for};
+/// The Lab engine's configuration, mark kinds and trim levels, re-exported
+/// from `terraphim_lab`.
+pub use terraphim_lab::{LabConfig, LabError, MarkKind, TrimLevel};
 
 /// Re-exported so callers can build a thesaurus without a direct dependency.
 pub use terraphim_types::Thesaurus;

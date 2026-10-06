@@ -20,6 +20,9 @@ pub struct KgAnalysis {
     pub unknown_terms: Vec<String>,
     /// Problems found by the core, such as a malformed annotation block.
     pub diagnostics: Vec<Diagnostic>,
+    /// One faded (`Unnecessary`) hint per ghosted span of the annotation
+    /// block. Published only when the `ghostDiagnostics` setting is on.
+    pub ghosts: Vec<Diagnostic>,
 }
 
 impl KgAnalysis {
@@ -29,6 +32,7 @@ impl KgAnalysis {
             matched_terms: Vec::new(),
             unknown_terms: Vec::new(),
             diagnostics: Vec::new(),
+            ghosts: Vec::new(),
         }
     }
 
@@ -38,6 +42,7 @@ impl KgAnalysis {
         self.matched_terms.is_empty()
             && self.unknown_terms.is_empty()
             && self.diagnostics.is_empty()
+            && self.ghosts.is_empty()
     }
 }
 
@@ -52,11 +57,18 @@ pub fn analyse_kg_document(text: &str, engine: &KgEngine) -> KgAnalysis {
     }
 
     let analysis = engine.analyse(text);
+    let ghosts = analysis
+        .block
+        .as_ref()
+        .map(|block| block.ghost_diagnostics())
+        .unwrap_or_default();
     if engine.concept_index().is_empty() {
         // No knowledge graph loaded: every word would be "unknown", which is
-        // noise. Block diagnostics do not depend on the graph, so keep them.
+        // noise. Block diagnostics and ghosts do not depend on the graph, so
+        // keep them.
         return KgAnalysis {
             diagnostics: analysis.diagnostics,
+            ghosts,
             ..KgAnalysis::empty()
         };
     }
@@ -92,6 +104,7 @@ pub fn analyse_kg_document(text: &str, engine: &KgEngine) -> KgAnalysis {
         matched_terms: analysis.matches,
         unknown_terms,
         diagnostics: analysis.diagnostics,
+        ghosts,
     }
 }
 
