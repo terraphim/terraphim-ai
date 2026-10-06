@@ -9,6 +9,7 @@
 //! {
 //!   "inlayHints": false,
 //!   "ghostDiagnostics": true,
+//!   "unknownTerms": false,
 //!   "lab": { "actions": [], "trigger": "save" }
 //! }
 //! ```
@@ -17,6 +18,7 @@
 //! |---|---|---|
 //! | `inlayHints` | `false` | `[i/n]` after each KG term with alternatives |
 //! | `ghostDiagnostics` | `true` | ghosted text published as faded (`Unnecessary`) hints |
+//! | `unknownTerms` | `false` | a Warning on every occurrence of a word that matches no thesaurus term |
 //! | `lab.actions` | `[]` (off) | Lab actions run automatically (names as in `terraphim.lab.mark`) |
 //! | `lab.trigger` | `"save"` | when Lab marks and the trim preview are recomputed: `save` (on open and save) or `command` (only on `terraphim.lab.mark` / `terraphim.trim.preview`) |
 //!
@@ -41,6 +43,10 @@ pub struct ServerSettings {
     /// `DiagnosticTag::Unnecessary` hints, which clients fade. On by default:
     /// it is derived from the file itself and costs nothing extra.
     pub ghost_diagnostics: bool,
+    /// Publish a Warning on every occurrence of a word that is not part of
+    /// any thesaurus match. Off by default: against a real thesaurus almost
+    /// every ordinary word is unknown, which buries the useful diagnostics.
+    pub unknown_terms: bool,
     /// Lab marks.
     pub lab: LabSettings,
 }
@@ -50,6 +56,7 @@ impl Default for ServerSettings {
         Self {
             inlay_hints: false,
             ghost_diagnostics: true,
+            unknown_terms: false,
             lab: LabSettings::default(),
         }
     }
@@ -109,6 +116,13 @@ mod tests {
         let defaults = ServerSettings::default();
         assert!(!defaults.inlay_hints);
         assert!(defaults.ghost_diagnostics);
+        assert!(!defaults.unknown_terms);
+    }
+
+    #[test]
+    fn unknown_terms_opt_in() {
+        let value = json!({"terraphim": {"unknownTerms": true}});
+        assert!(ServerSettings::from_value(Some(&value)).unknown_terms);
     }
 
     #[test]

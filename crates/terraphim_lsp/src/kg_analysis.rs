@@ -2,9 +2,9 @@
 //!
 //! Term matching, concept ids and the annotation-block boundary come from
 //! [`terraphim_lsp_core`]; this module adds the server-only list of
-//! unrecognised words used for diagnostics.
+//! unrecognised words used for the opt-in unknown-term diagnostics.
 
-use std::collections::HashSet;
+use std::ops::Range;
 
 use terraphim_lsp_core::{Diagnostic, KgEngine};
 
@@ -16,13 +16,24 @@ pub struct KgAnalysis {
     /// Terms from the thesaurus found in the document body, with concept id,
     /// normalised concept name and byte plus UTF-16 ranges.
     pub matched_terms: Vec<TermMatch>,
-    /// Words in the body that did not match any thesaurus entry.
-    pub unknown_terms: Vec<String>,
+    /// Every occurrence of a word in the body that is not part of any
+    /// thesaurus match, in document order, each with its own byte range.
+    pub unknown_terms: Vec<UnknownTerm>,
     /// Problems found by the core, such as a malformed annotation block.
     pub diagnostics: Vec<Diagnostic>,
     /// One faded (`Unnecessary`) hint per ghosted span of the annotation
     /// block. Published only when the `ghostDiagnostics` setting is on.
     pub ghosts: Vec<Diagnostic>,
+}
+
+/// One occurrence of a word that is not part of any knowledge-graph match.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownTerm {
+    /// The word as written, without surrounding punctuation.
+    pub text: String,
+    /// Byte range of this occurrence in the analysed document. Convert it
+    /// with [`terraphim_lsp_core::LineIndex`] (UTF-16 columns) for LSP.
+    pub bytes: Range<usize>,
 }
 
 impl KgAnalysis {
@@ -74,30 +85,19 @@ pub fn analyse_kg_document(text: &str, engine: &KgEngine) -> KgAnalysis {
     }
 
     let body = &text[..analysis.body_end.byte];
-    let matched_words: HashSet<String> = analysis
-        .matches
-        .iter()
-        .flat_map(|m| m.term.split_whitespace().map(str::to_lowercase))
-        .collect();
-    let matched_spans: Vec<String> = analysis
-        .matches
-        .iter()
-        .map(|m| m.text.to_lowercase())
-        .collect();
-
-    // Treat any non-empty whitespace-separated token that was not part of a
-    // match as an unknown term. This is intentionally simple: multi-word
-    // unknown phrases are not reconstructed here.
-    let unknown_terms = body
-        .split_whitespace()
-        .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()))
+    let matched: Vec<Range<usize>> = analysis.matches.iter().map(|m| m.range.bytes()).collect();
+    // A word is unknown when its range overlaps no match. Multi-word
+    // unknown phrases are not reconstructed: each word is reported alone.
+    let unknown_terms = words(body)
         .filter(|word| {
-            let lower = word.to_lowercase();
-            !lower.is_empty()
-                && !matched_words.contains(&lower)
-                && !matched_spans.iter().any(|span| span.contains(&lower))
+            !matched
+                .iter()
+                .any(|range| range.start < word.end && word.start < range.end)
         })
-        .map(String::from)
+        .map(|bytes| UnknownTerm {
+            text: body[bytes.clone()].to_string(),
+            bytes,
+        })
         .collect();
 
     KgAnalysis {
@@ -106,6 +106,31 @@ pub fn analyse_kg_document(text: &str, engine: &KgEngine) -> KgAnalysis {
         diagnostics: analysis.diagnostics,
         ghosts,
     }
+}
+
+/// Byte ranges of the words of `text`: whitespace-separated runs with
+/// leading and trailing non-alphanumeric characters trimmed. Runs with no
+/// alphanumeric character are skipped.
+fn words(text: &str) -> impl Iterator<Item = Range<usize>> + '_ {
+    let mut chars = text.char_indices().peekable();
+    std::iter::from_fn(move || {
+        loop {
+            // Skip whitespace up to the next run.
+            while chars.next_if(|(_, c)| c.is_whitespace()).is_some() {}
+            let &(run_start, _) = chars.peek()?;
+            let mut run_end = run_start;
+            while let Some((at, c)) = chars.next_if(|(_, c)| !c.is_whitespace()) {
+                run_end = at + c.len_utf8();
+            }
+            let run = &text[run_start..run_end];
+            let trimmed_start = run.trim_start_matches(|c: char| !c.is_alphanumeric());
+            let word = trimmed_start.trim_end_matches(|c: char| !c.is_alphanumeric());
+            if !word.is_empty() {
+                let start = run_start + (run.len() - trimmed_start.len());
+                return Some(start..start + word.len());
+            }
+        }
+    })
 }
 
 #[cfg(test)]
@@ -163,10 +188,47 @@ mod tests {
         assert_eq!(tokio.nterm, "tokio async runtime");
     }
 
+    fn unknown_texts(analysis: &KgAnalysis) -> Vec<&str> {
+        analysis
+            .unknown_terms
+            .iter()
+            .map(|term| term.text.as_str())
+            .collect()
+    }
+
     #[test]
     fn test_unknown_terms_found() {
         let analysis = analyse_kg_document("rust and xyz are great", &sample_engine());
-        assert!(analysis.unknown_terms.contains(&"xyz".to_string()));
+        assert_eq!(unknown_texts(&analysis), ["and", "xyz", "are", "great"]);
+    }
+
+    #[test]
+    fn test_every_occurrence_has_its_own_range() {
+        let text = "the rust book\nthe end, (the) the.";
+        let analysis = analyse_kg_document(text, &sample_engine());
+        let the: Vec<Range<usize>> = analysis
+            .unknown_terms
+            .iter()
+            .filter(|term| term.text == "the")
+            .map(|term| term.bytes.clone())
+            .collect();
+        assert_eq!(the, [0..3, 14..17, 24..27, 29..32]);
+        for range in the {
+            assert_eq!(&text[range], "the");
+        }
+    }
+
+    #[test]
+    fn test_words_inside_matches_are_not_unknown() {
+        let analysis = analyse_kg_document("Tokio, rust! async?", &sample_engine());
+        assert!(analysis.unknown_terms.is_empty(), "{analysis:?}");
+    }
+
+    #[test]
+    fn test_words_trim_punctuation_and_skip_symbols() {
+        let text = "  \"héllo,\" -- 😀 x\r\nend.";
+        let ranges: Vec<&str> = words(text).map(|range| &text[range]).collect();
+        assert_eq!(ranges, ["héllo", "x", "end"]);
     }
 
     #[test]

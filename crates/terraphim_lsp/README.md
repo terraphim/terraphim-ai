@@ -12,10 +12,12 @@ offers:
   thesaurus terms.
 - **`textDocument/completion`** - Suggest knowledge-graph terms at the cursor.
 - **`textDocument/diagnostic`** (pulled, and pushed as `publishDiagnostics`)
-  - Warn about terms in the document that are not present in the thesaurus,
-  report a malformed trailing `terraphim-alternatives` annotation block (one
-  diagnostic per document), and fade ghosted text (code `ghosted`, severity
-  Hint, tag `Unnecessary`; Zed fades it with `unnecessary_code_fade`).
+  - Report a malformed trailing `terraphim-alternatives` annotation block
+  (one diagnostic per document) and fade ghosted text (code `ghosted`,
+  severity Hint, tag `Unnecessary`; Zed fades it with
+  `unnecessary_code_fade`). With the opt-in `unknownTerms` setting, also warn
+  on every occurrence of a word that matches no thesaurus term, each at its
+  own range.
 - **Lab marks** - terraphim-editor's Lab engine (`terraphim_lab`): one
   diagnostic code per mark kind (`lab-typo`, `lab-punctuation`,
   `lab-weak-sentence`, `lab-long-sentence`, `lab-convoluted-sentence`,
@@ -44,6 +46,7 @@ Passed as `initializationOptions` or through
 {
   "inlayHints": false,
   "ghostDiagnostics": true,
+  "unknownTerms": false,
   "lab": { "actions": [], "trigger": "save" }
 }
 ```
@@ -52,6 +55,7 @@ Passed as `initializationOptions` or through
 |---|---|---|
 | `inlayHints` | `false` | `[i/n]` inlay hints (the capability is always advertised) |
 | `ghostDiagnostics` | `true` | faded hints over ghosted text |
+| `unknownTerms` | `false` | a Warning (`Unknown term: X`) on every occurrence of a word that is not part of any thesaurus match; off by default because against a real thesaurus nearly every ordinary word is unknown |
 | `lab.actions` | `[]` | Lab actions run automatically: `typos_and_punctuation`, `weakest_sentences`, `long_sentences`, `convoluted_sentences`, `off_tone`, `hedges_and_filler` |
 | `lab.trigger` | `"save"` | `save`: Lab marks and the trim preview are recomputed on open and save; `command`: only by the commands |
 
@@ -72,8 +76,8 @@ actions are computed immediately with the `save` trigger and on the next
 command with `command`. Switching the trigger from `command` to `save`
 computes the configured actions at once; switching `save` to `command`
 keeps the marks already shown (the next edit drops them as usual). Command-requested actions and trim previews stay
-until their `*.clear` command. Ghost hints follow `ghostDiagnostics` and
-inlay hints are refreshed.
+until their `*.clear` command. Ghost hints and unknown-term warnings follow
+`ghostDiagnostics` and `unknownTerms`, and inlay hints are refreshed.
 
 ## Commands
 

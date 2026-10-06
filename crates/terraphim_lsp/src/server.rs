@@ -24,7 +24,7 @@ use terraphim_types::Thesaurus;
 use crate::commands::{self, AddAlternativeArgs, DocumentArgs, LabMarkArgs, TrimPreviewArgs};
 use crate::completion::{build_completions, word_at_position};
 use crate::convert;
-use crate::diagnostics::{build_diagnostics_with_positions, ghost_diagnostics};
+use crate::diagnostics::{core_diagnostics, ghost_diagnostics, unknown_term_diagnostics};
 use crate::kg_analysis::analyse_kg_document;
 use crate::settings::{LabSettings, LabTrigger, ServerSettings};
 
@@ -34,9 +34,10 @@ use crate::settings::{LabSettings, LabTrigger, ServerSettings};
 ///
 /// - `textDocument/hover` - concept descriptions for matched KG terms
 /// - `textDocument/completion` - thesaurus term suggestions
-/// - `textDocument/diagnostic` (and pushed `publishDiagnostics`) - warnings
-///   for unknown terms and a malformed `terraphim-alternatives` annotation
-///   block, plus faded (`Unnecessary`) hints over ghosted text
+/// - `textDocument/diagnostic` (and pushed `publishDiagnostics`) - a
+///   malformed `terraphim-alternatives` annotation block, faded
+///   (`Unnecessary`) hints over ghosted text and, when the `unknownTerms`
+///   setting is on, a warning on every unknown-word occurrence
 /// - `textDocument/codeAction` - "Replace with X" for every other synonym of
 ///   the KG term at the cursor, keeping capitalisation and fixing `a`/`an`,
 ///   and "Apply fix: X" for Lab typo and punctuation marks
@@ -467,15 +468,21 @@ impl TerraphimLspServer {
             .collect()
     }
 
-    /// Every diagnostic for a document: unknown terms, a malformed
-    /// annotation block, ghost hints (when enabled), Lab marks and trim
-    /// candidates. Pushed and pulled diagnostics both come from here, so
+    /// Every diagnostic for a document: unknown terms (when enabled), a
+    /// malformed annotation block, ghost hints (when enabled), Lab marks and
+    /// trim candidates. Pushed and pulled diagnostics both come from here, so
     /// they always agree.
     fn diagnostics_for(&self, document: &OpenDocument) -> Vec<Diagnostic> {
         let text = document.text.as_str();
+        let settings = self.settings();
         let analysis = analyse_kg_document(text, &self.engine);
-        let mut diagnostics = build_diagnostics_with_positions(&analysis, text);
-        if self.settings().ghost_diagnostics {
+        let mut diagnostics = if settings.unknown_terms {
+            unknown_term_diagnostics(&analysis, text)
+        } else {
+            Vec::new()
+        };
+        diagnostics.extend(core_diagnostics(&analysis, text));
+        if settings.ghost_diagnostics {
             diagnostics.extend(ghost_diagnostics(&analysis, text));
         }
         if !document.lab.is_empty() || !document.trim.is_empty() {

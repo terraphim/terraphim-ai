@@ -537,7 +537,11 @@ async fn crlf_documents_map_ranges_before_the_line_break() {
 #[tokio::test]
 async fn crlf_hover_and_diagnostics_near_line_end() {
     let text = "a choice\r\nxyz\r\n";
-    let (service, _socket) = open_server(text, versioned_client()).await;
+    let init = InitializeParams {
+        initialization_options: Some(serde_json::json!({"unknownTerms": true})),
+        ..versioned_client()
+    };
+    let (service, _socket) = open_server(text, init).await;
     let server = service.inner();
     let hover = server
         .hover(HoverParams {
