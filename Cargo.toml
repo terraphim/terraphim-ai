@@ -55,7 +55,7 @@ exclude = [
 default-members = ["terraphim_server"]
 
 [workspace.package]
-version = "1.21.3"
+version = "1.22.0"
 edition = "2024"
 rust-version = "1.91"
 authors = ["Terraphim Team <team@terraphim.ai>"]

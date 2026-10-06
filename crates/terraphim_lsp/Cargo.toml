@@ -14,7 +14,7 @@ readme = "README.md"
 
 [dependencies]
 # Pure analysis core (also consumed in-process by terraphim-editor as WASM).
-terraphim_lsp_core = { path = "../terraphim_lsp_core", version = "1.21.3", registry = "terraphim" }
+terraphim_lsp_core = { path = "../terraphim_lsp_core", version = "1.22.0", registry = "terraphim" }
 terraphim_types = { version = "1.22.2", registry = "terraphim" }
 tower-lsp = "0.20"
 tokio = { workspace = true }
