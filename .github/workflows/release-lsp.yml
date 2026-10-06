@@ -198,6 +198,30 @@ jobs:
       - name: Install pinned Rust toolchain
         run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --target "$TARGET"
 
+      - name: Use a lane-local Cargo home and target dir
+        # The runner's CARGO_HOME holds the repo's build-dir
+        # ({cargo-cache-home}/build/by-project/...), which other workflows fill
+        # through the kache rustc wrapper with read-only, hard-linked files;
+        # a plain rustc (host or cross container) cannot overwrite them
+        # (run 37473919410, runner-4). Each lane therefore gets its own
+        # CARGO_HOME (registry, git cache and build-dir) and target dir under
+        # RUNNER_TEMP, as terraphim-clients release-binaries.yml does for its
+        # cross lanes. The lane home has no config.toml, so cross does not
+        # mount a rustc-wrapper into its container; RUSTC_WRAPPER is already
+        # empty for host builds. Toolchains stay in RUSTUP_HOME. It runs before
+        # "Install cross" so its fallback install also avoids the shared
+        # build-dir; the lane bin dir goes on PATH for that binary.
+        run: |
+          set -euo pipefail
+          LANE="$RUNNER_TEMP/cargo-lane-$TARGET"
+          rm -rf "$LANE"
+          mkdir -p "$LANE/home" "$LANE/target"
+          {
+            echo "CARGO_HOME=$LANE/home"
+            echo "CARGO_TARGET_DIR=$LANE/target"
+          } >> "$GITHUB_ENV"
+          echo "$LANE/home/bin" >> "$GITHUB_PATH"
+
       - name: Install cross
         if: matrix.use_cross
         run: |
@@ -211,7 +235,7 @@ jobs:
 
       - name: Fetch dependencies on the host
         # The registry is reachable from the runner host; cross containers then
-        # build offline from the mounted CARGO_HOME without needing the token.
+        # build offline from the mounted lane CARGO_HOME without needing the token.
         run: rustup run "$RUST_TOOLCHAIN" cargo fetch --locked
 
       - name: Build terraphim-lsp
@@ -233,7 +257,7 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          BIN="target/$TARGET/release/terraphim-lsp"
+          BIN="$CARGO_TARGET_DIR/$TARGET/release/terraphim-lsp"
           file "$BIN"
           if ! file "$BIN" | grep -q "$ARCH"; then
             echo "::error::$BIN is not a $ARCH binary"
@@ -251,7 +275,7 @@ jobs:
       - name: Stage raw binary
         run: |
           mkdir -p dist
-          cp "target/$TARGET/release/terraphim-lsp" "dist/terraphim-lsp-$TARGET"
+          cp "$CARGO_TARGET_DIR/$TARGET/release/terraphim-lsp" "dist/terraphim-lsp-$TARGET"
 
       - name: Upload raw binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

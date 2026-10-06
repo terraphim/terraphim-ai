@@ -124,6 +124,28 @@ class ReleaseLspWorkflowContract(unittest.TestCase):
                 self.jobs[name],
             )
 
+    def test_linux_lanes_use_a_lane_local_cargo_home_and_target_dir(self) -> None:
+        linux = self.jobs["build-linux"]
+        lane = step_run(linux, "Use a lane-local Cargo home and target dir")
+        self.assertIn('LANE="$RUNNER_TEMP/cargo-lane-$TARGET"', lane)
+        self.assertIn('rm -rf "$LANE"', lane)
+        self.assertIn('echo "CARGO_HOME=$LANE/home"', lane)
+        self.assertIn('echo "CARGO_TARGET_DIR=$LANE/target"', lane)
+        self.assertIn('>> "$GITHUB_ENV"', lane)
+        self.assertIn('echo "$LANE/home/bin" >> "$GITHUB_PATH"', lane)
+        # The lane exists before cross is installed, crates are resolved or
+        # anything builds, and every built path comes from the lane target dir.
+        order = [
+            linux.index("- name: Use a lane-local Cargo home and target dir"),
+            linux.index("- name: Install cross"),
+            linux.index("- name: Fetch dependencies on the host"),
+            linux.index("- name: Build terraphim-lsp\n"),
+            linux.index("- name: Build terraphim-lsp (cross)"),
+        ]
+        self.assertEqual(order, sorted(order))
+        self.assertNotIn('"target/$TARGET', linux)
+        self.assertIn('BIN="$CARGO_TARGET_DIR/$TARGET/release/terraphim-lsp"', linux)
+
     def test_pinned_toolchain_never_becomes_the_default(self) -> None:
         channel = re.search(
             r'(?m)^channel = "([^"]+)"', TOOLCHAIN.read_text(encoding="utf-8")
@@ -141,7 +163,8 @@ class ReleaseLspWorkflowContract(unittest.TestCase):
             set(re.findall(r"(?m)^          - target: (\S+)$", linux)), LINUX_TARGETS
         )
         self.assertIn(
-            'cp "target/$TARGET/release/terraphim-lsp" "dist/terraphim-lsp-$TARGET"',
+            'cp "$CARGO_TARGET_DIR/$TARGET/release/terraphim-lsp" '
+            '"dist/terraphim-lsp-$TARGET"',
             linux,
         )
         mac = self.jobs["build-macos"]
