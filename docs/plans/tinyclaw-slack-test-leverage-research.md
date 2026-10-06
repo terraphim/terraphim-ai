@@ -40,7 +40,7 @@ TinyClaw's Slack adapter (`crates/terraphim_tinyclaw/src/channels/slack.rs`) on 
 
 ### OpenClaw
 
-- **Location**: `/Users/alex/projects/terraphim/openclaw/`
+- **Location**: `~/projects/terraphim/openclaw/`
 - **Language**: TypeScript
 - **Test framework**: vitest
 - **Slack library**: `@slack/bolt` + `@slack/web-api`
@@ -58,7 +58,7 @@ TinyClaw's Slack adapter (`crates/terraphim_tinyclaw/src/channels/slack.rs`) on 
 
 ### rusty-claw
 
-- **Location**: `/Users/alex/projects/terraphim/rusty-claw/`
+- **Location**: `~/projects/terraphim/rusty-claw/`
 - **Language**: Rust
 - **Slack content**: None. No Slack-related code or tests found.
 

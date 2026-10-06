@@ -66,7 +66,7 @@
 
 ## 2. Technical Context
 
-### Git state (Mac, /Users/alex/projects/terraphim/terraphim-ai)
+### Git state (Mac, ~/projects/terraphim/terraphim-ai)
 
 ```
 Branch: main

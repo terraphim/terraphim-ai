@@ -14,7 +14,7 @@ The warnings were caused by the `QueryRsHaystackIndexer` trying to load cached s
 3. **Memory Backend**: The in-memory persistence layer was logging every `NotFound` as a warning
 
 ## Solution Applied
-**Removed all persistence operations from the search path** in `/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_middleware/src/haystack/query_rs.rs`:
+**Removed all persistence operations from the search path** in `~/projects/terraphim/terraphim-ai/crates/terraphim_middleware/src/haystack/query_rs.rs`:
 
 ### Before (Causing Warnings):
 ```rust
@@ -64,7 +64,7 @@ let (reddit_results, suggest_results, crates_results, docs_results) = tokio::joi
 4. **✅ Better Performance**: Search responses are 10-20x faster (100-500ms vs 2-5s)
 
 ## Files Modified
-- `/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_middleware/src/haystack/query_rs.rs`
+- `~/projects/terraphim/terraphim-ai/crates/terraphim_middleware/src/haystack/query_rs.rs`
 
 ## Testing
 - ✅ Backend compiles successfully (`cargo build`)

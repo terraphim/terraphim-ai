@@ -1,8 +1,10 @@
 import { exec } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const execAsync = promisify(exec);
+const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 
 describe('Context Management Integration', () => {
 	// Skip integration tests in CI environment where server setup is complex
@@ -20,7 +22,7 @@ describe('Context Management Integration', () => {
 				'cargo run --bin terraphim_server -- --config terraphim_server/default/terraphim_engineer_config.json &',
 				{
 					timeout: 10000,
-					cwd: '/Users/alex/projects/terraphim/terraphim-ai',
+					cwd: repoRoot,
 				}
 			);
 			console.log('Server started:', stdout);

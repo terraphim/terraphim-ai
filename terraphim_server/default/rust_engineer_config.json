@@ -35,7 +35,7 @@
       "kg": null,
       "haystacks": [
         {
-          "location": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "location": "terraphim_server/fixtures/haystack",
           "service": "Ripgrep",
           "read_only": false,
           "atomic_server_secret": null,

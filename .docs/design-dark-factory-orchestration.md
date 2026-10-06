@@ -713,7 +713,7 @@ No benchmarks needed for Phase 1. The reconciliation loop is I/O bound (waiting 
 ```toml
 # orchestrator.toml -- Dark Factory Agent Fleet
 
-working_dir = "/Users/alex/projects/terraphim/terraphim-ai"
+working_dir = "${HOME}/projects/terraphim/terraphim-ai"
 
 [nightwatch]
 eval_interval_secs = 300  # 5 minutes
@@ -725,7 +725,7 @@ critical_threshold = 0.70
 [compound_review]
 schedule = "0 2 * * *"  # 2 AM daily
 max_duration_secs = 1800  # 30 minutes
-repo_path = "/Users/alex/projects/terraphim/terraphim-ai"
+repo_path = "${HOME}/projects/terraphim/terraphim-ai"
 create_prs = false  # Dry run for first 2 weeks
 
 # --- Safety Layer (always running) ---

@@ -24,7 +24,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Default values
-SOURCE_DIR="/Users/alex/synced/expanded_docs"
+SOURCE_DIR="$HOME/synced/expanded_docs"
 OUTPUT_DIR="docs/src/kg/rust_notes_kg"
 FILTER_PATTERN="*rust*.md"
 MAX_ENTRIES=100
@@ -61,7 +61,7 @@ Usage:
 
 Options:
   --source, -s DIR      Source directory containing markdown notes
-                        (default: /Users/alex/synced/expanded_docs)
+                        (default: $HOME/synced/expanded_docs)
   --output, -o DIR      Output directory for KG files
                         (default: docs/src/kg/rust_notes_kg)
   --filter, -f PATTERN  Glob pattern to filter files

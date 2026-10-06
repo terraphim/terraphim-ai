@@ -80,7 +80,7 @@ The untracked `.docs/orchestrator-legacy-2301/patch-terraphim-toml.py` file was 
 
 ### Main Workspace
 
-Path: `/Users/alex/projects/terraphim/terraphim-ai`
+Path: `~/projects/terraphim/terraphim-ai`
 
 ```bash
 # Current branch

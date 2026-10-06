@@ -13,7 +13,7 @@ The public `terraphim-ai` repository has dead code warnings for several methods 
 
 ### Comparison with terraphim-private Repository
 
-The private repository at `/Users/alex/projects/terraphim/terraphim-private` contains a MORE COMPLETE implementation where these methods ARE actively used:
+The private repository at `~/projects/terraphim/terraphim-private` contains a MORE COMPLETE implementation where these methods ARE actively used:
 
 **Line 353 in private repo:**
 ```rust
@@ -93,9 +93,9 @@ The private repository has:
 
 ## Files to Sync
 
-**Source:** `/Users/alex/projects/terraphim/terraphim-private/crates/terraphim_middleware/src/haystack/query_rs.rs`
+**Source:** `~/projects/terraphim/terraphim-private/crates/terraphim_middleware/src/haystack/query_rs.rs`
 
-**Target:** `/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_middleware/src/haystack/query_rs.rs`
+**Target:** `~/projects/terraphim/terraphim-ai/crates/terraphim_middleware/src/haystack/query_rs.rs`
 
 **Key Sections:**
 - Lines 13-41: Add FetchStats and PersistenceStats structs

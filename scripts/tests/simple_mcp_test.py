@@ -7,6 +7,9 @@ import traceback
 from mcp import StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.session import ClientSession
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG,
@@ -17,7 +20,7 @@ logger = logging.getLogger(__name__)
 async def test_mcp_connection():
     """Simple test to verify MCP server connectivity"""
     try:
-        binary_path = "/Users/alex/projects/terraphim/terraphim-ai/target/release/terraphim_mcp_server"
+        binary_path = str(REPO_ROOT / "target/release/terraphim_mcp_server")
 
         logger.info("Creating server parameters...")
         server_params = StdioServerParameters(command=binary_path, args=[], env={})

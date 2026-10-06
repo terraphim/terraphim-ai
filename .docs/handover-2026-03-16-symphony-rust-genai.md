@@ -34,8 +34,8 @@ Total orchestration: ~45 minutes including retries.
 
 | Repo | Location | State |
 |------|----------|-------|
-| terraphim-ai (primary) | `/Users/alex/projects/terraphim/terraphim-ai` | main, WORKFLOW file uncommitted |
-| rust-genai (local) | `/Users/alex/projects/terraphim/rust-genai` | main, local behind gitea/main |
+| terraphim-ai (primary) | `~/projects/terraphim/terraphim-ai` | main, WORKFLOW file uncommitted |
+| rust-genai (local) | `~/projects/terraphim/rust-genai` | main, local behind gitea/main |
 | rust-genai (Gitea) | `git.terraphim.cloud/terraphim/rust-genai` | main at `b76e5a0`, fully synced |
 | rust-genai (GitHub) | `github.com/terraphim/rust-genai` | main at `1c62bfb`, NOT synced |
 

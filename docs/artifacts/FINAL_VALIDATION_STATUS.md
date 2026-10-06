@@ -33,7 +33,7 @@ terraphim_persistence: 25/25 tests ✅
 
 **Build Status:**
 ```bash
-Binary: /Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim_server
+Binary: ~/projects/terraphim/terraphim-ai/target/debug/terraphim_server
 Size: 57MB
 Type: Mach-O 64-bit executable arm64
 Version: 0.2.3

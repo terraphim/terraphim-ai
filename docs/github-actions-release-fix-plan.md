@@ -21,7 +21,7 @@ The GitHub Actions release workflows are failing across multiple platforms (Linu
    - Docker 24.04: Missing `/desktop/yarn.lock` file
 
 ### Project Structure
-- **Main workspace**: `/Users/alex/projects/terraphim/terraphim-ai/Cargo.toml`
+- **Main workspace**: `~/projects/terraphim/terraphim-ai/Cargo.toml`
 - **Server binary**: `terraphim_server` (path: `terraphim_server/`)
 - **TUI binary**: `terraphim_tui` (path: `crates/terraphim_tui/`)
 - **Desktop app**: `terraphim-ai-desktop` (path: `desktop/src-tauri/`)

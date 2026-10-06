@@ -14,7 +14,7 @@
 
 The original plan assumed `terraphim_orchestrator` lives inside `terraphim-ai`. Current evidence indicates the active orchestrator development line is in `terraphim-agents`, but this must be verified in the target working tree before implementation.
 
-- `terraphim_orchestrator` is the core of **`terraphim-agents`** (a separate Gitea repo at `git.terraphim.cloud/terraphim/terraphim-agents`), locally at `/Users/alex/projects/terraphim/terraphim-agents-2301`
+- `terraphim_orchestrator` is the core of **`terraphim-agents`** (a separate Gitea repo at `git.terraphim.cloud/terraphim/terraphim-agents`), locally at `~/projects/terraphim/terraphim-agents-2301`
 - Branch `task/2465-auto-merge-blocker-kind` is the active development branch (recent commits 2026-06-11 and 2026-06-12)
 - Branch `task/2301-auto-merge-config` on `terraphim-ai` contains 1,059 new files / 475,092 insertions — this is the **import/extraction of the orchestrator INTO terraphim-ai** (Gitea #1910 god-file decomposition), not a small config change
 - All Phase 2 remediation loop code (RemediationState, terraphim_persistence, integration tests) is already merged in `terraphim-agents` main
@@ -41,7 +41,7 @@ Decision for this plan:
 
 | Claim | Verification command/evidence | Status |
 |---|---|---|
-| Active orchestrator code is in `terraphim-agents` | In `/Users/alex/projects/terraphim/terraphim-agents-2301`, fetch remotes and verify `crates/terraphim_orchestrator` exists on the target branch. | **Verified** |
+| Active orchestrator code is in `terraphim-agents` | In `~/projects/terraphim/terraphim-agents-2301`, fetch remotes and verify `crates/terraphim_orchestrator` exists on the target branch. | **Verified** |
 | `task/2465-auto-merge-blocker-kind` contains active auto-merge work | Verify branch exists locally/remotely and inspect recent commits before editing. | **Verified** (commits 3d4eb19, cb9f7e8, 47767b0) |
 | Phase 2 remediation loop is already merged | Search the verified branch for `RemediationState`, persistence-backed remediation state, and integration tests. | **Verified** (`pr_poller::RemediationState`) |
 | `task/2301-auto-merge-config` is an orchestrator import, not a small config branch | Confirm diff size and target repo before using it as an implementation base. | **Verified** (deferred; 475k-line import on terraphim-ai) |

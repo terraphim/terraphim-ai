@@ -3,10 +3,13 @@
 import asyncio
 import json
 import subprocess
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 async def test_complete_mcp():
     """Test complete MCP protocol communication"""
-    binary_path = "/Users/alex/projects/terraphim/terraphim-ai/target/release/terraphim_mcp_server"
+    binary_path = str(REPO_ROOT / "target/release/terraphim_mcp_server")
 
     # Start the server process
     proc = subprocess.Popen(

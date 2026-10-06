@@ -23,7 +23,7 @@ adf-ctl cancel <agent-name>
 ```
 
 `adf-ctl` is installed locally at
-`/Users/alex/projects/terraphim/terraphim-ai/target/release/adf-ctl`.
+`~/projects/terraphim/terraphim-ai/target/release/adf-ctl`.
 It operates over SSH to bigbox and requires `ADF_WEBHOOK_SECRET` or reads
 the secret from `/opt/ai-dark-factory/orchestrator.toml` via SSH.
 

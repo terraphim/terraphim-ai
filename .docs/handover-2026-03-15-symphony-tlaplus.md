@@ -57,7 +57,7 @@ All work is complete and pushed.
 
 | Repo | Location | State |
 |------|----------|-------|
-| terraphim-ai | `/Users/alex/projects/terraphim/terraphim-ai` (local) | Clean on `main`, 2 untracked report files |
+| terraphim-ai | `~/projects/terraphim/terraphim-ai` (local) | Clean on `main`, 2 untracked report files |
 | tlaplus-ts | `https://git.terraphim.cloud/terraphim/tlaplus-ts` | All 8 issues closed, `main` has all merged work + defect fixes |
 | tlaplus-ts (bigbox clone) | `/tmp/tlaplus-ts-verify/` on bigbox | Used for verification and fix commits |
 

@@ -406,7 +406,7 @@ Gitea API POST /repos/{owner}/{repo}/issues/{pr_number}/comments
 - Research: `/tmp/agents-fix/.docs/research-2301-verdict-comment-posting.md` (382 lines)
 - Design: `/tmp/agents-fix/.docs/design-2301-verdict-comment-posting.md` (406 lines)
 - Structural Review: `/tmp/agents-fix/.docs/structural-review-2301.md` (generated inline in session)
-- Plan: `/Users/alex/.claude/plans/snuggly-giggling-quill.md`
+- Plan: `~/.claude/plans/snuggly-giggling-quill.md`
 
 ---
 

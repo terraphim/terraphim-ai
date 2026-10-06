@@ -52,7 +52,7 @@ The implementation meets the original requirement that local `.terraphim/` confi
 
 ### Environment
 
-- Repository: `/Users/alex/projects/terraphim/terraphim-ai`
+- Repository: `~/projects/terraphim/terraphim-ai`
 - Branch: `task/1862-local-terraphim-config-priority`
 - Commit: `1ae43f1ce`
 - Execution mode: local CLI/library validation

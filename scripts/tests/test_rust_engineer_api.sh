@@ -5,6 +5,8 @@
 
 set -e
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
 echo "🧪 End-to-End Test: Rust Engineer Role and QueryRs Haystack"
 echo "=========================================================="
 
@@ -81,7 +83,7 @@ RUST_ENGINEER_CONFIG='{
       "kg": null,
       "haystacks": [
         {
-          "location": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "location": "'"$REPO_ROOT"'/terraphim_server/fixtures/haystack",
           "service": "Ripgrep",
           "read_only": false,
           "atomic_server_secret": null,

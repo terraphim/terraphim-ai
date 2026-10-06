@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-The desktop frontend at `/Users/alex/projects/terraphim/terraphim-ai/desktop` has approximately 50+ TypeScript errors preventing successful builds. These errors fall into 5 main categories: TiPTap editor type mismatches, missing dependencies, D3 visualization type issues, test configuration problems, and general type safety violations. The frontend builds to `desktop/dist/` and is embedded in the terraphim_server binary, making these errors blocking for deployment.
+The desktop frontend at `~/projects/terraphim/terraphim-ai/desktop` has approximately 50+ TypeScript errors preventing successful builds. These errors fall into 5 main categories: TiPTap editor type mismatches, missing dependencies, D3 visualization type issues, test configuration problems, and general type safety violations. The frontend builds to `desktop/dist/` and is embedded in the terraphim_server binary, making these errors blocking for deployment.
 
 ## Essential Questions Check
 

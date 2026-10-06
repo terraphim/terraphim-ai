@@ -32,7 +32,7 @@ on_fail = "continue"
 [[steps]]
 name = "disciplined-pr-review"
 kind = "action"
-command = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/structured-pr-review.sh ${PR_NUMBER:-3201}"
+command = ".terraphim/bin/structured-pr-review.sh ${PR_NUMBER:-3201}"
 timeout_secs = 600
 on_fail = "continue"
 
@@ -53,6 +53,6 @@ on_fail = "continue"
 [[steps]]
 name = "auto-merge"
 kind = "action"
-command = "/Users/alex/projects/terraphim/terraphim-ai/.terraphim/bin/auto-merge.sh ${PR_NUMBER:-3201}"
+command = ".terraphim/bin/auto-merge.sh ${PR_NUMBER:-3201}"
 timeout_secs = 120
 on_fail = "continue"

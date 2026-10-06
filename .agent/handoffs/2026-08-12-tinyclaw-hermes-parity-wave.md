@@ -73,7 +73,7 @@ cargo fmt -p terraphim_tinyclaw -- --check
 
 ## Notes for the Next Session
 
-- **Gitea token**: `GITEA_TOKEN=$(sed -n 's/export GITEA_TOKEN="\(.*\)"/\1/p' ~/.zshrc | head -1)`; CLI is `/Users/alex/bin/gtr`.
+- **Gitea token**: `GITEA_TOKEN=$(sed -n 's/export GITEA_TOKEN="\(.*\)"/\1/p' ~/.zshrc | head -1)`; CLI is `~/bin/gtr`.
 - **Branch protection (main)**: contexts `adf/build` + `adf/pr-reviewer`, `block_admin_merge_override=false`, push whitelist `["root"]`.
 - **Merge loop** (established, Alex-approved): 5/5 structural review → self-post both statuses → squash merge → close issue with verification comment.
 - **Pre-existing dirty files** in the working tree are NOT mine — do not stage/commit them; commit with `--no-verify` (pre-commit fmt drift in terraphim-private sibling).

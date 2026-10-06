@@ -3353,7 +3353,7 @@ Successfully implemented **full-screen clickable knowledge graph visualization**
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering
 
@@ -3420,7 +3420,7 @@ let log_dir = std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| {
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering
 - **Log Directory:** Automatically uses `/tmp/terraphim-logs` to avoid permission issues
@@ -3787,7 +3787,7 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVe
 **Evidence**: Test logs show only one haystack being searched:
 ```
 Finding documents in haystack: Haystack {
-    location: "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/",
+    location: "terraphim_server/fixtures/haystack/",
     service: Ripgrep,
     read_only: false,
     atomic_server_secret: None,
@@ -4504,7 +4504,7 @@ Successfully implemented **full-screen clickable knowledge graph visualization**
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering
 
@@ -4571,7 +4571,7 @@ let log_dir = std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| {
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering
 - **Log Directory:** Automatically uses `/tmp/terraphim-logs` to avoid permission issues
@@ -4794,7 +4794,7 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVe
 **Evidence**: Test logs show only one haystack being searched:
 ```
 Finding documents in haystack: Haystack {
-    location: "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/",
+    location: "terraphim_server/fixtures/haystack/",
     service: Ripgrep,
     read_only: false,
     atomic_server_secret: None,
@@ -5511,7 +5511,7 @@ Successfully implemented **full-screen clickable knowledge graph visualization**
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering
 
@@ -5578,7 +5578,7 @@ let log_dir = std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| {
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering
 - **Log Directory:** Automatically uses `/tmp/terraphim-logs` to avoid permission issues
@@ -5801,7 +5801,7 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVe
 **Evidence**: Test logs show only one haystack being searched:
 ```
 Finding documents in haystack: Haystack {
-    location: "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/",
+    location: "terraphim_server/fixtures/haystack/",
     service: Ripgrep,
     read_only: false,
     atomic_server_secret: None,
@@ -6518,7 +6518,7 @@ Successfully implemented **full-screen clickable knowledge graph visualization**
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering
 
@@ -6585,7 +6585,7 @@ let log_dir = std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| {
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering
 - **Log Directory:** Automatically uses `/tmp/terraphim-logs` to avoid permission issues
@@ -6808,7 +6808,7 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVe
 **Evidence**: Test logs show only one haystack being searched:
 ```
 Finding documents in haystack: Haystack {
-    location: "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/",
+    location: "terraphim_server/fixtures/haystack/",
     service: Ripgrep,
     read_only: false,
     atomic_server_secret: None,
@@ -7525,7 +7525,7 @@ Successfully implemented **full-screen clickable knowledge graph visualization**
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering
 
@@ -7592,7 +7592,7 @@ let log_dir = std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| {
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering
 - **Log Directory:** Automatically uses `/tmp/terraphim-logs` to avoid permission issues
@@ -7815,7 +7815,7 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVe
 **Evidence**: Test logs show only one haystack being searched:
 ```
 Finding documents in haystack: Haystack {
-    location: "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/",
+    location: "terraphim_server/fixtures/haystack/",
     service: Ripgrep,
     read_only: false,
     atomic_server_secret: None,
@@ -8532,7 +8532,7 @@ Successfully implemented **full-screen clickable knowledge graph visualization**
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering with JSON-RPC communication
 
@@ -8599,7 +8599,7 @@ let log_dir = std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| {
    - Emphasis on using absolute paths
 
 **Correct Configuration:**
-- **Executable:** `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop`
+- **Executable:** `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`
 - **Arguments:** `mcp-server`
 - **Critical:** Always redirect stderr to prevent connection errors from interfering with JSON-RPC communication
 - **Log Directory:** Automatically uses `/tmp/terraphim-logs` to avoid permission issues
@@ -8820,7 +8820,7 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVe
 **Evidence**: Test logs show only one haystack being searched:
 ```
 Finding documents in haystack: Haystack {
-    location: "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/",
+    location: "terraphim_server/fixtures/haystack/",
     service: Ripgrep,
     read_only: false,
     atomic_server_secret: None,

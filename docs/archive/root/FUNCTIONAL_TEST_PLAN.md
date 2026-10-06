@@ -138,7 +138,7 @@ kill $SERVER_PID
 #!/bin/bash
 # test_desktop_app.sh
 
-APP_PATH="/Users/alex/projects/terraphim/terraphim-ai/target/release/bundle/macos/Terraphim Desktop.app"
+APP_PATH="$HOME/projects/terraphim/terraphim-ai/target/release/bundle/macos/Terraphim Desktop.app"
 TEST_LOG="desktop_test_results.log"
 
 # Launch app

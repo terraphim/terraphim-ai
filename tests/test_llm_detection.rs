@@ -10,7 +10,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🔍 Testing LLM provider detection...");
 
     // Load the config
-    let config_path = "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/default/terraphim_engineer_config.json";
+    // Run from the repository root.
+    let config_path = "terraphim_server/default/terraphim_engineer_config.json";
     let config_str = fs::read_to_string(config_path)?;
     let config: Config = serde_json::from_str(&config_str)?;
 

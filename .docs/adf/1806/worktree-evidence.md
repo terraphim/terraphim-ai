@@ -531,7 +531,7 @@ crates/terraphim_orchestrator/src/config.rs:1399:    pub fn working_dir_for_agen
 crates/terraphim_orchestrator/src/config.rs:1404:            .map(|p| p.working_dir.clone())
 crates/terraphim_orchestrator/src/config.rs:1405:            .unwrap_or_else(|| self.working_dir.clone())
 crates/terraphim_orchestrator/src/config.rs:1722:working_dir = "/tmp/terraphim"
-crates/terraphim_orchestrator/src/config.rs:1747:working_dir = "/Users/alex/projects/terraphim/terraphim-ai"
+crates/terraphim_orchestrator/src/config.rs:1747:working_dir = "${HOME}/projects/terraphim/terraphim-ai"
 crates/terraphim_orchestrator/src/config.rs:1822:working_dir = "/tmp"
 crates/terraphim_orchestrator/src/config.rs:1858:working_dir = "/tmp"
 crates/terraphim_orchestrator/src/config.rs:1882:working_dir = "/tmp"

@@ -9,7 +9,7 @@
       "theme": "spacelab",
       "haystacks": [
         {
-          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "path": "terraphim_server/fixtures/haystack",
           "service": "Ripgrep"
         }
       ],
@@ -22,7 +22,7 @@
       "theme": "lumen",
       "haystacks": [
         {
-          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "path": "terraphim_server/fixtures/haystack",
           "service": "Ripgrep"
         }
       ],
@@ -35,7 +35,7 @@
       "theme": "superhero",
       "haystacks": [
         {
-          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "path": "terraphim_server/fixtures/haystack",
           "service": "Ripgrep"
         }
       ],
@@ -48,7 +48,7 @@
       "theme": "flatly",
       "haystacks": [
         {
-          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "path": "terraphim_server/fixtures/haystack",
           "service": "Ripgrep"
         }
       ],
@@ -61,7 +61,7 @@
       "theme": "journal",
       "haystacks": [
         {
-          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "path": "terraphim_server/fixtures/haystack",
           "service": "Ripgrep"
         }
       ],

@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+
+const fixturesHaystack = fileURLToPath(
+	new URL('../../../terraphim_server/fixtures/haystack', import.meta.url)
+);
 
 test.describe('Ripgrep Tag Filtering Configuration', () => {
 	test.beforeEach(async ({ page }) => {
@@ -189,7 +194,7 @@ test.describe('Ripgrep Tag Filtering Configuration', () => {
 		await page.waitForSelector('#haystack-path-0-0', { timeout: 5000 });
 		await page.fill(
 			'#haystack-path-0-0',
-			'/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack'
+			fixturesHaystack
 		);
 		await page.fill('#ripgrep-hashtag-0-0', '#rust');
 

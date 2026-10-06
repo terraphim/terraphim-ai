@@ -903,7 +903,7 @@ If it's not needed, delete it. Never suppress the warning.
 **Lesson**: Example binaries hardcoding absolute paths break on any machine other than the
 author's. Use `CARGO_MANIFEST_DIR` with `concat!` for compile-time relative paths.
 
-**Discovery**: `kg_normalization.rs` hardcoded `/Users/alex/cto-executive-system/knowledge`.
+**Discovery**: `kg_normalization.rs` hardcoded one developer's absolute home path (`$HOME/cto-executive-system/knowledge`).
 The corpus was always available at `docs/src/kg` in this very repo.
 
 **Pattern**:

@@ -53,14 +53,14 @@ Add the role under `roles` in `~/.config/terraphim/embedded_config.json`:
     "automata_path": null,
     "knowledge_graph_local": {
       "input_type": "markdown",
-      "path": "/Users/alex/synced/ObsidianVault"
+      "path": "/absolute/path/to/ObsidianVault"
     },
     "public": false,
     "publish": false
   },
   "haystacks": [
     {
-      "location": "/Users/alex/synced/ObsidianVault",
+      "location": "/absolute/path/to/ObsidianVault",
       "service": "Ripgrep",
       "read_only": true
     },
@@ -109,7 +109,7 @@ cat > ~/bin/terraphim-agent-pa <<'SH'
 #!/usr/bin/env bash
 exec op run --account my.1password.com \
   --env-file=<(echo 'JMAP_ACCESS_TOKEN=op://VAULT/ITEM/credential') \
-  -- /Users/alex/.cargo/bin/terraphim-agent "$@"
+  -- "$HOME/.cargo/bin/terraphim-agent" "$@"
 SH
 chmod +x ~/bin/terraphim-agent-pa
 ```

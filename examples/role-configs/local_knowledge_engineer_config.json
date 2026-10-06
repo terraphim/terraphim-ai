@@ -26,7 +26,7 @@
           "extra_parameters": {}
         },
         {
-          "location": "/Users/alex/synced/expanded_docs",
+          "location": "docs",
           "service": "Ripgrep",
           "read_only": true,
           "atomic_server_secret": null,
@@ -57,7 +57,7 @@
       },
       "haystacks": [
         {
-          "location": "/Users/alex/synced/expanded_docs",
+          "location": "docs",
           "service": "Ripgrep",
           "read_only": true,
           "atomic_server_secret": null,
@@ -129,7 +129,7 @@
       "kg": null,
       "haystacks": [
         {
-          "location": "/Users/alex/synced/expanded_docs",
+          "location": "docs",
           "service": "Ripgrep",
           "read_only": true,
           "atomic_server_secret": null,

@@ -28,7 +28,7 @@
         },
         "knowledge_graph_local": {
           "input_type": "markdown",
-          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/"
+          "path": "terraphim_server/fixtures/haystack/"
         },
         "public": true,
         "publish": true
@@ -53,7 +53,7 @@
         },
         "knowledge_graph_local": {
           "input_type": "markdown",
-          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/"
+          "path": "terraphim_server/fixtures/haystack/"
         },
         "public": true,
         "publish": true

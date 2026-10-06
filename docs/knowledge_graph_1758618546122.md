@@ -2,7 +2,7 @@
 
 **Source:** Terraphim Search
 **Rank:** 5470
-**URL:** /Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/knowledge-graph.md
+**URL:** ~/projects/terraphim/terraphim-ai/docs/src/kg/knowledge-graph.md
 **Tags:** terraphim-graph
 **Downloaded:** 2025-09-23T09:09:06.122Z
 

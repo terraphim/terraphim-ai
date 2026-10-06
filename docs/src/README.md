@@ -18,19 +18,21 @@ Example configuration for this KG:
     },
     "knowledge_graph_local": {
       "input_type": "markdown",
-      "path": "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg",
+      "path": "docs/src/kg",
       "public": true,
       "publish": true
     }
   },
   "haystacks": [
     {
-      "path": "/Users/alex/projects/terraphim/terraphim-ai/docs/src/",
+      "path": "docs/src/",
       "service": "Ripgrep"
     }
   ]
 },
 ```
+
+The relative paths resolve from the working directory, so run the server from the repository root or replace them with absolute paths (`~` and `$HOME` are not expanded in these fields).
 
 - [ ]
 

@@ -582,7 +582,7 @@ From `/home/alex/projects/zestic-ai/portal-framework/.aider.chat.history.md` (tr
 > You can skip this check with --no-gitignore
 > Add .aider* to .gitignore (recommended)? (Y)es/(N)o [Yes]: y
 > Added .aider* to .gitignore
-> /Users/alex/.local/bin/aider --model ollama_chat/qwen3:8b
+> ~/.local/bin/aider --model ollama_chat/qwen3:8b
 > Aider v0.85.2
 > Model: ollama_chat/qwen3:8b with whole edit format
 > Git repo: .git with 0 files

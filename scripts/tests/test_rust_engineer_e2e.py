@@ -11,6 +11,9 @@ import requests
 import time
 import subprocess
 import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def print_success(message):
     print(f"✅ {message}")
@@ -88,7 +91,7 @@ def update_config_with_rust_engineer():
                 "kg": None,
                 "haystacks": [
                     {
-                        "location": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+                        "location": str(REPO_ROOT / "terraphim_server/fixtures/haystack"),
                         "service": "Ripgrep",
                         "read_only": False,
                         "atomic_server_secret": None,

@@ -61,8 +61,8 @@ Business outcomes:
 | Scope/worktree management | `crates/terraphim_orchestrator/src/scope.rs` | Manages file reservations and git worktrees | Git worktrees | Relevant because routing decisions affect where and how expensive work is launched |
 | ADF CLI | `crates/terraphim_orchestrator/src/adf_commands.rs`, `src/bin/adf.rs` | Operational commands and parser surface | Orchestrator internals | Natural place for exposing route explanation later |
 | ADF architecture plans | `.docs/design-dark-factory-orchestration.md`, `.docs/adf-architecture.md` | Original design intent and current operational model | Human governance | Useful to compare expected controller size vs current growth |
-| CTO Executive System plans | `/Users/alex/cto-executive-system/plans/adf-architecture-improvements.md`, `.docs/design-execution-tiers.md`, `.docs/design-unified-routing.md` | Adjacent architectural direction | ADF roadmap issues | Strongly reinforce typed control plane, policy gates, unified routing |
-| Developer flywheel methodology | `/Users/alex/cto-executive-system/knowledge/agent-flywheel-methodology.md` | Coordination methodology for agent swarms | Tracker, reservation patterns, planning discipline | Relevant for visible work claiming and advisory file reservations |
+| CTO Executive System plans | `~/cto-executive-system/plans/adf-architecture-improvements.md`, `.docs/design-execution-tiers.md`, `.docs/design-unified-routing.md` | Adjacent architectural direction | ADF roadmap issues | Strongly reinforce typed control plane, policy gates, unified routing |
+| Developer flywheel methodology | `~/cto-executive-system/knowledge/agent-flywheel-methodology.md` | Coordination methodology for agent swarms | Tracker, reservation patterns, planning discipline | Relevant for visible work claiming and advisory file reservations |
 | Tracker abstraction | `crates/terraphim_tracker/src/lib.rs`, `crates/terraphim_tracker/src/gitea.rs` | Normalised issue model and Gitea tracker client | ADF tracker workflows, pre-check tracker | Relevant because current claim/reservation mechanics are workflow-only, not tracker-native |
 
 Important dependencies across these elements:

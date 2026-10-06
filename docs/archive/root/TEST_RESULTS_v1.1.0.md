@@ -265,7 +265,7 @@ If you want to verify yourself:
 
 ```bash
 # Server
-cd /Users/alex/projects/terraphim/terraphim-ai
+cd ~/projects/terraphim/terraphim-ai
 ./target/release/terraphim_server --version
 tmux new-session -d -s server './target/release/terraphim_server --role Default'
 curl http://localhost:8000/health

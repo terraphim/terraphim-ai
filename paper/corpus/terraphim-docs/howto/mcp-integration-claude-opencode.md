@@ -49,7 +49,7 @@ For the Personal Assistant role (JMAP needs `JMAP_ACCESS_TOKEN` from 1Password),
 #!/usr/bin/env bash
 exec op run --account my.1password.com \
   --env-file=<(echo 'JMAP_ACCESS_TOKEN=op://VAULT/ITEM/credential') \
-  -- /Users/alex/.cargo/bin/terraphim_mcp_server "$@"
+  -- "$HOME/.cargo/bin/terraphim_mcp_server" "$@"
 ```
 
 ### Register in opencode
@@ -57,17 +57,19 @@ exec op run --account my.1password.com \
 Add two entries under `mcp` in `~/.config/opencode/opencode.json`:
 
 ```jsonc
-"terraphim":    { "type": "local", "command": ["/Users/alex/.cargo/bin/terraphim_mcp_server"] },
-"terraphim-pa": { "type": "local", "command": ["/Users/alex/bin/terraphim_mcp_server-pa"] }
+"terraphim":    { "type": "local", "command": ["<HOME>/.cargo/bin/terraphim_mcp_server"] },
+"terraphim-pa": { "type": "local", "command": ["<HOME>/bin/terraphim_mcp_server-pa"] }
 ```
+
+Replace `<HOME>` with the absolute path of your home directory.
 
 Restart opencode. Tools appear as `mcp__terraphim__search`, `mcp__terraphim_pa__search`, etc.
 
 ### Register in Claude Code
 
 ```bash
-claude mcp add terraphim    /Users/alex/.cargo/bin/terraphim_mcp_server
-claude mcp add terraphim-pa /Users/alex/bin/terraphim_mcp_server-pa
+claude mcp add terraphim    "$HOME/.cargo/bin/terraphim_mcp_server"
+claude mcp add terraphim-pa "$HOME/bin/terraphim_mcp_server-pa"
 claude mcp list
 ```
 
@@ -141,7 +143,7 @@ For the search-across-roles flow, CLI is enough. Add MCP when the model needs au
 
 ## Troubleshooting
 
-- **`terraphim-agent: command not found`** in slash command output -- the host is shelling out without your shell environment. Either install via `cargo install terraphim_agent` to a globally-visible path, or absolute-path the binary in the slash command (`/Users/alex/.cargo/bin/terraphim-agent ...`).
+- **`terraphim-agent: command not found`** in slash command output -- the host is shelling out without your shell environment. Either install via `cargo install terraphim_agent` to a globally-visible path, or absolute-path the binary in the slash command (`$HOME/.cargo/bin/terraphim-agent ...`).
 - **`mcp__terraphim_pa__search` returns zero email hits** -- the `op` CLI needs an active session (`op signin`); biometric prompts may not surface from non-interactive MCP health checks. Run `op signin` once per terminal session before launching the host.
 - **No matches from any role** -- run `terraphim-agent config reload` to rebuild the persisted role index from `embedded_config.json`. Most empty-result confusion is a stale persisted snapshot.
 - **Personal Assistant only shows notes, never email** -- you are calling `terraphim-agent` instead of `terraphim-agent-pa`, so `JMAP_ACCESS_TOKEN` is unset. The bare CLI is fine for the other roles.

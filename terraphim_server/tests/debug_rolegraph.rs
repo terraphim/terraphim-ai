@@ -18,8 +18,10 @@ mod tests {
     // Sample config with knowledge graphs for testing visualization
     fn sample_config_with_kg() -> Config {
         // Use absolute path to docs/src/kg
-        let kg_path =
-            std::path::PathBuf::from("/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg");
+        let kg_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("terraphim_server has a parent directory")
+            .join("docs/src/kg");
         let haystack = kg_path.parent().unwrap().to_path_buf();
 
         ConfigBuilder::new()

@@ -12,7 +12,7 @@
 - Discovered that the five apparent Hermes gaps (learning memory, scheduling, subagents, sandboxing, browser automation) already exist in the broader Terraphim stack (`terraphim-agent`, `terraphim_orchestrator`, `terraphim_spawner`, `terraphim_rlm`) — they are not wired into TinyClaw.
 - Created a Gitea initiative and five child issues documenting the integration work.
 - Located the local `adf` binary at `~/.cargo/bin/adf` (v1.20.3).
-- Updated `.terraphim/adf.toml` to use macOS paths (`/Users/alex/...`) so `adf --local` works on this machine.
+- Updated `.terraphim/adf.toml` to use macOS paths (`/Users/<user>/...`) so `adf --local` works on this machine.
 - Ran `adf --local --agent implementation-swarm`; the stub agent picked issue #2655 and posted a progress comment, confirming the agent routing table is functional.
 
 ## Artifact Index

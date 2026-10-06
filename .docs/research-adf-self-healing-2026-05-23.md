@@ -64,7 +64,7 @@ ADF orchestrator on bigbox spawns ~10 agents/hour. In the last 24 h: 13 success,
 | Self-healing plan in #1807 | none merged | The issue is a **report** of problems found, not a design |
 | GPT-5.5 access | Via existing `opencode` CLI as `opencode/gpt-5.5` and `opencode/gpt-5.5-pro` | **Confirmed live on bigbox via `opencode models`** |
 | MiniMax-M2.7-highspeed | Via existing `opencode` CLI as `minimax-coding-plan/MiniMax-M2.7-highspeed` | **Confirmed live on bigbox via `opencode models`**; subscription-backed via `minimax-coding-plan` (same pattern as `kimi-for-coding/k2p6`) |
-| pi-rust (pi_agent_rust) | Binary at `/Users/alex/.local/bin/pi-rust` (Mac); source at `/Users/alex/projects/pi_agent_rust`; **not yet installed on bigbox** | Single-binary, `pi-rust -p PROMPT` non-interactive, `--continue` for session memory, 8 built-in tools + `bash` (can call `gtr` directly) |
+| pi-rust (pi_agent_rust) | Binary at `~/.local/bin/pi-rust` (Mac); source at `~/projects/pi_agent_rust`; **not yet installed on bigbox** | Single-binary, `pi-rust -p PROMPT` non-interactive, `--continue` for session memory, 8 built-in tools + `bash` (can call `gtr` directly) |
 | pi-rust provider parity with opencode | **Confirmed via `pi-rust --list-providers` 2026-05-23**: `zai-coding-plan`, `minimax-coding-plan`, `kimi-for-coding`, `openai-codex` (aliases: `codex`, `chatgpt-codex`), `opencode` aggregator -- all subscription-backed coding plans present | pi-rust can act as a *drop-in alternative spawner* for the same models, useful as a self-healing fallback if opencode binary itself misbehaves |
 | Provider probes | orchestrator-internal | Reports: anthropic FAIL, zai TIMEOUT (**probe issue, not confirmed dead**), openai/kimi/minimax PASS |
 
@@ -150,7 +150,7 @@ cron tick (30 s)
 ### External Dependencies
 | Dependency | Version | Risk | Alternative |
 |---|---|---|---|
-| `pi-rust (pi_agent_rust)` (`pi`) | Cargo workspace at `/Users/alex/projects/pi_agent_rust` | Local-only binary, no network if offline; provider config required | opencode directly |
+| `pi-rust (pi_agent_rust)` (`pi`) | Cargo workspace at `~/projects/pi_agent_rust` | Local-only binary, no network if offline; provider config required | opencode directly |
 | `opencode` | Bun install on bigbox + Mac | Quarterly model ID drift across all models including gpt-5.5 | None; primary aggregator |
 | `opencode/gpt-5.5` model | **Confirmed live via `opencode models`** on bigbox 2026-05-23 | Subscription quota exhaustion under fleet-wide planning load | Auto-fallback to `opencode/gpt-5.4` via KG router |
 
@@ -269,11 +269,11 @@ If approved:
 ## Appendix
 
 ### Reference Materials
-- North Star `/Users/alex/cto-executive-system/north-star.md`
-- Handover `/Users/alex/projects/terraphim/terraphim-ai/.docs/handover-2026-05-22-kg-router-fix.md`
+- North Star `~/cto-executive-system/north-star.md`
+- Handover `~/projects/terraphim/terraphim-ai/.docs/handover-2026-05-22-kg-router-fix.md`
 - Stability roadmap `.docs/design-adf-stability-roadmap-2026-05-01.md`
-- pi-rust (pi_agent_rust) skill `/Users/alex/.claude/skills/pi-agent-rust/SKILL.md`
-- Codex CLI: `/Users/alex/.bun/bin/codex --help`
+- pi-rust (pi_agent_rust) skill `~/.claude/skills/pi-agent-rust/SKILL.md`
+- Codex CLI: `~/.bun/bin/codex --help`
 - Spec `.docs/spec-merge-coordinator.md` (referenced in #1805)
 - Bigbox config `/opt/ai-dark-factory/orchestrator.toml`, `conf.d/terraphim.toml`
 - Existing fix PR #1794 (validated KG-router fallback pattern)

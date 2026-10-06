@@ -111,7 +111,7 @@ async fn retry_fires_after_backoff() {
 
 ## Related Context
 
-- **TLA+ specs**: `/Users/alex/projects/terraphim/tlaplus-ts/` -- 3 modules, 8 checks, all passing
-- **Traceability report**: `/Users/alex/projects/terraphim/tlaplus-ts/.docs/tla-traceability-report.md`
-- **Plan file**: `/Users/alex/.claude/plans/jaunty-bouncing-parrot.md`
+- **TLA+ specs**: `~/projects/terraphim/tlaplus-ts/` -- 3 modules, 8 checks, all passing
+- **Traceability report**: `~/projects/terraphim/tlaplus-ts/.docs/tla-traceability-report.md`
+- **Plan file**: `~/.claude/plans/jaunty-bouncing-parrot.md`
 - **Gitea issues**: #251-#261 (8 bugs, 2 enhancements, 1 epic) filed from TLA+ verification
