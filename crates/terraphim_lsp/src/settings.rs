@@ -17,7 +17,7 @@
 //!
 //! | Setting | Default | Effect |
 //! |---|---|---|
-//! | `thesaurus` | none | path of a thesaurus JSON file; overrides `--thesaurus` and `TERRAPHIM_THESAURUS` (see [`crate::thesaurus`]); reloaded when it changes |
+//! | `thesaurus` | none | path of a thesaurus JSON file; overrides `--thesaurus` and `TERRAPHIM_THESAURUS`; an `initializationOptions` value survives later settings without one (see [`crate::thesaurus`]); reloaded when it changes |
 //! | `inlayHints` | `false` | `[i/n]` after each KG term with alternatives |
 //! | `ghostDiagnostics` | `true` | ghosted text published as faded (`Unnecessary`) hints |
 //! | `unknownTerms` | `false` | a Warning on every occurrence of a word that matches no thesaurus term |

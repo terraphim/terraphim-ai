@@ -4,10 +4,13 @@
 //! write (`{"name": ..., "data": {"term": {"id": 1, "nterm": ...}}}`). Its
 //! path is resolved in this order, the first one set winning:
 //!
-//! 1. the `thesaurus` setting (`initializationOptions` or
-//!    `workspace/didChangeConfiguration`, bare or under `terraphim`);
-//! 2. the `--thesaurus <path>` command-line flag;
-//! 3. the `TERRAPHIM_THESAURUS` environment variable.
+//! 1. the `thesaurus` setting of the latest
+//!    `workspace/didChangeConfiguration` (bare or under `terraphim`);
+//! 2. the `thesaurus` member of `initializationOptions` (bare or under
+//!    `terraphim`), so clients that send other settings through
+//!    `didChangeConfiguration` (as Zed's `settings` does) keep it;
+//! 3. the `--thesaurus <path>` command-line flag;
+//! 4. the `TERRAPHIM_THESAURUS` environment variable.
 //!
 //! Empty values are ignored. A leading `~/` expands to the home directory;
 //! other relative paths are relative to the server's working directory
@@ -47,6 +50,18 @@ pub fn launch_thesaurus_path(
         .flatten()
         .find(|value| !value.is_empty())
         .map(|value| expand_home(Path::new(value), home))
+}
+
+/// The `thesaurus` setting in effect: the latest configured value if set
+/// (and not blank), else the one from `initializationOptions`.
+pub fn thesaurus_setting<'a>(
+    configured: Option<&'a str>,
+    initial: Option<&'a str>,
+) -> Option<&'a str> {
+    [configured, initial]
+        .into_iter()
+        .flatten()
+        .find(|value| !value.trim().is_empty())
 }
 
 /// The thesaurus path in effect: the `thesaurus` setting if set (and not
@@ -260,6 +275,21 @@ mod tests {
             Some(PathBuf::from("/launch.json"))
         );
         assert_eq!(effective_thesaurus_path(None, None, None), None);
+    }
+
+    #[test]
+    fn configured_setting_wins_over_initialization_options() {
+        assert_eq!(
+            thesaurus_setting(Some("/c.json"), Some("/i.json")),
+            Some("/c.json")
+        );
+        assert_eq!(thesaurus_setting(None, Some("/i.json")), Some("/i.json"));
+        assert_eq!(
+            thesaurus_setting(Some(" "), Some("/i.json")),
+            Some("/i.json")
+        );
+        assert_eq!(thesaurus_setting(Some(""), None), None);
+        assert_eq!(thesaurus_setting(None, None), None);
     }
 
     #[test]

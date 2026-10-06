@@ -28,7 +28,9 @@ use crate::convert;
 use crate::diagnostics::{core_diagnostics, ghost_diagnostics, unknown_term_diagnostics};
 use crate::kg_analysis::analyse_kg_document;
 use crate::settings::{LabSettings, LabTrigger, ServerSettings};
-use crate::thesaurus::{LaunchOptions, effective_thesaurus_path, load_thesaurus};
+use crate::thesaurus::{
+    LaunchOptions, effective_thesaurus_path, load_thesaurus, thesaurus_setting,
+};
 
 /// Terraphim LSP server backed by a knowledge-graph thesaurus.
 ///
@@ -66,6 +68,9 @@ pub struct TerraphimLspServer {
     base_kg: Arc<Kg>,
     /// Launch-time thesaurus path and home directory.
     launch: LaunchOptions,
+    /// The `thesaurus` member of `initializationOptions`, kept under later
+    /// `didChangeConfiguration` settings that do not name one.
+    initial_thesaurus: std::sync::RwLock<Option<String>>,
     /// Bumped by every thesaurus load; a load installs its result only if
     /// no newer load started meanwhile.
     kg_loads: AtomicU64,
@@ -224,6 +229,7 @@ impl TerraphimLspServer {
             kg: std::sync::RwLock::new(Arc::clone(&base_kg)),
             base_kg,
             launch,
+            initial_thesaurus: std::sync::RwLock::new(None),
             kg_loads: AtomicU64::new(0),
             documents: Arc::new(RwLock::new(HashMap::new())),
             versioned_edits: AtomicBool::new(false),
@@ -289,7 +295,8 @@ impl TerraphimLspServer {
     }
 
     /// Make the thesaurus match `settings`: load the effective path
-    /// ([`effective_thesaurus_path`]) if it differs from the one in use, or
+    /// ([`thesaurus_setting`] over the `initializationOptions` value, then
+    /// [`effective_thesaurus_path`]) if it differs from the one in use, or
     /// return to the constructor's thesaurus when no path is configured.
     /// Returns whether the thesaurus was replaced.
     ///
@@ -298,8 +305,13 @@ impl TerraphimLspServer {
     /// empty engine for that path. The same path is not retried until it
     /// changes.
     async fn apply_thesaurus_setting(&self, settings: &ServerSettings) -> bool {
+        let initial = self
+            .initial_thesaurus
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
         let wanted = effective_thesaurus_path(
-            settings.thesaurus.as_deref(),
+            thesaurus_setting(settings.thesaurus.as_deref(), initial.as_deref()),
             self.launch.thesaurus.as_deref(),
             self.launch.home.as_deref(),
         );
@@ -849,6 +861,12 @@ impl LanguageServer for TerraphimLspServer {
             .store(inlay_hint_refresh, Ordering::Relaxed);
         let settings = ServerSettings::from_value(params.initialization_options.as_ref());
         self.set_settings(settings.clone());
+        settings.thesaurus.clone_into(
+            &mut self
+                .initial_thesaurus
+                .write()
+                .unwrap_or_else(PoisonError::into_inner),
+        );
         self.apply_thesaurus_setting(&settings).await;
         if self.kg().thesaurus.is_empty() && self.kg().path.is_none() {
             let message = "terraphim-lsp: no thesaurus configured; set the `thesaurus` \
@@ -924,8 +942,8 @@ impl LanguageServer for TerraphimLspServer {
     ///   they wait for the next Lab command. Switching `save` to `command`
     ///   keeps the installed marks: they are still valid for the current
     ///   text, and the next edit drops them as usual.
-    /// - A changed `thesaurus` path is loaded first (see
-    ///   [`Self::apply_thesaurus_setting`]).
+    /// - A changed `thesaurus` path is loaded first, on the blocking pool;
+    ///   a missing or invalid file is reported once.
     /// - Every document is republished, so ghost hints and unknown-term
     ///   warnings follow their settings and diagnostics follow the
     ///   thesaurus, and inlay hints are refreshed.

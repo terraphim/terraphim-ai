@@ -45,10 +45,14 @@ thesaurus: a JSON file in the format terraphim's thesaurus builders write
 path is taken from the first of these that is set (empty values are
 ignored):
 
-1. the `thesaurus` setting (`initializationOptions` or
-   `workspace/didChangeConfiguration`, bare or under `terraphim`);
-2. the `--thesaurus <path>` (or `--thesaurus=<path>`) command-line flag;
-3. the `TERRAPHIM_THESAURUS` environment variable.
+1. the `thesaurus` setting of the latest `workspace/didChangeConfiguration`
+   (bare or under `terraphim`);
+2. the `thesaurus` member of `initializationOptions` (bare or under
+   `terraphim`); it is kept when a later `didChangeConfiguration` does not
+   name a thesaurus, so Zed's `initialization_options` and `settings` can be
+   combined;
+3. the `--thesaurus <path>` (or `--thesaurus=<path>`) command-line flag;
+4. the `TERRAPHIM_THESAURUS` environment variable.
 
 A leading `~/` expands to the home directory; other relative paths are
 relative to the server's working directory (editors usually start it at the
@@ -58,8 +62,8 @@ and logs a `window/logMessage` warning saying how to configure one.
 The file is read and compiled on the blocking thread pool at `initialize`,
 and again whenever `didChangeConfiguration` changes the path; every open
 document is then republished and inlay hints are refreshed. Removing the
-setting returns to the launch path (or the constructor's thesaurus for
-programmatic use). A missing or invalid file is logged and shown once as a
+configured setting returns to the `initializationOptions` path, then the
+launch path, then the constructor's thesaurus (for programmatic use). A missing or invalid file is logged and shown once as a
 `window/showMessage` Warning; the server keeps running with an empty
 thesaurus for that path and does not retry it until the path changes (or
 the server restarts).
@@ -87,7 +91,7 @@ Passed as `initializationOptions` or through
 
 | Setting | Default | Effect |
 |---|---|---|
-| `thesaurus` | none | path of the thesaurus JSON file; overrides `--thesaurus` and `TERRAPHIM_THESAURUS`; reloaded when it changes (see [Thesaurus](#thesaurus)) |
+| `thesaurus` | none | path of the thesaurus JSON file; overrides `--thesaurus` and `TERRAPHIM_THESAURUS`; a value from `initializationOptions` survives later settings without one; reloaded when it changes (see [Thesaurus](#thesaurus)) |
 | `inlayHints` | `false` | `[i/n]` inlay hints (the capability is always advertised) |
 | `ghostDiagnostics` | `true` | faded hints over ghosted text |
 | `unknownTerms` | `false` | a Warning (`Unknown term: X`) on every occurrence of a word that is not part of any thesaurus match; off by default because against a real thesaurus nearly every ordinary word is unknown |

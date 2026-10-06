@@ -313,6 +313,36 @@ async fn missing_thesaurus_is_logged_not_shown() {
     );
 }
 
+/// Zed sends `initialization_options` at `initialize` and its `settings`
+/// through `didChangeConfiguration`: a thesaurus given only in the former
+/// survives the latter, which a configured `thesaurus` still overrides.
+#[tokio::test]
+async fn initialization_thesaurus_survives_settings_without_one() {
+    let (service, socket) = launch_service(None);
+    let mut messages = inbox(socket);
+    let server = service.inner();
+    server
+        .initialize(init(Some(json!({"thesaurus": FIXTURE}))))
+        .await
+        .unwrap();
+    open(server).await;
+    configure(
+        server,
+        json!({"inlayHints": true, "ghostDiagnostics": true}),
+    )
+    .await;
+    assert_eq!(server.thesaurus_path(), Some(PathBuf::from(FIXTURE)));
+    assert_kg_features_work(server).await;
+
+    configure(server, json!({"thesaurus": MISSING, "inlayHints": true})).await;
+    assert_kg_features_off(server).await;
+    assert_eq!(warnings(&drain(&mut messages).await).len(), 1);
+
+    // Dropping the configured path returns to the initialisation one.
+    configure(server, json!({"inlayHints": true})).await;
+    assert_kg_features_work(server).await;
+}
+
 #[tokio::test]
 async fn did_change_configuration_reloads_the_thesaurus() {
     let (service, socket) = launch_service(None);
