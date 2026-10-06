@@ -37,6 +37,39 @@ offers:
 Edits are versioned (`documentChanges` with the document version) for
 clients that accept them, so a stale edit is rejected rather than applied.
 
+## Thesaurus
+
+Hover, "Replace with X" actions, `[i/n]` inlay hints and completion need a
+thesaurus: a JSON file in the format terraphim's thesaurus builders write
+(`{"name": "...", "data": {"term": {"id": 1, "nterm": "concept"}}}`). The
+path is taken from the first of these that is set (empty values are
+ignored):
+
+1. the `thesaurus` setting (`initializationOptions` or
+   `workspace/didChangeConfiguration`, bare or under `terraphim`);
+2. the `--thesaurus <path>` (or `--thesaurus=<path>`) command-line flag;
+3. the `TERRAPHIM_THESAURUS` environment variable.
+
+A leading `~/` expands to the home directory; other relative paths are
+relative to the server's working directory (editors usually start it at the
+workspace root). With none set, the binary starts with an empty thesaurus
+and logs a `window/logMessage` warning saying how to configure one.
+
+The file is read and compiled on the blocking thread pool at `initialize`,
+and again whenever `didChangeConfiguration` changes the path; every open
+document is then republished and inlay hints are refreshed. Removing the
+setting returns to the launch path (or the constructor's thesaurus for
+programmatic use). A missing or invalid file is logged and shown once as a
+`window/showMessage` Warning; the server keeps running with an empty
+thesaurus for that path and does not retry it until the path changes (or
+the server restarts).
+
+Selecting a thesaurus by Terraphim **role** is not supported yet: resolving
+a role needs `terraphim_config` and its persistence stack (device settings,
+remote or markdown knowledge graphs, async builders), which this server
+does not depend on. Build the role's thesaurus with the Terraphim tools and
+point `thesaurus` at the JSON file.
+
 ## Settings
 
 Passed as `initializationOptions` or through
@@ -44,6 +77,7 @@ Passed as `initializationOptions` or through
 
 ```json
 {
+  "thesaurus": "/path/to/thesaurus.json",
   "inlayHints": false,
   "ghostDiagnostics": true,
   "unknownTerms": false,
@@ -53,6 +87,7 @@ Passed as `initializationOptions` or through
 
 | Setting | Default | Effect |
 |---|---|---|
+| `thesaurus` | none | path of the thesaurus JSON file; overrides `--thesaurus` and `TERRAPHIM_THESAURUS`; reloaded when it changes (see [Thesaurus](#thesaurus)) |
 | `inlayHints` | `false` | `[i/n]` inlay hints (the capability is always advertised) |
 | `ghostDiagnostics` | `true` | faded hints over ghosted text |
 | `unknownTerms` | `false` | a Warning (`Unknown term: X`) on every occurrence of a word that is not part of any thesaurus match; off by default because against a real thesaurus nearly every ordinary word is unknown |
@@ -127,7 +162,25 @@ The `terraphim-lsp` binary speaks LSP over standard input/output and can be
 configured in any LSP-compatible editor:
 
 ```bash
-terraphim-lsp
+terraphim-lsp --thesaurus ~/kg/thesaurus.json
+# or
+TERRAPHIM_THESAURUS=~/kg/thesaurus.json terraphim-lsp
+```
+
+`terraphim-lsp --help` lists the flags. Unrecognised arguments (such as
+`--stdio`) are ignored. In Zed, for example:
+
+```json
+{
+  "lsp": {
+    "terraphim-lsp": {
+      "initialization_options": {
+        "thesaurus": "/absolute/path/to/thesaurus.json",
+        "inlayHints": true
+      }
+    }
+  }
+}
 ```
 
 ### Programmatic use
@@ -152,6 +205,12 @@ async fn main() {
     // a test harness.
 }
 ```
+
+To load the thesaurus from a file the way the binary does, use
+`TerraphimLspServer::with_launch_options` (or
+`run_stdio_with_launch_options`) with a
+`terraphim_lsp::thesaurus::LaunchOptions`; a client `thesaurus` setting
+replaces a programmatic thesaurus in either case.
 
 ## Architecture
 

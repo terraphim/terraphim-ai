@@ -7,6 +7,7 @@
 //!
 //! ```json
 //! {
+//!   "thesaurus": "/path/to/thesaurus.json",
 //!   "inlayHints": false,
 //!   "ghostDiagnostics": true,
 //!   "unknownTerms": false,
@@ -16,6 +17,7 @@
 //!
 //! | Setting | Default | Effect |
 //! |---|---|---|
+//! | `thesaurus` | none | path of a thesaurus JSON file; overrides `--thesaurus` and `TERRAPHIM_THESAURUS` (see [`crate::thesaurus`]); reloaded when it changes |
 //! | `inlayHints` | `false` | `[i/n]` after each KG term with alternatives |
 //! | `ghostDiagnostics` | `true` | ghosted text published as faded (`Unnecessary`) hints |
 //! | `unknownTerms` | `false` | a Warning on every occurrence of a word that matches no thesaurus term |
@@ -35,6 +37,9 @@ use terraphim_lsp_core::LabAction;
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ServerSettings {
+    /// Path of the thesaurus JSON file. `None` (or blank) falls back to the
+    /// launch path; see [`crate::thesaurus`].
+    pub thesaurus: Option<String>,
     /// Return `[i/n]` inlay hints (position of the current form among its
     /// concept's terms). Off by default: hints change line layout, and Zed
     /// keeps inlay hints off by default too.
@@ -54,6 +59,7 @@ pub struct ServerSettings {
 impl Default for ServerSettings {
     fn default() -> Self {
         Self {
+            thesaurus: None,
             inlay_hints: false,
             ghost_diagnostics: true,
             unknown_terms: false,
@@ -117,6 +123,23 @@ mod tests {
         assert!(!defaults.inlay_hints);
         assert!(defaults.ghost_diagnostics);
         assert!(!defaults.unknown_terms);
+    }
+
+    #[test]
+    fn thesaurus_path_bare_or_nested() {
+        let bare = json!({"thesaurus": "/kg/t.json"});
+        assert_eq!(
+            ServerSettings::from_value(Some(&bare)).thesaurus.as_deref(),
+            Some("/kg/t.json")
+        );
+        let nested = json!({"terraphim": {"thesaurus": "~/t.json"}});
+        assert_eq!(
+            ServerSettings::from_value(Some(&nested))
+                .thesaurus
+                .as_deref(),
+            Some("~/t.json")
+        );
+        assert_eq!(ServerSettings::default().thesaurus, None);
     }
 
     #[test]

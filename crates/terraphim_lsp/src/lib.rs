@@ -13,6 +13,7 @@ pub mod diagnostics;
 pub mod kg_analysis;
 pub mod server;
 pub mod settings;
+pub mod thesaurus;
 
 pub use server::TerraphimLspServer;
 pub use terraphim_lsp_core as core;
