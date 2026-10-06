@@ -244,9 +244,16 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
                 "publish-tauri.yml",
                 "release-comprehensive.yml",
                 "release-coordinator.yml",
+                "release-lsp.yml",
             },
             "every workflow that writes GitHub releases must be classified",
         )
+
+        # The narrow LSP workflow publishes only terraphim_lsp-v* pre-releases.
+        lsp_text = (WORKFLOW_DIR / "release-lsp.yml").read_text(encoding="utf-8")
+        self.assertIn("      - 'terraphim_lsp-v*'", lsp_text)
+        self.assertIn("^terraphim_lsp-v[0-9]+", lsp_text)
+        self.assertIn("--prerelease", lsp_text)
 
         # Standard releases in the comprehensive producer/recovery workflow
         # are explicitly barred; component releases remain available.

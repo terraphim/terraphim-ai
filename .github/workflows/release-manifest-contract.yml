@@ -12,6 +12,8 @@ on:
       - ".github/workflows/publish-bun.yml"
       - ".github/workflows/publish-tauri.yml"
       - ".github/workflows/release-sign.yml"
+      - ".github/workflows/release-lsp.yml"
+      - "rust-toolchain.toml"
       - ".github/scripts/release/**"
       - ".release/release-manifest.schema.json"
       - "scripts/requirements-release-manifest.in"
@@ -28,6 +30,7 @@ on:
       - "tests/workflow_release_coordinator_sequence_test.py"
       - "tests/workflow_release_recovery_contract_test.py"
       - "tests/workflow_release_sign_test.py"
+      - "tests/workflow_release_lsp_contract_test.py"
       - "config/homebrew/**"
       - "scripts/generate-homebrew-formulas.py"
       - "scripts/homebrew-outbox.sh"
@@ -44,6 +47,8 @@ on:
       - ".github/workflows/publish-bun.yml"
       - ".github/workflows/publish-tauri.yml"
       - ".github/workflows/release-sign.yml"
+      - ".github/workflows/release-lsp.yml"
+      - "rust-toolchain.toml"
       - ".github/scripts/release/**"
       - ".release/release-manifest.schema.json"
       - "scripts/requirements-release-manifest.in"
@@ -60,6 +65,7 @@ on:
       - "tests/workflow_release_coordinator_sequence_test.py"
       - "tests/workflow_release_recovery_contract_test.py"
       - "tests/workflow_release_sign_test.py"
+      - "tests/workflow_release_lsp_contract_test.py"
       - "config/homebrew/**"
       - "scripts/generate-homebrew-formulas.py"
       - "scripts/homebrew-outbox.sh"
@@ -170,13 +176,13 @@ jobs:
       - name: actionlint (static workflow analysis)
         run: |
           set -euo pipefail
-          actionlint .github/workflows/release-coordinator.yml .github/workflows/release-sign.yml .github/workflows/release-comprehensive.yml .github/workflows/publish-npm.yml .github/workflows/publish-pypi.yml .github/workflows/publish-bun.yml .github/workflows/publish-tauri.yml .github/workflows/release-manifest-contract.yml
+          actionlint .github/workflows/release-coordinator.yml .github/workflows/release-sign.yml .github/workflows/release-comprehensive.yml .github/workflows/publish-npm.yml .github/workflows/publish-pypi.yml .github/workflows/publish-bun.yml .github/workflows/publish-tauri.yml .github/workflows/release-manifest-contract.yml .github/workflows/release-lsp.yml
 
       - name: Parse workflow YAML
         run: |
           python3 -c "
           import yaml
-          for f in ['.github/workflows/release-coordinator.yml', '.github/workflows/release-sign.yml', '.github/workflows/release-comprehensive.yml', '.github/workflows/publish-npm.yml', '.github/workflows/publish-pypi.yml', '.github/workflows/publish-bun.yml', '.github/workflows/publish-tauri.yml']:
+          for f in ['.github/workflows/release-coordinator.yml', '.github/workflows/release-sign.yml', '.github/workflows/release-comprehensive.yml', '.github/workflows/publish-npm.yml', '.github/workflows/publish-pypi.yml', '.github/workflows/publish-bun.yml', '.github/workflows/publish-tauri.yml', '.github/workflows/release-lsp.yml']:
               with open(f) as fh:
                   yaml.safe_load(fh)
               print(f, 'parsed OK')
@@ -199,6 +205,9 @@ jobs:
 
       - name: Run release-sign already-signed contract tests
         run: python -m unittest -v tests.workflow_release_sign_test
+
+      - name: Run terraphim-lsp pre-release workflow contract tests
+        run: python -m unittest -v tests.workflow_release_lsp_contract_test
 
       - name: Run R2 publish-manifest shell contract tests
         run: bash .github/scripts/release/tests/test_r2_publish_manifest.sh

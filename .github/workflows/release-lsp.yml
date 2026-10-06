@@ -1,0 +1,521 @@
+# Narrow terraphim-lsp pre-release.
+#
+# Builds only the terraphim-lsp binary for the targets the Zed extension
+# provisions, publishes the raw binaries plus checksums.txt as a GitHub
+# pre-release, and leaves release-comprehensive.yml untouched (its `v*` and
+# component tag patterns do not match `terraphim_lsp-v*`).
+#
+# Asset names are a contract with zed-terraphim provisioning
+# (zed-terraphim docs/design/z2-z4-remaining-design.md, step 6 and AC11):
+#   terraphim-lsp-<target>, terraphim-lsp-universal-apple-darwin, checksums.txt
+#
+# Every job that runs cargo uses a self-hosted runner: the private Cargo
+# registry on git.terraphim.cloud is reachable only from the tailnet, so
+# GitHub-hosted runners get 403 on crate downloads (design section 9).
+# Windows is not built (no self-hosted Windows runner; zed-terraphim#16).
+#
+# The release is created with the workflow's GITHUB_TOKEN. Events raised by
+# GITHUB_TOKEN do not start other workflow runs, so publishing this
+# pre-release does not trigger the `release: published` workflows
+# (release-sign.yml, publish-bun.yml, python-bindings.yml).
+
+name: Release terraphim-lsp
+
+on:
+  push:
+    tags:
+      - 'terraphim_lsp-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, for example terraphim_lsp-v1.22.0-rc.1'
+        required: true
+        type: string
+      dry_run:
+        description: 'Build and upload workflow artifacts only; create no release'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-lsp-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  # Must match rust-toolchain.toml; installed alongside, never as the default.
+  RUST_TOOLCHAIN: '1.96'
+
+jobs:
+  resolve:
+    name: Resolve tag, source and version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.source.outputs.tag }}
+      source_sha: ${{ steps.source.outputs.source_sha }}
+      publish: ${{ steps.source.outputs.publish }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Resolve tag and source commit
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          WORKFLOW_SHA: ${{ github.sha }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            TAG="$INPUT_TAG"
+            if [[ "$INPUT_DRY_RUN" == "true" ]]; then PUBLISH=false; else PUBLISH=true; fi
+          else
+            TAG="$REF_NAME"
+            PUBLISH=true
+          fi
+
+          if [[ ! "$TAG" =~ ^terraphim_lsp-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid tag '$TAG' (expected terraphim_lsp-vX.Y.Z or terraphim_lsp-vX.Y.Z-<pre>)"
+            exit 1
+          fi
+
+          if OBJECT_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" 2>/dev/null)"; then
+            OBJECT_SHA="$(jq -r '.object.sha' <<<"$OBJECT_JSON")"
+            OBJECT_TYPE="$(jq -r '.object.type' <<<"$OBJECT_JSON")"
+            while [[ "$OBJECT_TYPE" == "tag" ]]; do
+              TAG_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${OBJECT_SHA}")"
+              OBJECT_SHA="$(jq -r '.object.sha' <<<"$TAG_JSON")"
+              OBJECT_TYPE="$(jq -r '.object.type' <<<"$TAG_JSON")"
+            done
+            if [[ "$OBJECT_TYPE" != "commit" ]]; then
+              echo "::error::Tag '$TAG' peeled to unsupported object type '$OBJECT_TYPE'"
+              exit 1
+            fi
+            SOURCE_SHA="$OBJECT_SHA"
+          elif [[ "$PUBLISH" == "false" ]]; then
+            echo "::notice::Tag '$TAG' does not exist; dry run builds the dispatched commit $WORKFLOW_SHA"
+            SOURCE_SHA="$WORKFLOW_SHA"
+          else
+            echo "::error::Tag '$TAG' does not exist; push it first or dispatch with dry_run=true"
+            exit 1
+          fi
+
+          {
+            echo "tag=$TAG"
+            echo "source_sha=$SOURCE_SHA"
+            echo "publish=$PUBLISH"
+          } >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG source_sha=$SOURCE_SHA publish=$PUBLISH"
+
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.source.outputs.source_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check tag version against the crate version
+        id: version
+        env:
+          TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # The tag may carry a pre-release suffix (terraphim_lsp-v1.22.0-rc.1)
+          # over a crate version without one (1.22.0); the base must match.
+          python3 - <<'PY'
+          import os, re, tomllib
+
+          with open("Cargo.toml", "rb") as fh:
+              workspace = tomllib.load(fh)
+          with open("crates/terraphim_lsp/Cargo.toml", "rb") as fh:
+              crate = tomllib.load(fh)
+          version = crate["package"]["version"]
+          if isinstance(version, dict) and version.get("workspace"):
+              version = workspace["workspace"]["package"]["version"]
+
+          tag_version = os.environ["TAG"].removeprefix("terraphim_lsp-v")
+          base = re.sub(r"-.*$", "", tag_version)
+          if tag_version != version and not ("-" not in version and base == version):
+              raise SystemExit(
+                  f"::error::Tag version {tag_version} does not match "
+                  f"crates/terraphim_lsp version {version}"
+              )
+          print(f"crate version {version}, tag version {tag_version}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"version={version}\n")
+          PY
+
+  build-linux:
+    name: Build ${{ matrix.target }}
+    needs: resolve
+    runs-on: [self-hosted, Linux, X64, bigbox]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            use_cross: false
+            runnable: true
+            arch: x86-64
+          - target: x86_64-unknown-linux-musl
+            use_cross: true
+            runnable: true
+            arch: x86-64
+          - target: aarch64-unknown-linux-musl
+            use_cross: true
+            runnable: false
+            arch: aarch64
+    env:
+      CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
+      TARGET: ${{ matrix.target }}
+    steps:
+      - name: Repair rustup toolchain permissions (self-hosted)
+        run: |
+          FIX="${HOME}/.local/bin/fix-rust-toolchain-perms.sh"
+          if [[ -x "$FIX" ]]; then
+            "$FIX" || true
+          fi
+
+      - name: Disable Rust wrappers for self-hosted release builds
+        run: |
+          {
+            echo "RUSTC_WRAPPER="
+            echo "RUSTC_WORKSPACE_WRAPPER="
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --target "$TARGET"
+
+      - name: Install cross
+        if: matrix.use_cross
+        run: |
+          if command -v cross &>/dev/null; then
+            cross --version || true
+            exit 0
+          fi
+          rustup run "$RUST_TOOLCHAIN" cargo install cross --locked \
+            --git https://github.com/cross-rs/cross \
+            --rev 29d00c7803f221f1b3f35e561b03792368fb8339
+
+      - name: Fetch dependencies on the host
+        # The registry is reachable from the runner host; cross containers then
+        # build offline from the mounted CARGO_HOME without needing the token.
+        run: rustup run "$RUST_TOOLCHAIN" cargo fetch --locked
+
+      - name: Build terraphim-lsp
+        if: "!matrix.use_cross"
+        run: |
+          rustup run "$RUST_TOOLCHAIN" cargo build --release --locked \
+            --target "$TARGET" -p terraphim_lsp --bin terraphim-lsp
+
+      - name: Build terraphim-lsp (cross)
+        if: matrix.use_cross
+        run: |
+          rustup run "$RUST_TOOLCHAIN" cross build --release --locked --offline \
+            --target "$TARGET" -p terraphim_lsp --bin terraphim-lsp
+
+      - name: Verify binary
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+          RUNNABLE: ${{ matrix.runnable }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          BIN="target/$TARGET/release/terraphim-lsp"
+          file "$BIN"
+          if ! file "$BIN" | grep -q "$ARCH"; then
+            echo "::error::$BIN is not a $ARCH binary"
+            exit 1
+          fi
+          if [[ "$RUNNABLE" == "true" ]]; then
+            ACTUAL="$("$BIN" --version)"
+            if [[ "$ACTUAL" != "terraphim-lsp $VERSION" ]]; then
+              echo "::error::Expected 'terraphim-lsp $VERSION', got '$ACTUAL'"
+              exit 1
+            fi
+            echo "$ACTUAL"
+          fi
+
+      - name: Stage raw binary
+        run: |
+          mkdir -p dist
+          cp "target/$TARGET/release/terraphim-lsp" "dist/terraphim-lsp-$TARGET"
+
+      - name: Upload raw binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraphim-lsp-${{ matrix.target }}
+          path: dist/terraphim-lsp-${{ matrix.target }}
+          if-no-files-found: error
+
+  build-macos:
+    name: Build macOS (aarch64, x86_64, universal)
+    needs: resolve
+    # Apple Silicon runner (Klarian-147); x86_64-apple-darwin cross-compiles.
+    runs-on: [self-hosted, macOS]
+    outputs:
+      signing: ${{ steps.sign.outputs.signing }}
+    env:
+      CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
+    steps:
+      - name: Repair rustup toolchain permissions (self-hosted)
+        run: |
+          FIX="${HOME}/.local/bin/fix-rust-toolchain-perms.sh"
+          if [[ -x "$FIX" ]]; then
+            "$FIX" || true
+          fi
+
+      - name: Disable Rust wrappers for self-hosted release builds
+        run: |
+          {
+            echo "RUSTC_WRAPPER="
+            echo "RUSTC_WORKSPACE_WRAPPER="
+          } >> "$GITHUB_ENV"
+
+      - name: Cleanup self-hosted runner
+        run: |
+          find /tmp -name "*.keychain-db" -mmin +60 -delete 2>/dev/null || true
+          find /tmp -name "signing.keychain*" -delete 2>/dev/null || true
+          find /tmp -name "certificate.p12" -delete 2>/dev/null || true
+
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal \
+            --target aarch64-apple-darwin --target x86_64-apple-darwin
+
+      - name: Build terraphim-lsp for both architectures
+        run: |
+          set -euo pipefail
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            rustup run "$RUST_TOOLCHAIN" cargo build --release --locked \
+              --target "$target" -p terraphim_lsp --bin terraphim-lsp
+          done
+
+      - name: Stage raw binaries and the universal binary
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            cp "target/$target/release/terraphim-lsp" "dist/terraphim-lsp-$target"
+          done
+          lipo -create \
+            dist/terraphim-lsp-x86_64-apple-darwin \
+            dist/terraphim-lsp-aarch64-apple-darwin \
+            -output dist/terraphim-lsp-universal-apple-darwin
+          lipo -info dist/terraphim-lsp-universal-apple-darwin
+
+      - name: Verify binaries
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          lipo -archs dist/terraphim-lsp-aarch64-apple-darwin | grep -qx arm64
+          lipo -archs dist/terraphim-lsp-x86_64-apple-darwin | grep -qx x86_64
+          lipo -archs dist/terraphim-lsp-universal-apple-darwin | tr ' ' '\n' | sort | tr '\n' ' ' | grep -q "arm64 x86_64"
+          for bin in dist/terraphim-lsp-aarch64-apple-darwin dist/terraphim-lsp-universal-apple-darwin; do
+            ACTUAL="$("$bin" --version)"
+            if [[ "$ACTUAL" != "terraphim-lsp $VERSION" ]]; then
+              echo "::error::$bin: expected 'terraphim-lsp $VERSION', got '$ACTUAL'"
+              exit 1
+            fi
+          done
+          # x86_64 runs only where Rosetta is installed; otherwise lipo checked it.
+          if ACTUAL="$(arch -x86_64 dist/terraphim-lsp-x86_64-apple-darwin --version 2>/dev/null)"; then
+            if [[ "$ACTUAL" != "terraphim-lsp $VERSION" ]]; then
+              echo "::error::x86_64: expected 'terraphim-lsp $VERSION', got '$ACTUAL'"
+              exit 1
+            fi
+          else
+            echo "::notice::Rosetta unavailable; x86_64 binary checked by architecture only"
+          fi
+
+      - name: Install 1Password CLI
+        # Signing is best effort: an install failure must not fail the build.
+        continue-on-error: true
+        uses: 1password/install-cli-action@9a0c9dd934086b7ab1d90115d455bda1c53c2bdb # v2
+
+      - name: Sign and notarise the universal binary (best effort)
+        id: sign
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          set -uo pipefail
+          ASSET=dist/terraphim-lsp-universal-apple-darwin
+          if [[ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]] || ! command -v op >/dev/null 2>&1; then
+            echo "::warning::1Password CLI or OP_SERVICE_ACCOUNT_TOKEN unavailable; shipping the universal binary unsigned"
+            echo "signing=unsigned" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # read_secret <variable> <item/field> stores the 1Password value.
+          read_secret() {
+            local value
+            value="$(op read "op://TerraphimPlatform/$2" --no-newline)" || return 1
+            printf -v "$1" '%s' "$value"
+          }
+          if ! read_secret APPLE_ID apple.developer.credentials/username ||
+             ! read_secret APPLE_TEAM_ID apple.developer.credentials/APPLE_TEAM_ID ||
+             ! read_secret APPLE_APP_PASSWORD apple.developer.credentials/APPLE_APP_SPECIFIC_PASSWORD ||
+             ! read_secret CERT_BASE64 apple.developer.certificate/base64 ||
+             ! read_secret CERT_PASSWORD apple.developer.certificate/password; then
+            echo "::warning::Could not read Apple signing credentials; shipping the universal binary unsigned"
+            echo "signing=unsigned" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::add-mask::$APPLE_ID"
+          echo "::add-mask::$APPLE_APP_PASSWORD"
+          echo "::add-mask::$CERT_PASSWORD"
+
+          # Sign a copy so a failure part-way leaves the shipped binary intact.
+          WORK="$RUNNER_TEMP/lsp-sign"
+          rm -rf "$WORK" && mkdir -p "$WORK"
+          cp "$ASSET" "$WORK/"
+          if ./scripts/sign-macos-binary.sh "$WORK/$(basename "$ASSET")" \
+               "$APPLE_ID" "$APPLE_TEAM_ID" "$APPLE_APP_PASSWORD" "$CERT_BASE64" "$CERT_PASSWORD" &&
+             codesign --verify --strict --verbose=2 "$WORK/$(basename "$ASSET")"; then
+            cp "$WORK/$(basename "$ASSET")" "$ASSET"
+            echo "signing=signed" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Signing or notarisation failed; shipping the universal binary unsigned"
+            echo "signing=unsigned" >> "$GITHUB_OUTPUT"
+          fi
+          rm -rf "$WORK"
+
+      - name: Upload raw binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraphim-lsp-apple-darwin
+          path: dist/terraphim-lsp-*
+          if-no-files-found: error
+
+  checksums:
+    name: Assemble assets and checksums
+    needs: [resolve, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download raw binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: terraphim-lsp-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Check the asset set and write checksums.txt
+        working-directory: release-assets
+        run: |
+          set -euo pipefail
+          expected="$(printf '%s\n' \
+            terraphim-lsp-aarch64-apple-darwin \
+            terraphim-lsp-aarch64-unknown-linux-musl \
+            terraphim-lsp-universal-apple-darwin \
+            terraphim-lsp-x86_64-apple-darwin \
+            terraphim-lsp-x86_64-unknown-linux-gnu \
+            terraphim-lsp-x86_64-unknown-linux-musl)"
+          shopt -s nullglob dotglob
+          actual="$(printf '%s\n' * | LC_ALL=C sort)"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Unexpected asset set"
+            diff <(echo "$expected") <(echo "$actual") || true
+            exit 1
+          fi
+          chmod +x -- *
+          sha256sum -- * > checksums.txt
+          cat checksums.txt
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: release-assets/*
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub pre-release
+    needs: [resolve, build-macos, checksums]
+    if: needs.resolve.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: release-assets
+
+      - name: Write release notes
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+          VERSION: ${{ needs.resolve.outputs.version }}
+          SIGNING: ${{ needs.build-macos.outputs.signing }}
+        run: |
+          set -euo pipefail
+          if [[ "$SIGNING" == "signed" ]]; then
+            MAC_NOTE="The universal macOS binary is signed and notarised."
+          else
+            MAC_NOTE="The universal macOS binary is NOT signed or notarised in this pre-release; macOS may require clearing the quarantine attribute (xattr -d com.apple.quarantine <file>) when downloaded through a browser."
+          fi
+          {
+            echo "Pre-release of \`terraphim-lsp\` $VERSION (\`terraphim-lsp --version\` prints \`terraphim-lsp $VERSION\`)."
+            echo
+            echo "## Assets"
+            echo
+            echo "Raw, uncompressed binaries:"
+            echo
+            for f in release-assets/terraphim-lsp-*; do
+              echo "- \`$(basename "$f")\`"
+            done
+            echo "- \`checksums.txt\`: SHA-256 of every binary above"
+            echo
+            echo "$MAC_NOTE"
+            echo
+            echo "Windows is not built yet (terraphim/zed-terraphim#16)."
+            echo
+            echo "## Verify a download"
+            echo
+            echo "Download the binary and \`checksums.txt\` into one directory, then run:"
+            echo
+            echo '```bash'
+            echo 'sha256sum --ignore-missing -c checksums.txt        # Linux'
+            echo 'shasum -a 256 --ignore-missing -c checksums.txt    # macOS'
+            echo '```'
+            echo
+            echo "Each line of \`checksums.txt\` is \`<lowercase sha256>  <file name>\`."
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Create or update the pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" release-assets/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "$TAG" --notes-file release-notes.md --prerelease
+          else
+            gh release create "$TAG" release-assets/* --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --prerelease --latest=false \
+              --title "$TAG" --notes-file release-notes.md
+          fi
