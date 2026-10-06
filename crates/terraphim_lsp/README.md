@@ -11,11 +11,17 @@ offers:
 - **`textDocument/hover`** - Show concept descriptions when hovering over
   thesaurus terms.
 - **`textDocument/completion`** - Suggest knowledge-graph terms at the cursor.
-- **`textDocument/diagnostic`** (pulled, and pushed as `publishDiagnostics`)
-  - Warn about terms in the document that are not present in the thesaurus,
-  report a malformed trailing `terraphim-alternatives` annotation block (one
-  diagnostic per document), and fade ghosted text (code `ghosted`, severity
-  Hint, tag `Unnecessary`; Zed fades it with `unnecessary_code_fade`).
+- **Diagnostics**, one model per client so nothing is shown twice: clients
+  that advertise `textDocument.diagnostic` pull them (`textDocument/diagnostic`
+  is advertised only to them) and get `workspace/diagnostic/refresh` when
+  results change without an edit (Lab runs and clears, settings and
+  thesaurus changes), if they accept it; other clients get
+  `textDocument/publishDiagnostics` pushes only. Report a malformed trailing `terraphim-alternatives` annotation block
+  (one diagnostic per document) and fade ghosted text (code `ghosted`,
+  severity Hint, tag `Unnecessary`; Zed fades it with
+  `unnecessary_code_fade`). With the opt-in `unknownTerms` setting, also warn
+  on every occurrence of a word that matches no thesaurus term, each at its
+  own range.
 - **Lab marks** - terraphim-editor's Lab engine (`terraphim_lab`): one
   diagnostic code per mark kind (`lab-typo`, `lab-punctuation`,
   `lab-weak-sentence`, `lab-long-sentence`, `lab-convoluted-sentence`,
@@ -35,23 +41,66 @@ offers:
 Edits are versioned (`documentChanges` with the document version) for
 clients that accept them, so a stale edit is rejected rather than applied.
 
+## Thesaurus
+
+Hover, "Replace with X" actions, `[i/n]` inlay hints and completion need a
+thesaurus: a JSON file in the format terraphim's thesaurus builders write
+(`{"name": "...", "data": {"term": {"id": 1, "nterm": "concept"}}}`). The
+path is taken from the first of these that is set (empty values are
+ignored):
+
+1. the `thesaurus` setting of the latest `workspace/didChangeConfiguration`
+   (bare or under `terraphim`);
+2. the `thesaurus` member of `initializationOptions` (bare or under
+   `terraphim`); it is kept when a later `didChangeConfiguration` does not
+   name a thesaurus, so Zed's `initialization_options` and `settings` can be
+   combined;
+3. the `--thesaurus <path>` (or `--thesaurus=<path>`) command-line flag;
+4. the `TERRAPHIM_THESAURUS` environment variable.
+
+A leading `~/` expands to the home directory; other relative paths are
+relative to the server's working directory (editors usually start it at the
+workspace root). With none set, the binary starts with an empty thesaurus
+and logs a `window/logMessage` warning saying how to configure one.
+
+The file is read and compiled on the blocking thread pool at `initialize`,
+and again whenever `didChangeConfiguration` changes the path; every open
+document is then republished and inlay hints are refreshed. Removing the
+configured setting returns to the `initializationOptions` path, then the
+launch path, then the constructor's thesaurus (for programmatic use). A missing or invalid file is logged and shown once as a
+`window/showMessage` Warning; the server keeps running with an empty
+thesaurus for that path and does not retry it until the path changes (or
+the server restarts).
+
+Selecting a thesaurus by Terraphim **role** is not supported yet: resolving
+a role needs `terraphim_config` and its persistence stack (device settings,
+remote or markdown knowledge graphs, async builders), which this server
+does not depend on. Build the role's thesaurus with the Terraphim tools and
+point `thesaurus` at the JSON file.
+
 ## Settings
 
 Passed as `initializationOptions` or through
-`workspace/didChangeConfiguration`, bare or under a `terraphim` key:
+`workspace/didChangeConfiguration`, bare or under a `terraphim` key (when
+both appear, the keys are merged and the nested value wins per top-level
+key):
 
 ```json
 {
+  "thesaurus": "/path/to/thesaurus.json",
   "inlayHints": false,
   "ghostDiagnostics": true,
+  "unknownTerms": false,
   "lab": { "actions": [], "trigger": "save" }
 }
 ```
 
 | Setting | Default | Effect |
 |---|---|---|
+| `thesaurus` | none | path of the thesaurus JSON file; overrides `--thesaurus` and `TERRAPHIM_THESAURUS`; a value from `initializationOptions` survives later settings without one; reloaded when it changes (see [Thesaurus](#thesaurus)) |
 | `inlayHints` | `false` | `[i/n]` inlay hints (the capability is always advertised) |
 | `ghostDiagnostics` | `true` | faded hints over ghosted text |
+| `unknownTerms` | `false` | a Warning (`Unknown term: X`) on every occurrence of a word that is not part of any thesaurus match; off by default because against a real thesaurus nearly every ordinary word is unknown |
 | `lab.actions` | `[]` | Lab actions run automatically: `typos_and_punctuation`, `weakest_sentences`, `long_sentences`, `convoluted_sentences`, `off_tone`, `hedges_and_filler` |
 | `lab.trigger` | `"save"` | `save`: Lab marks and the trim preview are recomputed on open and save; `command`: only by the commands |
 
@@ -72,8 +121,8 @@ actions are computed immediately with the `save` trigger and on the next
 command with `command`. Switching the trigger from `command` to `save`
 computes the configured actions at once; switching `save` to `command`
 keeps the marks already shown (the next edit drops them as usual). Command-requested actions and trim previews stay
-until their `*.clear` command. Ghost hints follow `ghostDiagnostics` and
-inlay hints are refreshed.
+until their `*.clear` command. Ghost hints and unknown-term warnings follow
+`ghostDiagnostics` and `unknownTerms`, and inlay hints are refreshed.
 
 ## Commands
 
@@ -123,7 +172,25 @@ The `terraphim-lsp` binary speaks LSP over standard input/output and can be
 configured in any LSP-compatible editor:
 
 ```bash
-terraphim-lsp
+terraphim-lsp --thesaurus ~/kg/thesaurus.json
+# or
+TERRAPHIM_THESAURUS=~/kg/thesaurus.json terraphim-lsp
+```
+
+`terraphim-lsp --help` lists the flags. Unrecognised arguments (such as
+`--stdio`) are ignored. In Zed, for example:
+
+```json
+{
+  "lsp": {
+    "terraphim-lsp": {
+      "initialization_options": {
+        "thesaurus": "/absolute/path/to/thesaurus.json",
+        "inlayHints": true
+      }
+    }
+  }
+}
 ```
 
 ### Programmatic use
@@ -148,6 +215,12 @@ async fn main() {
     // a test harness.
 }
 ```
+
+To load the thesaurus from a file the way the binary does, use
+`TerraphimLspServer::with_launch_options` (or
+`run_stdio_with_launch_options`) with a
+`terraphim_lsp::thesaurus::LaunchOptions`; a client `thesaurus` setting
+replaces a programmatic thesaurus in either case.
 
 ## Architecture
 

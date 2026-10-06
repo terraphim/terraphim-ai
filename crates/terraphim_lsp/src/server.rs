@@ -6,7 +6,8 @@
 //! engine.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, PoisonError};
 
 use serde_json::Value;
@@ -24,9 +25,12 @@ use terraphim_types::Thesaurus;
 use crate::commands::{self, AddAlternativeArgs, DocumentArgs, LabMarkArgs, TrimPreviewArgs};
 use crate::completion::{build_completions, word_at_position};
 use crate::convert;
-use crate::diagnostics::{build_diagnostics_with_positions, ghost_diagnostics};
+use crate::diagnostics::{core_diagnostics, ghost_diagnostics, unknown_term_diagnostics};
 use crate::kg_analysis::analyse_kg_document;
 use crate::settings::{LabSettings, LabTrigger, ServerSettings};
+use crate::thesaurus::{
+    LaunchOptions, effective_thesaurus_path, load_thesaurus, thesaurus_setting,
+};
 
 /// Terraphim LSP server backed by a knowledge-graph thesaurus.
 ///
@@ -34,9 +38,11 @@ use crate::settings::{LabSettings, LabTrigger, ServerSettings};
 ///
 /// - `textDocument/hover` - concept descriptions for matched KG terms
 /// - `textDocument/completion` - thesaurus term suggestions
-/// - `textDocument/diagnostic` (and pushed `publishDiagnostics`) - warnings
-///   for unknown terms and a malformed `terraphim-alternatives` annotation
-///   block, plus faded (`Unnecessary`) hints over ghosted text
+/// - `textDocument/diagnostic` for clients that pull, pushed
+///   `publishDiagnostics` for the others (never both) - a
+///   malformed `terraphim-alternatives` annotation block, faded
+///   (`Unnecessary`) hints over ghosted text and, when the `unknownTerms`
+///   setting is on, a warning on every unknown-word occurrence
 /// - `textDocument/codeAction` - "Replace with X" for every other synonym of
 ///   the KG term at the cursor, keeping capitalisation and fixing `a`/`an`,
 ///   and "Apply fix: X" for Lab typo and punctuation marks
@@ -48,12 +54,27 @@ use crate::settings::{LabSettings, LabTrigger, ServerSettings};
 /// - `workspace/executeCommand` - the commands in [`commands::ALL`]
 ///
 /// Settings come from `initializationOptions` and
-/// `workspace/didChangeConfiguration`; see [`ServerSettings`].
+/// `workspace/didChangeConfiguration`; see [`ServerSettings`]. The
+/// thesaurus is loaded from the `thesaurus` setting, the `--thesaurus` flag
+/// or `TERRAPHIM_THESAURUS` (see [`crate::thesaurus`]) and reloaded when the
+/// path changes.
 #[derive(Debug)]
 pub struct TerraphimLspServer {
     client: Client,
-    thesaurus: Thesaurus,
-    engine: KgEngine,
+    /// The knowledge graph in use. A std lock: it is only held to clone or
+    /// replace the `Arc`, never across an `.await`.
+    kg: std::sync::RwLock<Arc<Kg>>,
+    /// The knowledge graph the server was constructed with, used while no
+    /// thesaurus path is configured.
+    base_kg: Arc<Kg>,
+    /// Launch-time thesaurus path and home directory.
+    launch: LaunchOptions,
+    /// The `thesaurus` member of `initializationOptions`, kept under later
+    /// `didChangeConfiguration` settings that do not name one.
+    initial_thesaurus: std::sync::RwLock<Option<String>>,
+    /// Bumped by every thesaurus load; a load installs its result only if
+    /// no newer load started meanwhile.
+    kg_loads: AtomicU64,
     documents: Arc<RwLock<HashMap<Url, OpenDocument>>>,
     /// Whether the client accepts `WorkspaceEdit.documentChanges`
     /// (`workspace.workspaceEdit.documentChanges`), read at `initialize`.
@@ -61,11 +82,40 @@ pub struct TerraphimLspServer {
     /// Whether the client accepts `workspace/inlayHint/refresh`, read at
     /// `initialize`.
     inlay_hint_refresh: AtomicBool,
+    /// Whether the client pulls diagnostics (`textDocument.diagnostic`),
+    /// read at `initialize`. Then the server never pushes
+    /// `publishDiagnostics`, so each diagnostic is shown once.
+    pull_diagnostics: AtomicBool,
+    /// Whether the client accepts `workspace/diagnostic/refresh`, read at
+    /// `initialize`; used in pull mode when results change outside a
+    /// client request (Lab runs, clears, settings and thesaurus changes).
+    diagnostic_refresh: AtomicBool,
     /// Current settings. A std lock: it is never held across an `.await`.
     settings: std::sync::RwLock<ServerSettings>,
     /// The Lab engine's configuration (embedded default lists), or `None`
     /// if they failed to load.
     lab_config: Option<Arc<LabConfig>>,
+}
+
+/// A thesaurus and the engine compiled from it, swapped as one unit so
+/// completion and matching never disagree.
+#[derive(Debug)]
+struct Kg {
+    thesaurus: Thesaurus,
+    engine: KgEngine,
+    /// The file it was loaded from (even if loading failed and the engine
+    /// is empty); `None` for the thesaurus given to the constructor.
+    path: Option<PathBuf>,
+}
+
+impl Kg {
+    fn empty_for(path: PathBuf) -> Self {
+        Self {
+            thesaurus: Thesaurus::new("empty".to_string()),
+            engine: KgEngine::empty(),
+            path: Some(path),
+        }
+    }
 }
 
 /// An open document: its full text, the version the client last sent, and
@@ -158,25 +208,43 @@ impl TerraphimLspServer {
     ///
     /// If the thesaurus cannot be compiled into a matcher, the error is logged
     /// and the server runs without KG matches rather than failing to start.
+    ///
+    /// A `thesaurus` setting from the client replaces this thesaurus.
     pub fn new(client: Client, thesaurus: Thesaurus) -> Self {
+        Self::build(client, thesaurus, LaunchOptions::default())
+    }
+
+    /// Create a server that starts with an empty thesaurus and loads the
+    /// launch thesaurus (`--thesaurus` / `TERRAPHIM_THESAURUS`, resolved
+    /// into `launch`) at `initialize`, unless the client's `thesaurus`
+    /// setting names another file.
+    pub fn with_launch_options(client: Client, launch: LaunchOptions) -> Self {
+        Self::build(client, Thesaurus::new("empty".to_string()), launch)
+    }
+
+    fn build(client: Client, thesaurus: Thesaurus, launch: LaunchOptions) -> Self {
         let engine = KgEngine::new(&thesaurus).unwrap_or_else(|error| {
             log::error!("terraphim_lsp: KG engine unavailable: {error}");
             KgEngine::empty()
         });
-        if !engine.skipped_patterns().is_empty() {
-            log::warn!(
-                "terraphim_lsp: {} thesaurus keys too short to match: {:?}",
-                engine.skipped_patterns().len(),
-                engine.skipped_patterns()
-            );
-        }
-        Self {
-            client,
+        log_skipped_patterns(&engine);
+        let base_kg = Arc::new(Kg {
             thesaurus,
             engine,
+            path: None,
+        });
+        Self {
+            client,
+            kg: std::sync::RwLock::new(Arc::clone(&base_kg)),
+            base_kg,
+            launch,
+            initial_thesaurus: std::sync::RwLock::new(None),
+            kg_loads: AtomicU64::new(0),
             documents: Arc::new(RwLock::new(HashMap::new())),
             versioned_edits: AtomicBool::new(false),
             inlay_hint_refresh: AtomicBool::new(false),
+            pull_diagnostics: AtomicBool::new(false),
+            diagnostic_refresh: AtomicBool::new(false),
             settings: std::sync::RwLock::new(ServerSettings::default()),
             lab_config: LabConfig::with_defaults()
                 .inspect_err(|error| {
@@ -210,6 +278,117 @@ impl TerraphimLspServer {
         let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
         let (service, socket) = LspService::new(move |client| Self::new(client, thesaurus.clone()));
         Server::new(stdin, stdout, socket).serve(service).await;
+    }
+
+    /// Run the LSP server over stdio with launch options (see
+    /// [`Self::with_launch_options`]). The `terraphim-lsp` binary uses this.
+    pub async fn run_stdio_with_launch_options(launch: LaunchOptions) {
+        let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
+        let (service, socket) =
+            LspService::new(move |client| Self::with_launch_options(client, launch.clone()));
+        Server::new(stdin, stdout, socket).serve(service).await;
+    }
+
+    /// The knowledge graph in use.
+    fn kg(&self) -> Arc<Kg> {
+        Arc::clone(&self.kg.read().unwrap_or_else(PoisonError::into_inner))
+    }
+
+    /// The path of the thesaurus file in use, if one was loaded from a file
+    /// (successfully or not).
+    pub fn thesaurus_path(&self) -> Option<PathBuf> {
+        self.kg().path.clone()
+    }
+
+    /// The number of thesaurus terms in use (0 when none is loaded).
+    pub fn thesaurus_len(&self) -> usize {
+        self.kg().thesaurus.len()
+    }
+
+    /// Make the thesaurus match `settings`: load the effective path
+    /// ([`thesaurus_setting`] over the `initializationOptions` value, then
+    /// [`effective_thesaurus_path`]) if it differs from the one in use, or
+    /// return to the constructor's thesaurus when no path is configured.
+    /// Returns whether the thesaurus was replaced.
+    ///
+    /// A missing or invalid file is logged and shown once to the user
+    /// (`window/showMessage`, Warning); the server keeps running with an
+    /// empty engine for that path. The same path is not retried until it
+    /// changes.
+    async fn apply_thesaurus_setting(&self, settings: &ServerSettings) -> bool {
+        let initial = self
+            .initial_thesaurus
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        let wanted = effective_thesaurus_path(
+            thesaurus_setting(settings.thesaurus.as_deref(), initial.as_deref()),
+            self.launch.thesaurus.as_deref(),
+            self.launch.home.as_deref(),
+        );
+        if self.kg().path == wanted {
+            return false;
+        }
+        let load = self.kg_loads.fetch_add(1, Ordering::SeqCst) + 1;
+        let kg = match wanted {
+            None => Arc::clone(&self.base_kg),
+            Some(path) => Arc::new(self.load_kg(path).await),
+        };
+        let mut current = self.kg.write().unwrap_or_else(PoisonError::into_inner);
+        if self.kg_loads.load(Ordering::SeqCst) != load {
+            // A newer load started while this one ran; it decides.
+            return false;
+        }
+        *current = kg;
+        true
+    }
+
+    /// Load the thesaurus at `path` on the blocking pool; on failure, report
+    /// it and return an empty knowledge graph for that path.
+    async fn load_kg(&self, path: PathBuf) -> Kg {
+        let task_path = path.clone();
+        let result = tokio::task::spawn_blocking(move || load_thesaurus(&task_path)).await;
+        match result {
+            Ok(Ok(loaded)) => {
+                log::info!(
+                    "terraphim_lsp: loaded {} thesaurus terms from {}",
+                    loaded.thesaurus.len(),
+                    path.display()
+                );
+                log_skipped_patterns(&loaded.engine);
+                Kg {
+                    thesaurus: loaded.thesaurus,
+                    engine: loaded.engine,
+                    path: Some(path),
+                }
+            }
+            Ok(Err(error)) => {
+                self.report_load_failure(&path, &error).await;
+                Kg::empty_for(path)
+            }
+            Err(error) => {
+                self.report_load_failure(&path, &error).await;
+                Kg::empty_for(path)
+            }
+        }
+    }
+
+    async fn report_load_failure(&self, path: &Path, error: &(dyn std::fmt::Display + Sync)) {
+        log::error!(
+            "terraphim_lsp: cannot load thesaurus {}: {error}",
+            path.display()
+        );
+        self.client
+            .show_message(
+                MessageType::WARNING,
+                format!(
+                    "terraphim-lsp: cannot load thesaurus {}: {error}. Hover, synonym \
+                     actions and inlay hints stay off until the `thesaurus` setting \
+                     names a valid thesaurus JSON file.",
+                    path.display()
+                ),
+            )
+            .await;
     }
 
     /// The current settings.
@@ -311,7 +490,13 @@ impl TerraphimLspServer {
             return;
         };
         if let Installed::Yes(document) = self.install_lab(uri, &job, results).await {
-            self.publish(uri, &document).await;
+            let had_work = !job.actions.is_empty() || job.trim_level.is_some();
+            if had_work || !self.pull_diagnostics.load(Ordering::Relaxed) {
+                // A pulling client already pulled for the edit or open; ask
+                // it again only when the Lab run could have changed the
+                // results.
+                self.publish(uri, &document).await;
+            }
         }
     }
 
@@ -446,7 +631,7 @@ impl TerraphimLspServer {
         let text = document.text.as_str();
         let index = LineIndex::new(text);
         let offset = convert::byte_offset(&index, position);
-        let Some(set) = self.engine.alternatives_at(text, offset) else {
+        let Some(set) = self.kg().engine.alternatives_at(text, offset) else {
             return Vec::new();
         };
         set.replacements
@@ -467,15 +652,21 @@ impl TerraphimLspServer {
             .collect()
     }
 
-    /// Every diagnostic for a document: unknown terms, a malformed
-    /// annotation block, ghost hints (when enabled), Lab marks and trim
-    /// candidates. Pushed and pulled diagnostics both come from here, so
+    /// Every diagnostic for a document: unknown terms (when enabled), a
+    /// malformed annotation block, ghost hints (when enabled), Lab marks and
+    /// trim candidates. Pushed and pulled diagnostics both come from here, so
     /// they always agree.
     fn diagnostics_for(&self, document: &OpenDocument) -> Vec<Diagnostic> {
         let text = document.text.as_str();
-        let analysis = analyse_kg_document(text, &self.engine);
-        let mut diagnostics = build_diagnostics_with_positions(&analysis, text);
-        if self.settings().ghost_diagnostics {
+        let settings = self.settings();
+        let analysis = analyse_kg_document(text, &self.kg().engine);
+        let mut diagnostics = if settings.unknown_terms {
+            unknown_term_diagnostics(&analysis, text)
+        } else {
+            Vec::new()
+        };
+        diagnostics.extend(core_diagnostics(&analysis, text));
+        if settings.ghost_diagnostics {
             diagnostics.extend(ghost_diagnostics(&analysis, text));
         }
         if !document.lab.is_empty() || !document.trim.is_empty() {
@@ -489,20 +680,60 @@ impl TerraphimLspServer {
         diagnostics
     }
 
-    /// Publish a document's diagnostics to the client.
-    async fn publish(&self, uri: &Url, document: &OpenDocument) {
+    /// Push a document's diagnostics, unless the client pulls them: a
+    /// client that pulls re-requests after its own edits and opens, and
+    /// would show pushed diagnostics a second time.
+    async fn push(&self, uri: &Url, document: &OpenDocument) {
+        if self.pull_diagnostics.load(Ordering::Relaxed) {
+            return;
+        }
         let diagnostics = self.diagnostics_for(document);
-        self.client
-            .publish_diagnostics(uri.clone(), diagnostics, Some(document.version))
+        self.send_push(uri.clone(), diagnostics, Some(document.version))
             .await;
     }
 
-    /// Publish the diagnostics of the open document `uri`.
-    async fn publish_open(&self, uri: &Url) {
+    /// The only place `publishDiagnostics` is sent: nothing in pull mode.
+    async fn send_push(&self, uri: Url, diagnostics: Vec<Diagnostic>, version: Option<i32>) {
+        if self.pull_diagnostics.load(Ordering::Relaxed) {
+            return;
+        }
+        self.client
+            .publish_diagnostics(uri, diagnostics, version)
+            .await;
+    }
+
+    /// Push the diagnostics of the open document `uri` (push mode only).
+    async fn push_open(&self, uri: &Url) {
         let document = self.documents.read().await.get(uri).cloned();
         if let Some(document) = document {
-            self.publish(uri, &document).await;
+            self.push(uri, &document).await;
         }
+    }
+
+    /// A document's diagnostics changed without a client edit (a Lab run,
+    /// a clear): push them, or in pull mode ask the client to pull again.
+    async fn publish(&self, uri: &Url, document: &OpenDocument) {
+        if self.pull_diagnostics.load(Ordering::Relaxed) {
+            self.request_diagnostic_refresh();
+        } else {
+            self.push(uri, document).await;
+        }
+    }
+
+    /// Send `workspace/diagnostic/refresh` when the client pulls and
+    /// accepts it. Spawned, so no handler waits on the client's reply.
+    fn request_diagnostic_refresh(&self) {
+        if !(self.pull_diagnostics.load(Ordering::Relaxed)
+            && self.diagnostic_refresh.load(Ordering::Relaxed))
+        {
+            return;
+        }
+        let client = self.client.clone();
+        tokio::spawn(async move {
+            if let Err(error) = client.workspace_diagnostic_refresh().await {
+                log::debug!("terraphim_lsp: diagnostic refresh failed: {error}");
+            }
+        });
     }
 
     /// "Apply fix: X" code actions for the Lab marks touching `range`.
@@ -539,7 +770,8 @@ impl TerraphimLspServer {
     fn inlay_hints(&self, text: &str, range: Range) -> Vec<InlayHint> {
         let index = LineIndex::new(text);
         let wanted = convert::byte_range_of(&index, range);
-        self.engine
+        self.kg()
+            .engine
             .synonym_positions(text)
             .into_iter()
             .filter(|hint| {
@@ -680,13 +912,42 @@ impl LanguageServer for TerraphimLspServer {
             .and_then(|workspace| workspace.inlay_hint.as_ref())
             .and_then(|inlay_hint| inlay_hint.refresh_support)
             .unwrap_or(false);
+        let pull_diagnostics = params
+            .capabilities
+            .text_document
+            .as_ref()
+            .is_some_and(|text_document| text_document.diagnostic.is_some());
+        let diagnostic_refresh = params
+            .capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.diagnostic.as_ref())
+            .and_then(|diagnostic| diagnostic.refresh_support)
+            .unwrap_or(false);
+        self.pull_diagnostics
+            .store(pull_diagnostics, Ordering::Relaxed);
+        self.diagnostic_refresh
+            .store(diagnostic_refresh, Ordering::Relaxed);
         self.versioned_edits
             .store(versioned_edits, Ordering::Relaxed);
         self.inlay_hint_refresh
             .store(inlay_hint_refresh, Ordering::Relaxed);
-        self.set_settings(ServerSettings::from_value(
-            params.initialization_options.as_ref(),
-        ));
+        let settings = ServerSettings::from_value(params.initialization_options.as_ref());
+        self.set_settings(settings.clone());
+        settings.thesaurus.clone_into(
+            &mut self
+                .initial_thesaurus
+                .write()
+                .unwrap_or_else(PoisonError::into_inner),
+        );
+        self.apply_thesaurus_setting(&settings).await;
+        if self.kg().thesaurus.is_empty() && self.kg().path.is_none() {
+            let message = "terraphim-lsp: no thesaurus configured; set the `thesaurus` \
+                           initialization option, --thesaurus or TERRAPHIM_THESAURUS to \
+                           enable hover, synonym actions and inlay hints";
+            log::warn!("{message}");
+            self.client.log_message(MessageType::WARNING, message).await;
+        }
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
                 text_document_sync: Some(TextDocumentSyncCapability::Options(
@@ -711,14 +972,16 @@ impl LanguageServer for TerraphimLspServer {
                     resolve_provider: Some(false),
                     ..CompletionOptions::default()
                 }),
-                diagnostic_provider: Some(DiagnosticServerCapabilities::Options(
-                    DiagnosticOptions {
+                // One diagnostics model per client: pull (advertised here,
+                // never pushed) when the client supports it, else push only.
+                diagnostic_provider: pull_diagnostics.then(|| {
+                    DiagnosticServerCapabilities::Options(DiagnosticOptions {
                         identifier: Some("terraphim-lsp".to_string()),
                         inter_file_dependencies: false,
                         workspace_diagnostics: false,
                         work_done_progress_options: WorkDoneProgressOptions::default(),
-                    },
-                )),
+                    })
+                }),
                 // Always advertised so hints can be switched on later through
                 // `workspace/didChangeConfiguration`; the server returns none
                 // while the `inlayHints` setting is off (the default).
@@ -754,12 +1017,17 @@ impl LanguageServer for TerraphimLspServer {
     ///   they wait for the next Lab command. Switching `save` to `command`
     ///   keeps the installed marks: they are still valid for the current
     ///   text, and the next edit drops them as usual.
-    /// - Every document is republished, so ghost hints follow
-    ///   `ghostDiagnostics`, and inlay hints are refreshed.
+    /// - A changed `thesaurus` path is loaded first, on the blocking pool;
+    ///   a missing or invalid file is reported once.
+    /// - Every document is republished (pushed, or one
+    ///   `workspace/diagnostic/refresh` in pull mode), so ghost hints and
+    ///   unknown-term warnings follow their settings and diagnostics follow
+    ///   the thesaurus, and inlay hints are refreshed.
     async fn did_change_configuration(&self, params: DidChangeConfigurationParams) {
         let old = self.settings();
         let new = ServerSettings::from_value(Some(&params.settings));
         self.set_settings(new.clone());
+        self.apply_thesaurus_setting(&new).await;
         let recompute = lab_recompute_needed(&old.lab, &new.lab);
         let uris: Vec<Url> = {
             let mut documents = self.documents.write().await;
@@ -777,9 +1045,10 @@ impl LanguageServer for TerraphimLspServer {
             if recompute {
                 self.refresh_lab_and_publish(&uri).await;
             } else {
-                self.publish_open(&uri).await;
+                self.push_open(&uri).await;
             }
         }
+        self.request_diagnostic_refresh();
         if self.inlay_hint_refresh.load(Ordering::Relaxed)
             && let Err(error) = self.client.inlay_hint_refresh().await
         {
@@ -795,7 +1064,7 @@ impl LanguageServer for TerraphimLspServer {
         if self.settings().lab.trigger == LabTrigger::Save {
             self.refresh_lab_and_publish(&uri).await;
         } else {
-            self.publish_open(&uri).await;
+            self.push_open(&uri).await;
         }
     }
 
@@ -811,18 +1080,20 @@ impl LanguageServer for TerraphimLspServer {
         let version = params.text_document.version;
         if let Some(change) = params.content_changes.into_iter().last() {
             self.store_document(&uri, &change.text, version).await;
-            self.publish_open(&uri).await;
+            self.push_open(&uri).await;
         }
     }
 
+    /// Forget the document. A push client gets an empty set, clearing what
+    /// was pushed. A pull client gets nothing: in the pull model the client
+    /// owns the results it pulled and stops pulling (and drops them) for a
+    /// closed document, so neither a push nor a refresh is needed.
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         self.documents
             .write()
             .await
             .remove(&params.text_document.uri);
-        self.client
-            .publish_diagnostics(params.text_document.uri, vec![], None)
-            .await;
+        self.send_push(params.text_document.uri, vec![], None).await;
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
@@ -833,7 +1104,7 @@ impl LanguageServer for TerraphimLspServer {
             return Ok(None);
         };
 
-        let analysis = analyse_kg_document(&text, &self.engine);
+        let analysis = analyse_kg_document(&text, &self.kg().engine);
         let index = LineIndex::new(&text);
         let offset = convert::byte_offset(&index, position);
 
@@ -935,7 +1206,7 @@ impl LanguageServer for TerraphimLspServer {
         };
 
         let word = word_at_position(&text, position);
-        let items = build_completions(&self.thesaurus, &word);
+        let items = build_completions(&self.kg().thesaurus, &word);
 
         if items.is_empty() {
             Ok(None)
@@ -967,6 +1238,17 @@ impl LanguageServer for TerraphimLspServer {
                 related_documents: None,
             }),
         ))
+    }
+}
+
+/// Log the thesaurus keys an engine could not compile (too short to match).
+fn log_skipped_patterns(engine: &KgEngine) {
+    if !engine.skipped_patterns().is_empty() {
+        log::warn!(
+            "terraphim_lsp: {} thesaurus keys too short to match: {:?}",
+            engine.skipped_patterns().len(),
+            engine.skipped_patterns()
+        );
     }
 }
 

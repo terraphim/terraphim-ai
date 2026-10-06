@@ -28,6 +28,11 @@ tower = { version = "0.5", features = ["util"] }
 futures = "0.3"
 # Reads back the blocks the add-alternative command writes.
 terraphim_alternatives = { version = "0.1", registry = "terraphim" }
+criterion = "0.8"
+
+[[bench]]
+name = "unknown_terms"
+harness = false
 
 [[bin]]
 name = "terraphim-lsp"
