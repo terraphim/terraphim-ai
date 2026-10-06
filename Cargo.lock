@@ -8332,6 +8332,7 @@ dependencies = [
 name = "terraphim_lsp"
 version = "1.22.0"
 dependencies = [
+ "criterion",
  "env_logger",
  "futures",
  "log",

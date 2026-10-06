@@ -85,15 +85,11 @@ pub fn analyse_kg_document(text: &str, engine: &KgEngine) -> KgAnalysis {
     }
 
     let body = &text[..analysis.body_end.byte];
-    let matched: Vec<Range<usize>> = analysis.matches.iter().map(|m| m.range.bytes()).collect();
     // A word is unknown when its range overlaps no match. Multi-word
     // unknown phrases are not reconstructed: each word is reported alone.
+    let mut matched = MatchCursor::new(analysis.matches.iter().map(|m| m.range.bytes()));
     let unknown_terms = words(body)
-        .filter(|word| {
-            !matched
-                .iter()
-                .any(|range| range.start < word.end && word.start < range.end)
-        })
+        .filter(|word| !matched.overlaps(word))
         .map(|bytes| UnknownTerm {
             text: body[bytes.clone()].to_string(),
             bytes,
@@ -105,6 +101,56 @@ pub fn analyse_kg_document(text: &str, engine: &KgEngine) -> KgAnalysis {
         unknown_terms,
         diagnostics: analysis.diagnostics,
         ghosts,
+    }
+}
+
+/// Overlap queries of word ranges, in increasing order, against match
+/// ranges: linear in words plus matches instead of their product.
+///
+/// The match ranges are sorted by start and merged where they overlap or
+/// touch (the union, and so every overlap answer, is unchanged), so a
+/// single cursor advancing with the words answers each query.
+#[derive(Debug)]
+struct MatchCursor {
+    matches: Vec<Range<usize>>,
+    next: usize,
+    /// Cursor advances plus queries; bounded by matches plus words.
+    steps: usize,
+}
+
+impl MatchCursor {
+    fn new(ranges: impl Iterator<Item = Range<usize>>) -> Self {
+        let mut ranges: Vec<Range<usize>> = ranges.filter(|range| !range.is_empty()).collect();
+        ranges.sort_unstable_by_key(|range| range.start);
+        let mut matches: Vec<Range<usize>> = Vec::with_capacity(ranges.len());
+        for range in ranges {
+            match matches.last_mut() {
+                Some(last) if range.start <= last.end => last.end = last.end.max(range.end),
+                _ => matches.push(range),
+            }
+        }
+        Self {
+            matches,
+            next: 0,
+            steps: 0,
+        }
+    }
+
+    /// Whether `word` overlaps any match. Words must be queried in
+    /// increasing, non-overlapping order (as [`words`] yields them).
+    fn overlaps(&mut self, word: &Range<usize>) -> bool {
+        self.steps += 1;
+        while self
+            .matches
+            .get(self.next)
+            .is_some_and(|range| range.end <= word.start)
+        {
+            self.next += 1;
+            self.steps += 1;
+        }
+        self.matches
+            .get(self.next)
+            .is_some_and(|range| range.start < word.end)
     }
 }
 
@@ -222,6 +268,65 @@ mod tests {
     fn test_words_inside_matches_are_not_unknown() {
         let analysis = analyse_kg_document("Tokio, rust! async?", &sample_engine());
         assert!(analysis.unknown_terms.is_empty(), "{analysis:?}");
+    }
+
+    /// The quadratic definition the cursor must agree with.
+    fn overlaps_naively(matches: &[Range<usize>], word: &Range<usize>) -> bool {
+        matches
+            .iter()
+            .any(|range| range.start < word.end && word.start < range.end)
+    }
+
+    #[test]
+    fn test_cursor_handles_overlapping_adjacent_and_unsorted_matches() {
+        let matches = [10..14, 0..3, 2..5, 5..7, 30..40, 32..35];
+        let words = [
+            0..1,
+            3..4,
+            7..9,
+            9..11,
+            14..16,
+            18..22,
+            25..30,
+            33..34,
+            40..42,
+        ];
+        // An empty match covers no text, so it is dropped.
+        let with_empty = matches.iter().cloned().chain([20..20]);
+        let mut cursor = MatchCursor::new(with_empty);
+        assert_eq!(cursor.matches, [0..7, 10..14, 30..40], "merged and sorted");
+        for word in &words {
+            assert_eq!(
+                cursor.overlaps(word),
+                overlaps_naively(&matches, word),
+                "{word:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_large_document_is_linear_in_words_and_matches() {
+        // 10k words, every other one a thesaurus term.
+        let text = "rust filler ".repeat(5_000);
+        let engine = sample_engine();
+        let analysis = engine.analyse(&text);
+        assert_eq!(analysis.matches.len(), 5_000);
+        let mut cursor = MatchCursor::new(analysis.matches.iter().map(|m| m.range.bytes()));
+        let word_ranges: Vec<Range<usize>> = words(&text).collect();
+        assert_eq!(word_ranges.len(), 10_000);
+        let unknown = word_ranges
+            .iter()
+            .filter(|word| !cursor.overlaps(word))
+            .count();
+        assert_eq!(unknown, 5_000);
+        assert!(
+            cursor.steps <= word_ranges.len() + analysis.matches.len(),
+            "{} steps",
+            cursor.steps
+        );
+        let full = analyse_kg_document(&text, &engine);
+        assert_eq!(full.unknown_terms.len(), 5_000);
+        assert!(full.unknown_terms.iter().all(|term| term.text == "filler"));
     }
 
     #[test]

@@ -77,7 +77,9 @@ point `thesaurus` at the JSON file.
 ## Settings
 
 Passed as `initializationOptions` or through
-`workspace/didChangeConfiguration`, bare or under a `terraphim` key:
+`workspace/didChangeConfiguration`, bare or under a `terraphim` key (when
+both appear, the keys are merged and the nested value wins per top-level
+key):
 
 ```json
 {

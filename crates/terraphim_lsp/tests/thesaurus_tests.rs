@@ -389,3 +389,29 @@ async fn programmatic_thesaurus_is_kept_without_a_path() {
     configure(server, json!({"inlayHints": true})).await;
     assert_kg_features_work(server).await;
 }
+
+/// A bare `thesaurus` next to a nested `terraphim` object is kept, in
+/// `initializationOptions` and in `didChangeConfiguration` alike.
+#[tokio::test]
+async fn mixed_bare_and_nested_settings_merge() {
+    let (service, _socket) = launch_service(None);
+    let server = service.inner();
+    let mixed = json!({"thesaurus": FIXTURE, "terraphim": {"inlayHints": true}});
+    server.initialize(init(Some(mixed))).await.unwrap();
+    open(server).await;
+    assert_eq!(server.thesaurus_path(), Some(PathBuf::from(FIXTURE)));
+    assert!(server.settings().inlay_hints);
+    assert_kg_features_work(server).await;
+
+    let (service, _socket) = launch_service(None);
+    let server = service.inner();
+    server.initialize(init(None)).await.unwrap();
+    open(server).await;
+    configure(
+        server,
+        json!({"thesaurus": FIXTURE, "terraphim": {"inlayHints": true, "unknownTerms": true}}),
+    )
+    .await;
+    assert!(server.settings().unknown_terms);
+    assert_kg_features_work(server).await;
+}
