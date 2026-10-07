@@ -338,13 +338,13 @@ async fn trim_actions_reach_pull_clients_through_refresh() {
     open(server, LAB_DOC).await;
     inbox.drain().await;
 
-    run_trim_action(server, "Trim preview: slight").await;
+    run_trim_action(server, "Trim: Slight trim ~10%").await;
     let messages = inbox.drain().await;
     assert_eq!(count(&messages, "textDocument/publishDiagnostics"), 0);
     assert_eq!(count(&messages, "workspace/diagnostic/refresh"), 1);
     assert_eq!(trim_count(&pull(server).await), 5);
 
-    run_trim_action(server, "Clear trim preview").await;
+    run_trim_action(server, "Trim: Original").await;
     let messages = inbox.drain().await;
     assert_eq!(count(&messages, "textDocument/publishDiagnostics"), 0);
     assert_eq!(count(&messages, "workspace/diagnostic/refresh"), 1);
@@ -358,7 +358,7 @@ async fn trim_actions_reach_push_clients_through_publish() {
     open(server, LAB_DOC).await;
     inbox.drain().await;
 
-    run_trim_action(server, "Trim preview: slight").await;
+    run_trim_action(server, "Trim: Slight trim ~10%").await;
     let messages = inbox.drain().await;
     let last = messages
         .iter()
@@ -367,7 +367,7 @@ async fn trim_actions_reach_push_clients_through_publish() {
     let pushed: PublishDiagnosticsParams = serde_json::from_value(last.1.clone()).unwrap();
     assert_eq!(trim_count(&pushed.diagnostics), 5);
 
-    run_trim_action(server, "Clear trim preview").await;
+    run_trim_action(server, "Trim: Original").await;
     let messages = inbox.drain().await;
     let last = messages
         .iter()
@@ -409,7 +409,7 @@ async fn zed_shaped_initialize_gets_refreshes_after_trim_and_lab() {
     open(server, LAB_DOC).await;
     inbox.drain().await;
 
-    run_trim_action(server, "Trim preview: tighten").await;
+    run_trim_action(server, "Trim: Tighten more ~20%").await;
     let messages = inbox.drain().await;
     assert_eq!(count(&messages, "workspace/diagnostic/refresh"), 1);
     assert_eq!(count(&messages, "textDocument/publishDiagnostics"), 0);
@@ -433,7 +433,7 @@ async fn pull_clients_that_do_not_advertise_refresh_get_none() {
         let server = service.inner();
         open(server, LAB_DOC).await;
         inbox.drain().await;
-        run_trim_action(server, "Trim preview: tighten").await;
+        run_trim_action(server, "Trim: Tighten more ~20%").await;
         let messages = inbox.drain().await;
         assert_eq!(
             count(&messages, "workspace/diagnostic/refresh"),

@@ -17,12 +17,15 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
 use terraphim_lsp_core::{
-    Diagnostic as CoreDiagnostic, KgEngine, LabAction, LabConfig, LabFinding, LineIndex, TextRange,
-    TrimLevel, add_alternative, lab_findings, trim_preview,
+    CutId, KgEngine, LabAction, LabConfig, LabFinding, LineIndex, TextRange, TrimLevel, TrimPlan,
+    TrimView, add_alternative, lab_findings, trim_cuts, trim_plan_for, trim_view,
 };
 use terraphim_types::Thesaurus;
 
-use crate::commands::{self, AddAlternativeArgs, DocumentArgs, LabMarkArgs, TrimPreviewArgs};
+use crate::commands::{
+    self, AddAlternativeArgs, DocumentArgs, LabMarkArgs, TrimKeepArgs, TrimMakeCutsArgs,
+    TrimNextArgs, TrimPreviewArgs,
+};
 use crate::completion::{build_completions, word_at_position};
 use crate::convert;
 use crate::diagnostics::{core_diagnostics, ghost_diagnostics, unknown_term_diagnostics};
@@ -50,6 +53,10 @@ use crate::thesaurus::{
 /// - Lab marks and trim candidates as diagnostics, computed on demand
 ///   (`terraphim.lab.mark`, `terraphim.trim.preview`) and, for the
 ///   configured `lab.actions`, on open and save; never on every keystroke
+/// - the trim review (R-8.4, R-8.5): a status card
+///   (`window/showMessageRequest`) with "Make the cuts"
+///   (`workspace/applyEdit`), "Walk through" (`window/showDocument`) and
+///   "Done", and "Keep" code actions on faded cuts
 /// - `textDocument/inlayHint` - `[i/n]` after each KG term with alternatives,
 ///   when the `inlayHints` setting is on (off by default)
 /// - `workspace/executeCommand` - the commands in [`commands::ALL`]
@@ -79,10 +86,22 @@ pub struct TerraphimLspServer {
     documents: Arc<RwLock<HashMap<Url, OpenDocument>>>,
     /// Whether the client accepts `WorkspaceEdit.documentChanges`
     /// (`workspace.workspaceEdit.documentChanges`), read at `initialize`.
-    versioned_edits: AtomicBool,
+    versioned_edits: Arc<AtomicBool>,
     /// Whether the client accepts `workspace/inlayHint/refresh`, read at
     /// `initialize`.
     inlay_hint_refresh: AtomicBool,
+    /// Whether the client shows `window/showMessageRequest` with buttons
+    /// (`window.showMessage.messageActionItem`), read at `initialize`. The
+    /// trim status card is a prompt then, else a plain message.
+    prompts: Arc<AtomicBool>,
+    /// Whether the client takes `window/showDocument`
+    /// (`window.showDocument.support`), read at `initialize`; "Walk
+    /// through" selects the next cut with it.
+    show_document: Arc<AtomicBool>,
+    /// Whether the client takes `workspace/applyEdit`
+    /// (`workspace.applyEdit`), read at `initialize`; "Make the cuts"
+    /// sends its edit with it, else returns the edit.
+    apply_edit: Arc<AtomicBool>,
     /// Whether the client pulls diagnostics (`textDocument.diagnostic`),
     /// read at `initialize`. Then the server never pushes
     /// `publishDiagnostics`, so each diagnostic is shown once.
@@ -136,17 +155,47 @@ struct OpenDocument {
     /// their ranges would be stale.
     lab: Vec<LabFinding>,
     /// The trim level previewed through `terraphim.trim.preview`, until
-    /// `terraphim.trim.clear`.
+    /// `terraphim.trim.clear` (or "Trim: Original"), or until an edit
+    /// leaves exactly the text "Make the cuts" produces.
     trim_level: Option<TrimLevel>,
-    /// Trim candidates for the current text. Cleared on every change.
-    trim: Vec<CoreDiagnostic>,
-    /// The trim status card for the current text, `535 → 480 words · −10%`.
-    trim_status: Option<String>,
+    /// The cuts kept with `terraphim.trim.keep`. Cut ids belong to one plan,
+    /// so they are forgotten with it on every change.
+    trim_kept: Vec<CutId>,
+    /// Every trim level planned for the current text. Cleared on every
+    /// change; switching level and keeping cuts reuse it.
+    trim_plan: Option<Arc<TrimPlan>>,
+    /// The review of the trim level with its kept cuts, for the current
+    /// text: the faded spans, the cuts and the status card numbers. Cleared
+    /// on every change.
+    trim: Option<Arc<TrimView>>,
+    /// The text "Make the cuts" turns the current text into.
+    trim_made: Option<Arc<str>>,
+    /// The start (byte offset) of the span the card's "Walk through" last
+    /// showed; the next one follows it.
+    trim_walk: Option<usize>,
+    /// A "Make the cuts" edit sent with `workspace/applyEdit` and not yet
+    /// answered as failed. While one is pending no second cut is sent.
+    trim_cutting: Option<PendingCut>,
     /// Bumped whenever what the Lab results depend on changes: the text,
     /// the requested actions, the trim level or the Lab settings. A Lab run
     /// installs its results only if the generation it snapshotted is still
     /// current, so runs finishing out of order never overwrite newer state.
     generation: u64,
+}
+
+/// A "Make the cuts" edit sent to the client with `workspace/applyEdit`.
+///
+/// The preview ends when the client confirms the edit (`applied: true`) and
+/// the document has changed since the edit was built, in either order. So a
+/// client whose text differs from [`OpenDocument::trim_made`] (a trailing
+/// newline, say) still ends it, while typing during a request the client
+/// then rejects does not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingCut {
+    /// The version the edit was built for.
+    version: i32,
+    /// Whether the client answered `applied: true`.
+    applied: bool,
 }
 
 /// A snapshot of one document for a Lab run.
@@ -157,6 +206,9 @@ struct LabJob {
     generation: u64,
     actions: Vec<LabAction>,
     trim_level: Option<TrimLevel>,
+    trim_kept: Vec<CutId>,
+    /// The plan of `text`, when one was already computed.
+    trim_plan: Option<Arc<TrimPlan>>,
 }
 
 /// What became of a Lab run's results.
@@ -175,8 +227,33 @@ enum Installed {
 #[derive(Debug, Clone, Default)]
 struct LabResults {
     lab: Vec<LabFinding>,
-    trim: Vec<CoreDiagnostic>,
-    trim_status: Option<String>,
+    trim: Option<TrimReview>,
+}
+
+/// A trim review computed for one text: the plan, the view of the level
+/// with its kept cuts, and the text "Make the cuts" would leave.
+#[derive(Debug, Clone)]
+struct TrimReview {
+    plan: Arc<TrimPlan>,
+    view: TrimView,
+    made: String,
+}
+
+impl TrimReview {
+    fn compute(text: &str, plan: Arc<TrimPlan>, level: TrimLevel, kept: &[CutId]) -> Self {
+        Self {
+            view: trim_view(text, &plan, level, kept),
+            made: trim_cuts(text, &plan, level, kept).text,
+            plan,
+        }
+    }
+
+    /// Install into `document` (computed for its current text).
+    fn install(self, document: &mut OpenDocument) {
+        document.trim_plan = Some(self.plan);
+        document.trim = Some(Arc::new(self.view));
+        document.trim_made = Some(self.made.into());
+    }
 }
 
 impl LabJob {
@@ -188,16 +265,14 @@ impl LabJob {
         } else {
             lab_findings(&self.text, config, &self.actions)
         };
-        let preview = self
-            .trim_level
-            .map(|level| trim_preview(&self.text, config, level));
-        LabResults {
-            lab,
-            trim_status: preview.as_ref().map(|preview| preview.status.clone()),
-            trim: preview
-                .map(|preview| preview.diagnostics)
-                .unwrap_or_default(),
-        }
+        let trim = self.trim_level.map(|level| {
+            let plan = self
+                .trim_plan
+                .clone()
+                .unwrap_or_else(|| Arc::new(trim_plan_for(&self.text, config)));
+            TrimReview::compute(&self.text, plan, level, &self.trim_kept)
+        });
+        LabResults { lab, trim }
     }
 }
 
@@ -207,10 +282,19 @@ const FIX_KIND: CodeActionKind = CodeActionKind::QUICKFIX;
 /// The code-action kind of the synonym replacements.
 const REPLACE_KIND: CodeActionKind = CodeActionKind::REFACTOR_REWRITE;
 
-/// The code-action kind of the trim preview actions. Clients that cannot add
-/// palette commands (Zed) reach `terraphim.trim.preview` and
-/// `terraphim.trim.clear` through these command-only actions.
+/// The code-action kind of the trim actions. Clients that cannot add
+/// palette commands (Zed) reach the `terraphim.trim.*` commands through
+/// these command-only actions.
 const TRIM_KIND: CodeActionKind = CodeActionKind::new("refactor.terraphim.trim");
+
+/// The status card's buttons (R-8.4).
+const CARD_MAKE_CUTS: &str = "Make the cuts";
+const CARD_WALK: &str = "Walk through";
+const CARD_DONE: &str = "Done";
+
+/// The status card's hint. Zed has no clickable fades, so a cut is kept
+/// through its code action.
+const CARD_HINT: &str = "Faded words would go. Keep one with the Keep action.";
 
 impl TerraphimLspServer {
     /// Create a new LSP server instance tied to the given LSP client and
@@ -251,8 +335,11 @@ impl TerraphimLspServer {
             initial_thesaurus: std::sync::RwLock::new(None),
             kg_loads: AtomicU64::new(0),
             documents: Arc::new(RwLock::new(HashMap::new())),
-            versioned_edits: AtomicBool::new(false),
+            versioned_edits: Arc::new(AtomicBool::new(false)),
             inlay_hint_refresh: AtomicBool::new(false),
+            prompts: Arc::new(AtomicBool::new(false)),
+            show_document: Arc::new(AtomicBool::new(false)),
+            apply_edit: Arc::new(AtomicBool::new(false)),
             pull_diagnostics: AtomicBool::new(false),
             diagnostic_refresh: AtomicBool::new(false),
             refresh_hint: None,
@@ -453,8 +540,19 @@ impl TerraphimLspServer {
         document.version = version;
         document.generation += 1;
         document.lab.clear();
-        document.trim.clear();
-        document.trim_status = None;
+        let cut = document.trim_made.as_deref() == Some(text)
+            || document
+                .trim_cutting
+                .is_some_and(|pending| pending.applied && version > pending.version);
+        if cut {
+            // "Make the cuts" was applied: the preview is over.
+            end_preview(document);
+        }
+        document.trim_kept.clear();
+        document.trim_plan = None;
+        document.trim = None;
+        document.trim_made = None;
+        document.trim_walk = None;
     }
 
     /// What a Lab run needs from a document, taken under a brief lock so
@@ -470,6 +568,8 @@ impl TerraphimLspServer {
             generation: document.generation,
             actions,
             trim_level: document.trim_level,
+            trim_kept: document.trim_kept.clone(),
+            trim_plan: document.trim_plan.clone(),
         }
     }
 
@@ -498,8 +598,13 @@ impl TerraphimLspServer {
             return Installed::Superseded;
         }
         document.lab = results.lab;
-        document.trim = results.trim;
-        document.trim_status = results.trim_status;
+        match results.trim {
+            Some(review) => review.install(document),
+            None => {
+                document.trim = None;
+                document.trim_made = None;
+            }
+        }
         Installed::Yes(document.clone())
     }
 
@@ -631,22 +736,12 @@ impl TerraphimLspServer {
     /// `TextDocumentEdit`, so a stale action is rejected instead of applied
     /// to text it was not computed for; others get plain `changes`.
     fn workspace_edit(&self, uri: &Url, version: i32, edits: Vec<TextEdit>) -> WorkspaceEdit {
-        if !self.versioned_edits.load(Ordering::Relaxed) {
-            return WorkspaceEdit {
-                changes: Some(HashMap::from([(uri.clone(), edits)])),
-                ..WorkspaceEdit::default()
-            };
-        }
-        WorkspaceEdit {
-            document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {
-                text_document: OptionalVersionedTextDocumentIdentifier {
-                    uri: uri.clone(),
-                    version: Some(version),
-                },
-                edits: edits.into_iter().map(OneOf::Left).collect(),
-            }])),
-            ..WorkspaceEdit::default()
-        }
+        workspace_edit(
+            uri,
+            version,
+            edits,
+            self.versioned_edits.load(Ordering::Relaxed),
+        )
     }
 
     /// "Replace with X" code actions for the KG term at `position`.
@@ -697,11 +792,15 @@ impl TerraphimLspServer {
         if settings.ghost_diagnostics {
             diagnostics.extend(ghost_diagnostics(&analysis, text));
         }
-        if !document.lab.is_empty() || !document.trim.is_empty() {
+        let trim = document
+            .trim
+            .as_ref()
+            .map_or(&[][..], |view| &view.diagnostics);
+        if !document.lab.is_empty() || !trim.is_empty() {
             let index = LineIndex::new(text);
             let lab = document.lab.iter().map(|finding| &finding.diagnostic);
             diagnostics.extend(
-                lab.chain(&document.trim)
+                lab.chain(trim)
                     .map(|diagnostic| convert::diagnostic(&index, diagnostic)),
             );
         }
@@ -879,20 +978,30 @@ impl TerraphimLspServer {
         .await
     }
 
-    /// The command-only trim actions: one preview per level other than
-    /// `original`, and "Clear trim preview".
+    /// The command-only trim actions at `position`: the five levels ("Trim:
+    /// Original" ends the preview), "Make the cuts", "Walk through" and,
+    /// with the cursor inside a faded cut, "Keep: «excerpt»".
     ///
     /// The menu is stateless on purpose: Zed caches code actions per cursor
     /// position and does not re-request them after `workspace/executeCommand`,
-    /// so a menu that hid the active level or the clear action would go
-    /// stale. Re-previewing the active level and clearing with nothing
-    /// active are harmless no-ops. None carries an `edit`, so the client runs
-    /// the command through `workspace/executeCommand`. Not offered without
-    /// the Lab engine, whose absence makes both commands fail.
-    fn trim_actions(&self, uri: &Url, document: &OpenDocument) -> Vec<CodeAction> {
+    /// so every action except Keep is always offered and resolves the trim
+    /// state when it runs, not when the menu was built. That is why "Make the
+    /// cuts" is a command, not an edit: a Keep does not change the document
+    /// version, so an edit cached before it would delete the kept words.
+    /// Re-previewing the active level, and making the cuts or walking with
+    /// nothing faded, are harmless no-ops. None carries an `edit`, so the
+    /// client runs the command through `workspace/executeCommand`. Not
+    /// offered without the Lab engine, whose absence makes the commands fail.
+    fn trim_actions(
+        &self,
+        uri: &Url,
+        document: &OpenDocument,
+        position: Position,
+    ) -> Vec<CodeAction> {
         if self.lab_config.is_none() {
             return Vec::new();
         }
+        let version = document.version;
         let command_action = |title: String, command: &str, argument: Value| CodeAction {
             title: title.clone(),
             kind: Some(TRIM_KIND),
@@ -905,50 +1014,211 @@ impl TerraphimLspServer {
         };
         let mut actions: Vec<CodeAction> = TrimLevel::ALL
             .into_iter()
-            .filter(|level| *level != TrimLevel::Original)
             .map(|level| {
-                let name = serde_json::to_value(level)
-                    .ok()
-                    .and_then(|name| name.as_str().map(str::to_owned))
-                    .unwrap_or_default();
                 command_action(
-                    format!("Trim preview: {name}"),
+                    level_title(level),
                     commands::TRIM_PREVIEW,
-                    serde_json::json!({"uri": uri, "level": level, "version": document.version}),
+                    serde_json::json!({"uri": uri, "level": level, "version": version}),
                 )
             })
             .collect();
         actions.push(command_action(
-            "Clear trim preview".to_string(),
-            commands::TRIM_CLEAR,
-            serde_json::json!({"uri": uri}),
+            format!("Trim: {CARD_MAKE_CUTS}"),
+            commands::TRIM_MAKE_CUTS,
+            serde_json::json!({"uri": uri, "version": version}),
         ));
+        actions.push(command_action(
+            format!("Trim: {CARD_WALK}"),
+            commands::TRIM_NEXT,
+            serde_json::json!({"uri": uri, "version": version, "position": position}),
+        ));
+        if let Some(view) = &document.trim {
+            let index = LineIndex::new(&document.text);
+            let offset = convert::byte_offset(&index, position);
+            let mut under: Vec<_> = view
+                .cuts
+                .iter()
+                .filter(|cut| cut.range.start.byte <= offset && offset < cut.range.end.byte)
+                .collect();
+            // Innermost first: keeping a filler inside a faded sentence keeps
+            // just the filler; keeping the sentence keeps both.
+            under.sort_by_key(|cut| cut.range.end.byte - cut.range.start.byte);
+            let mut offered = Vec::new();
+            for cut in under {
+                if offered.contains(&cut.id) {
+                    continue;
+                }
+                offered.push(cut.id);
+                actions.push(command_action(
+                    format!(
+                        "Keep: \u{ab}{}\u{bb}",
+                        excerpt(&document.text[cut.range.bytes()])
+                    ),
+                    commands::TRIM_KEEP,
+                    serde_json::json!({"uri": uri, "cut": cut.id, "version": version}),
+                ));
+            }
+        }
         actions
     }
 
-    /// [`commands::TRIM_PREVIEW`]: fade the spans a trim level would cut.
+    /// The JSON result of the trim commands that change the preview.
+    fn trim_result(document: &OpenDocument) -> Value {
+        let level = document.trim_level.unwrap_or(TrimLevel::Original);
+        match &document.trim {
+            Some(view) => serde_json::json!({
+                "level": level,
+                "candidates": view.spans.len(),
+                "status": view.status.card_text(),
+                "words_before": view.status.words_before,
+                "words_after": view.status.words_after,
+                "percent": view.status.percent,
+            }),
+            None => serde_json::json!({
+                "level": level,
+                "candidates": 0,
+                "status": Value::Null,
+            }),
+        }
+    }
+
+    /// [`commands::TRIM_PREVIEW`]: fade the spans a trim level would cut,
+    /// then show the status card (without waiting for it).
     async fn trim_preview(&self, args: TrimPreviewArgs) -> Result<Option<Value>> {
         let level = args.level;
         let document = self
             .update_lab(&args.uri, args.version, |document| {
                 document.trim_level = (level != TrimLevel::Original).then_some(level);
+                document.trim_walk = None;
+                document.trim_cutting = None;
+                if level == TrimLevel::Original {
+                    document.trim_kept.clear();
+                }
             })
             .await?;
-        Ok(Some(serde_json::json!({
-            "level": level,
-            "candidates": document.trim.len(),
-            "status": document.trim_status,
-        })))
+        if document.trim.is_some() {
+            self.show_card(&args.uri);
+        }
+        Ok(Some(Self::trim_result(&document)))
     }
 
     /// [`commands::TRIM_CLEAR`]: stop the trim preview.
     async fn trim_clear(&self, args: DocumentArgs) -> Result<Option<Value>> {
-        self.clear_overlay(&args.uri, |document| {
-            document.trim_level = None;
-            document.trim.clear();
-            document.trim_status = None;
-        })
-        .await
+        self.clear_overlay(&args.uri, end_preview).await
+    }
+
+    /// [`commands::TRIM_KEEP`]: un-fade one cut, recompute the card numbers
+    /// from the plan already computed for this text, publish and re-send
+    /// the card.
+    async fn trim_keep(&self, args: TrimKeepArgs) -> Result<Option<Value>> {
+        let document = {
+            let mut documents = self.documents.write().await;
+            let document = documents
+                .get_mut(&args.uri)
+                .ok_or_else(|| commands::invalid_params(format!("{} is not open", args.uri)))?;
+            if let Some(version) = args.version
+                && version != document.version
+            {
+                return Err(commands::content_modified(version, document.version));
+            }
+            let (Some(level), Some(plan)) = (document.trim_level, document.trim_plan.clone())
+            else {
+                return Err(commands::invalid_params(
+                    "no trim preview to keep a cut from",
+                ));
+            };
+            if !plan.faded(level).any(|cut| cut.id == args.cut) {
+                return Err(commands::invalid_params(format!(
+                    "cut {} is not faded at {}",
+                    args.cut.0,
+                    level.label()
+                )));
+            }
+            if !document.trim_kept.contains(&args.cut) {
+                document.trim_kept.push(args.cut);
+            }
+            TrimReview::compute(&document.text, plan, level, &document.trim_kept).install(document);
+            // A Lab run snapshotted before the keep must not install.
+            document.generation += 1;
+            document.clone()
+        };
+        self.publish(&args.uri, &document).await;
+        self.show_card(&args.uri);
+        Ok(Some(Self::trim_result(&document)))
+    }
+
+    /// [`commands::TRIM_MAKE_CUTS`]: delete every still-faded span, as the
+    /// trim state is now (not as a cached menu saw it).
+    async fn trim_make_cuts(&self, args: TrimMakeCutsArgs) -> Result<Option<Value>> {
+        let document = self.checked_document(&args.uri, args.version).await?;
+        let Some((edit, words_after)) = self.card().cuts_edit(&args.uri, &document) else {
+            return Ok(Some(serde_json::json!({"edits": 0})));
+        };
+        let edits = edit_count(&edit);
+        if self.apply_edit.load(Ordering::Relaxed) {
+            let card = self.card();
+            let (uri, version, generation) =
+                (args.uri.clone(), document.version, document.generation);
+            tokio::spawn(async move { card.apply_cuts(&uri, version, generation).await });
+            return Ok(Some(
+                serde_json::json!({"edits": edits, "words_after": words_after}),
+            ));
+        }
+        Ok(Some(serde_json::json!({
+            "edits": edits,
+            "words_after": words_after,
+            "edit": edit,
+        })))
+    }
+
+    /// [`commands::TRIM_NEXT`]: select the next faded span after
+    /// `position`, wrapping to the first.
+    async fn trim_next(&self, args: TrimNextArgs) -> Result<Option<Value>> {
+        let range = {
+            let mut documents = self.documents.write().await;
+            let document = documents
+                .get_mut(&args.uri)
+                .ok_or_else(|| commands::invalid_params(format!("{} is not open", args.uri)))?;
+            if let Some(version) = args.version
+                && version != document.version
+            {
+                return Err(commands::content_modified(version, document.version));
+            }
+            let index = LineIndex::new(&document.text);
+            let offset = convert::byte_offset(&index, args.position);
+            let Some(span) = walk_step(document, Some(offset)) else {
+                return Ok(None);
+            };
+            document.trim_walk = Some(span.start.byte);
+            convert::range(&index, span)
+        };
+        if self.show_document.load(Ordering::Relaxed) {
+            let client = self.client.clone();
+            let uri = args.uri.clone();
+            tokio::spawn(async move { select(&client, uri, range).await });
+        }
+        Ok(Some(serde_json::json!({ "range": range })))
+    }
+
+    /// What the status card needs, detached from `self` so the card can run
+    /// in its own task.
+    fn card(&self) -> Card {
+        Card {
+            client: self.client.clone(),
+            documents: Arc::clone(&self.documents),
+            prompts: self.prompts.load(Ordering::Relaxed),
+            show_document: self.show_document.load(Ordering::Relaxed),
+            apply_edit: self.apply_edit.load(Ordering::Relaxed),
+            versioned_edits: self.versioned_edits.load(Ordering::Relaxed),
+        }
+    }
+
+    /// Show the status card for `uri` in a task of its own: no handler ever
+    /// waits for the user's answer.
+    fn show_card(&self, uri: &Url) {
+        let card = self.card();
+        let uri = uri.clone();
+        tokio::spawn(async move { card.run(uri).await });
     }
 
     async fn clear_overlay(
@@ -1013,6 +1283,28 @@ impl LanguageServer for TerraphimLspServer {
             .store(versioned_edits, Ordering::Relaxed);
         self.inlay_hint_refresh
             .store(inlay_hint_refresh, Ordering::Relaxed);
+        let window = params.capabilities.window.as_ref();
+        self.prompts.store(
+            window
+                .and_then(|window| window.show_message.as_ref())
+                .is_some_and(|show| show.message_action_item.is_some()),
+            Ordering::Relaxed,
+        );
+        self.show_document.store(
+            window
+                .and_then(|window| window.show_document.as_ref())
+                .is_some_and(|show| show.support),
+            Ordering::Relaxed,
+        );
+        self.apply_edit.store(
+            params
+                .capabilities
+                .workspace
+                .as_ref()
+                .and_then(|workspace| workspace.apply_edit)
+                .unwrap_or(false),
+            Ordering::Relaxed,
+        );
         let settings = ServerSettings::from_value(params.initialization_options.as_ref());
         self.set_settings(settings.clone());
         settings.thesaurus.clone_into(
@@ -1184,13 +1476,35 @@ impl LanguageServer for TerraphimLspServer {
         let uri = params.text_document_position_params.text_document.uri;
         let position = params.text_document_position_params.position;
 
-        let Some(text) = self.document_text(&uri).await else {
+        let Some(document) = self.documents.read().await.get(&uri).cloned() else {
             return Ok(None);
         };
-
-        let analysis = analyse_kg_document(&text, &self.kg().engine);
+        let text = document.text;
         let index = LineIndex::new(&text);
         let offset = convert::byte_offset(&index, position);
+
+        // A faded trim span: the card and why the span would go.
+        if let Some((view, span)) = document.trim.as_ref().and_then(|view| {
+            view.spans
+                .iter()
+                .find(|span| span.range.start.byte <= offset && offset < span.range.end.byte)
+                .map(|span| (view, span))
+        }) {
+            return Ok(Some(Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: format!(
+                        "**{}** {}\n\n{}\n\n{CARD_HINT}",
+                        view.level.label(),
+                        view.status.card_text(),
+                        span.reason
+                    ),
+                }),
+                range: Some(convert::range(&index, span.range)),
+            }));
+        }
+
+        let analysis = analyse_kg_document(&text, &self.kg().engine);
 
         let hover = analysis
             .matched_terms
@@ -1237,7 +1551,7 @@ impl LanguageServer for TerraphimLspServer {
             actions.extend(self.replacement_actions(&uri, &document, params.range.start));
         }
         if trims {
-            actions.extend(self.trim_actions(&uri, &document));
+            actions.extend(self.trim_actions(&uri, &document, params.range.start));
         }
         let actions: Vec<CodeActionOrCommand> = actions
             .into_iter()
@@ -1278,6 +1592,18 @@ impl LanguageServer for TerraphimLspServer {
             commands::TRIM_CLEAR => {
                 let args = commands::single_argument(&params.command, params.arguments)?;
                 self.trim_clear(args).await
+            }
+            commands::TRIM_KEEP => {
+                let args = commands::single_argument(&params.command, params.arguments)?;
+                self.trim_keep(args).await
+            }
+            commands::TRIM_MAKE_CUTS => {
+                let args = commands::single_argument(&params.command, params.arguments)?;
+                self.trim_make_cuts(args).await
+            }
+            commands::TRIM_NEXT => {
+                let args = commands::single_argument(&params.command, params.arguments)?;
+                self.trim_next(args).await
             }
             other => Err(commands::invalid_params(format!(
                 "unknown command {other:?}"
@@ -1357,6 +1683,374 @@ fn lab_recompute_needed(old: &LabSettings, new: &LabSettings) -> bool {
             .any(|action| !old.actions.contains(action))
 }
 
+/// The status card (R-8.4) and the actions it drives, in a task of its own.
+#[derive(Debug, Clone)]
+struct Card {
+    client: Client,
+    documents: Arc<RwLock<HashMap<Url, OpenDocument>>>,
+    prompts: bool,
+    show_document: bool,
+    apply_edit: bool,
+    versioned_edits: bool,
+}
+
+impl Card {
+    /// Show the card for `uri` and act on the answer until the user is done:
+    /// "Make the cuts" applies the edit, "Walk through" selects the next
+    /// faded span and shows the card again, "Done" or dismissing it leaves
+    /// the fades. Every answer is checked against the version the card was
+    /// shown for. A client without prompts gets the card as a message.
+    async fn run(self, uri: Url) {
+        loop {
+            let Some((version, message)) = self.message(&uri).await else {
+                return;
+            };
+            if !self.prompts {
+                self.client.show_message(MessageType::INFO, message).await;
+                return;
+            }
+            let buttons = [CARD_MAKE_CUTS, CARD_WALK, CARD_DONE]
+                .map(|title| MessageActionItem {
+                    title: title.to_string(),
+                    properties: HashMap::new(),
+                })
+                .to_vec();
+            let answer = self
+                .client
+                .show_message_request(MessageType::INFO, message, Some(buttons))
+                .await;
+            let choice = match answer {
+                Ok(Some(item)) => item.title,
+                Ok(None) => return,
+                Err(error) => {
+                    log::debug!("terraphim_lsp: trim card failed: {error}");
+                    return;
+                }
+            };
+            match choice.as_str() {
+                CARD_MAKE_CUTS => {
+                    self.make_cuts(&uri, version).await;
+                    return;
+                }
+                CARD_WALK => {
+                    if !self.walk(&uri, version).await {
+                        return;
+                    }
+                }
+                _ => return,
+            }
+        }
+    }
+
+    /// The card text for the current preview of `uri` and its version;
+    /// `None` when nothing is previewed.
+    async fn message(&self, uri: &Url) -> Option<(i32, String)> {
+        let documents = self.documents.read().await;
+        let document = documents.get(uri)?;
+        let view = document.trim.as_ref()?;
+        Some((
+            document.version,
+            format!(
+                "{}: {}. {CARD_HINT}",
+                view.level.label(),
+                view.status.card_text()
+            ),
+        ))
+    }
+
+    /// The document if it is still at `version` with a preview; otherwise
+    /// warn that the card is stale.
+    async fn current(&self, uri: &Url, version: i32) -> Option<OpenDocument> {
+        let document = self.documents.read().await.get(uri).cloned();
+        match document {
+            Some(document) if document.version == version && document.trim.is_some() => {
+                Some(document)
+            }
+            _ => {
+                self.client
+                    .show_message(
+                        MessageType::WARNING,
+                        "terraphim-lsp: the document changed since the trim card was shown; \
+                         preview the trim again.",
+                    )
+                    .await;
+                None
+            }
+        }
+    }
+
+    /// The edit "Make the cuts" makes on `document` now, and the words left;
+    /// `None` without a preview.
+    fn cuts_edit(&self, uri: &Url, document: &OpenDocument) -> Option<(WorkspaceEdit, usize)> {
+        let level = document.trim_level?;
+        let plan = document.trim_plan.as_ref()?;
+        let view = document.trim.as_ref()?;
+        let made = trim_cuts(&document.text, plan, level, &document.trim_kept);
+        let index = LineIndex::new(&document.text);
+        let edits = made
+            .edits
+            .iter()
+            .map(|edit| convert::text_edit(&index, edit))
+            .collect();
+        Some((
+            workspace_edit(uri, document.version, edits, self.versioned_edits),
+            view.status.words_after,
+        ))
+    }
+
+    async fn make_cuts(&self, uri: &Url, version: i32) {
+        let Some(document) = self.current(uri, version).await else {
+            return;
+        };
+        if self.apply_edit {
+            // The edit is built from the live state at sending time: a Keep
+            // made since the card was shown is honoured.
+            self.apply_cuts(uri, version, document.generation).await;
+        } else {
+            self.client
+                .show_message(
+                    MessageType::WARNING,
+                    "terraphim-lsp: this editor cannot take server edits; use the \
+                     \"Trim: Make the cuts\" code action.",
+                )
+                .await;
+        }
+    }
+
+    /// Build "Make the cuts" for `uri` and send it with
+    /// `workspace/applyEdit`, if the document is still at `version` and
+    /// `generation` (no edit, Keep, level change or Lab run since the caller
+    /// looked). The edit is built and the pending cut recorded under one
+    /// lock, so what is sent is exactly the state that was checked. The
+    /// preview ends as described at [`PendingCut`].
+    async fn apply_cuts(&self, uri: &Url, version: i32, generation: u64) {
+        let edit = {
+            let mut documents = self.documents.write().await;
+            if documents
+                .get(uri)
+                .is_some_and(|document| document.trim_cutting.is_some())
+            {
+                // One cut at a time: a second request's answer must not
+                // clear or overwrite the first one's pending state.
+                drop(documents);
+                self.client
+                    .show_message(
+                        MessageType::INFO,
+                        "terraphim-lsp: the cuts were already sent to the editor.",
+                    )
+                    .await;
+                return;
+            }
+            let built = documents.get_mut(uri).and_then(|document| {
+                if document.version != version || document.generation != generation {
+                    return None;
+                }
+                let (edit, _) = self.cuts_edit(uri, document)?;
+                document.trim_cutting = Some(PendingCut {
+                    version,
+                    applied: false,
+                });
+                Some(edit)
+            });
+            match built {
+                Some(edit) => edit,
+                None => {
+                    drop(documents);
+                    self.client
+                        .show_message(
+                            MessageType::WARNING,
+                            "terraphim-lsp: the trim preview changed before the cuts were \
+                             made; nothing was cut. Choose \"Make the cuts\" again.",
+                        )
+                        .await;
+                    return;
+                }
+            }
+        };
+        let applied = match self.client.apply_edit(edit).await {
+            Ok(response) => {
+                if !response.applied {
+                    log::info!(
+                        "terraphim_lsp: the client did not apply the cuts: {:?}",
+                        response.failure_reason
+                    );
+                }
+                response.applied
+            }
+            Err(error) => {
+                log::debug!("terraphim_lsp: applyEdit failed: {error}");
+                false
+            }
+        };
+        let mut documents = self.documents.write().await;
+        let Some(document) = documents.get_mut(uri) else {
+            return;
+        };
+        if document.trim_cutting.map(|pending| pending.version) != Some(version) {
+            return;
+        }
+        if !applied {
+            document.trim_cutting = None;
+        } else if document.version > version {
+            // The edit's change arrived first: the preview is over.
+            end_preview(document);
+            document.generation += 1;
+        } else if let Some(pending) = document.trim_cutting.as_mut() {
+            // The change follows; it ends the preview.
+            pending.applied = true;
+        }
+    }
+
+    /// Select the faded span after the one the card last showed (wrapping)
+    /// and remember it. False when the card is stale or nothing is faded.
+    async fn walk(&self, uri: &Url, version: i32) -> bool {
+        let Some(document) = self.current(uri, version).await else {
+            return false;
+        };
+        let Some(span) = walk_step(&document, None) else {
+            return false;
+        };
+        {
+            let mut documents = self.documents.write().await;
+            match documents.get_mut(uri) {
+                Some(stored) if stored.version == version => {
+                    stored.trim_walk = Some(span.start.byte);
+                }
+                _ => return false,
+            }
+        }
+        let range = convert::range(&LineIndex::new(&document.text), span);
+        if self.show_document {
+            select(&self.client, uri.clone(), range).await;
+        }
+        true
+    }
+}
+
+/// Select `range` of `uri` with `window/showDocument`.
+async fn select(client: &Client, uri: Url, range: Range) {
+    let shown = client
+        .show_document(ShowDocumentParams {
+            uri,
+            external: Some(false),
+            take_focus: Some(true),
+            selection: Some(range),
+        })
+        .await;
+    if let Err(error) = shown {
+        log::debug!("terraphim_lsp: showDocument failed: {error}");
+    }
+}
+
+/// The next faded span of a walk through `document`'s preview, wrapping.
+///
+/// The walk continues from the span it last showed while `offset` (the
+/// cursor of the "Walk through" code action) lies within that span, ends
+/// included: after `window/showDocument` the cursor sits at one end of the
+/// selection, and a span can start exactly where the previous one ends.
+/// From anywhere else, the first span starting at or after `offset`. The
+/// card's button walks without a cursor (`None`).
+fn walk_step(document: &OpenDocument, offset: Option<usize>) -> Option<TextRange> {
+    let spans = &document.trim.as_ref()?.spans;
+    let last = document
+        .trim_walk
+        .and_then(|start| spans.iter().position(|span| span.range.start.byte == start));
+    let next = match (last, offset) {
+        (Some(last), None) => last + 1,
+        (Some(last), Some(offset))
+            if spans[last].range.start.byte <= offset && offset <= spans[last].range.end.byte =>
+        {
+            last + 1
+        }
+        (None, None) => match document.trim_walk {
+            // The last span went (a Keep): carry on after where it was.
+            Some(start) => spans
+                .iter()
+                .position(|span| span.range.start.byte > start)
+                .unwrap_or(0),
+            None => 0,
+        },
+        (_, Some(offset)) => spans
+            .iter()
+            .position(|span| span.range.start.byte >= offset)
+            .unwrap_or(0),
+    };
+    spans.get(next).or(spans.first()).map(|span| span.range)
+}
+
+/// End `document`'s trim preview: no level, no keeps, nothing faded.
+fn end_preview(document: &mut OpenDocument) {
+    document.trim_level = None;
+    document.trim_kept.clear();
+    document.trim = None;
+    document.trim_made = None;
+    document.trim_walk = None;
+    document.trim_cutting = None;
+}
+
+/// The number of text edits in a workspace edit built by [`workspace_edit`].
+fn edit_count(edit: &WorkspaceEdit) -> usize {
+    match (&edit.document_changes, &edit.changes) {
+        (Some(DocumentChanges::Edits(documents)), _) => {
+            documents.iter().map(|document| document.edits.len()).sum()
+        }
+        (_, Some(changes)) => changes.values().map(Vec::len).sum(),
+        _ => 0,
+    }
+}
+
+/// A workspace edit applying `edits` to version `version` of `uri`:
+/// a versioned `TextDocumentEdit` when the client accepts
+/// `documentChanges`, so a stale edit is rejected instead of applied to
+/// text it was not computed for; plain `changes` otherwise.
+fn workspace_edit(uri: &Url, version: i32, edits: Vec<TextEdit>, versioned: bool) -> WorkspaceEdit {
+    if !versioned {
+        return WorkspaceEdit {
+            changes: Some(HashMap::from([(uri.clone(), edits)])),
+            ..WorkspaceEdit::default()
+        };
+    }
+    WorkspaceEdit {
+        document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {
+            text_document: OptionalVersionedTextDocumentIdentifier {
+                uri: uri.clone(),
+                version: Some(version),
+            },
+            edits: edits.into_iter().map(OneOf::Left).collect(),
+        }])),
+        ..WorkspaceEdit::default()
+    }
+}
+
+/// The code-action title of a trim level: "Trim: Original", "Trim: Slight
+/// trim ~10%", ...
+fn level_title(level: TrimLevel) -> String {
+    if level == TrimLevel::Original {
+        return format!("Trim: {}", level.label());
+    }
+    format!(
+        "Trim: {} ~{}%",
+        level.label(),
+        (level.target_fraction() * 100.0).round() as u32
+    )
+}
+
+/// A cut's text for a "Keep" title: trimmed of spaces and the punctuation
+/// that joins it to its neighbours, cut to about 40 characters on a word.
+fn excerpt(text: &str) -> String {
+    let text = text
+        .trim()
+        .trim_matches(|c: char| matches!(c, ',' | ';' | ':' | '\u{2014}' | '\u{2013}'))
+        .trim();
+    const MAX: usize = 40;
+    if text.chars().count() <= MAX {
+        return text.to_string();
+    }
+    let cut: String = text.chars().take(MAX).collect();
+    let cut = cut.rsplit_once(' ').map_or(cut.as_str(), |(head, _)| head);
+    format!("{}\u{2026}", cut.trim_end())
+}
+
 /// Whether a requested code-action kind (`params.context.only`) includes
 /// `kind`: equal, or a dot-separated prefix of it (`refactor` includes
 /// `refactor.rewrite`).
@@ -1386,6 +2080,10 @@ mod tests {
 
     async fn installed(server: &TerraphimLspServer) -> OpenDocument {
         server.documents.read().await[&uri()].clone()
+    }
+
+    fn trim_spans(document: &OpenDocument) -> usize {
+        document.trim.as_ref().map_or(0, |view| view.spans.len())
     }
 
     fn request(action: LabAction) -> impl FnOnce(&mut OpenDocument) {
@@ -1474,7 +2172,7 @@ mod tests {
         ));
         let document = installed(server).await;
         assert_eq!(document.lab.len(), 1, "the long-sentence mark survives");
-        assert_eq!(document.trim.len(), 5);
+        assert_eq!(trim_spans(&document), 5);
 
         // Through the command path, a superseded run recomputes from the
         // current state, so its result is what is installed.
@@ -1482,7 +2180,7 @@ mod tests {
         assert_eq!(finished.lab_actions, [LabAction::LongSentences]);
         assert_eq!(finished.lab.len(), 1);
         assert_eq!(finished.trim_level, Some(TrimLevel::Slight));
-        assert_eq!(finished.trim.len(), 5);
+        assert_eq!(trim_spans(&finished), 5);
     }
 
     /// Clearing while a preview is in flight: the preview never comes back.
@@ -1500,7 +2198,7 @@ mod tests {
         server
             .clear_overlay(&uri(), |document| {
                 document.trim_level = None;
-                document.trim.clear();
+                document.trim = None;
             })
             .await
             .unwrap();
@@ -1509,7 +2207,7 @@ mod tests {
             server.install_lab(&uri(), &job, results).await,
             Installed::Superseded
         ));
-        assert!(installed(server).await.trim.is_empty());
+        assert!(installed(server).await.trim.is_none());
     }
 
     #[test]

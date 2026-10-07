@@ -24,7 +24,10 @@
 //! for their range.
 
 use serde::{Deserialize, Serialize};
-use terraphim_lab::{Cut, LabConfig, LabMark, MarkKind, TrimLevel, mark_many, trim_plan};
+use terraphim_lab::{
+    CutId, LabConfig, LabMark, MarkKind, TrimLevel, TrimPlan, TrimStatus, make_cuts, mark_many,
+    trim_plan,
+};
 
 use crate::block::split_annotation_block;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, DiagnosticTag, Severity};
@@ -103,7 +106,7 @@ pub fn severity_for_mark(kind: MarkKind) -> Severity {
 /// assert_eq!(found[0].fix.as_ref().unwrap().title, "Apply fix: receive");
 /// ```
 pub fn lab_findings(text: &str, config: &LabConfig, actions: &[LabAction]) -> Vec<LabFinding> {
-    let body = &text[..split_annotation_block(text).body_end.byte];
+    let body = body_of(text);
     let marks = mark_many(body, config, actions);
     let ranges = ranges_from_utf16(body, marks.iter().map(|m| (m.start, m.end)));
     marks
@@ -125,39 +128,132 @@ pub fn lab_findings(text: &str, config: &LabConfig, actions: &[LabAction]) -> Ve
 /// assert_eq!(preview.diagnostics[0].tags, [DiagnosticTag::Unnecessary]);
 /// ```
 pub fn trim_preview(text: &str, config: &LabConfig, level: TrimLevel) -> TrimPreview {
-    let body = &text[..split_annotation_block(text).body_end.byte];
-    let plan = trim_plan(body, config);
-    let faded: Vec<&Cut> = plan.faded(level).collect();
-    let mut outermost: Vec<&Cut> = faded
-        .iter()
-        .copied()
-        .filter(|cut| {
-            !faded.iter().any(|other| {
-                !std::ptr::eq(*other, *cut)
-                    && other.start <= cut.start
-                    && cut.end <= other.end
-                    && (other.start, other.end) != (cut.start, cut.end)
-            })
-        })
-        .collect();
-    outermost.dedup_by_key(|cut| (cut.start, cut.end));
-    let ranges = ranges_from_utf16(body, outermost.iter().map(|cut| (cut.start, cut.end)));
-    let diagnostics = outermost
+    let plan = trim_plan_for(text, config);
+    let view = trim_view(text, &plan, level, &[]);
+    TrimPreview {
+        level,
+        diagnostics: view.diagnostics,
+        status: view.status.card_text(),
+    }
+}
+
+/// One trim cut positioned in the full text.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TrimCutRange {
+    /// The cut's id in its [`TrimPlan`]. Pieces of a cut split around a
+    /// kept cut share the id.
+    pub id: CutId,
+    /// Where it lies in the full text.
+    pub range: TextRange,
+    /// Why the span would go (`filler "quite"`, `weak sentence`, ...).
+    pub reason: String,
+}
+
+/// The trim review of one level with some cuts kept (R-8.4, R-8.5).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TrimView {
+    /// The level shown.
+    pub level: TrimLevel,
+    /// The status card numbers, honouring the kept cuts.
+    pub status: TrimStatus,
+    /// What "Make the cuts" deletes ([`TrimPlan::active`]), nested cuts
+    /// included, in document order.
+    pub cuts: Vec<TrimCutRange>,
+    /// The faded spans shown: the active cuts not lying inside another
+    /// one, in document order (also the "Walk through" order).
+    pub spans: Vec<TrimCutRange>,
+    /// One [`DiagnosticCode::TrimCandidate`] hint per entry of `spans`,
+    /// tagged [`DiagnosticTag::Unnecessary`].
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// "Make the cuts" on the full text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrimCuts {
+    /// The engine's deletions and join tidy-ups as full-text edits, sorted
+    /// and non-overlapping (see [`terraphim_lab::make_cuts`]).
+    pub edits: Vec<TextEdit>,
+    /// The full text after the edits; the annotation block is untouched.
+    pub text: String,
+}
+
+/// Plan every trim level for the body of `text` (the annotation block is
+/// never given to the engine). The plan depends only on the text and the
+/// configuration; switching level or keeping cuts reuses it.
+pub fn trim_plan_for(text: &str, config: &LabConfig) -> TrimPlan {
+    trim_plan(body_of(text), config)
+}
+
+/// The review of `level` with the cuts in `kept` kept, positioned in
+/// `text`. `plan` must come from [`trim_plan_for`] on the same `text`.
+pub fn trim_view(text: &str, plan: &TrimPlan, level: TrimLevel, kept: &[CutId]) -> TrimView {
+    let body = body_of(text);
+    let active = plan.active(level, kept);
+    let ranges = ranges_from_utf16(body, active.iter().map(|cut| (cut.start, cut.end)));
+    let cuts: Vec<TrimCutRange> = active
         .iter()
         .zip(ranges)
-        .map(|(cut, range)| Diagnostic {
+        .map(|(cut, range)| TrimCutRange {
+            id: cut.id,
             range,
+            reason: cut.reason.clone(),
+        })
+        .collect();
+    let mut spans: Vec<TrimCutRange> = cuts
+        .iter()
+        .filter(|cut| {
+            !cuts.iter().any(|other| {
+                other.range.start.byte <= cut.range.start.byte
+                    && cut.range.end.byte <= other.range.end.byte
+                    && other.range.bytes() != cut.range.bytes()
+            })
+        })
+        .cloned()
+        .collect();
+    spans.dedup_by(|a, b| a.range.bytes() == b.range.bytes());
+    let diagnostics = spans
+        .iter()
+        .map(|span| Diagnostic {
+            range: span.range,
             severity: Severity::Hint,
             code: DiagnosticCode::TrimCandidate,
-            message: format!("{}: {}", level.label(), cut.reason),
+            message: format!("{}: {}", level.label(), span.reason),
             tags: vec![DiagnosticTag::Unnecessary],
         })
         .collect();
-    TrimPreview {
+    TrimView {
         level,
+        status: plan.status(level, kept),
+        cuts,
+        spans,
         diagnostics,
-        status: plan.status(level, &[]).card_text(),
     }
+}
+
+/// "Make the cuts" at `level` with `kept` kept: the engine's
+/// [`make_cuts`] on the body, as edits on the full `text`. `plan` must come
+/// from [`trim_plan_for`] on the same `text`.
+pub fn trim_cuts(text: &str, plan: &TrimPlan, level: TrimLevel, kept: &[CutId]) -> TrimCuts {
+    let body = body_of(text);
+    let made = make_cuts(body, &plan.active(level, kept));
+    let ranges = ranges_from_utf16(body, made.edits.iter().map(|edit| (edit.start, edit.end)));
+    let edits = made
+        .edits
+        .into_iter()
+        .zip(ranges)
+        .map(|(edit, range)| TextEdit {
+            range,
+            new_text: edit.insert,
+        })
+        .collect();
+    let mut after = made.text;
+    after.push_str(&text[body.len()..]);
+    TrimCuts { edits, text: after }
+}
+
+/// The body of `text`: everything before the annotation block.
+fn body_of(text: &str) -> &str {
+    &text[..split_annotation_block(text).body_end.byte]
 }
 
 fn finding(mark: LabMark, range: TextRange) -> LabFinding {

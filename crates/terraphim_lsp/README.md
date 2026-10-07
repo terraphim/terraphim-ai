@@ -38,11 +38,31 @@ offers:
   "Apply fix: X" (`quickfix`) replacing exactly the marked range. On any
   open document, command-only trim actions (`refactor.terraphim.trim`, no
   `edit`) for clients that cannot add palette commands, such as Zed:
-  "Trim preview: slight|tighten|sharper|half" run `terraphim.trim.preview`
-  with `{uri, level, version}`, and "Clear trim preview" runs
-  `terraphim.trim.clear`. The menu is stateless (Zed caches code actions until
-  the cursor moves): the active level is still listed and clear is always
-  offered; repeating either is a no-op.
+  "Trim: Original", "Trim: Slight trim ~10%", "Trim: Tighten more ~20%",
+  "Trim: Even sharper ~30%" and "Trim: Cut in half ~50%" run
+  `terraphim.trim.preview` with `{uri, level, version}` ("Original" ends the
+  preview); "Trim: Make the cuts" runs `terraphim.trim.make_cuts` and "Trim:
+  Walk through" runs `terraphim.trim.next` from the cursor; with the cursor
+  inside a faded cut, "Keep: «excerpt»" runs `terraphim.trim.keep` (innermost
+  cut first). The menu is stateless (Zed caches code actions until the cursor
+  moves): every level and review action is always listed and reads the trim
+  state when it runs, so "Make the cuts" is a command, not a cached edit that
+  would ignore a later Keep.
+- **Trim review** (R-8.4, R-8.5) - after a preview or a Keep the server
+  shows the status card with `window/showMessageRequest`, without waiting
+  for it: `Slight trim: 479 → 433 words · −10%. Faded words would go. Keep
+  one with the Keep action.` with the buttons `Make the cuts`, `Walk
+  through` and `Done`. "Make the cuts" sends the engine's `make_cuts` edit
+  (deletions plus join tidy-ups) through `workspace/applyEdit`, versioned and
+  rechecked against the version the card was shown for; when the client
+  reports exactly that text back, the preview ends. "Walk through" selects
+  the next faded span with `window/showDocument` and shows the card again;
+  "Done" or dismissing it leaves the fades. Hovering a faded span shows the
+  card numbers and why the span would go. Clients without
+  `window.showMessage.messageActionItem` get the card as a plain message;
+  without `workspace.applyEdit`, `terraphim.trim.make_cuts` returns the
+  edit; without `window.showDocument.support`, `terraphim.trim.next` returns
+  the range only.
 - **`textDocument/inlayHint`** - `[i/n]` after each KG term with
   alternatives: the current form is synonym `i` of `n`. Off by default.
 - **`workspace/executeCommand`** - see below.
@@ -143,8 +163,11 @@ version of the document, or the request fails with `ContentModified`.
 | `terraphim.alternative.add` | `uri`, `range`, `text`, `kind?` (`word`/`sentence`/`paragraph`), `version?` | a `WorkspaceEdit` that rewrites only the trailing annotation block, written by terraphim-editor's own writer; the client applies it |
 | `terraphim.lab.mark` | `uri`, `action`, `version?` | `{ action, marks }`; the action sticks to the document until cleared |
 | `terraphim.lab.clear` | `uri` | `null` |
-| `terraphim.trim.preview` | `uri`, `level` (`original`/`slight`/`tighten`/`sharper`/`half`), `version?` | `{ level, candidates, status }`, `status` being the Lab status card (`61 → 55 words · −10%`) |
+| `terraphim.trim.preview` | `uri`, `level` (`original`/`slight`/`tighten`/`sharper`/`half`), `version?` | `{ level, candidates, status, words_before, words_after, percent }`, `status` being the Lab status card (`61 → 55 words · −10%`); the card is then shown |
 | `terraphim.trim.clear` | `uri` | `null` |
+| `terraphim.trim.keep` | `uri`, `cut`, `version?` | like `terraphim.trim.preview`, with the cut un-faded; the card is shown again |
+| `terraphim.trim.make_cuts` | `uri`, `version?` | `{ edits, words_after }`; the edit goes out with `workspace/applyEdit`, or is returned as `edit` |
+| `terraphim.trim.next` | `uri`, `position`, `version?` | `{ range }` of the next faded span after `position`, wrapping; `null` with nothing faded |
 
 `terraphim.alternative.add` refuses (`InvalidParams`) a malformed block, a
 range outside the body, an alternative equal to the current text or already

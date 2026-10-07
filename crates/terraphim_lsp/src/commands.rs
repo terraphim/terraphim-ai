@@ -11,8 +11,11 @@
 //! | [`ADD_ALTERNATIVE`] | `uri`, `range`, `text`, `kind?`, `version?` | a `WorkspaceEdit` rewriting the annotation block |
 //! | [`LAB_MARK`] | `uri`, `action`, `version?` | `{ action, marks }`; the marks are published as diagnostics |
 //! | [`LAB_CLEAR`] | `uri` | `null`; Lab marks removed |
-//! | [`TRIM_PREVIEW`] | `uri`, `level`, `version?` | `{ level, candidates, status }`; candidates published as faded hints |
+//! | [`TRIM_PREVIEW`] | `uri`, `level`, `version?` | `{ level, candidates, status, words_before, words_after, percent }`; candidates published as faded hints, then the status card |
 //! | [`TRIM_CLEAR`] | `uri` | `null`; trim hints removed |
+//! | [`TRIM_KEEP`] | `uri`, `cut`, `version?` | like [`TRIM_PREVIEW`]; the cut is un-faded, then the card is re-sent |
+//! | [`TRIM_MAKE_CUTS`] | `uri`, `version?` | `{ edits, words_after }`, plus `edit` (a `WorkspaceEdit`) when the client cannot take `workspace/applyEdit` |
+//! | [`TRIM_NEXT`] | `uri`, `position`, `version?` | `{ range }` of the next faded span after `position` (wrapping), selected with `window/showDocument`; `null` when nothing is faded |
 //!
 //! `action` is one of `typos_and_punctuation`, `weakest_sentences`,
 //! `long_sentences`, `convoluted_sentences`, `off_tone`,
@@ -37,9 +40,9 @@
 use serde::Deserialize;
 use serde_json::Value;
 use tower_lsp::jsonrpc::{Error, ErrorCode};
-use tower_lsp::lsp_types::{Range, Url};
+use tower_lsp::lsp_types::{Position, Range, Url};
 
-use terraphim_lsp_core::{LabAction, SpanKind, TrimLevel};
+use terraphim_lsp_core::{CutId, LabAction, SpanKind, TrimLevel};
 
 /// Add a human-written alternative for a range to the annotation block.
 ///
@@ -63,6 +66,18 @@ pub const TRIM_PREVIEW: &str = "terraphim.trim.preview";
 /// Remove a document's trim preview.
 pub const TRIM_CLEAR: &str = "terraphim.trim.clear";
 
+/// Keep one faded cut of the trim preview (un-fade it) and recompute the
+/// status card.
+pub const TRIM_KEEP: &str = "terraphim.trim.keep";
+
+/// Delete every still-faded span of the trim preview ("Make the cuts"):
+/// the server sends the edit with `workspace/applyEdit`, or returns it to a
+/// client that cannot take that request.
+pub const TRIM_MAKE_CUTS: &str = "terraphim.trim.make_cuts";
+
+/// Select the next faded span after a position ("Walk through").
+pub const TRIM_NEXT: &str = "terraphim.trim.next";
+
 /// Every command the server executes, as advertised in
 /// `executeCommandProvider.commands`.
 pub const ALL: &[&str] = &[
@@ -71,6 +86,9 @@ pub const ALL: &[&str] = &[
     LAB_CLEAR,
     TRIM_PREVIEW,
     TRIM_CLEAR,
+    TRIM_KEEP,
+    TRIM_MAKE_CUTS,
+    TRIM_NEXT,
 ];
 
 /// Arguments of [`ADD_ALTERNATIVE`].
@@ -113,6 +131,43 @@ pub struct TrimPreviewArgs {
     pub uri: Url,
     /// The level to preview.
     pub level: TrimLevel,
+    /// The document version the client expects.
+    #[serde(default)]
+    pub version: Option<i32>,
+}
+
+/// Arguments of [`TRIM_KEEP`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrimKeepArgs {
+    /// The document.
+    pub uri: Url,
+    /// The cut to keep, as offered by the "Keep" code action.
+    pub cut: CutId,
+    /// The document version the client expects.
+    #[serde(default)]
+    pub version: Option<i32>,
+}
+
+/// Arguments of [`TRIM_MAKE_CUTS`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrimMakeCutsArgs {
+    /// The document.
+    pub uri: Url,
+    /// The document version the client expects.
+    #[serde(default)]
+    pub version: Option<i32>,
+}
+
+/// Arguments of [`TRIM_NEXT`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrimNextArgs {
+    /// The document.
+    pub uri: Url,
+    /// Where to start looking; the next span starts after it.
+    pub position: Position,
     /// The document version the client expects.
     #[serde(default)]
     pub version: Option<i32>,

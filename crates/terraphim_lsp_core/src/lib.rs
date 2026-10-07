@@ -82,8 +82,8 @@ pub use engine::{
     TextEdit, apply_edits,
 };
 pub use lab::{
-    LabAction, LabFinding, LabFix, TrimPreview, code_for_mark, lab_findings, severity_for_mark,
-    trim_preview,
+    LabAction, LabFinding, LabFix, TrimCutRange, TrimCuts, TrimPreview, TrimView, code_for_mark,
+    lab_findings, severity_for_mark, trim_cuts, trim_plan_for, trim_preview, trim_view,
 };
 pub use offset::{LineIndex, LinePosition, TextOffset, TextRange, utf16_len};
 /// Span granularity for [`add_alternative`], re-exported from
@@ -93,7 +93,7 @@ pub use terraphim_alternatives::SpanKind;
 pub use terraphim_alternatives::{Article, article_for};
 /// The Lab engine's configuration, mark kinds and trim levels, re-exported
 /// from `terraphim_lab`.
-pub use terraphim_lab::{LabConfig, LabError, MarkKind, TrimLevel};
+pub use terraphim_lab::{CutId, LabConfig, LabError, MarkKind, TrimLevel, TrimPlan, TrimStatus};
 
 /// Re-exported so callers can build a thesaurus without a direct dependency.
 pub use terraphim_types::Thesaurus;

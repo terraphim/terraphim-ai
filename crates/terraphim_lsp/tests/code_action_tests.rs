@@ -632,6 +632,17 @@ fn trim_kind() -> CodeActionKind {
     CodeActionKind::new(TRIM_KIND)
 }
 
+/// The trim menu, outside any faded cut: five levels, then the review.
+const TRIM_MENU: [&str; 7] = [
+    "Trim: Original",
+    "Trim: Slight trim ~10%",
+    "Trim: Tighten more ~20%",
+    "Trim: Even sharper ~30%",
+    "Trim: Cut in half ~50%",
+    "Trim: Make the cuts",
+    "Trim: Walk through",
+];
+
 #[tokio::test]
 async fn trim_actions_are_command_only_previews() {
     let (service, _socket) = open_server(LAB_DOC, versioned_client()).await;
@@ -644,26 +655,19 @@ async fn trim_actions_are_command_only_previews() {
         .collect();
     assert_eq!(
         titles_of(&trims),
-        [
-            "Trim preview: slight",
-            "Trim preview: tighten",
-            "Trim preview: sharper",
-            "Trim preview: half",
-            "Clear trim preview",
-        ],
-        "stateless menu (Zed caches it): always all levels and clear, never `original`"
+        TRIM_MENU,
+        "stateless menu (Zed caches it): always every level and the review actions"
     );
-    let clear = trims.last().unwrap();
-    assert!(clear.edit.is_none());
-    assert_eq!(
-        clear.command.as_ref().unwrap().command,
-        "terraphim.trim.clear"
-    );
-    for (trim, level) in trims.iter().zip(["slight", "tighten", "sharper", "half"]) {
+    for trim in &trims {
         assert!(trim.edit.is_none(), "command-only so clients execute it");
+        assert_eq!(trim.command.as_ref().unwrap().title, trim.title);
+    }
+    for (trim, level) in trims
+        .iter()
+        .zip(["original", "slight", "tighten", "sharper", "half"])
+    {
         let command = trim.command.as_ref().expect("command");
         assert_eq!(command.command, "terraphim.trim.preview");
-        assert_eq!(command.title, trim.title);
         assert_eq!(
             command.arguments,
             Some(vec![
@@ -671,6 +675,22 @@ async fn trim_actions_are_command_only_previews() {
             ])
         );
     }
+    let make = trims[5].command.as_ref().unwrap();
+    assert_eq!(make.command, "terraphim.trim.make_cuts");
+    assert_eq!(
+        make.arguments,
+        Some(vec![serde_json::json!({"uri": uri(), "version": 1})])
+    );
+    let walk = trims[6].command.as_ref().unwrap();
+    assert_eq!(walk.command, "terraphim.trim.next");
+    assert_eq!(
+        walk.arguments,
+        Some(vec![serde_json::json!({
+            "uri": uri(),
+            "version": 1,
+            "position": {"line": 0, "character": 0}
+        })])
+    );
 }
 
 fn titles_of<'a>(actions: &[&'a CodeAction]) -> Vec<&'a str> {
@@ -690,7 +710,7 @@ async fn trim_actions_honour_the_only_filter() {
         let actions = request_all_actions(server, at, Some(only))
             .await
             .expect("trims");
-        assert_eq!(actions.len(), 5);
+        assert_eq!(actions.len(), TRIM_MENU.len());
         assert!(actions.iter().all(|a| a.kind == Some(trim_kind())));
     }
     for only in [
@@ -709,7 +729,7 @@ async fn trim_actions_honour_the_only_filter() {
         .expect("actions");
     assert_eq!(
         all.iter().filter(|a| a.kind == Some(trim_kind())).count(),
-        5
+        TRIM_MENU.len()
     );
 }
 
@@ -764,7 +784,7 @@ async fn trim_diagnostics(server: &TerraphimLspServer) -> usize {
 }
 
 #[tokio::test]
-async fn executing_a_trim_action_previews_and_the_clear_action_removes_it() {
+async fn executing_a_trim_action_previews_and_trim_original_removes_it() {
     let (service, _socket) = open_server(LAB_DOC, versioned_client()).await;
     let server = service.inner();
     let at = Position::new(0, 0);
@@ -772,39 +792,23 @@ async fn executing_a_trim_action_previews_and_the_clear_action_removes_it() {
 
     let actions = request_all_actions(server, at, only()).await.unwrap();
     assert_eq!(trim_diagnostics(server).await, 0);
-    let slight = actions
-        .iter()
-        .find(|a| a.title.ends_with("slight"))
-        .unwrap();
-    run(server, slight).await;
+    run(server, &actions[1]).await;
     assert_eq!(trim_diagnostics(server).await, 5);
 
     // The menu does not change with the active level.
     let actions = request_all_actions(server, at, only()).await.unwrap();
-    assert_eq!(
-        titles(&actions),
-        [
-            "Trim preview: slight",
-            "Trim preview: tighten",
-            "Trim preview: sharper",
-            "Trim preview: half",
-            "Clear trim preview",
-        ]
-    );
-    let clear = actions.last().unwrap();
-    assert!(clear.edit.is_none());
-    assert_eq!(
-        clear.command.as_ref().unwrap().arguments,
-        Some(vec![serde_json::json!({"uri": uri()})])
-    );
+    assert_eq!(titles(&actions), TRIM_MENU);
     // Re-previewing the active level is a no-op.
-    run(server, &actions[0]).await;
+    run(server, &actions[1]).await;
     assert_eq!(trim_diagnostics(server).await, 5);
-    run(server, clear).await;
+    run(server, &actions[0]).await;
     assert_eq!(trim_diagnostics(server).await, 0);
-    // Clearing with nothing active is harmless.
-    run(server, clear).await;
-    assert_eq!(trim_diagnostics(server).await, 0);
+    // "Original" with nothing active, and the review actions with nothing
+    // faded, are harmless.
+    for action in [&actions[0], &actions[5], &actions[6]] {
+        run(server, action).await;
+        assert_eq!(trim_diagnostics(server).await, 0);
+    }
     let again = request_all_actions(server, at, only()).await.unwrap();
     assert_eq!(titles(&again), titles(&actions), "stateless menu");
 }

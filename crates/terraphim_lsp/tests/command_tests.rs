@@ -239,6 +239,9 @@ async fn initialize_advertises_inlay_hints_and_every_command() {
             "terraphim.lab.clear",
             "terraphim.trim.preview",
             "terraphim.trim.clear",
+            "terraphim.trim.keep",
+            "terraphim.trim.make_cuts",
+            "terraphim.trim.next",
         ]
     );
 }
@@ -719,10 +722,14 @@ async fn trim_preview_fades_candidates_until_cleared() {
     .await
     .unwrap()
     .unwrap();
+    assert_eq!(result["level"], json!("slight"));
+    assert_eq!(result["candidates"], json!(5));
     assert_eq!(
-        result,
-        json!({"level": "slight", "candidates": 5, "status": "61 \u{2192} 55 words \u{b7} \u{2212}10%"})
+        result["status"],
+        json!("61 \u{2192} 55 words \u{b7} \u{2212}10%")
     );
+    assert_eq!(result["words_before"], json!(61));
+    assert_eq!(result["words_after"], json!(55));
     let all = diagnostics(server).await;
     let trimmed = with_code(&all, "trim-candidate");
     assert_eq!(trimmed.len(), 5);
