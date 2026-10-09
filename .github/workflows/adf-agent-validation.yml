@@ -44,6 +44,17 @@ jobs:
           rustc --version
           cargo --version
 
+      - name: Disable Rust wrappers for self-hosted builds
+        # The runner host sets rustc-wrapper = "kache" in ~/.cargo/config.toml,
+        # but kache is not on the runner PATH, so cargo dies with "could not
+        # execute process `kache ...` (never executed)". release-lsp.yml clears
+        # the wrapper on its self-hosted lane for the same reason.
+        run: |
+          {
+            echo "RUSTC_WRAPPER="
+            echo "RUSTC_WORKSPACE_WRAPPER="
+          } >> "$GITHUB_ENV"
+
       - name: Build adf binary
         run: |
           cargo build --release -p terraphim_orchestrator --bin adf
