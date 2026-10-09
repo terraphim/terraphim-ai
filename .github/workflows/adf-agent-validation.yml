@@ -53,7 +53,9 @@ jobs:
         # content-addressed cache the wrapper exists to provide.
         run: |
           echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-          kache --version
+          # GITHUB_PATH applies from the next step, so assert the binary
+          # directly here rather than relying on PATH already being updated.
+          "${HOME}/.local/bin/kache" --version
 
       - name: Build adf binary
         run: |
