@@ -1,0 +1,3 @@
+# The manifest is compared byte-for-byte with the Linux-built VSIX on every host.
+.gitattributes text eol=lf
+media/editor-build.json text eol=lf
