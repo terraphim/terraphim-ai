@@ -1,50 +1,61 @@
 {
   "name": "terraphim-it",
   "displayName": "Terraphim It",
-  "description": "Apply Current Terraphim AI role to the current text",
-  "version": "0.0.3",
+  "description": "Intelligent Markdown editor with alternatives, knowledge-graph synonyms and role-based suggestions",
+  "version": "0.1.0",
   "publisher": "applied-knowledge-systems",
   "private": true,
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/terraphim/terraphim-ai"
   },
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.126.0"
   },
   "categories": [
     "AI",
-    "Programming Languages",
-    "Education",
-    "Machine Learning",
-    "Data Science",
     "Other",
     "Snippets"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCustomEditor:terraphimIt.alternativeControl"
+  ],
   "main": "./out/extension",
   "contributes": {
     "commands": [
       {
         "command": "extension.terraphimCommand",
-        "title": "Terraphim IT"
+        "title": "Terraphim IT",
+        "enablement": "isWorkspaceTrusted"
       },
       {
         "command": "extension.terraphimAIAutocomplete",
-        "title": "Terraphim AI Autocomplete"
+        "title": "Terraphim AI Autocomplete",
+        "enablement": "isWorkspaceTrusted"
       },
       {
         "command": "extension.terraphimNapiAutocomplete",
-        "title": "Terraphim Napi Autocomplete"
+        "title": "Terraphim Napi Autocomplete",
+        "enablement": "isWorkspaceTrusted"
       },
       {
         "command": "extension.terraphimServerAutocomplete",
-        "title": "Terraphim Server Autocomplete"
+        "title": "Terraphim Server Autocomplete",
+        "enablement": "isWorkspaceTrusted"
       },
       {
         "command": "extension.terraphimHealthCheck",
-        "title": "Terraphim Server Health Check"
+        "title": "Terraphim Server Health Check",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "terraphimIt.openAlternativeControl",
+        "title": "Terraphim: Open Alternative Control"
+      },
+      {
+        "command": "terraphimIt.exportKnowledgeGraph",
+        "title": "Terraphim: Export Document Knowledge Graph"
       }
     ],
     "configuration": {
@@ -76,15 +87,33 @@
           "description": "Default role to use for searches and autocomplete"
         }
       }
-    }
+    },
+    "customEditors": [
+      {
+        "viewType": "terraphimIt.alternativeControl",
+        "displayName": "Terraphim Alternative Control",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "option"
+      }
+    ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "python3 scripts/editor_assets.py && npm run compile",
     "compile": "npx tsc -p ./",
     "lint": "eslint \"src/**/*.ts\"",
     "watch": "npx tsc -watch -p ./",
     "update-ontologies": "npx ad-generate ontologies",
-    "build-rust": "wasm-pack build rust-lib --target nodejs"
+    "build-rust": "wasm-pack build rust-lib --target nodejs",
+    "test:host": "node --test tests/hostProtocol.test.cjs",
+    "test:assets": "python3 -m unittest discover -s tests -p \"*_test.py\"",
+    "test:export": "node --test tests/knowledgeGraphExport.test.cjs tests/exportIntent.test.cjs tests/exportTarget.test.cjs",
+    "editor:fetch": "python3 scripts/released_editor.py",
+    "package:vsix": "vsce package --pre-release --out terraphim-it.vsix",
+    "test:native": "node tests/runPackaged.cjs"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",
@@ -92,10 +121,19 @@
     "@typescript-eslint/eslint-plugin": "^7.14.0",
     "@typescript-eslint/parser": "^7.14.0",
     "eslint": "^8.26.0",
-    "typescript": "^5.6"
+    "typescript": "^5.6",
+    "@vscode/vsce": "4.0.0",
+    "ovsx": "1.2.0",
+    "@vscode/test-electron": "3.1.0"
   },
   "dependencies": {
     "@tomic/cli": "0.40.0",
     "@tomic/lib": "0.40.0"
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Alternative Control edits Markdown locally. Existing server and native-module commands require a trusted workspace."
+    }
   }
 }

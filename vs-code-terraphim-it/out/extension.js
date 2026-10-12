@@ -2,13 +2,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 const vscode = require("vscode");
+const alternativeControl_1 = require("./alternativeControl");
 const lib_1 = require("@tomic/lib");
 const getStore_1 = require("./helpers/getStore");
 const serverConnection_1 = require("./helpers/serverConnection");
-const pkg_1 = require("../rust-lib/pkg");
-const index_js_1 = require("terraphim_ai_nodejs/index.js");
 const airportOntology_1 = require("./ontologies/airportOntology");
 function activate(context) {
+    (0, alternativeControl_1.registerAlternativeControl)(context);
     let agent;
     let store;
     let activeProvider;
@@ -40,7 +40,7 @@ function activate(context) {
             const text = document.getText();
             const results = await get_all_resources(store);
             const thesaurus = JSON.stringify(results);
-            const replacedText = await (0, pkg_1.replace_links)(text, thesaurus);
+            const replacedText = await replace_links(text, thesaurus);
             editor.edit(editBuilder => {
                 editBuilder.replace(new vscode.Range(0, 0, editor.document.lineCount, 0), replacedText.toString());
             });
@@ -165,7 +165,7 @@ class TerraphimNapiCompletionProvider {
                     }
                     else {
                         // Fallback to local nodejs binding
-                        const results = await (0, index_js_1.searchDocumentsSelectedRole)(word);
+                        const results = await searchDocumentsSelectedRole(word);
                         const parsedResults = JSON.parse(results);
                         this.lastResults = this.createCompletionItems(parsedResults);
                     }
@@ -174,7 +174,7 @@ class TerraphimNapiCompletionProvider {
                     console.warn('Server search failed, using local nodejs binding:', error);
                     // Fallback to local nodejs binding
                     try {
-                        const results = await (0, index_js_1.searchDocumentsSelectedRole)(word);
+                        const results = await searchDocumentsSelectedRole(word);
                         const parsedResults = JSON.parse(results);
                         this.lastResults = this.createCompletionItems(parsedResults);
                     }
@@ -311,5 +311,17 @@ async function get_all_resources(store) {
     }
     // console.log(results);
     return results;
+}
+// Native integrations are optional: do not prevent the shared WASM editor
+// from activating when a platform-specific binding has not been built.
+async function replace_links(text, thesaurus) {
+    const nativePath = '../rust-lib/pkg';
+    const native = await Promise.resolve(`${nativePath}`).then(s => require(s));
+    return native.replace_links(text, thesaurus);
+}
+async function searchDocumentsSelectedRole(word) {
+    const nativePath = 'terraphim_ai_nodejs/index.js';
+    const native = await Promise.resolve(`${nativePath}`).then(s => require(s));
+    return native.searchDocumentsSelectedRole(word);
 }
 //# sourceMappingURL=extension.js.map

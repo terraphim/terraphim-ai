@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
+import { registerAlternativeControl } from './alternativeControl';
 import { CollectionBuilder, core, Store } from '@tomic/lib';
 import { getStore, getUpdatedStore } from './helpers/getStore';
 import { serverConnection } from './helpers/serverConnection';
-import { replace_links } from '../rust-lib/pkg';
-import { searchDocumentsSelectedRole } from 'terraphim_ai_nodejs/index.js';
 import {
   airportOntology,
   type SystemOperatorAnalyticalLens,
@@ -22,6 +21,7 @@ interface EngineeringData {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+  registerAlternativeControl(context);
   let agent: string | undefined;
   let store: Store | undefined;
   let activeProvider: vscode.Disposable | undefined;
@@ -411,4 +411,17 @@ async function get_all_resources(store: Store): Promise<EngineeringData> {
   }
   // console.log(results);
   return results;
+}
+
+// Native integrations are optional: do not prevent the shared WASM editor
+// from activating when a platform-specific binding has not been built.
+async function replace_links(text: string, thesaurus: string): Promise<string> {
+  const nativePath = '../rust-lib/pkg';
+  const native = await import(nativePath) as { replace_links(text: string, thesaurus: string): Promise<string> };
+  return native.replace_links(text, thesaurus);
+}
+async function searchDocumentsSelectedRole(word: string): Promise<string> {
+  const nativePath = 'terraphim_ai_nodejs/index.js';
+  const native = await import(nativePath) as { searchDocumentsSelectedRole(word: string): Promise<string> };
+  return native.searchDocumentsSelectedRole(word);
 }

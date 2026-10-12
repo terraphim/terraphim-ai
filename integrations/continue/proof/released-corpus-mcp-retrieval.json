@@ -1,0 +1,70 @@
+{
+  "mode": "retrieval-only",
+  "binarySha256": "ce20e2bf87c6753c717dade4ac7baac98b05d0be9cb39af1f3afbcbf6e5c47de",
+  "graphSha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d",
+  "argv": [
+    "/Users/alex/.codex/visualizations/2026/10/09/01a1221d-a378-7a00-8943-4c42925945f0/synonym-search-story/releases-20261011/clients-runtime/terraphim-grep",
+    "--search-only",
+    "--json",
+    "--thesaurus",
+    "/Users/alex/.codex/visualizations/2026/10/09/01a1221d-a378-7a00-8943-4c42925945f0/synonym-search-story/extensions-20261012/vscode-export-review/native-export-partial/risk-concern.knowledge-graph.json",
+    "--paths",
+    "/Users/alex/.codex/visualizations/2026/10/09/01a1221d-a378-7a00-8943-4c42925945f0/synonym-search-story/releases-20261011/flow/corpus",
+    "-n",
+    "8",
+    "--",
+    "Concern"
+  ],
+  "output": {
+    "chunks": [
+      {
+        "content": "Risk: Timber may arrive late. Decision: Keep a backup supplier.",
+        "source": "project-brief.md",
+        "line_start": 7,
+        "line_end": 7,
+        "relevance_score": 2.0,
+        "haystack": "code"
+      },
+      {
+        "content": "Risk: Rain may delay planting. Decision: Reserve a covered area.",
+        "source": "project-brief.md",
+        "line_start": 10,
+        "line_end": 10,
+        "relevance_score": 2.0,
+        "haystack": "code"
+      },
+      {
+        "content": "Risk: Volunteers may cancel. Decision: Keep a reserve list.",
+        "source": "project-brief.md",
+        "line_start": 13,
+        "line_end": 13,
+        "relevance_score": 2.0,
+        "haystack": "code"
+      }
+    ],
+    "answer": null,
+    "concepts": [
+      {
+        "id": 0,
+        "name": "concern",
+        "display_value": null,
+        "score": 1.0
+      },
+      {
+        "id": 0,
+        "name": "risk",
+        "display_value": null,
+        "score": 1.0
+      }
+    ],
+    "sufficiency": "SearchOnly",
+    "sufficiency_explanation": "Found 3 chunks but diversity 1 < 2; returning search results only (pass --answer or --force-rlm to synthesise).",
+    "stats": {
+      "search_latency_ms": 3,
+      "rlm_latency_ms": null,
+      "chunks_returned": 3,
+      "kg_hits": 2
+    }
+  },
+  "serverSha256": "6c1d4b1dd891b39edb9da62312ebc6ac95147e3f8bf65bd490ed6cf9f93f9962"
+}

@@ -1,0 +1,11 @@
+/media/editor/
+__pycache__/
+
+# Qualified packages and native test receipts are CI artifacts.
+*.vsix
+release-manifest.json
+SHA256SUMS
+native-results/
+.vscode-test/
+publication.json
+registry.json

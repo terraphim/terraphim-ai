@@ -1,4 +1,24 @@
-# Terraphim IT - VS Code Extension
+# Terraphim It — intelligent Markdown editing
+
+Keep alternatives beside your writing, swap wording, and share their knowledge graph with search. This extends the existing `applied-knowledge-systems.terraphim-it` extension.
+
+1. Open a Markdown file and run **Terraphim: Open Alternative Control**.
+2. Select a word such as **Risk**, add **Concern** as an alternative, and choose which wording is active.
+3. Save the document. VS Code owns persistence and undo/redo; the annotation block preserves the alternatives.
+4. Run **Terraphim: Export Document Knowledge Graph**, or use the editor's **Share with search** dialog. Save the JSON and export clean Markdown into a corpus folder.
+5. Search it with a released CLI:
+
+```sh
+terraphim-grep concern --paths ./briefs --thesaurus ./brief.knowledge-graph.json --search-only --json
+terraphim-grep concern --paths ./briefs --thesaurus ./brief.knowledge-graph.json --answer --json
+```
+
+The first command retrieves matching sources. `--answer` additionally uses your configured synthesis provider. Exporting a graph is explicit: it does not automatically modify a shared role or upload your document.
+
+This preview targets desktop VS Code 1.126+. Editing and KG export run locally using bundled Terraphim WASM. Suggestions from the built-in graph are synonyms, not generated LLM rewrites. [Integration details and current acceptance scope](README-alternative-control.md).
+
+## Existing server and Atomic commands
+
 
 An intelligent VS Code extension that integrates with Terraphim AI to provide semantic search and AI-powered autocomplete functionality for your code and documents.
 

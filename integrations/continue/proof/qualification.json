@@ -1,0 +1,34 @@
+{
+  "status": "finite-checks-passed",
+  "nativeContinueUI": "NOT_DEMONSTRATED",
+  "optionalProviderSynthesis": "BLOCKED_BY_AUTOMATIC_APPROVAL_REVIEW_NOT_PRODUCT_FAILURE",
+  "sdk": "mcp==1.30.0",
+  "testCount": 6,
+  "actualReleasedCorpusChunks": 3,
+  "sources": {
+    "integrations/continue/.gitignore": "2874c28384c174d45bd90025557c0ad82eb61833f1be3ce16540dc2b621d8852",
+    "integrations/continue/README.md": "2382aada437efd9c0829926f2b00748aec4e03c75607709deeeaf0ce06d33d9e",
+    "integrations/continue/install.py": "20ad3d9dc1f516c06a968d45b1d5de0c6b15fe06c7fc1c7b9efb4bddbd0b8a41",
+    "integrations/continue/integration.json": "c280ee4a0931e7c1a2cbc4ee50be88c4dabe28140eb94acc69fdd332c614435b",
+    "integrations/continue/package.py": "9c630508814bdcbdf38a1a307cea9b4587e269962180b290059011f8e5311648",
+    "integrations/continue/requirements.txt": "041f051d52c80d80584fabc4e90b6eb7a30a5ba41ea5ac340060875e9c919e94",
+    "integrations/continue/risk-concern.exported.json": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d",
+    "integrations/continue/server.py": "6c1d4b1dd891b39edb9da62312ebc6ac95147e3f8bf65bd490ed6cf9f93f9962",
+    "integrations/continue/test_install.py": "7eed8d945acfadfbc6374fb9b350f172b03ca60a01d819d81a042c145c9d40c0",
+    "integrations/continue/test_package.py": "92223f584bd6f70b70a689d327d1deab2479fe9d7e6260d3d29a20ff259027a8",
+    "integrations/continue/test_source.py": "f178604310c93d8fc8bd25c526547bb934d31a7b81bcc4f0bf500e2b25549c25",
+    "integrations/continue/test_transport.py": "c8d28a9f4bcf1268134c679b9186e0c3819c775a7d383d41ab1e2ce3100b6a8c",
+    "integrations/continue/verify_source.py": "30f8ad26618286f4343c73d649c2a782ec5d69bc3b6b4847fd5a876d8b221a6c"
+  },
+  "workflowSha256": "80202152173a197c4aa4fc91af5088c42eac10f5b32393efc9e0d44c234e6e79",
+  "notes": [
+    "No Continue rebuild; actual fork MCP schema and conversion executed.",
+    "No retrieval/normalization/KG implementation duplicated; delegates to released grep1.21.19.",
+    "Actual SDK initialize/list/call and default no-answer verified; no native Continue launch.",
+    "External-provider check was rejected by automatic approval review; no retry or bypass.",
+    "CI workflow and remote tag publication have not executed."
+  ],
+  "sourceGateQualification": "Actual local Git origin: clean source and matching tag PASS; moved tag and tagged commit absent from main REFUSED",
+  "workflowLocalChecks": "YAML parse and all run blocks bash -n PASS; remote workflow not run",
+  "testLog": "/private/tmp/continue-final-tests-r9.log"
+}
