@@ -18,7 +18,7 @@ The browser and VS Code share the published editor WASM. The LSP reuses `terraph
 |---|---|---|---|
 | 1 | Shared LSP with document graph export | Locked Rust core/LSP tests, warnings-denied Clippy, native file exports, cross-platform builds | New immutable LSP candidate after PR merge; raw binaries plus checksum manifest |
 | 2 | VS Code 0.1.0 preview | Reproducible editor import, TypeScript/lint, actual WASM tests, real VSIX verification, native package lifecycle on Linux/macOS/Windows | GitHub preview asset then same VSIX to VS Marketplace and Open VSX |
-| 3 | Continue integration | Real MCP SDK transport against released grep, baseline/registered graph comparison, explicit synthesis output validation | Versioned integration bundle/configuration with checksums; no duplicate editor listing |
+| 3 | Continue integration | Real MCP SDK transport against released grep, baseline/registered graph comparison; provider synthesis separately qualified | Dedicated tag-driven bundle/configuration release with checksums; Continue Hub block after namespace/API qualification |
 | 4 | Existing Zed adapter update | Rust/WASI tests and size guards; every pinned binary anonymously downloadable; native stock-Zed saved outputs | Reviewed adapter archive; separately qualified catalog LSP package |
 | 5 | Website/distribution links | Anonymous exact-version installs/readback, launch/version check, same synonym-to-search saved output | Update terraphim.ai capability/download documentation only with qualified release links |
 
@@ -44,6 +44,8 @@ Before creating the catalog PR: publish an anonymously readable source mirror co
 
 VS Marketplace: retain the publisher, configure its Entra principal and GitHub environment federation, then set `VSCE_AZURE_CLIENT_ID` and `VSCE_AZURE_TENANT_ID`. Open VSX: confirm namespace ownership and agreement and configure the repository/workflow/environment trusted publisher. These account bindings were not present in the inspected repository variables; do not fabricate a successful login or fall back to printing tokens.
 
+Continue Hub: verify Terraphim namespace access and a currently supported publishing API/action before implementing its upload job. The previously documented publish-action source currently returns 404. The bundle release is already automated independently; Hub availability must not be inferred from it. The Hub block must accept user-supplied paths and resolve through Continue's real registry loader before release status is green.
+
 Zed: use a public catalog fork and narrowly scoped `ZED_CATALOG_TOKEN` only in the catalog environment. The catalog input records the exact native-qualified source and an HTTPS evidence URL. This is a maintainer attestation; it does not automatically prove GUI behavior. Source publication and catalog acceptance are separate states.
 
 For the private Gitea monorepo, preserve the existing PR. Publish a scoped VS Code/Continue source PR against the public repository instead of pushing unrelated private history. Binary-only public LSP releases must identify their reviewed source and immutable tag.
@@ -58,3 +60,12 @@ For the private Gitea monorepo, preserve the existing PR. Publish a scoped VS Co
 - Public release verification downloads exact-version artifacts anonymously and compares bytes or signed VSIX payloads. A catalog PR or CI artifact is not marketplace publication.
 
 Current partial evidence is recorded in `.docs/verification-extension-publication-20261012.md`. Any red/native or account gate remains visible; a passing core test cannot clear it.
+
+## Implementation and review status
+
+- [Public VS Code and Continue PR #972](https://github.com/terraphim/terraphim-ai/pull/972) contains the scoped source and automated package/release workflows. The same VSIX passed Linux/macOS/Windows native lifecycle in [run 38216701669](https://github.com/terraphim/terraphim-ai/actions/runs/38216701669); final legacy-command repairs require a new matrix.
+- [Private LSP/core PR #3484](https://git.terraphim.cloud/terraphim/terraphim-ai/pulls/3484) adds authored synonym export using existing crates and protects source aliases/stale snapshots. Native Zed requalification remains a release gate.
+- [Existing Zed adapter PR #34](https://git.terraphim.cloud/terraphim/zed-terraphim/pulls/34) adds immutable release/readback and catalog-PR CI. Existing Gitea CI passed actual 74 Rust and 42 Python tests; public GitHub/catalog prerequisites above remain pending.
+- [Publication tracking issue #3488](https://git.terraphim.cloud/terraphim/terraphim-ai/issues/3488) records the cross-repository release sequence and actual evidence.
+
+Marketplace publication is driven only by the reviewed version tag and qualified artifacts. Credentials/account ownership, upstream Zed acceptance and Continue Hub's unavailable publication contract cannot be replaced by a passing local test.

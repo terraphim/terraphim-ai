@@ -36,7 +36,7 @@
       },
       {
         "command": "extension.terraphimNapiAutocomplete",
-        "title": "Terraphim Napi Autocomplete",
+        "title": "Terraphim Search Autocomplete (Server)",
         "enablement": "isWorkspaceTrusted"
       },
       {
@@ -102,18 +102,19 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "python3 scripts/editor_assets.py && npm run compile",
+    "vscode:prepublish": "python3 scripts/editor_assets.py && python3 scripts/legacy_assets.py && npm run compile",
     "compile": "npx tsc -p ./",
     "lint": "eslint \"src/**/*.ts\"",
     "watch": "npx tsc -watch -p ./",
     "update-ontologies": "npx ad-generate ontologies",
-    "build-rust": "wasm-pack build rust-lib --target nodejs",
+    "build-rust": "python3 scripts/legacy_assets.py --build",
     "test:host": "node --test tests/hostProtocol.test.cjs",
     "test:assets": "python3 -m unittest discover -s tests -p \"*_test.py\"",
     "test:export": "node --test tests/knowledgeGraphExport.test.cjs tests/exportIntent.test.cjs tests/exportTarget.test.cjs",
     "editor:fetch": "python3 scripts/released_editor.py",
     "package:vsix": "vsce package --pre-release --out terraphim-it.vsix",
-    "test:native": "node tests/runPackaged.cjs"
+    "test:native": "node tests/runPackaged.cjs",
+    "test:legacy": "node --test tests/legacyLinks.test.cjs"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",
@@ -133,7 +134,7 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Alternative Control edits Markdown locally. Existing server and native-module commands require a trusted workspace."
+      "description": "Alternative Control edits Markdown locally. Existing server and Atomic-resource commands require a trusted workspace."
     }
   }
 }

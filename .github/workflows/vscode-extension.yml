@@ -14,7 +14,7 @@ permissions:
 jobs:
   package:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     defaults:
       run:
         working-directory: vs-code-terraphim-it
@@ -27,9 +27,27 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: vs-code-terraphim-it/package-lock.json
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run editor:fetch
-      - run: npm run compile && npm run lint && npm run test:assets && npm run test:host && npm run test:export
+      - name: Build existing Terraphim link engine from locked public crates
+        env:
+          RUSTC_WRAPPER: ''
+          RUSTC_WORKSPACE_WRAPPER: ''
+          CARGO_BUILD_BUILD_DIR: target/build
+        run: |
+          set -euo pipefail
+          cd rust-lib
+          rustup show active-toolchain
+          cargo install wasm-pack --version 0.13.1 --locked
+          cargo fmt --all -- --check
+          cargo test --locked
+          cargo clippy --locked --all-targets -- -D warnings
+          cd ..
+          npm run build-rust
+      - run: npm run compile && npm run lint && npm run test:legacy && npm run test:assets && npm run test:host && npm run test:export
       - run: npm run package:vsix
       - run: python3 scripts/verify_vsix.py terraphim-it.vsix --output release-manifest.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -64,6 +82,9 @@ jobs:
         with:
           name: vscode-package-${{ github.sha }}
           path: vs-code-terraphim-it
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Check package integrity before executing it
         run: python3 -c "import hashlib,json,pathlib; p=pathlib.Path('terraphim-it.vsix'); assert hashlib.sha256(p.read_bytes()).hexdigest()==json.load(open('release-manifest.json'))['sha256']"

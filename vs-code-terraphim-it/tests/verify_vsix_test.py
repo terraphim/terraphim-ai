@@ -9,6 +9,7 @@ import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from verify_vsix import verify, check_tag
+import legacy_assets
 
 XML = '''<PackageManifest xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
 <Metadata><Identity Id="terraphim-it" Publisher="applied-knowledge-systems" Version="0.1.0"/>
@@ -28,8 +29,16 @@ class VsixTest(unittest.TestCase):
                    'extension.vsixmanifest':XML.encode(),
                    'extension/media/editor-build.json':lock, 'extension/media/editor/host-assets.json':lock,
                    'extension/media/editor/engine.wasm':data}
-        for name in ['out/extension.js','out/alternativeControl.js','media/knowledge-graph.cjs','media/export-intent.js','media/export-target.cjs','media/alternative-control.js','LICENSE.txt','readme.md','node_modules/@tomic/lib/package.json']:
+        for name in ['out/extension.js','out/alternativeControl.js','out/helpers/linkReplacement.js','media/knowledge-graph.cjs','media/export-intent.js','media/export-target.cjs','media/alternative-control.js','LICENSE.txt','readme.md','node_modules/@tomic/lib/package.json']:
             entries['extension/'+name] = b'fixture'
+        legacy_data = {"rust-lib/pkg/terraphim_it.js": b'package parser fixture',
+                       "rust-lib/pkg/terraphim_it_bg.wasm": b'\x00asm\x01\x00\x00\x00'}
+        legacy_lock = {"schema": 1, "rust": legacy_assets.RUST, "wasmPack": legacy_assets.WASM_PACK,
+                       "target": "wasm32-unknown-unknown", "inputs": legacy_assets.inputs(legacy_assets.ROOT),
+                       "assets": {name: hashlib.sha256(value).hexdigest() for name, value in legacy_data.items()}}
+        entries["extension/media/legacy-build.json"] = json.dumps(legacy_lock).encode()
+        for name, value in legacy_data.items():
+            entries["extension/" + name] = value
         if changed:
             entries.update(changed)
         path = root / 'fixture.vsix'
@@ -81,6 +90,17 @@ class VsixTest(unittest.TestCase):
                         ('Path="extension/package.json"','Path="extension/other.json"'),
                         ('Version="0.1.0"','Version="0.1.0" TargetPlatform="win32-x64"')]:
             self.assert_rejected({'extension.vsixmanifest':XML.replace(old,new).encode()})
+
+    def test_missing_changed_or_wrong_source_link_module_is_refused(self):
+        for changed in [{"extension/rust-lib/pkg/terraphim_it_bg.wasm": b"changed"},
+                        {"extension/media/legacy-build.json": b"{}"}]:
+            self.assert_rejected(changed)
+        with tempfile.TemporaryDirectory() as temp:
+            path, lock = self.package(Path(temp))
+            wrong = dict(legacy_assets.inputs(legacy_assets.ROOT))
+            wrong["rust-lib/src/lib.rs"] = "0" * 64
+            with self.assertRaisesRegex(ValueError, "source differs"):
+                verify(path, self.manifest, lock, wrong)
 
     def test_tag_is_exact_and_immutable(self):
         check_tag('terraphim_vscode-v0.1.0','0.1.0')

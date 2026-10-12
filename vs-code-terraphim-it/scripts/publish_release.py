@@ -13,6 +13,7 @@ import zipfile
 from xml.etree.ElementTree import ParseError
 
 import verify_vsix
+import legacy_assets
 
 REPO_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*")
 SHA_RE = re.compile(r"[0-9a-f]{40}")
@@ -61,7 +62,7 @@ def verify_package(vsix, manifest, sums, tag, root=verify_vsix.ROOT):
     verify_vsix.check_tag(tag, expected["version"])
     report = json.loads(manifest.read_text())
     source = check_source(root, report, tag)
-    actual = verify_vsix.verify(vsix, expected, (root / "media/editor-build.json").read_bytes())
+    actual = verify_vsix.verify(vsix, expected, (root / "media/editor-build.json").read_bytes(), legacy_assets.inputs(root))
     if any(report.get(key) != value for key, value in actual.items()):
         raise ValueError("Qualification report differs from actual VSIX or current source assets")
     wanted = {vsix.name: digest(vsix)}

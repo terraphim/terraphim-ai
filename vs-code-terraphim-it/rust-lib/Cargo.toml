@@ -4,11 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
-terraphim_automata = { path = "../../crates/terraphim_automata" }
-wasm-bindgen-futures = "0.4.1"
+wasm-bindgen = "=0.2.114"
+terraphim_automata = { version = "=1.20.4", default-features = false }
+
 [workspace]
 resolver = "2"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import publish_release as publication
 import verify_vsix
 import verify_vsix_test
+import legacy_assets
 
 
 class PublicationTest(unittest.TestCase):
@@ -21,8 +22,12 @@ class PublicationTest(unittest.TestCase):
         (root / "media").mkdir()
         (root / "media/editor-build.json").write_bytes(lock)
         (root / "package.json").write_text(json.dumps(fixture.manifest))
+        for name in legacy_assets.INPUTS:
+            destination = root / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes((legacy_assets.ROOT / name).read_bytes())
         subprocess.run(["git", "init", "-q", str(root)], check=True)
-        subprocess.run(["git", "add", "package.json", "media/editor-build.json"], cwd=root, check=True)
+        subprocess.run(["git", "add", "package.json", "media/editor-build.json", "rust-lib"], cwd=root, check=True)
         subprocess.run(["git", "-c", "commit.gpgsign=false", "-c", "user.name=Publication Test",
                         "-c", "user.email=publication-test@example.invalid", "commit", "-qm", "test fixture"], cwd=root, check=True)
         subprocess.run(["git", "-c", "tag.gpgsign=false", "tag", self.tag], cwd=root, check=True)

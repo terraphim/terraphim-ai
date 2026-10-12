@@ -9,3 +9,7 @@ native-results/
 .vscode-test/
 publication.json
 registry.json
+
+# Rebuilt from the pinned public Rust wrapper before packaging.
+/rust-lib/pkg/
+/media/legacy-build.json

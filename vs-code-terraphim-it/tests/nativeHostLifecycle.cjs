@@ -26,6 +26,29 @@ exports.run = async () => {
     assert.ok(extension); await extension.activate();
     report.extensionPath = extension.extensionPath;
     report.assetLockSha256 = digest(await fs.readFile(path.join(extension.extensionPath,'media/editor-build.json')));
+    const {replaceLinks} = require(path.join(extension.extensionPath,'out/helpers/linkReplacement.js'));
+    const linkGraph = JSON.stringify({name:'Project brief',data:{
+      risk:{id:1,nterm:'risk',url:'https://example.com/decisions/risk'},
+      concern:{id:1,nterm:'risk',url:'https://example.com/decisions/risk'},
+    }});
+    const linked = await replaceLinks('A concern and risk. 😀\r\n',linkGraph);
+    assert.equal(linked,'A [risk](https://example.com/decisions/risk) and [risk](https://example.com/decisions/risk). 😀\r\n');
+    await assert.rejects(replaceLinks('Preserve this document','{invalid}'));
+    await fs.writeFile(path.join(output,'linked-project-brief.md'),linked);
+    report.checks.push('installed command loader and packaged Terraphim automata WASM produce exact synonym links; malformed input rejects without replacement');
+    const serverConfig = vscode.workspace.getConfiguration('terraphimIt');
+    const previousServer = serverConfig.inspect('serverUrl').globalValue;
+    try {
+      // Port zero cannot serve a local Terraphim instance: exercise real failure,
+      // not a fake HTTP server or a substituted VS Code API.
+      await serverConfig.update('serverUrl','http://127.0.0.1:0',vscode.ConfigurationTarget.Global);
+      for (const command of ['extension.terraphimNapiAutocomplete','extension.terraphimServerAutocomplete']) {
+        assert.equal(await vscode.commands.executeCommand(command),false);
+      }
+      report.checks.push('both legacy and current server completion commands reject a real unavailable endpoint without false activation or native-module import');
+    } finally {
+      await serverConfig.update('serverUrl',previousServer,vscode.ConfigurationTarget.Global);
+    }
     await vscode.workspace.fs.writeFile(uri,Buffer.from(initial));
     document = await vscode.workspace.openTextDocument(uri);
     const view = 'terraphimIt.alternativeControl';
@@ -97,7 +120,7 @@ exports.run = async () => {
   finally {
     report.windowFocused = vscode.window.state.focused;
     report.outputs = {};
-    for (const name of ['saved-change.md','saved-undo.md','saved-redo.md','risk-concern.md','risk-concern.knowledge-graph.json']) {
+    for (const name of ['saved-change.md','saved-undo.md','saved-redo.md','risk-concern.md','risk-concern.knowledge-graph.json','linked-project-brief.md']) {
       try {
         const bytes = await fs.readFile(path.join(output,name));
         report.outputs[name]={bytes:bytes.length,sha256:digest(bytes)};

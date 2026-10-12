@@ -5,7 +5,8 @@
 - Extend the existing Terraphim It extension with the shared Alternative Control Markdown editor.
 - Create, edit and swap alternatives with document-scoped KG synonym registration, native save/history and clean Markdown export.
 - Export an acknowledged document's knowledge graph through the existing Terraphim Rust `synonyms::` parser and types. The resulting JSON can be passed to `terraphim-grep --thesaurus`.
-- Bundle verified editor v0.1.0-rc.1 bytes. No Rust toolchain or private registry credentials are required for extension users or VSIX packaging.
+- Bundle verified editor v0.1.0-rc.1 bytes. Extension users need no Rust toolchain; package builders use a pinned Rust toolchain and public dependencies.
+- Package the existing Terraphim link engine as portable WASM; refuse invalid data and stale document replacements. Preserve the legacy NAPI command ID through the existing health-checked server provider.
 - Automate package integrity, real-WASM tests and native packaged lifecycle checks before marketplace publication.
 - Require VS Code 1.126 or newer for this preview's native qualification. The original 41 visual requirements are not all certified.
 

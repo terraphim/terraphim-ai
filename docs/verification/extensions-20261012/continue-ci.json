@@ -1,0 +1,68 @@
+{
+  "baseline": {
+    "chunks": [],
+    "answer": null,
+    "concepts": [],
+    "sufficiency": "RlmInsufficient",
+    "sufficiency_explanation": "No chunks or knowledge-graph concepts matched the query; there is nothing to synthesise an answer from.",
+    "stats": {
+      "search_latency_ms": 2,
+      "rlm_latency_ms": null,
+      "chunks_returned": 0,
+      "kg_hits": 0
+    }
+  },
+  "retrieval": {
+    "mode": "retrieval-only",
+    "binarySha256": "6aa8ddfa9695234d990f19beb6c0bdeee4d6ed09b90600537b59e316f81220e6",
+    "graphSha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d",
+    "argv": [
+      "/home/runner/work/_temp/continue-grep/terraphim-grep",
+      "--search-only",
+      "--json",
+      "--thesaurus",
+      "/tmp/tmpwntwaoax/graph.json",
+      "--paths",
+      "/tmp/tmpwntwaoax/corpus",
+      "-n",
+      "8",
+      "--",
+      "Concern"
+    ],
+    "output": {
+      "chunks": [
+        {
+          "content": "Risk: supplier delays require a backup plan.",
+          "source": "brief.md",
+          "line_start": 1,
+          "line_end": 1,
+          "relevance_score": 2.0,
+          "haystack": "code"
+        }
+      ],
+      "answer": null,
+      "concepts": [
+        {
+          "id": 0,
+          "name": "concern",
+          "display_value": null,
+          "score": 1.0
+        },
+        {
+          "id": 0,
+          "name": "risk",
+          "display_value": null,
+          "score": 1.0
+        }
+      ],
+      "sufficiency": "RlmInsufficient",
+      "sufficiency_explanation": "Only 1 chunk(s) and 2 KG concept(s) were retrieved; the minimum for a meaningful answer is 3 chunks, and coverage was 1.00. Too little evidence to synthesise -- try broadening the query or the searched paths.",
+      "stats": {
+        "search_latency_ms": 2,
+        "rlm_latency_ms": null,
+        "chunks_returned": 1,
+        "kg_hits": 2
+      }
+    }
+  }
+}

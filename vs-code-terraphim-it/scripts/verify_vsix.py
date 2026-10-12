@@ -12,10 +12,12 @@ import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
 
+import legacy_assets
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def verify(package, expected, asset_lock):
+def verify(package, expected, asset_lock, legacy_inputs=None):
     with zipfile.ZipFile(package) as archive:
         names = archive.namelist()
         if len(set(names)) != len(names):
@@ -72,7 +74,21 @@ def verify(package, expected, asset_lock):
         for name, digest in assets.items():
             if not hmac.compare_digest(hashlib.sha256(archive.read("extension/media/editor/" + name)).hexdigest(), digest):
                 raise ValueError("VSIX asset bytes changed: " + name)
-        for name in ("out/extension.js", "out/alternativeControl.js", "media/knowledge-graph.cjs",
+        legacy_lock = json.loads(archive.read("extension/media/legacy-build.json"))
+        if (legacy_lock.get("schema") != 1 or legacy_lock.get("rust") != legacy_assets.RUST
+                or legacy_lock.get("wasmPack") != legacy_assets.WASM_PACK
+                or legacy_lock.get("target") != "wasm32-unknown-unknown"
+                or set(legacy_lock.get("assets", {})) != set(legacy_assets.ASSETS)
+                or set(legacy_lock.get("inputs", {})) != set(legacy_assets.INPUTS)):
+            raise ValueError("Missing or invalid link replacement build receipt")
+        if legacy_inputs is not None and legacy_lock["inputs"] != legacy_inputs:
+            raise ValueError("Link replacement source differs from current checkout")
+        for name, digest in legacy_lock["assets"].items():
+            if hashlib.sha256(archive.read("extension/" + name)).hexdigest() != digest:
+                raise ValueError("Link replacement asset bytes changed: " + name)
+        if not archive.read("extension/rust-lib/pkg/terraphim_it_bg.wasm").startswith(b"\x00asm"):
+            raise ValueError("Link replacement WASM is invalid")
+        for name in ("out/extension.js", "out/alternativeControl.js", "out/helpers/linkReplacement.js", "media/knowledge-graph.cjs",
                      "media/export-intent.js", "media/export-target.cjs", "media/alternative-control.js", "LICENSE.txt", "readme.md",
                      "node_modules/@tomic/lib/package.json"):
             if "extension/" + name not in names:
@@ -83,7 +99,7 @@ def verify(package, expected, asset_lock):
     return {"schema": 1, "extension": actual["publisher"] + "." + actual["name"],
             "version": actual["version"], "sha256": hashlib.sha256(Path(package).read_bytes()).hexdigest(),
             "bytes": Path(package).stat().st_size,
-            "editorSource": json.loads(asset_lock)["sourceHead"], "assets": len(assets)}
+            "editorSource": json.loads(asset_lock)["sourceHead"], "assets": len(assets), "legacyInputs": legacy_lock["inputs"]}
 
 
 def check_tag(tag, version):
@@ -100,7 +116,7 @@ def main():
     manifest = json.loads((ROOT / "package.json").read_text())
     if args.tag:
         check_tag(args.tag, manifest["version"])
-    report = verify(args.package, manifest, (ROOT / "media/editor-build.json").read_bytes())
+    report = verify(args.package, manifest, (ROOT / "media/editor-build.json").read_bytes(), legacy_assets.inputs(ROOT))
     report["sourceCommit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     report["sourceTreeDirty"] = bool(subprocess.check_output(
         ["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT, text=True).strip())
