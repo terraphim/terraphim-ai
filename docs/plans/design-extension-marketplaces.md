@@ -63,7 +63,7 @@ Current partial evidence is recorded in `.docs/verification-extension-publicatio
 
 ## Implementation and review status
 
-- [Public VS Code and Continue PR #972](https://github.com/terraphim/terraphim-ai/pull/972) contains the scoped source and automated package/release workflows. The same VSIX passed Linux/macOS/Windows native lifecycle in [run 38216701669](https://github.com/terraphim/terraphim-ai/actions/runs/38216701669); final legacy-command repairs require a new matrix.
+- [Public VS Code and Continue PR #972](https://github.com/terraphim/terraphim-ai/pull/972) contains the scoped source and automated package/release workflows. The same VSIX passed Linux/macOS/Windows native lifecycle in [run 38216701669](https://github.com/terraphim/terraphim-ai/actions/runs/38216701669); the final legacy-command repair at source `4c45aa221` also passed all three hosts in [run 38218712077](https://github.com/terraphim/terraphim-ai/actions/runs/38218712077), with all 18 actual saved output hashes verified.
 - [Private LSP/core PR #3484](https://git.terraphim.cloud/terraphim/terraphim-ai/pulls/3484) adds authored synonym export using existing crates and protects source aliases/stale snapshots. Native Zed requalification remains a release gate.
 - [Existing Zed adapter PR #34](https://git.terraphim.cloud/terraphim/zed-terraphim/pulls/34) adds immutable release/readback and catalog-PR CI. Existing Gitea CI passed actual 74 Rust and 42 Python tests; public GitHub/catalog prerequisites above remain pending.
 - [Publication tracking issue #3488](https://git.terraphim.cloud/terraphim/terraphim-ai/issues/3488) records the cross-repository release sequence and actual evidence.
