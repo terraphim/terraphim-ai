@@ -20,6 +20,8 @@ PYPI_WORKFLOW = ROOT / ".github/workflows/publish-pypi.yml"
 NPM_WORKFLOW = ROOT / ".github/workflows/publish-npm.yml"
 BUN_WORKFLOW = ROOT / ".github/workflows/publish-bun.yml"
 TAURI_WORKFLOW = ROOT / ".github/workflows/publish-tauri.yml"
+CONTINUE_WORKFLOW = ROOT / ".github/workflows/continue-integration.yml"
+VSCODE_WORKFLOW = ROOT / ".github/workflows/vscode-release.yml"
 CONTRACT_WORKFLOW = ROOT / ".github/workflows/release-manifest-contract.yml"
 AGENT_EVAL_WORKFLOW = ROOT / ".github/workflows/agent-eval.yml"
 WORKFLOW_DIR = ROOT / ".github/workflows"
@@ -29,7 +31,8 @@ GITHUB_RELEASE_WRITER_PATTERN = re.compile(
     r"uses:\s*[\"']actions/create-release\b|"
     r"softprops/action-gh-release|gh release (?:create|edit|upload)|"
     r"repos\.(?:create|update)Release|createRelease|updateRelease|"
-    r"github-publish-release\.sh",
+    r"github-publish-release\.sh|"
+    r"\bpython[0-9.]*\s+[\"']?(?:[\w./-]+/)?publish_release\.py\b",
     re.IGNORECASE,
 )
 
@@ -226,6 +229,8 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         cls.npm_text = NPM_WORKFLOW.read_text(encoding="utf-8")
         cls.bun_text = BUN_WORKFLOW.read_text(encoding="utf-8")
         cls.tauri_text = TAURI_WORKFLOW.read_text(encoding="utf-8")
+        cls.continue_text = CONTINUE_WORKFLOW.read_text(encoding="utf-8")
+        cls.vscode_text = VSCODE_WORKFLOW.read_text(encoding="utf-8")
         cls.contract_text = CONTRACT_WORKFLOW.read_text(encoding="utf-8")
 
     def test_exhaustive_github_release_writer_inventory_is_single_publisher_safe(
@@ -245,6 +250,8 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
                 "publish-tauri.yml",
                 "release-comprehensive.yml",
                 "release-coordinator.yml",
+                "continue-integration.yml",
+                "vscode-release.yml",
             },
             "every workflow that writes GitHub releases must be classified",
         )
@@ -288,6 +295,87 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertIn("refs/tags/app-v", tauri_release)
         self.assertIn("refs/tags/desktop-v", tauri_release)
 
+    def test_extension_writers_retain_component_source_and_qualification_gates(self) -> None:
+        continuation = job_block(self.continue_text, "attach-to-published-release")
+        self.assertIn("if: startsWith(github.ref, 'refs/tags/terraphim_continue-v')", continuation)
+        self.assertTrue(has_need(continuation, "verify-and-package"))
+        self.assertIn("environment: continue-releases", continuation)
+        self.assertIn('test "$RELEASE_TAG" = "$expected"', continuation)
+        self.assertIn("verify_source.py --tag", continuation)
+        # Every literal release write retains the immediate live-source check.
+        mutation_lines = continuation.splitlines()
+        for index, line in enumerate(mutation_lines):
+            if re.search(r"gh release (?:create|upload|edit)\b", line):
+                self.assertEqual(mutation_lines[index - 1].strip(), "qualify_source")
+
+        self.assertTrue(has_need(job_block(self.vscode_text, "release"), "qualify"))
+        self.assertTrue(has_need(job_block(self.vscode_text, "qualify"), "source"))
+        source = job_block(self.vscode_text, "source")
+        self.assertIn('test "$REF_TYPE" = tag', source)
+        self.assertIn("check_tag(os.environ['REF_NAME']", source)
+        self.assertIn("git merge-base --is-ancestor HEAD origin/main", source)
+        release = job_block(self.vscode_text, "release")
+        self.assertIn("environment: extension-releases", release)
+        self.assertIn("python3 scripts/publish_release.py", release)
+        self.assertIn('TAG: ${{ github.ref_name }}', release)
+        self.assertIn("check_native(", release)
+
+    def test_actual_extension_tag_guards_reject_standard_and_other_component_tags(self) -> None:
+        # Execute the literal pre-mutation guard, not a reimplementation or publisher mock.
+        continue_step = step_run_block(
+            job_block(self.continue_text, "attach-to-published-release"),
+            "Attach separately downloadable integration",
+        )
+        continue_script = textwrap.dedent(continue_step.split("run: |\n", 1)[1])
+        self.assertIn("\ncd integration\n", continue_script)
+        continue_guard = continue_script.split("\ncd integration\n", 1)[0]
+        vscode_step = step_run_block(
+            job_block(self.vscode_text, "source"),
+            "Require an immutable version tag on the reviewed main history",
+        )
+        vscode_script = textwrap.dedent(vscode_step.split("run: |\n", 1)[1])
+        self.assertIn("\ngit merge-base --is-ancestor", vscode_script)
+        vscode_guard = vscode_script.split("\ngit merge-base --is-ancestor", 1)[0]
+        try:
+            manifest = json.loads((ROOT / "integrations/continue/integration.json").read_text())
+            vscode_version = json.loads((ROOT / "vs-code-terraphim-it/package.json").read_text())["version"]
+        except json.JSONDecodeError as error:
+            self.fail(f"Invalid checked-in extension release manifest: {error}")
+        self.assertEqual(manifest["tagPrefix"], "terraphim_continue-v")
+        continue_tag = manifest["tagPrefix"] + manifest["version"]
+        vscode_tag = "terraphim_vscode-v" + vscode_version
+        candidates = [continue_tag, vscode_tag, "v1.21.20", "main", "python-v1.0.0",
+                      "terraphim_continue-v999.0.0", "terraphim_vscode-v999.0.0",
+                      continue_tag + ";echo unexpected", vscode_tag + "-rc.1"]
+        for expected, script in [(continue_tag, continue_guard), (vscode_tag, vscode_guard)]:
+            for tag in candidates:
+                with self.subTest(writer=expected, tag=tag):
+                    result = subprocess.run(
+                        ["bash", "-euo", "pipefail", "-c", script], cwd=ROOT,
+                        env=dict(os.environ, RELEASE_TAG=tag, REF_TYPE="tag", REF_NAME=tag),
+                        check=False, capture_output=True, text=True, timeout=20,
+                    )
+                    self.assertEqual(result.returncode == 0, tag == expected, result.stderr)
+        branch = subprocess.run(
+            ["bash", "-euo", "pipefail", "-c", vscode_guard], cwd=ROOT,
+            env=dict(os.environ, REF_TYPE="branch", REF_NAME=vscode_tag),
+            check=False, capture_output=True, text=True, timeout=20,
+        )
+        self.assertNotEqual(branch.returncode, 0)
+
+    def test_extension_writer_changes_trigger_contract_on_pr_and_push(self) -> None:
+        for event in ("pull_request", "push"):
+            paths = section(section(self.contract_text, "on"), event)
+            for path in (".github/workflows/continue-integration.yml",
+                         ".github/workflows/vscode-release.yml",
+                         "integrations/continue/verify_source.py",
+                         "integrations/continue/integration.json",
+                         "vs-code-terraphim-it/package.json",
+                         "vs-code-terraphim-it/scripts/publish_release.py",
+                         "vs-code-terraphim-it/scripts/verify_vsix.py"):
+                with self.subTest(event=event, path=path):
+                    self.assertIn(path, paths)
+
     def test_release_writer_detector_accepts_quoted_and_unquoted_action_syntax(
         self,
     ) -> None:
@@ -300,6 +388,14 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         ):
             with self.subTest(syntax=syntax):
                 self.assertRegex(syntax, GITHUB_RELEASE_WRITER_PATTERN)
+
+    def test_release_writer_detector_includes_python_publication_helper(self) -> None:
+        for syntax in ("python3 scripts/publish_release.py --tag x",
+                       'python "vs-code-terraphim-it/scripts/publish_release.py"',
+                       "python3.12 './scripts/publish_release.py' --repo org/repo"):
+            with self.subTest(syntax=syntax):
+                self.assertRegex(syntax, GITHUB_RELEASE_WRITER_PATTERN)
+        self.assertNotRegex("python3 scripts/verify_registry.py", GITHUB_RELEASE_WRITER_PATTERN)
 
     def test_bun_release_writer_allows_only_component_tag_and_non_dry_dispatch(
         self,
