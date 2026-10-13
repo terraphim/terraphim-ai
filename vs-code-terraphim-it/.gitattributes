@@ -1,0 +1,9 @@
+# The manifest is compared byte-for-byte with the Linux-built VSIX on every host.
+.gitattributes text eol=lf
+media/editor-build.json text eol=lf
+
+# Link-engine source hashes must match the same VSIX on Windows and Unix.
+rust-lib/Cargo.toml text eol=lf
+rust-lib/Cargo.lock text eol=lf
+rust-lib/rust-toolchain.toml text eol=lf
+rust-lib/src/lib.rs text eol=lf

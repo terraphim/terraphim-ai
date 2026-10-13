@@ -1,0 +1,89 @@
+{
+  "ciRun": "https://github.com/terraphim/terraphim-ai/actions/runs/38216701669",
+  "sourceCommit": "673c921d7fe7b02a2997395af8610b8c61f432a8",
+  "status": "PASS",
+  "checkedActualFileHashes": true,
+  "hosts": [
+    {
+      "artifact": "vscode-native-macos-14-673c921d7fe7b02a2997395af8610b8c61f432a8/tv-cxnWZb",
+      "packageSha256": "50f0b1fc060cfa2e77406961dfaec1f0c5b476fbc369888d3bc856fbb469419e",
+      "scope": "Native VS Code document persistence, history, custom-view lifecycle and packaged Rust/WASM graph export from saved files; graph export is a core helper call, not a webview download or save-dialog interaction. Webview contents, save cancellation, all41 and upgrade/rollback unqualified",
+      "outputs": {
+        "saved-change.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "saved-undo.md": {
+          "bytes": 51,
+          "sha256": "cac9d81e4ddcbba97bcc231f1163d3b9280e3c65312e2fd43a98153023cc2203"
+        },
+        "saved-redo.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "risk-concern.md": {
+          "bytes": 552,
+          "sha256": "f6afa1e9380541a594a8818da8cd6e5d3fd4078d8a4be6cbfa0b7065c231e129"
+        },
+        "risk-concern.knowledge-graph.json": {
+          "bytes": 281,
+          "sha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d"
+        }
+      }
+    },
+    {
+      "artifact": "vscode-native-ubuntu-24.04-673c921d7fe7b02a2997395af8610b8c61f432a8/tv-F2WfY0",
+      "packageSha256": "50f0b1fc060cfa2e77406961dfaec1f0c5b476fbc369888d3bc856fbb469419e",
+      "scope": "Native VS Code document persistence, history, custom-view lifecycle and packaged Rust/WASM graph export from saved files; graph export is a core helper call, not a webview download or save-dialog interaction. Webview contents, save cancellation, all41 and upgrade/rollback unqualified",
+      "outputs": {
+        "saved-change.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "saved-undo.md": {
+          "bytes": 51,
+          "sha256": "cac9d81e4ddcbba97bcc231f1163d3b9280e3c65312e2fd43a98153023cc2203"
+        },
+        "saved-redo.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "risk-concern.md": {
+          "bytes": 552,
+          "sha256": "f6afa1e9380541a594a8818da8cd6e5d3fd4078d8a4be6cbfa0b7065c231e129"
+        },
+        "risk-concern.knowledge-graph.json": {
+          "bytes": 281,
+          "sha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d"
+        }
+      }
+    },
+    {
+      "artifact": "vscode-native-windows-2025-673c921d7fe7b02a2997395af8610b8c61f432a8/tv-KcKZmS",
+      "packageSha256": "50f0b1fc060cfa2e77406961dfaec1f0c5b476fbc369888d3bc856fbb469419e",
+      "scope": "Native VS Code document persistence, history, custom-view lifecycle and packaged Rust/WASM graph export from saved files; graph export is a core helper call, not a webview download or save-dialog interaction. Webview contents, save cancellation, all41 and upgrade/rollback unqualified",
+      "outputs": {
+        "saved-change.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "saved-undo.md": {
+          "bytes": 51,
+          "sha256": "cac9d81e4ddcbba97bcc231f1163d3b9280e3c65312e2fd43a98153023cc2203"
+        },
+        "saved-redo.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "risk-concern.md": {
+          "bytes": 552,
+          "sha256": "f6afa1e9380541a594a8818da8cd6e5d3fd4078d8a4be6cbfa0b7065c231e129"
+        },
+        "risk-concern.knowledge-graph.json": {
+          "bytes": 281,
+          "sha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d"
+        }
+      }
+    }
+  ]
+}

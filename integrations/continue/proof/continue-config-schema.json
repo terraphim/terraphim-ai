@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "scope": "Actual fork schema parse and JSON-to-internal stdio conversion; no native extension launch",
+  "continueHead": "6bd9618dd98d2092897e3e1257fce46257820e3e",
+  "sourceHashes": {
+    "json": "d27a8e3231a9cbf93e18e2278de029a86c45a4a9cad23600c658144a168dd45d",
+    "convertJson": "fa88112aff264aaa9e86f9d59fc16933b47fac87257a5d555d22beca1d1bc507"
+  },
+  "normalized": {
+    "warnings": [],
+    "yamlConfig": {
+      "name": "Terraphim",
+      "type": "stdio",
+      "command": "/private/tmp/terraphim-continue-venv/bin/python",
+      "args": [
+        "/private/tmp/terraphim-ai-output-fixes-20261011/integrations/continue/server.py",
+        "--binary",
+        "/Users/alex/.codex/visualizations/2026/10/09/01a1221d-a378-7a00-8943-4c42925945f0/synonym-search-story/releases-20261011/clients-runtime/terraphim-grep",
+        "--binary-sha256",
+        "ce20e2bf87c6753c717dade4ac7baac98b05d0be9cb39af1f3afbcbf6e5c47de",
+        "--graph",
+        "/Users/alex/.codex/visualizations/2026/10/09/01a1221d-a378-7a00-8943-4c42925945f0/synonym-search-story/extensions-20261012/vscode-export-review/native-export-partial/risk-concern.knowledge-graph.json",
+        "--corpus",
+        "/Users/alex/.codex/visualizations/2026/10/09/01a1221d-a378-7a00-8943-4c42925945f0/synonym-search-story/releases-20261011/flow/corpus"
+      ]
+    }
+  }
+}

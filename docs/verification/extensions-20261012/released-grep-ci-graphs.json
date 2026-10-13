@@ -1,0 +1,44 @@
+{
+  "status": "PASS",
+  "cliVersion": "terraphim-grep 1.21.19",
+  "cliSha256": "ce20e2bf87c6753c717dade4ac7baac98b05d0be9cb39af1f3afbcbf6e5c47de",
+  "synthesis": false,
+  "results": [
+    {
+      "graph": "vscode-native-macos-14-673c921d7fe7b02a2997395af8610b8c61f432a8/tv-cxnWZb/risk-concern.knowledge-graph.json",
+      "graphSha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d",
+      "outputSha256": "77213375243f1ab99c9f6358282cb3407e0be3af12050061158a11801f9ac081",
+      "chunkCount": 3,
+      "answer": null,
+      "sources": [
+        "project-brief.md",
+        "project-brief.md",
+        "project-brief.md"
+      ]
+    },
+    {
+      "graph": "vscode-native-ubuntu-24.04-673c921d7fe7b02a2997395af8610b8c61f432a8/tv-F2WfY0/risk-concern.knowledge-graph.json",
+      "graphSha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d",
+      "outputSha256": "6dd67609b8443b6f750788988d1d2433b83cb8e8016654424fab07ccb073570c",
+      "chunkCount": 3,
+      "answer": null,
+      "sources": [
+        "project-brief.md",
+        "project-brief.md",
+        "project-brief.md"
+      ]
+    },
+    {
+      "graph": "vscode-native-windows-2025-673c921d7fe7b02a2997395af8610b8c61f432a8/tv-KcKZmS/risk-concern.knowledge-graph.json",
+      "graphSha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d",
+      "outputSha256": "6dd67609b8443b6f750788988d1d2433b83cb8e8016654424fab07ccb073570c",
+      "chunkCount": 3,
+      "answer": null,
+      "sources": [
+        "project-brief.md",
+        "project-brief.md",
+        "project-brief.md"
+      ]
+    }
+  ]
+}

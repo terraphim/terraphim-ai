@@ -1,0 +1,15 @@
+/media/editor/
+__pycache__/
+
+# Qualified packages and native test receipts are CI artifacts.
+*.vsix
+release-manifest.json
+SHA256SUMS
+native-results/
+.vscode-test/
+publication.json
+registry.json
+
+# Rebuilt from the pinned public Rust wrapper before packaging.
+/rust-lib/pkg/
+/media/legacy-build.json

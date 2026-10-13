@@ -1,0 +1,99 @@
+name: VS Code extension
+on:
+  pull_request:
+    paths: ['vs-code-terraphim-it/**', '.github/workflows/vscode-*.yml']
+  push:
+    branches: [main, 'codex/**']
+    paths: ['vs-code-terraphim-it/**', '.github/workflows/vscode-*.yml']
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: vs-code-terraphim-it
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: vs-code-terraphim-it/package-lock.json
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run editor:fetch
+      - name: Build existing Terraphim link engine from locked public crates
+        env:
+          RUSTC_WRAPPER: ''
+          RUSTC_WORKSPACE_WRAPPER: ''
+          CARGO_BUILD_BUILD_DIR: target/build
+        run: |
+          set -euo pipefail
+          cd rust-lib
+          rustup show active-toolchain
+          cargo install wasm-pack --version 0.13.1 --locked
+          cargo fmt --all -- --check
+          cargo test --locked
+          cargo clippy --locked --all-targets -- -D warnings
+          cd ..
+          npm run build-rust
+      - run: npm run compile && npm run lint && npm run test:legacy && npm run test:assets && npm run test:host && npm run test:export
+      - run: npm run package:vsix
+      - run: python3 scripts/verify_vsix.py terraphim-it.vsix --output release-manifest.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: vscode-package-${{ github.sha }}
+          path: |
+            vs-code-terraphim-it/terraphim-it.vsix
+            vs-code-terraphim-it/release-manifest.json
+            vs-code-terraphim-it/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+  native:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: vs-code-terraphim-it
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: vscode-package-${{ github.sha }}
+          path: vs-code-terraphim-it
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check package integrity before executing it
+        run: python3 -c "import hashlib,json,pathlib; p=pathlib.Path('terraphim-it.vsix'); assert hashlib.sha256(p.read_bytes()).hexdigest()==json.load(open('release-manifest.json'))['sha256']"
+      - name: Exercise actual packaged extension in native host
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then xvfb-run -a npm run test:native; else npm run test:native; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: vscode-native-${{ matrix.os }}-${{ github.sha }}
+          path: vs-code-terraphim-it/native-results
+          if-no-files-found: error

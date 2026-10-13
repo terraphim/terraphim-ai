@@ -2,17 +2,26 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 const vscode = require("vscode");
+const alternativeControl_1 = require("./alternativeControl");
 const lib_1 = require("@tomic/lib");
 const getStore_1 = require("./helpers/getStore");
 const serverConnection_1 = require("./helpers/serverConnection");
-const pkg_1 = require("../rust-lib/pkg");
-const index_js_1 = require("terraphim_ai_nodejs/index.js");
+const linkReplacement_1 = require("./helpers/linkReplacement");
 const airportOntology_1 = require("./ontologies/airportOntology");
 function activate(context) {
+    (0, alternativeControl_1.registerAlternativeControl)(context);
     let agent;
     let store;
     let activeProvider;
     const disposable = vscode.commands.registerCommand('extension.terraphimCommand', async function () {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showWarningMessage('Open a text document before replacing knowledge-graph links.');
+            return false;
+        }
+        const document = editor.document;
+        const version = document.version;
+        const text = document.getText();
         // Get the configuration
         const config = vscode.workspace.getConfiguration('terraphimIt');
         // Only ask for agent if it's not set and hasn't been asked before
@@ -29,28 +38,25 @@ function activate(context) {
                 }
             }
         }
-        vscode.window.showInformationMessage("Replacing links using Rust");
-        // --------- Create a Store ---------.
-        store = (0, getStore_1.getStore)(agent);
-        const editor = vscode.window.activeTextEditor;
-        if (editor) {
-            const document = editor.document;
-            // const selection = editor.selection;
-            // Get the word within the selection
-            const text = document.getText();
+        try {
+            store = (0, getStore_1.getStore)(agent);
             const results = await get_all_resources(store);
-            const thesaurus = JSON.stringify(results);
-            const replacedText = await (0, pkg_1.replace_links)(text, thesaurus);
-            editor.edit(editBuilder => {
-                editBuilder.replace(new vscode.Range(0, 0, editor.document.lineCount, 0), replacedText.toString());
+            const replacedText = await (0, linkReplacement_1.replaceLinks)(text, JSON.stringify(results));
+            if (document.isClosed || document.version !== version || document.getText() !== text) {
+                throw new Error('The document changed while knowledge-graph links were loading. Run Terraphim IT again.');
+            }
+            const applied = await editor.edit(editBuilder => {
+                editBuilder.replace(new vscode.Range(document.positionAt(0), document.positionAt(text.length)), replacedText);
             });
-            // Show information message with agent if it's set
-            if (agent) {
-                vscode.window.showInformationMessage(`Terraphim IT executed with agent starting with: ${agent.substring(0, 5)}`);
+            if (!applied) {
+                throw new Error('VS Code did not apply the knowledge-graph link edit.');
             }
-            else {
-                vscode.window.showInformationMessage('Terraphim IT executed');
-            }
+            vscode.window.showInformationMessage('Terraphim IT replaced knowledge-graph links');
+            return true;
+        }
+        catch (error) {
+            vscode.window.showErrorMessage(`Terraphim IT could not replace links: ${error instanceof Error ? error.message : String(error)}`);
+            return false;
         }
     });
     context.subscriptions.push(disposable);
@@ -72,41 +78,23 @@ function activate(context) {
         vscode.window.showInformationMessage('Terraphim AI Autocomplete activated');
     });
     context.subscriptions.push(autocompleteDisposable);
-    const napiAutocompleteDisposable = vscode.commands.registerCommand('extension.terraphimNapiAutocomplete', async function () {
-        // Deactivate the existing provider if any
-        if (activeProvider) {
-            activeProvider.dispose();
-            activeProvider = undefined;
-        }
-        // Register the completion provider
-        const provider = vscode.languages.registerCompletionItemProvider({ scheme: 'file', language: '*' }, new TerraphimNapiCompletionProvider(), ' ' // Trigger on space
-        );
-        activeProvider = provider;
-        context.subscriptions.push(provider);
-        vscode.window.showInformationMessage('Terraphim Napi Autocomplete activated');
-    });
-    context.subscriptions.push(napiAutocompleteDisposable);
-    // Register the Terraphim Server Autocomplete command
-    const serverAutocompleteDisposable = vscode.commands.registerCommand('extension.terraphimServerAutocomplete', async function () {
-        // Deactivate the existing provider if any
-        if (activeProvider) {
-            activeProvider.dispose();
-            activeProvider = undefined;
-        }
-        // Check server health first
+    // Preserve the legacy command ID while using the packaged server client.
+    // A missing optional NAPI module must never masquerade as active autocomplete.
+    const activateServerAutocomplete = async () => {
         const healthCheck = await serverConnection_1.serverConnection.healthCheck();
         if (!healthCheck.healthy) {
             vscode.window.showWarningMessage(`Terraphim server is not available: ${healthCheck.message}. Please check your configuration and server status.`);
-            return;
+            return false;
         }
-        // Register the completion provider
-        const provider = vscode.languages.registerCompletionItemProvider({ scheme: 'file', language: '*' }, new TerraphimServerCompletionProvider(), ' ' // Trigger on space
-        );
+        activeProvider?.dispose();
+        const provider = vscode.languages.registerCompletionItemProvider({ scheme: 'file', language: '*' }, new TerraphimServerCompletionProvider(), ' ');
         activeProvider = provider;
         context.subscriptions.push(provider);
         vscode.window.showInformationMessage('Terraphim Server Autocomplete activated');
-    });
-    context.subscriptions.push(serverAutocompleteDisposable);
+        return true;
+    };
+    context.subscriptions.push(vscode.commands.registerCommand('extension.terraphimNapiAutocomplete', activateServerAutocomplete));
+    context.subscriptions.push(vscode.commands.registerCommand('extension.terraphimServerAutocomplete', activateServerAutocomplete));
     // Register the Server Health Check command
     const healthCheckDisposable = vscode.commands.registerCommand('extension.terraphimHealthCheck', async function () {
         vscode.window.showInformationMessage('Checking server health...');
@@ -130,90 +118,6 @@ function activate(context) {
         }
     });
     context.subscriptions.push(configChangeDisposable);
-}
-class TerraphimNapiCompletionProvider {
-    constructor() {
-        this.lastQuery = '';
-        this.lastResults = [];
-        this.updateSubscription = null;
-        this.subscribeForUpdates();
-    }
-    subscribeForUpdates() {
-        if (this.updateSubscription) {
-            this.updateSubscription.dispose();
-        }
-        this.updateSubscription = vscode.workspace.onDidChangeTextDocument(this.onDocumentChange.bind(this));
-    }
-    onDocumentChange(event) {
-        const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor && event.document === activeEditor.document) {
-            this.updateCompletions(activeEditor.document, activeEditor.selection.active);
-        }
-    }
-    async updateCompletions(document, position) {
-        const wordRange = document.getWordRangeAtPosition(position) || document.getWordRangeAtPosition(position.translate(0, -1));
-        if (wordRange) {
-            const word = document.getText(wordRange);
-            console.log("word", word);
-            if (word !== this.lastQuery && word.length >= 2) { // Only search if word has at least 2 characters
-                this.lastQuery = word;
-                // Try server-based search first, fallback to local nodejs binding
-                try {
-                    const searchResponse = await serverConnection_1.serverConnection.searchDocuments(word, 10);
-                    if (searchResponse.status === 'success' && searchResponse.results.length > 0) {
-                        this.lastResults = this.createCompletionItemsFromServer(searchResponse.results);
-                    }
-                    else {
-                        // Fallback to local nodejs binding
-                        const results = await (0, index_js_1.searchDocumentsSelectedRole)(word);
-                        const parsedResults = JSON.parse(results);
-                        this.lastResults = this.createCompletionItems(parsedResults);
-                    }
-                }
-                catch (error) {
-                    console.warn('Server search failed, using local nodejs binding:', error);
-                    // Fallback to local nodejs binding
-                    try {
-                        const results = await (0, index_js_1.searchDocumentsSelectedRole)(word);
-                        const parsedResults = JSON.parse(results);
-                        this.lastResults = this.createCompletionItems(parsedResults);
-                    }
-                    catch (localError) {
-                        console.error('Both server and local search failed:', localError);
-                        this.lastResults = [];
-                    }
-                }
-            }
-        }
-    }
-    createCompletionItems(parsedResults) {
-        return Object.entries(parsedResults).map(([key, value]) => {
-            const item = new vscode.CompletionItem(value.title, vscode.CompletionItemKind.Text);
-            item.detail = value.body;
-            item.documentation = new vscode.MarkdownString(`[${value.title}](${value.url})`);
-            return item;
-        });
-    }
-    createCompletionItemsFromServer(results) {
-        return results.map((result) => {
-            const item = new vscode.CompletionItem(result.title, vscode.CompletionItemKind.Text);
-            item.detail = result.description || result.body || '';
-            item.documentation = new vscode.MarkdownString(`[${result.title}](${result.url})`);
-            if (result.rank) {
-                item.sortText = result.rank.toString().padStart(3, '0');
-            }
-            return item;
-        });
-    }
-    async provideCompletionItems(document, position, token, context) {
-        await this.updateCompletions(document, position);
-        return this.lastResults;
-    }
-    dispose() {
-        if (this.updateSubscription) {
-            this.updateSubscription.dispose();
-        }
-    }
 }
 class TerraphimCompletionProvider {
     constructor(store) {
@@ -239,7 +143,7 @@ class TerraphimServerCompletionProvider {
         this.lastResults = [];
     }
     async provideCompletionItems(document, position, token, context) {
-        const wordRange = document.getWordRangeAtPosition(position) || document.getWordRangeAtPosition(position.translate(0, -1));
+        const wordRange = document.getWordRangeAtPosition(position) || (position.character > 0 ? document.getWordRangeAtPosition(position.translate(0, -1)) : undefined);
         if (!wordRange) {
             return [];
         }

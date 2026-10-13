@@ -1,0 +1,2 @@
+# Current maintained v1 line, retaining compatibility with Continue's stdio client.
+mcp==1.30.0

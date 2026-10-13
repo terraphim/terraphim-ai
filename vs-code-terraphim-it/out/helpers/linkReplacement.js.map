@@ -1,0 +1,1 @@
+{"version":3,"file":"linkReplacement.js","sourceRoot":"","sources":["../../src/helpers/linkReplacement.ts"],"names":[],"mappings":";;AACA,oCAKC;AAND,sEAAsE;AAC/D,KAAK,UAAU,YAAY,CAAC,IAAY,EAAE,SAAiB;IAChE,gFAAgF;IAChF,MAAM,UAAU,GAAG,oCAAoC,CAAC;IACxD,MAAM,MAAM,GAAG,yBAAa,UAAU,yBAA+D,CAAC;IACtG,OAAO,MAAM,CAAC,aAAa,CAAC,IAAI,EAAE,SAAS,CAAC,CAAC;AAC/C,CAAC"}

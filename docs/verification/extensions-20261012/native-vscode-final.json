@@ -1,0 +1,145 @@
+{
+  "status": "PASS",
+  "ciRun": "https://github.com/terraphim/terraphim-ai/actions/runs/38218712077",
+  "sourceCommit": "4c45aa221ad573266a73cbacdbad2620a42a26ca",
+  "sourceTreeDirty": false,
+  "packageSha256": "863f2e39c2cd07084af3391064a3f294384d8db67a090ad197620aeacb15b79e",
+  "scope": "Packaged native document/history/custom-view lifecycle, Rust helper synonym export and link outputs, unavailable-server refusal; not webview/dialog UAT, live remote server/Atomic flow, all 41 requirements, upgrade/rollback or marketplace publication",
+  "hosts": [
+    {
+      "artifact": "vscode-native-macos-14-4c45aa221ad573266a73cbacdbad2620a42a26ca/tv-IHdU08",
+      "checks": [
+        "installed command loader and packaged Terraphim automata WASM produce exact synonym links; malformed input rejects without replacement",
+        "both legacy and current server completion commands reject a real unavailable endpoint without false activation or native-module import",
+        "two actual custom-editor tabs on the same native document, source unchanged",
+        "real native edit and save preserve Unicode and CRLF bytes",
+        "installed Rust/WASM creates synonyms:: Risk, Concern; actual native document saves annotations; packaged host helper exports saved JSON with one shared concept and preserves source",
+        "native undo/redo each saved as exact actual bytes",
+        "custom views dispose and reopen without modifying committed native source"
+      ],
+      "outputs": {
+        "saved-change.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "saved-undo.md": {
+          "bytes": 51,
+          "sha256": "cac9d81e4ddcbba97bcc231f1163d3b9280e3c65312e2fd43a98153023cc2203"
+        },
+        "saved-redo.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "risk-concern.md": {
+          "bytes": 552,
+          "sha256": "f6afa1e9380541a594a8818da8cd6e5d3fd4078d8a4be6cbfa0b7065c231e129"
+        },
+        "risk-concern.knowledge-graph.json": {
+          "bytes": 281,
+          "sha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d"
+        },
+        "linked-project-brief.md": {
+          "bytes": 99,
+          "sha256": "046291ad2734ae6080645e333c1273f653ecfb4f6bdbfdc3170f13b3d8ba4ecc"
+        }
+      },
+      "releasedGrep": {
+        "binaryVersion": "1.21.19",
+        "binarySha256": "ce20e2bf87c6753c717dade4ac7baac98b05d0be9cb39af1f3afbcbf6e5c47de",
+        "resultSha256": "e51c03a50ec29ec12c2154c02cd711567600cc0bdb1f0125bdf5d0f213ab8aea",
+        "chunks": 3,
+        "answer": null
+      }
+    },
+    {
+      "artifact": "vscode-native-ubuntu-24.04-4c45aa221ad573266a73cbacdbad2620a42a26ca/tv-aLXRxA",
+      "checks": [
+        "installed command loader and packaged Terraphim automata WASM produce exact synonym links; malformed input rejects without replacement",
+        "both legacy and current server completion commands reject a real unavailable endpoint without false activation or native-module import",
+        "two actual custom-editor tabs on the same native document, source unchanged",
+        "real native edit and save preserve Unicode and CRLF bytes",
+        "installed Rust/WASM creates synonyms:: Risk, Concern; actual native document saves annotations; packaged host helper exports saved JSON with one shared concept and preserves source",
+        "native undo/redo each saved as exact actual bytes",
+        "custom views dispose and reopen without modifying committed native source"
+      ],
+      "outputs": {
+        "saved-change.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "saved-undo.md": {
+          "bytes": 51,
+          "sha256": "cac9d81e4ddcbba97bcc231f1163d3b9280e3c65312e2fd43a98153023cc2203"
+        },
+        "saved-redo.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "risk-concern.md": {
+          "bytes": 552,
+          "sha256": "f6afa1e9380541a594a8818da8cd6e5d3fd4078d8a4be6cbfa0b7065c231e129"
+        },
+        "risk-concern.knowledge-graph.json": {
+          "bytes": 281,
+          "sha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d"
+        },
+        "linked-project-brief.md": {
+          "bytes": 99,
+          "sha256": "046291ad2734ae6080645e333c1273f653ecfb4f6bdbfdc3170f13b3d8ba4ecc"
+        }
+      },
+      "releasedGrep": {
+        "binaryVersion": "1.21.19",
+        "binarySha256": "ce20e2bf87c6753c717dade4ac7baac98b05d0be9cb39af1f3afbcbf6e5c47de",
+        "resultSha256": "6dd67609b8443b6f750788988d1d2433b83cb8e8016654424fab07ccb073570c",
+        "chunks": 3,
+        "answer": null
+      }
+    },
+    {
+      "artifact": "vscode-native-windows-2025-4c45aa221ad573266a73cbacdbad2620a42a26ca/tv-Uw9i7n",
+      "checks": [
+        "installed command loader and packaged Terraphim automata WASM produce exact synonym links; malformed input rejects without replacement",
+        "both legacy and current server completion commands reject a real unavailable endpoint without false activation or native-module import",
+        "two actual custom-editor tabs on the same native document, source unchanged",
+        "real native edit and save preserve Unicode and CRLF bytes",
+        "installed Rust/WASM creates synonyms:: Risk, Concern; actual native document saves annotations; packaged host helper exports saved JSON with one shared concept and preserves source",
+        "native undo/redo each saved as exact actual bytes",
+        "custom views dispose and reopen without modifying committed native source"
+      ],
+      "outputs": {
+        "saved-change.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "saved-undo.md": {
+          "bytes": 51,
+          "sha256": "cac9d81e4ddcbba97bcc231f1163d3b9280e3c65312e2fd43a98153023cc2203"
+        },
+        "saved-redo.md": {
+          "bytes": 51,
+          "sha256": "8933c6e15299e54c0c8c9ad88473800fad11fd3f881a2b543688828ad2dbfb40"
+        },
+        "risk-concern.md": {
+          "bytes": 552,
+          "sha256": "f6afa1e9380541a594a8818da8cd6e5d3fd4078d8a4be6cbfa0b7065c231e129"
+        },
+        "risk-concern.knowledge-graph.json": {
+          "bytes": 281,
+          "sha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d"
+        },
+        "linked-project-brief.md": {
+          "bytes": 99,
+          "sha256": "046291ad2734ae6080645e333c1273f653ecfb4f6bdbfdc3170f13b3d8ba4ecc"
+        }
+      },
+      "releasedGrep": {
+        "binaryVersion": "1.21.19",
+        "binarySha256": "ce20e2bf87c6753c717dade4ac7baac98b05d0be9cb39af1f3afbcbf6e5c47de",
+        "resultSha256": "e2ee2976e5d1a6383e441d1e2dad7169c93e1fc4422d2d5a3e689ce8c69b6e50",
+        "chunks": 3,
+        "answer": null
+      }
+    }
+  ]
+}

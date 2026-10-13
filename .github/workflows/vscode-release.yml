@@ -1,0 +1,151 @@
+name: Publish VS Code extension
+on:
+  push:
+    tags: ['terraphim_vscode-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: vscode-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require an immutable version tag on the reviewed main history
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          test "$REF_TYPE" = tag
+          python3 - <<'PY'
+          import json,os,sys
+          sys.path.insert(0,'vs-code-terraphim-it/scripts')
+          from verify_vsix import check_tag
+          check_tag(os.environ['REF_NAME'],json.load(open('vs-code-terraphim-it/package.json'))['version'])
+          PY
+          git merge-base --is-ancestor HEAD origin/main
+  qualify:
+    needs: source
+    uses: ./.github/workflows/vscode-extension.yml
+  release:
+    needs: qualify
+    runs-on: ubuntu-24.04
+    environment: extension-releases
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: vs-code-terraphim-it
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: vscode-package-${{ github.sha }}
+          path: vs-code-terraphim-it
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: vscode-native-*-${{ github.sha }}
+          path: vs-code-terraphim-it/native-results
+      - name: Require receipts from all three hosts for the exact package
+        env:
+          SOURCE: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,sys
+          sys.path.insert(0,'scripts')
+          from publish_release import check_native
+          report=json.load(open('release-manifest.json'))
+          assert report['sourceCommit']==os.environ['SOURCE']
+          assert report['sourceTreeDirty'] is False
+          for platform in ('ubuntu-24.04','macos-14','windows-2025'):
+              receipts=list(pathlib.Path('native-results',f"vscode-native-{platform}-{os.environ['SOURCE']}").rglob('launcher.json'))
+              assert len(receipts)==1, (platform,receipts)
+              check_native(json.loads(receipts[0].read_text()),report['sha256'])
+          PY
+      - name: Publish qualified bytes and verify anonymous downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: python3 scripts/publish_release.py --repo "$REPOSITORY" --tag "$TAG" --vsix terraphim-it.vsix --manifest release-manifest.json --sums SHA256SUMS --receipt publication.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: vscode-publication-${{ github.sha }}
+          path: vs-code-terraphim-it/publication.json
+          if-no-files-found: error
+  marketplace:
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        registry: [visual-studio-marketplace, open-vsx]
+    runs-on: ubuntu-24.04
+    environment: ${{ matrix.registry }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: vs-code-terraphim-it
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: vscode-package-${{ github.sha }}
+          path: vs-code-terraphim-it
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: sha256sum -c SHA256SUMS
+      - name: Authenticate the existing publisher with federated Entra identity
+        if: matrix.registry == 'visual-studio-marketplace'
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac
+        with:
+          client-id: ${{ vars.VSCE_AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.VSCE_AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      # A retry may encounter an already published exact version. Readback is
+      # the mandatory authority; any absent or different payload fails the job.
+      - name: Publish exact VSIX to Visual Studio Marketplace
+        continue-on-error: true
+        if: matrix.registry == 'visual-studio-marketplace'
+        run: npm exec -- vsce publish --azure-credential --packagePath terraphim-it.vsix --pre-release
+      - name: Publish exact VSIX to Open VSX with trusted publishing
+        continue-on-error: true
+        if: matrix.registry == 'open-vsx' && vars.OVSX_BOOTSTRAP_FIRST_PUBLISH != 'true'
+        run: python3 scripts/publish_openvsx.py --vsix terraphim-it.vsix --manifest release-manifest.json
+      - name: Bootstrap the first Open VSX version explicitly
+        continue-on-error: true
+        if: matrix.registry == 'open-vsx' && vars.OVSX_BOOTSTRAP_FIRST_PUBLISH == 'true'
+        env:
+          OVSX_BOOTSTRAP_PAT: ${{ secrets.OVSX_BOOTSTRAP_PAT }}
+        # Open VSX cannot register a trusted publisher before an active version
+        # exists. Only this environment setting enables the one-time bootstrap;
+        # a failed OIDC attempt never falls back to a stored token.
+        run: python3 scripts/publish_openvsx.py --bootstrap --vsix terraphim-it.vsix --manifest release-manifest.json
+      - name: Verify exact published registry payload
+        env:
+          REGISTRY: ${{ matrix.registry }}
+        run: |
+          if [[ "$REGISTRY" == visual-studio-marketplace ]]; then registry=marketplace; else registry=openvsx; fi
+          python3 scripts/verify_registry.py --registry "$registry" --vsix terraphim-it.vsix --manifest release-manifest.json --receipt registry.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: vscode-registry-${{ matrix.registry }}-${{ github.sha }}
+          path: vs-code-terraphim-it/registry.json
+          if-no-files-found: error

@@ -1,0 +1,19 @@
+{
+  "release": "https://github.com/terraphim/terraphim-editor/releases/tag/v0.1.0-rc.1",
+  "sourceCommit": "05d0aa50151c131db4a3b30b56aba67c00add5fc",
+  "archive": {
+    "name": "editor-candidate.tar.gz",
+    "url": "https://github.com/terraphim/terraphim-editor/releases/download/v0.1.0-rc.1/editor-candidate.tar.gz",
+    "sha256": "a514f45276397b93f38d8e14c9e3bde6203bd9c625bc13c81829de31ffa9eb79"
+  },
+  "manifest": {
+    "name": "assets-manifest.json",
+    "url": "https://github.com/terraphim/terraphim-editor/releases/download/v0.1.0-rc.1/assets-manifest.json",
+    "sha256": "d8d65165263c237f4c3c65d97b69b1083850daaea556fcd9a01241758ec2a4a7"
+  },
+  "bridge": {
+    "name": "host-session.js",
+    "url": "https://raw.githubusercontent.com/terraphim/terraphim-editor/05d0aa50151c131db4a3b30b56aba67c00add5fc/public/js/host-session.js",
+    "sha256": "9e5efc4c3f1f2003cd86f05b266b6666e546c68a065eaca67c897c2328a09388"
+  }
+}
