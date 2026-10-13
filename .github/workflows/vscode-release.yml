@@ -126,8 +126,17 @@ jobs:
         run: npm exec -- vsce publish --azure-credential --packagePath terraphim-it.vsix --pre-release
       - name: Publish exact VSIX to Open VSX with trusted publishing
         continue-on-error: true
-        if: matrix.registry == 'open-vsx'
-        run: npm exec -- ovsx publish terraphim-it.vsix --trusted-publishing --pre-release
+        if: matrix.registry == 'open-vsx' && vars.OVSX_BOOTSTRAP_FIRST_PUBLISH != 'true'
+        run: python3 scripts/publish_openvsx.py --vsix terraphim-it.vsix --manifest release-manifest.json
+      - name: Bootstrap the first Open VSX version explicitly
+        continue-on-error: true
+        if: matrix.registry == 'open-vsx' && vars.OVSX_BOOTSTRAP_FIRST_PUBLISH == 'true'
+        env:
+          OVSX_BOOTSTRAP_PAT: ${{ secrets.OVSX_BOOTSTRAP_PAT }}
+        # Open VSX cannot register a trusted publisher before an active version
+        # exists. Only this environment setting enables the one-time bootstrap;
+        # a failed OIDC attempt never falls back to a stored token.
+        run: python3 scripts/publish_openvsx.py --bootstrap --vsix terraphim-it.vsix --manifest release-manifest.json
       - name: Verify exact published registry payload
         env:
           REGISTRY: ${{ matrix.registry }}
