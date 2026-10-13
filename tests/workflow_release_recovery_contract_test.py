@@ -336,10 +336,13 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         vscode_script = textwrap.dedent(vscode_step.split("run: |\n", 1)[1])
         self.assertIn("\ngit merge-base --is-ancestor", vscode_script)
         vscode_guard = vscode_script.split("\ngit merge-base --is-ancestor", 1)[0]
-        manifest = json.loads((ROOT / "integrations/continue/integration.json").read_text())
+        try:
+            manifest = json.loads((ROOT / "integrations/continue/integration.json").read_text())
+            vscode_version = json.loads((ROOT / "vs-code-terraphim-it/package.json").read_text())["version"]
+        except json.JSONDecodeError as error:
+            self.fail(f"Invalid checked-in extension release manifest: {error}")
         self.assertEqual(manifest["tagPrefix"], "terraphim_continue-v")
         continue_tag = manifest["tagPrefix"] + manifest["version"]
-        vscode_version = json.loads((ROOT / "vs-code-terraphim-it/package.json").read_text())["version"]
         vscode_tag = "terraphim_vscode-v" + vscode_version
         candidates = [continue_tag, vscode_tag, "v1.21.20", "main", "python-v1.0.0",
                       "terraphim_continue-v999.0.0", "terraphim_vscode-v999.0.0",
@@ -350,13 +353,13 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
                     result = subprocess.run(
                         ["bash", "-euo", "pipefail", "-c", script], cwd=ROOT,
                         env=dict(os.environ, RELEASE_TAG=tag, REF_TYPE="tag", REF_NAME=tag),
-                        capture_output=True, text=True, timeout=20,
+                        check=False, capture_output=True, text=True, timeout=20,
                     )
                     self.assertEqual(result.returncode == 0, tag == expected, result.stderr)
         branch = subprocess.run(
             ["bash", "-euo", "pipefail", "-c", vscode_guard], cwd=ROOT,
             env=dict(os.environ, REF_TYPE="branch", REF_NAME=vscode_tag),
-            capture_output=True, text=True, timeout=20,
+            check=False, capture_output=True, text=True, timeout=20,
         )
         self.assertNotEqual(branch.returncode, 0)
 
