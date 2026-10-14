@@ -948,6 +948,7 @@ async fn export_applying_to_disk(
 async fn assert_export_alias_refused(
     link: fn(&std::path::Path, &std::path::Path),
     other_open: bool,
+    language: &str,
 ) {
     for (command, suffix) in [
         (commands::EXPORT_KNOWLEDGE_GRAPH, "knowledge-graph.json"),
@@ -960,14 +961,14 @@ async fn assert_export_alias_refused(
         std::fs::write(&source_path, &original).unwrap();
         let mut harness = Harness::start(ZED, json!({}), source.clone(), &original).await;
         let protected_path = if other_open {
-            let path = directory.path().join("other.md");
+            let path = directory.path().join(format!("other.{language}"));
             std::fs::write(&path, "Saved other document.\n").unwrap();
             harness
                 .server()
                 .did_open(DidOpenTextDocumentParams {
                     text_document: TextDocumentItem {
                         uri: Url::from_file_path(&path).unwrap(),
-                        language_id: "markdown".into(),
+                        language_id: language.into(),
                         version: 4,
                         text: "Unsaved changes in another document.\n".into(),
                     },
@@ -1000,6 +1001,7 @@ async fn graph_and_clean_exports_refuse_source_hard_links() {
     assert_export_alias_refused(
         |source, target| std::fs::hard_link(source, target).unwrap(),
         false,
+        "markdown",
     )
     .await;
 }
@@ -1009,6 +1011,7 @@ async fn graph_and_clean_exports_refuse_dirty_open_document_hard_links() {
     assert_export_alias_refused(
         |source, target| std::fs::hard_link(source, target).unwrap(),
         true,
+        "markdown",
     )
     .await;
 }
@@ -1019,6 +1022,7 @@ async fn graph_and_clean_exports_refuse_source_symlinks() {
     assert_export_alias_refused(
         |source, target| std::os::unix::fs::symlink(source, target).unwrap(),
         false,
+        "markdown",
     )
     .await;
 }
@@ -1029,6 +1033,7 @@ async fn graph_and_clean_exports_refuse_dirty_open_document_symlinks() {
     assert_export_alias_refused(
         |source, target| std::os::unix::fs::symlink(source, target).unwrap(),
         true,
+        "markdown",
     )
     .await;
 }
@@ -1078,7 +1083,7 @@ fn graph_and_clean_exports_refuse_source_changes_during_file_inspection() {
                 (commands::EXPORT_KNOWLEDGE_GRAPH, "knowledge-graph.json"),
                 (commands::EXPORT, "clean.md"),
             ] {
-                for change in ["edit", "close", "reopen"] {
+                for change in ["edit", "close", "reopen", "reopen_same"] {
                     let directory = tempfile::tempdir().unwrap();
                     let source_path = directory.path().join("brief.md");
                     let source = Url::from_file_path(&source_path).unwrap();
@@ -1131,14 +1136,18 @@ fn graph_and_clean_exports_refuse_source_changes_during_file_inspection() {
                                 },
                             })
                             .await;
-                        if change == "reopen" {
+                        if change == "reopen" || change == "reopen_same" {
                             server
                                 .did_open(DidOpenTextDocumentParams {
                                     text_document: TextDocumentItem {
                                         uri: source.clone(),
                                         language_id: "markdown".into(),
                                         version: 1,
-                                        text: updated.into(),
+                                        text: if change == "reopen_same" {
+                                            original.clone()
+                                        } else {
+                                            updated.into()
+                                        },
                                     },
                                 })
                                 .await;
@@ -1627,4 +1636,150 @@ async fn export_replaces_existing_closed_file_without_truncating_it_first() {
     assert_eq!(result.unwrap().unwrap()["written"], true);
     assert_eq!(std::fs::read_to_string(&target).unwrap(), "Keep this.");
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[tokio::test]
+async fn graph_and_clean_exports_protect_passive_json_hard_links() {
+    for language in ["json", "jsonc"] {
+        assert_export_alias_refused(
+            |source, target| std::fs::hard_link(source, target).unwrap(),
+            true,
+            language,
+        )
+        .await;
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn graph_and_clean_exports_protect_passive_json_symlinks() {
+    for language in ["json", "jsonc"] {
+        assert_export_alias_refused(
+            |source, target| std::os::unix::fs::symlink(source, target).unwrap(),
+            true,
+            language,
+        )
+        .await;
+    }
+}
+
+#[test]
+fn exports_refuse_target_lifecycle_changes_during_file_inspection() {
+    // The real filesystem inspection is delayed by occupying its blocking pool.
+    // Notifications run after the actual target snapshot and before dispatch.
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .max_blocking_threads(1)
+        .build()
+        .unwrap()
+        .block_on(async {
+            for (command, suffix) in [
+                (commands::EXPORT_KNOWLEDGE_GRAPH, "knowledge-graph.json"),
+                (commands::EXPORT, "clean.md"),
+            ] {
+                for change in ["edit", "close", "reopen", "open", "kind"] {
+                    let directory = tempfile::tempdir().unwrap();
+                    let source_path = directory.path().join("brief.md");
+                    let source = Url::from_file_path(&source_path).unwrap();
+                    let original = authored_graph_document();
+                    std::fs::write(&source_path, &original).unwrap();
+                    let target_path = directory.path().join(format!("brief.{suffix}"));
+                    let target = Url::from_file_path(&target_path).unwrap();
+                    let previous = "{\"user\":\"preserve this output\"}\n";
+                    std::fs::write(&target_path, previous).unwrap();
+                    let mut harness = Harness::start(
+                        ZED,
+                        json!({"lab":{"trigger":"command"}}),
+                        source.clone(),
+                        &original,
+                    )
+                    .await;
+                    let (server, client) = (harness.service.inner(), &mut harness.client);
+                    if change != "open" {
+                        server
+                            .did_open(DidOpenTextDocumentParams {
+                                text_document: TextDocumentItem {
+                                    uri: target.clone(),
+                                    language_id: "json".into(),
+                                    version: 1,
+                                    text: previous.into(),
+                                },
+                            })
+                            .await;
+                    }
+                    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+                    let (release_tx, release_rx) = std::sync::mpsc::channel();
+                    let occupying = tokio::task::spawn_blocking(move || {
+                        entered_tx.send(()).unwrap();
+                        let _ = release_rx.recv();
+                    });
+                    entered_rx.await.unwrap();
+                    let mut run = Box::pin(server.execute_command(ExecuteCommandParams {
+                        command: command.into(),
+                        arguments: vec![json!({"uri":source,"version":1})],
+                        work_done_progress_params: Default::default(),
+                    }));
+                    assert!(futures::poll!(&mut run).is_pending());
+                    if change == "edit" {
+                        server
+                            .did_change(DidChangeTextDocumentParams {
+                                text_document: VersionedTextDocumentIdentifier {
+                                    uri: target.clone(),
+                                    version: 2,
+                                },
+                                content_changes: vec![TextDocumentContentChangeEvent {
+                                    range: None,
+                                    range_length: None,
+                                    text: previous.into(),
+                                }],
+                            })
+                            .await;
+                    } else {
+                        if change != "open" {
+                            server
+                                .did_close(DidCloseTextDocumentParams {
+                                    text_document: TextDocumentIdentifier {
+                                        uri: target.clone(),
+                                    },
+                                })
+                                .await;
+                        }
+                        if change != "close" {
+                            server
+                                .did_open(DidOpenTextDocumentParams {
+                                    text_document: TextDocumentItem {
+                                        uri: target.clone(),
+                                        language_id: if change == "kind" {
+                                            "jsonc"
+                                        } else {
+                                            "json"
+                                        }
+                                        .into(),
+                                        version: 1,
+                                        text: previous.into(),
+                                    },
+                                })
+                                .await;
+                        }
+                    }
+                    release_tx.send(()).unwrap();
+                    occupying.await.unwrap();
+                    let result = tokio::time::timeout(Duration::from_secs(5), run)
+                        .await
+                        .expect("refusal requires no client applyEdit")
+                        .unwrap()
+                        .unwrap();
+                    assert_eq!(result["written"], false, "{command} {change}");
+                    assert_eq!(std::fs::read_to_string(&target_path).unwrap(), previous);
+                    assert_eq!(std::fs::read_to_string(&source_path).unwrap(), original);
+                    assert!(
+                        client
+                            .quiet()
+                            .await
+                            .iter()
+                            .all(|request| request.method() != "workspace/applyEdit")
+                    );
+                }
+            }
+        });
 }
