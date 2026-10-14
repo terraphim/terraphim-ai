@@ -39,7 +39,7 @@ jobs:
         if: inputs.registry == 'all' || inputs.registry == matrix.registry
         env:
           REGISTRY: ${{ matrix.registry }}
-        run: python3 vs-code-terraphim-it/scripts/verify_registry.py --registry "$REGISTRY" --vsix registry-input/terraphim-it.vsix --manifest registry-input/release-manifest.json --receipt registry-result.json --attempts 20 --delay 30
+        run: python3 vs-code-terraphim-it/scripts/verify_registry.py --registry "$REGISTRY" --vsix registry-input/terraphim-it.vsix --manifest registry-input/release-manifest.json --receipt registry-result.json --attempts 1 --delay 0
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always() && (inputs.registry == 'all' || inputs.registry == matrix.registry)
         with:
