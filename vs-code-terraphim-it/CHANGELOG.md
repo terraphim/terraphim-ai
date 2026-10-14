@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 (preview)
+
+- Verify the federated service principal and its Azure DevOps profile before Marketplace publication; retain non-secret identity evidence and refuse an unconfirmed profile.
+
 ## 0.1.1 (preview)
 
 - Bundle the verified editor v0.1.0-rc.2 release built with public Terraphim crate dependencies.

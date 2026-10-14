@@ -21,4 +21,32 @@ publisher, protected environment and federated identity are ready. Enabled
 targets remain `PENDING_PUBLICATION` until the separate registry readback passes.
 These gates do not create access, weaken tag policies or provide a PAT fallback.
 
+Microsoft publication also requires `VSCE_MARKETPLACE_PROFILE_ID` in the existing
+`visual-studio-marketplace` environment. After federated login, CI verifies the
+service principal client and tenant, then queries its own Azure DevOps profile.
+The profile ID is distinct from the Entra application and enterprise object IDs.
+An empty or different expected profile ID stops the job before upload and retains
+only non-secret metadata in `vscode-marketplace-identity-<commit>-<attempt>`.
+That receipt proves identity admission, not publisher membership or publication.
+
+For initial setup, enable the Microsoft readiness gate only after the existing
+publisher and its federation are ready. Leave the profile ID unset for the first
+identity read. Use the returned profile ID to add that principal as **Contributor**
+to `applied-knowledge-systems`; verify the assignment, then configure the expected
+profile ID. Rerun only that release's `marketplace-plan` job and its dependent
+marketplace job to use the already qualified package. Verify the final registry
+receipt against every extension payload file. Do not rerun package qualification
+or dispatch the same version afresh: a rebuilt VSIX can have different ZIP
+timestamps, and the immutable GitHub publisher will refuse replacement bytes.
+The original source tag, package artifact and three native receipts must remain
+available; select retained receipts by artifact ID and digest, not name alone.
+
+Version 0.1.2 introduces this CI-only identity step because the immutable 0.1.1
+tag cannot be changed. It retains the same released editor inputs and runtime
+features. Real Azure identity retrieval remains an integration gate until the
+configured principal executes it; local payload fixtures do not qualify login.
+This step assigns no Azure resource roles or organization membership and creates
+no long-lived secrets. See Microsoft's documented
+[principal profile lookup](https://learn.microsoft.com/en-us/azure/devops/extend/publish/command-line?view=azure-devops#publish-with-a-microsoft-entra-token).
+
 Acceptance reports distinguish actual saved files, engine tests and visual UI checks. The original 41 visual requirements are not all accepted. This is a scoped preview; stock Zed visual limitations and the separate Zed fork remain outside this VSIX's claims.

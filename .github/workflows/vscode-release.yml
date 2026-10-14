@@ -140,6 +140,19 @@ jobs:
           client-id: ${{ vars.VSCE_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.VSCE_AZURE_TENANT_ID }}
           allow-no-subscriptions: true
+      - name: Confirm the authenticated publisher profile before uploading
+        if: matrix.registry == 'visual-studio-marketplace'
+        env:
+          VSCE_AZURE_CLIENT_ID: ${{ vars.VSCE_AZURE_CLIENT_ID }}
+          VSCE_AZURE_TENANT_ID: ${{ vars.VSCE_AZURE_TENANT_ID }}
+          VSCE_MARKETPLACE_PROFILE_ID: ${{ vars.VSCE_MARKETPLACE_PROFILE_ID }}
+        run: python3 scripts/marketplace_identity.py --receipt marketplace-identity.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always() && matrix.registry == 'visual-studio-marketplace'
+        with:
+          name: vscode-marketplace-identity-${{ github.sha }}-${{ github.run_attempt }}
+          path: vs-code-terraphim-it/marketplace-identity.json
+          if-no-files-found: warn
       # A retry may encounter an already published exact version. Readback is
       # the mandatory authority; any absent or different payload fails the job.
       - name: Publish exact VSIX to Visual Studio Marketplace

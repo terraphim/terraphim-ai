@@ -2,7 +2,7 @@
   "name": "terraphim-it",
   "displayName": "Terraphim It",
   "description": "Intelligent Markdown editor with alternatives, knowledge-graph synonyms and role-based suggestions",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "applied-knowledge-systems",
   "private": true,
   "license": "Apache-2.0",
