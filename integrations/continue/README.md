@@ -26,6 +26,47 @@ python3 -m venv .venv
 
 This creates only `.continue/mcpServers/terraphim.json` and `.continue/rules/terraphim.md` in that project; existing files are refused and existing model settings retained. The generated config uses this venv's Python and the bundle's absolute path. Open the project in the existing Continue extension, select Agent mode and inspect its MCP tool list. Ask it to call `terraphim_retrieve` for `Concern`, then inspect the returned Risk excerpt. Explicitly request the answer tool only if installed and desired. Do not treat a model's narrative as proof that a tool ran.
 
+## Use both CLIs directly
+
+The integration calls `terraphim-grep`; `terraphim-agent` is a separate CLI for memory and learning. Install both separately from the [clients v1.21.20 release](https://github.com/terraphim/terraphim-clients/releases/tag/v1.21.20): select your platform archives, verify `SHA256SUMS`, extract them and add the executables to `PATH`. Neither CLI is bundled here. The commands below were checked with **1.21.20** on macOS ARM64; the existing MCP transport CI separately pins grep 1.21.19.
+
+```sh
+terraphim-grep --version
+terraphim-agent --version
+```
+
+The shared concept uses Logseq-compatible `synonyms::` syntax in a Markdown knowledge-base note:
+
+```markdown
+# Risk
+synonyms:: Concern
+```
+
+The adapter and CLI consume its compiled JSON graph. Run this example in a fresh working directory. It uses the graph exported from the editor, included as `risk-concern.exported.json` in this bundle. Copy that file into the working directory first. The clean corpus contains Risk but no literal Concern:
+
+```sh
+mkdir briefs
+printf '%s\n' 'Risk: supplier delays require a backup plan.' > briefs/decision.md
+terraphim-grep concern --search-only --haystack all \
+  --paths ./briefs --thesaurus ./risk-concern.exported.json --json -n 3
+```
+
+The returned `chunks` contain the Risk sentence and `answer` is `null`. To adopt a newly authored synonym, review the editor export, replace the file at the configured `--graph` path, and restart the MCP server. The running server refuses changed graph bytes; a new process records the reviewed graph's digest at startup. If you use a different graph path, update `--graph` in `.continue/mcpServers/terraphim.json` first. The installer refuses existing configuration rather than overwriting it. The [synonym-search tutorial](https://terraphim.ai/how-tos/synonym-search/) includes the editor steps, video and downloadable examples.
+
+To compare retrieval with provider synthesis on a corpus with several relevant passages, run the same search with `--answer` instead of `--search-only`. That requires a configured provider and can send the retrieved context to it; inspect the returned passages, answer and citations separately. The Continue adapter exposes this mode only when installed with `--allow-synthesis`.
+
+Preserve an authored decision using agent memory, then read the actual saved item (Python 3 extracts the returned ID):
+
+```sh
+terraphim-agent --format json memory capture \
+  --content 'Risk requires a Decision: approve a second supplier as the mitigation.' \
+  --provenance-tag 'public-project-brief' > captured-memory.json
+memory_id="$(python3 -c 'import json; print(json.load(open("captured-memory.json"))["memory_id"])')"
+terraphim-agent memory show "$memory_id" --json
+```
+
+The readback's `memory_item.content` contains that sentence, with the `provenance:public-project-brief` tag. Capture writes to the current user's OS-local memory store (independent of the working directory). It does not consume the exported graph, configure a retrieval role or add a memory tool to this MCP adapter. Follow the [memory walkthrough](https://terraphim.ai/posts/cold-start-tax-agentic-memory/) for role-aware retrieval and the [hooks walkthrough](https://terraphim.ai/posts/native-hook-support/) for reviewed command corrections.
+
 ## Verification and packaging
 
 ```sh

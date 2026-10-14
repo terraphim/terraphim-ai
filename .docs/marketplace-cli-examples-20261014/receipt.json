@@ -1,0 +1,89 @@
+{
+  "checkedAt": "2026-10-14T18:36:54.066022+00:00",
+  "host": {
+    "system": "Darwin",
+    "architecture": "arm64"
+  },
+  "release": "https://github.com/terraphim/terraphim-clients/releases/tag/v1.21.20",
+  "binaries": {
+    "terraphim-grep": {
+      "sha256": "95491857b6a115ce7f4ec2a9d24bd0f7b8efcc1a52bd1403b34a62dd704012ab",
+      "version": "terraphim-grep 1.21.20"
+    },
+    "terraphim-agent": {
+      "sha256": "bff31dc42d6d1a99bf51291039d7719c6a48c2326e582e5e24eaa1eaf11e17ec",
+      "version": "terraphim-agent 1.21.20"
+    }
+  },
+  "cases": [
+    {
+      "name": "vscode",
+      "sourceDocument": "vs-code-terraphim-it/README.md",
+      "sourceSha256": "c14dfef1378e99015bb8a921fa186be7be1ce732d308302f7d1c830b4378d8ea",
+      "graphSha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d",
+      "graphProvenance": "Existing editor-exported graph at integrations/continue/risk-concern.exported.json; labelled input.",
+      "profileIsolation": "Dedicated child HOME/config/data directories; no real user memory used; provider/credential environment names omitted.",
+      "commands": [
+        {
+          "block": "terraphim-grep --version\nterraphim-agent --version",
+          "exitCode": 0,
+          "stdout": "vscode-versions.stdout",
+          "stderr": "vscode-versions.stderr"
+        },
+        {
+          "block": "terraphim-grep concern --search-only --haystack all \\\n  --paths ./briefs --thesaurus ./brief.knowledge-graph.json --json -n 3",
+          "exitCode": 0,
+          "stdout": "vscode-search.stdout",
+          "stderr": "vscode-search.stderr"
+        },
+        {
+          "block": "terraphim-grep concern --answer --haystack all \\\n  --paths ./briefs --thesaurus ./brief.knowledge-graph.json --json -n 3",
+          "exitCode": 0,
+          "stdout": "vscode-answer-insufficient.stdout",
+          "stderr": "vscode-answer-insufficient.stderr"
+        },
+        {
+          "block": "terraphim-agent --format json memory capture \\\n  --content 'Risk requires a Decision: approve a second supplier as the mitigation.' \\\n  --provenance-tag 'public-project-brief' > captured-memory.json\nmemory_id=\"$(python3 -c 'import json; print(json.load(open(\"captured-memory.json\"))[\"memory_id\"])')\"\nterraphim-agent memory show \"$memory_id\" --json",
+          "exitCode": 0,
+          "stdout": "vscode-capture-show.stdout",
+          "stderr": "vscode-capture-show.stderr"
+        }
+      ],
+      "baseline": "Zero passages with explicit empty graph; one Risk passage with existing editor export.",
+      "finalDocumentSha256": "065ac3ecaaf3f9d92873b245edd39fae5102dcca79ca6cc02f89b78616fac06f",
+      "executedBlocksUnchangedInFinalDocument": true
+    },
+    {
+      "name": "continue",
+      "sourceDocument": "integrations/continue/README.md",
+      "sourceSha256": "898de9de9b482123ae30ff0b8c22810342f7d17e463ee1ca6b402e29a00d2dc4",
+      "graphSha256": "f8648b16470e764bdff5c95064078419d71e8d41d2ca30d4b1508017c166a45d",
+      "graphProvenance": "Existing editor-exported graph at integrations/continue/risk-concern.exported.json; labelled input.",
+      "profileIsolation": "Dedicated child HOME/config/data directories; no real user memory used; provider/credential environment names omitted.",
+      "commands": [
+        {
+          "block": "terraphim-grep --version\nterraphim-agent --version",
+          "exitCode": 0,
+          "stdout": "continue-versions.stdout",
+          "stderr": "continue-versions.stderr"
+        },
+        {
+          "block": "mkdir briefs\nprintf '%s\\n' 'Risk: supplier delays require a backup plan.' > briefs/decision.md\nterraphim-grep concern --search-only --haystack all \\\n  --paths ./briefs --thesaurus ./risk-concern.exported.json --json -n 3",
+          "exitCode": 0,
+          "stdout": "continue-search.stdout",
+          "stderr": "continue-search.stderr"
+        },
+        {
+          "block": "terraphim-agent --format json memory capture \\\n  --content 'Risk requires a Decision: approve a second supplier as the mitigation.' \\\n  --provenance-tag 'public-project-brief' > captured-memory.json\nmemory_id=\"$(python3 -c 'import json; print(json.load(open(\"captured-memory.json\"))[\"memory_id\"])')\"\nterraphim-agent memory show \"$memory_id\" --json",
+          "exitCode": 0,
+          "stdout": "continue-capture-show.stdout",
+          "stderr": "continue-capture-show.stderr"
+        }
+      ],
+      "baseline": "Zero passages with explicit empty graph; one Risk passage with existing editor export.",
+      "finalDocumentSha256": "ca2e1f9e5e87e1e863e5015f4d6847bfda222ddb8d3b0abcf79f5063a1adc66b",
+      "executedBlocksUnchangedInFinalDocument": true
+    }
+  ],
+  "scope": "Exact new README shell blocks executed with released binaries in fresh child-only local profiles. The graph is an existing editor export supplied as labelled input; these CLI runs do not claim a new editor operation or provider synthesis."
+}

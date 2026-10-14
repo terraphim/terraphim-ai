@@ -93,7 +93,7 @@ jobs:
             cmp terraphim-continue-SHA256SUMS existing/terraphim-continue-SHA256SUMS
           else
             qualify_source
-            gh release create "$RELEASE_TAG" --verify-tag --draft --title "Terraphim Continue integration $version" --notes "Agent-mode MCP tools backed by released terraphim-grep. Actual SDK transport qualified; native Continue UI and full editor parity remain unqualified." --latest=false
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "Terraphim Continue integration $version" --notes "Agent-mode MCP tools backed by separately installed terraphim-grep. The packaged README includes runnable terraphim-grep synonym-search and terraphim-agent authored-memory capture/readback examples, verified with clients v1.21.20. See https://terraphim.ai/how-tos/synonym-search/ and https://terraphim.ai/posts/cold-start-tax-agentic-memory/. Actual SDK transport qualified; native Continue UI and full editor parity remain unqualified." --latest=false
             qualify_source
             gh release upload "$RELEASE_TAG" "$CONTINUE_ARCHIVE_NAME" terraphim-continue-SHA256SUMS
           fi

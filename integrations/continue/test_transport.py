@@ -50,10 +50,26 @@ class TransportTests(unittest.TestCase):
                         self.assertTrue(invalid.isError)
                         disabled = await session.call_tool('terraphim_answer', {'query': 'Concern'})
                         self.assertTrue(disabled.isError)
-                        local_graph.write_text('{}')
+                        updated_graph = json.loads(local_graph.read_text())
+                        updated_graph['data']['hazard'] = updated_graph['data']['risk']
+                        local_graph.write_text(json.dumps(updated_graph))
                         drift = await session.call_tool('terraphim_retrieve', {'query': 'Concern'})
                         self.assertTrue(drift.isError)
                         self.assertIn('changed', drift.content[0].text)
+                        receipt['changedGraphRefused'] = drift.content[0].text
+                # The graph is pinned for one server process, unlike the explicit
+                # released-binary digest in the generated configuration.
+                async with stdio_client(params) as streams:
+                    async with ClientSession(*streams) as session:
+                        await session.initialize()
+                        result = await session.call_tool('terraphim_retrieve', {'query': 'Hazard'})
+                        self.assertFalse(result.isError)
+                        restarted = json.loads(result.content[0].text)
+                        self.assertNotEqual(restarted['graphSha256'], actual['graphSha256'])
+                        self.assertEqual(restarted['graphSha256'], hashlib.sha256(local_graph.read_bytes()).hexdigest())
+                        self.assertEqual(restarted['output']['chunks'][0]['content'], 'Risk: supplier delays require a backup plan.')
+                        self.assertIsNone(restarted['output']['answer'])
+                        receipt['reviewedGraphAfterRestart'] = restarted
         asyncio.run(exercise())
         if os.environ.get('TERRAPHIM_CONTINUE_RECEIPT'):
             Path(os.environ['TERRAPHIM_CONTINUE_RECEIPT']).write_text(json.dumps(receipt, indent=2))
