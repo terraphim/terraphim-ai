@@ -27,7 +27,7 @@ class TransportTests(unittest.TestCase):
                 (corpus / 'brief.md').write_text('Risk: supplier delays require a backup plan.\n')
                 local_graph = Path(directory) / 'graph.json'
                 local_graph.write_bytes(graph.read_bytes())
-                baseline = json.loads(subprocess.check_output([str(binary), '--search-only', '--json', '--paths', str(corpus), '--', 'Concern'], cwd=corpus))
+                baseline = json.loads(subprocess.check_output([str(binary), '--search-only', '--json', '--paths', str(corpus), '--', 'Concern'], cwd=corpus, timeout=30))
                 self.assertEqual(baseline['chunks'], [])
                 receipt['baseline'] = baseline
                 params = StdioServerParameters(command=sys.executable, args=[str(HERE / 'server.py'),
