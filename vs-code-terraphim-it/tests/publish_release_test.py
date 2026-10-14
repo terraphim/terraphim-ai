@@ -117,6 +117,62 @@ class PublicationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             publication.select_release([[draft], [draft]], self.tag)
 
+    def test_created_draft_readback_is_bounded_and_stops_at_first_visible_release(self):
+        draft = {"tag_name": self.tag, "draft": True, "prerelease": True, "assets": []}
+        observed = []
+
+        def snapshots(values):
+            for value in values:
+                observed.append(value)
+                yield value
+
+        self.assertEqual(publication.recover_visible_release(snapshots([None, None, draft, None])), draft)
+        self.assertEqual(observed, [None, None, draft])
+        observed.clear()
+        self.assertEqual(publication.recover_visible_release(snapshots([None] * 4 + [draft])), draft)
+        self.assertEqual(len(observed), 5)
+        observed.clear()
+        with self.assertRaisesRegex(ValueError, "same qualified artifact"):
+            publication.recover_visible_release(snapshots([None] * 5 + [draft]))
+        self.assertEqual(observed, [None] * 5)
+        self.assertEqual(len(publication.RELEASE_LOOKUP_DELAYS), 5)
+        self.assertEqual(sum(publication.RELEASE_LOOKUP_DELAYS), 8)
+
+    def test_visible_mismatch_or_ambiguous_readback_is_never_retried(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            vsix, manifest, sums, _ = self.qualified(root)
+            original = {p.name: p.read_bytes() for p in (vsix, manifest, sums)}
+            wrong = {"tag_name": "other", "draft": True, "prerelease": True, "assets": []}
+            values = iter([wrong, None])
+            current = publication.recover_visible_release(values)
+            with self.assertRaisesRegex(ValueError, "tag or preview"):
+                publication.resume_plan(current, self.tag, [vsix, manifest, sums])
+            self.assertIsNone(next(values))
+            self.assertEqual(original, {p.name: p.read_bytes() for p in (vsix, manifest, sums)})
+
+        def ambiguous_snapshots():
+            yield None
+            draft = {"tag_name": self.tag}
+            yield publication.select_release([[draft, draft]], self.tag)
+
+        with self.assertRaisesRegex(ValueError, "Ambiguous"):
+            publication.recover_visible_release(ambiguous_snapshots())
+
+    def test_readback_policy_executes_in_real_subprocess_without_cloud_calls(self):
+        with tempfile.TemporaryDirectory() as folder:
+            fixture = Path(folder) / "readbacks.json"
+            draft = {"tag_name": self.tag, "draft": True, "prerelease": True, "assets": []}
+            fixture.write_text(json.dumps([None, draft]))
+            code = ("import json,sys; sys.path.insert(0,sys.argv[1]); import publish_release; "
+                    "print(json.dumps(publish_release.recover_visible_release("
+                    "iter(json.load(open(sys.argv[2]))))))")
+            result = subprocess.run([sys.executable, "-c", code,
+                                     str(Path(publication.__file__).parent), str(fixture)],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout), draft)
+
     def test_anonymous_download_rejects_credentials_and_overwrite_before_network(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "download"
