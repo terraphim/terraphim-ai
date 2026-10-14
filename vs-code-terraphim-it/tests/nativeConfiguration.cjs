@@ -10,9 +10,30 @@ exports.checkConfiguration = async (extension, output) => {
   const keys = ['agent', 'atomicServerUrl', 'serverUrl', 'selectedRole', 'enableLocalServer'];
   const previous = Object.fromEntries(keys.map(key => [key, config().inspect(key).globalValue]));
   const { Agent } = createRequire(path.join(extension.extensionPath, 'out/extension.js'))('@tomic/lib');
-  const stores = require(path.join(extension.extensionPath, 'out/helpers/getStore.js'));
-  const { serverConnection } = require(path.join(extension.extensionPath, 'out/helpers/serverConnection.js'));
+  const canonical = async filename => {
+    const actual = await fs.realpath(filename);
+    return process.platform === 'win32' ? actual.toLowerCase() : actual;
+  };
+  const loadedModule = async relative => {
+    // VS Code's Windows URI path can differ in drive case/short-name spelling
+    // from Node's loaded filename. A second require would create another
+    // singleton whose configuration listener was never registered by activate.
+    const expected = await canonical(path.join(extension.extensionPath, relative));
+    const candidates = Object.values(require.cache).filter(module => path.basename(module.filename) === path.basename(relative));
+    const matches = [];
+    for (const module of candidates) {
+      if (await canonical(module.filename) === expected) matches.push(module);
+    }
+    assert.equal(matches.length, 1, `exactly one activated package module: ${relative}`);
+    return matches[0];
+  };
+  const storeModule = await loadedModule('out/helpers/getStore.js');
+  const connectionModule = await loadedModule('out/helpers/serverConnection.js');
+  const stores = storeModule.exports;
+  const { serverConnection } = connectionModule.exports;
   const report = { hostVersion: vscode.version, extensionVersion: extension.packageJSON.version,
+    requestedModuleFiles: {store:path.join(extension.extensionPath, 'out/helpers/getStore.js'), connection:path.join(extension.extensionPath, 'out/helpers/serverConnection.js')},
+    activatedModuleFiles: {store:storeModule.filename, connection:connectionModule.filename},
     scope: 'Actual native settings, packaged Store identity and routing refusal; no authenticated service or successful remote retrieval claimed', checks: [] };
   const update = async (key, value) => {
     if (config().inspect(key).globalValue === value) return;

@@ -21,4 +21,6 @@ Before bumping versions: TypeScript compile and ESLint pass; 63 package/integrit
 
 Local VS Code 1.141.2 passed those configuration checks and actual saved-file/KG outputs. One earlier candidate also passed native history/reopen; the later candidate refused the history assertion because its window was unfocused. That failed attempt is retained and does not qualify the final package. The immutable release workflow must pass the complete lifecycle on the exact packaged bytes on Linux, macOS and Windows before publication. No all-41 or visual-UI qualification is added by these tests.
 
+The first PR matrix passed Linux/macOS but failed Windows' local-mode assertion. Its log initialized two Stores at the same endpoint: dynamically requiring a Windows URI-derived path can instantiate another copy of a singleton. The native test now selects exactly one already loaded production module by actual file identity, records requested/loaded paths, and retains all refusal assertions. A fresh complete matrix must confirm the correction; the test never refreshes the singleton itself or substitutes its API.
+
 No release asset replacement, tag reuse, Open VSX readiness change or branch-protection change is part of this amendment.
