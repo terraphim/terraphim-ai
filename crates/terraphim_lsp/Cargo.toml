@@ -11,20 +11,58 @@ repository = "https://github.com/terraphim/terraphim-ai"
 keywords = ["ai", "lsp", "language-server", "ide"]
 license = "Apache-2.0"
 readme = "README.md"
+publish = ["crates-io"]
 
 [dependencies]
-terraphim_automata = { version = "1.20.2", registry = "terraphim" }
-terraphim_types = { version = "1.20.2", registry = "terraphim" }
-terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
+same-file = "1.0.6"
+# Pure analysis core (also consumed in-process by terraphim-editor as WASM).
+terraphim_lsp_core = { path = "../terraphim_lsp_core", version = "1.23.1" }
+terraphim_types = "1.22.3"
 tower-lsp = "0.20"
 tokio = { workspace = true }
+# The `Service` trait for the exit watcher; the util features are for tests.
+tower = { version = "0.5", default-features = false }
+serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
 env_logger = "0.11"
 
 [dev-dependencies]
+tempfile = { workspace = true }
 tower = { version = "0.5", features = ["util"] }
+futures = "0.3"
+# Reads back the blocks the add-alternative command writes.
+terraphim_alternatives = "0.1.1"
+criterion = "0.8"
+
+[[bench]]
+name = "unknown_terms"
+harness = false
 
 [[bin]]
 name = "terraphim-lsp"
 path = "src/main.rs"
+
+# Build and publish this bounded workspace without resolving unrelated packages
+# or patches from the repository's root workspace.
+[workspace]
+resolver = "2"
+members = [".", "../terraphim_lsp_core"]
+
+[workspace.package]
+version = "1.22.0-rc.4"
+edition = "2024"
+rust-version = "1.91"
+
+[workspace.dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+tempfile = "3.27"
+thiserror = "1.0"
+
+[profile.release]
+lto = false
+codegen-units = 1
+opt-level = 3

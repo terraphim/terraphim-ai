@@ -36,7 +36,6 @@ CRATES=(
   "terraphim_github_runner"
   "terraphim_gitea_runner"
   "terraphim_rlm"
-  "terraphim_lsp"
 )
 
 declare -A CRATE_DIR_MAP=(
@@ -69,6 +68,15 @@ parse_args() {
       *) log_error "Unknown option: $1"; show_help ;;
     esac
   done
+}
+
+reject_reserved_crates() {
+  case "$SPECIFIC_CRATE" in
+    terraphim_lsp|terraphim_lsp_core)
+      log_error "LSP packages are owned by publish-lsp-crates.yml; use an exact reviewed package tag."
+      exit 1
+      ;;
+  esac
 }
 
 check_prerequisites() {
@@ -257,5 +265,6 @@ main() {
 }
 
 parse_args "$@"
+reject_reserved_crates
 check_prerequisites
 main "$@"

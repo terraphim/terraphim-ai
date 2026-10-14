@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "repository": "terraphim/terraphim-ai",
+  "owner": "AlexMikhalev",
+  "toolchain": "1.96",
+  "workspaceManifest": "crates/terraphim_lsp/Cargo.toml",
+  "packages": [
+    {
+      "name": "terraphim_lsp_core",
+      "version": "1.23.1",
+      "path": "crates/terraphim_lsp_core/Cargo.toml"
+    },
+    {
+      "name": "terraphim_lsp",
+      "version": "1.22.0-rc.4",
+      "path": "crates/terraphim_lsp/Cargo.toml"
+    }
+  ]
+}

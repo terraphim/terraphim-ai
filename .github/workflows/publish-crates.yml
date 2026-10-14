@@ -33,6 +33,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Refuse packages owned by the reviewed LSP publisher
+        env:
+          REQUESTED_CRATES: ${{ inputs.crate_list }}
+          REQUESTED_CRATE: ${{ inputs.crate }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -f
+          for crate in $REQUESTED_CRATES $REQUESTED_CRATE; do
+            case "$crate" in
+              terraphim_lsp|terraphim_lsp_core)
+                echo "::error::LSP packages are owned by publish-lsp-crates.yml; use an exact reviewed package tag."
+                exit 1
+                ;;
+              terraphim_update|terraphim_github_runner|terraphim_gitea_runner|terraphim_rlm)
+                ;;
+              *)
+                echo "::error::Unsupported legacy package; use an exact allowed package name."
+                exit 1
+                ;;
+            esac
+          done
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -56,18 +79,28 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
           TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token")
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Resolve crate list
         id: crates
+        env:
+          REQUESTED_CRATES: ${{ inputs.crate_list }}
+          REQUESTED_CRATE: ${{ inputs.crate }}
         run: |
-          if [ -n "${{ inputs.crate_list }}" ]; then
-            echo "list=${{ inputs.crate_list }}" >> $GITHUB_OUTPUT
-          elif [ -n "${{ inputs.crate }}" ]; then
-            echo "list=${{ inputs.crate }}" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          set -f
+          if [ -n "$REQUESTED_CRATES" ]; then
+            selected="$REQUESTED_CRATES"
+          elif [ -n "$REQUESTED_CRATE" ]; then
+            selected="$REQUESTED_CRATE"
           else
-            echo "list=terraphim_update terraphim_github_runner terraphim_gitea_runner terraphim_rlm terraphim_lsp" >> $GITHUB_OUTPUT
+            selected='terraphim_update terraphim_github_runner terraphim_gitea_runner terraphim_rlm'
           fi
+          normalized=""
+          for crate in $selected; do
+            normalized="${normalized:+$normalized }$crate"
+          done
+          printf 'list=%s\n' "$normalized" >> "$GITHUB_OUTPUT"
 
       - name: Publish crates in dependency order
         env:
@@ -79,12 +112,12 @@ jobs:
           chmod +x ./scripts/publish-crates.sh
 
           for crate in $CRATE_LIST; do
-            ARGS="--crate $crate"
+            ARGS=(--crate "$crate")
             if [ "$DRY_RUN" = "true" ]; then
-              ARGS="$ARGS --dry-run"
+              ARGS+=(--dry-run)
             fi
             VERSION=$(grep -m1 '^version' Cargo.toml | sed 's/version = "//; s/"//')
-            ./scripts/publish-crates.sh $ARGS --version "$VERSION"
+            ./scripts/publish-crates.sh "${ARGS[@]}" --version "$VERSION"
           done
 
       - name: Verify published packages
