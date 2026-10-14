@@ -14,6 +14,13 @@ on:
       - ".github/workflows/release-sign.yml"
       - ".github/workflows/continue-integration.yml"
       - ".github/workflows/vscode-release.yml"
+      - ".github/workflows/lsp-producer.yml"
+      - ".github/workflows/lsp-publish.yml"
+      - "docs/contracts/schemas/lsp-*.schema.json"
+      - "release/lsp/**"
+      - "tests/lsp_handoff_test.py"
+      - "tests/lsp_private_producer_test.py"
+      - "tests/workflow_lsp_handoff_test.py"
       - "integrations/continue/verify_source.py"
       - "integrations/continue/integration.json"
       - "vs-code-terraphim-it/package.json"
@@ -53,6 +60,13 @@ on:
       - ".github/workflows/release-sign.yml"
       - ".github/workflows/continue-integration.yml"
       - ".github/workflows/vscode-release.yml"
+      - ".github/workflows/lsp-producer.yml"
+      - ".github/workflows/lsp-publish.yml"
+      - "docs/contracts/schemas/lsp-*.schema.json"
+      - "release/lsp/**"
+      - "tests/lsp_handoff_test.py"
+      - "tests/lsp_private_producer_test.py"
+      - "tests/workflow_lsp_handoff_test.py"
       - "integrations/continue/verify_source.py"
       - "integrations/continue/integration.json"
       - "vs-code-terraphim-it/package.json"
@@ -184,7 +198,7 @@ jobs:
       - name: actionlint (static workflow analysis)
         run: |
           set -euo pipefail
-          actionlint .github/workflows/release-coordinator.yml .github/workflows/release-sign.yml .github/workflows/release-comprehensive.yml .github/workflows/publish-npm.yml .github/workflows/publish-pypi.yml .github/workflows/publish-bun.yml .github/workflows/publish-tauri.yml .github/workflows/release-manifest-contract.yml
+          actionlint .github/workflows/lsp-producer.yml .github/workflows/lsp-publish.yml .github/workflows/release-coordinator.yml .github/workflows/release-sign.yml .github/workflows/release-comprehensive.yml .github/workflows/publish-npm.yml .github/workflows/publish-pypi.yml .github/workflows/publish-bun.yml .github/workflows/publish-tauri.yml .github/workflows/release-manifest-contract.yml
 
       - name: Parse workflow YAML
         run: |
@@ -201,6 +215,9 @@ jobs:
 
       - name: Run workflow static contract tests
         run: python -m unittest -v tests.workflow_release_coordinator_contract_test
+
+      - name: Private-source LSP handoff and workflow contracts
+        run: python -m unittest -v tests.lsp_handoff_test tests.lsp_private_producer_test tests.workflow_lsp_handoff_test
 
       - name: Run exhaustive release-writer and recovery contract tests
         run: python -m unittest -v tests.workflow_release_recovery_contract_test

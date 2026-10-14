@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraphim.ai/schemas/lsp-release-handoff.schema.json",
+  "title": "LSP release-handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "tag",
+    "requestSha256",
+    "manifestSha256",
+    "producer",
+    "artifact"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "tag": {
+      "type": "string",
+      "pattern": "^terraphim_lsp-v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$"
+    },
+    "requestSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "manifestSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "workflow",
+        "controlCommit",
+        "runId",
+        "runAttempt",
+        "event"
+      ],
+      "properties": {
+        "repository": {
+          "const": "terraphim/terraphim-ai"
+        },
+        "workflow": {
+          "const": ".github/workflows/lsp-producer.yml"
+        },
+        "controlCommit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "runId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "runAttempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event": {
+          "const": "workflow_dispatch"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "digest"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^lsp-frozen-terraphim_lsp-v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?-attempt[1-9][0-9]*$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

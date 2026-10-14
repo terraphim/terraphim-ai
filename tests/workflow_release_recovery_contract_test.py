@@ -32,7 +32,9 @@ GITHUB_RELEASE_WRITER_PATTERN = re.compile(
     r"softprops/action-gh-release|gh release (?:create|edit|upload)|"
     r"repos\.(?:create|update)Release|createRelease|updateRelease|"
     r"github-publish-release\.sh|"
-    r"\bpython[0-9.]*\s+[\"']?(?:[\w./-]+/)?publish_release\.py\b",
+    r"\bpython[0-9.]*\s+[\"']?(?:[\w./-]+/)?publish_release\.py\b|"
+    r"\bpython[0-9.]*\s+[\"']?(?:[\w./-]+/)?publish_lsp_release\.py\b|"
+    r"\bpython[0-9.]*\s+[\"']?(?:[\w./-]+/)?lsp_handoff\.py[\"']?\s+publish\b",
     re.IGNORECASE,
 )
 
@@ -252,6 +254,7 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
                 "release-coordinator.yml",
                 "continue-integration.yml",
                 "vscode-release.yml",
+                "lsp-publish.yml",
             },
             "every workflow that writes GitHub releases must be classified",
         )
