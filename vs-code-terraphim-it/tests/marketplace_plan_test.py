@@ -17,7 +17,7 @@ class MarketplacePlanTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
             environment = {key: value for key, value in os.environ.items() if key not in FLAGS}
-            environment.update({"GITHUB_SHA": "a" * 40, "GITHUB_REF_NAME": "terraphim_vscode-v0.1.1",
+            environment.update({"GITHUB_SHA": "a" * 40, "GITHUB_REF_NAME": "terraphim_vscode-v" + json.loads((ROOT / "package.json").read_text())["version"],
                                 "GITHUB_OUTPUT": str(folder / "outputs"),
                                 "GITHUB_STEP_SUMMARY": str(folder / "summary"), **flags})
             result = subprocess.run([sys.executable, str(SCRIPT), "--receipt", str(folder / "receipt.json")],
@@ -84,7 +84,7 @@ class MarketplacePlanTests(unittest.TestCase):
             receipt.write_text("earlier publication evidence\n")
             result = subprocess.run([sys.executable, str(SCRIPT), "--receipt", str(receipt)],
                                     env={**os.environ, "GITHUB_SHA": "a" * 40,
-                                         "GITHUB_REF_NAME": "terraphim_vscode-v0.1.1"},
+                                         "GITHUB_REF_NAME": "terraphim_vscode-v" + json.loads((ROOT / "package.json").read_text())["version"]},
                                     capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(receipt.read_text(), "earlier publication evidence\n")
