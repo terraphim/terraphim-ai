@@ -129,21 +129,26 @@ def prepare(root, lane, expected, item):
     return source_receipt(lane, expected)
 
 
-def environment(lane):
+def environment(lane, *, for_cross=False):
     env = {k: v for k, v in os.environ.items() if not k.startswith(('CARGO_', 'RUSTC_', 'RUSTFLAGS', 'GH_', 'GITHUB_TOKEN', 'GITEA_', 'OP_'))}
     for key in ('RUSTC', 'RUSTDOC', 'RUSTUP_TOOLCHAIN'):
         env.pop(key, None)
     env.update({'CARGO_HOME': str(lane / 'cargo'), 'CARGO_TARGET_DIR': str(lane / 'target'),
                 'CARGO_BUILD_BUILD_DIR': str(lane / 'target'), 'CARGO_TERM_COLOR': 'never',
                 'RUSTC_WRAPPER': '', 'RUSTC_WORKSPACE_WRAPPER': ''})
+    if for_cross:
+        # Cross maps CARGO_TARGET_DIR to /target inside its container, but the
+        # pinned wrapper forwards CARGO_BUILD_BUILD_DIR unchanged. Let Cargo
+        # default its build directory to that mapped target, never a host path.
+        env.pop('CARGO_BUILD_BUILD_DIR', None)
     return env
 
 
-def command(argv, cwd, lane, name):
+def command(argv, cwd, lane, name, *, for_cross=False):
     logs = lane / 'logs'; logs.mkdir(exist_ok=True)
     path = logs / (name + '.log')
     with path.open('xb') as output:
-        result = subprocess.run(argv, cwd=cwd, env=environment(lane), stdout=output,
+        result = subprocess.run(argv, cwd=cwd, env=environment(lane, for_cross=for_cross), stdout=output,
                                 stderr=subprocess.STDOUT, timeout=3600, check=False)
     record = {'argv': argv, 'exitCode': result.returncode, 'log': path.name, 'sha256': publisher.digest(path)}
     require(result.returncode == 0, 'Build command failed: ' + name)
@@ -374,7 +379,7 @@ def build(lane, expected, target, cross_image=None):
         invocation = ['rustup', 'run', expected['toolchain'], 'cross']
     else:
         invocation = cargo
-    commands.append(command(invocation + ['build', '--locked', '--offline', '--release', '--target', target, '--bin', 'terraphim-lsp'], source, lane, 'build-' + target))
+    commands.append(command(invocation + ['build', '--locked', '--offline', '--release', '--target', target, '--bin', 'terraphim-lsp'], source, lane, 'build-' + target, for_cross=cross_image is not None))
     return stage_binary(lane / 'target' / target / 'release/terraphim-lsp', target, lane, expected, commands,
                         {'crossImage': cross_image, 'crossImageSelection': 'Runtime digest resolved from upstream 0.2.5 tag; the recorded digest is used for this build.'} if cross_image else {})
 

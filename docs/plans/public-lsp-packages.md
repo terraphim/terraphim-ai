@@ -20,7 +20,7 @@ change. The original `alternative.add` result remains unchanged.
 
 - `terraphim_lsp_core` is version `1.23.1`, with public dependencies on types
   `1.22.3`, automata `2.1.0`, alternatives `0.1.1` and Lab `0.1.1`.
-- `terraphim_lsp` is the `1.22.0-rc.4` candidate and depends on core `1.23.1`.
+- `terraphim_lsp` is the `1.22.0-rc.5` candidate and depends on core `1.23.1`.
 - Both packages restrict publication to crates.io and include the Apache-2.0
   licence notice and their own test fixtures. No private Git history, registry
   credentials or operational files are part of the snapshot.
@@ -63,8 +63,8 @@ for public registry sources, builds the package, and tests the extracted bytes
 outside the source checkout. A second job reproduces the qualified archive
 before requesting publication credentials.
 
-Publish `terraphim_lsp_core-v1.23.1` first, then
-`terraphim_lsp-v1.22.0-rc.4`. Existing crates use the `crates-io` environment and
+Core `terraphim_lsp_core-v1.23.1` is already published. The next server tag is
+`terraphim_lsp-v1.22.0-rc.5`; the published RC4 crate and source tag remain immutable. Existing crates use the `crates-io` environment and
 crates.io trusted publishing. A first-ever crate name uses a deliberate manual
 run on its exact tag with `auth_mode=bootstrap` and the `crates-io-bootstrap`
 environment. This temporary path reads the existing `CARGO_REGISTRY_TOKEN`
@@ -107,3 +107,22 @@ The earlier private-source producer remains manually dispatchable for its
 separate provenance work, but it does not publish releases. The public binary
 publisher accepts only the reviewed crate workflow call and no longer consumes
 private producer artifacts. The RC4 release uses public package provenance.
+
+## Cross build directory correction
+
+RC4 crate publication succeeded, but its musl binary lanes failed before
+compilation. The pinned Cross wrapper maps `CARGO_TARGET_DIR` to `/target` while
+forwarding `CARGO_BUILD_BUILD_DIR` unchanged. An absolute host build directory
+therefore pointed outside the writable container mount. For Cross build commands
+only, the helper now omits that redundant override so Cargo defaults to the
+mapped target directory. Native command environments and filesystem permissions
+remain unchanged.
+
+The original failure and correction were reproduced with actual non-root Cargo
+1.96 containers. Both full musl builds of the already-published RC4 crate then
+passed using pinned Cross revision `29d00c7803f221f1b3f35e561b03792368fb8339` and
+the corrected helper. The x86-64 binary also passed actual version, save/reopen
+and synonym-export protocol checks; ARM64 was architecture-checked without a
+native runtime claim. These diagnostic outputs are not published release assets.
+RC5 changes the server release identity and build helper; core 1.23.1 remains
+unchanged. The normal release workflow must qualify and publish the new source.

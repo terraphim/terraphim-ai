@@ -12,7 +12,7 @@
     },
     {
       "name": "terraphim_lsp",
-      "version": "1.22.0-rc.4",
+      "version": "1.22.0-rc.5",
       "path": "crates/terraphim_lsp/Cargo.toml"
     }
   ]

@@ -111,6 +111,36 @@ class PublicBinaryTests(unittest.TestCase):
             b.command([sys.executable,'-c','raise SystemExit(4)'],lane,lane,'real-failure')
         self.assertTrue((lane/'logs/real-failure.log').is_file())
 
+    def test_cross_environment_omits_host_build_dir_without_changing_native(self):
+        lane = self.root / 'lane'
+        previous = os.environ.get('CARGO_BUILD_BUILD_DIR')
+        try:
+            os.environ['CARGO_BUILD_BUILD_DIR'] = '/unrelated/inherited/build'
+            native = b.environment(lane)
+            cross = b.environment(lane, for_cross=True)
+        finally:
+            if previous is None:
+                os.environ.pop('CARGO_BUILD_BUILD_DIR', None)
+            else:
+                os.environ['CARGO_BUILD_BUILD_DIR'] = previous
+        self.assertEqual(native['CARGO_BUILD_BUILD_DIR'], str(lane / 'target'))
+        self.assertNotIn('CARGO_BUILD_BUILD_DIR', cross)
+        self.assertEqual(cross['CARGO_TARGET_DIR'], str(lane / 'target'))
+        self.assertEqual({k: v for k, v in native.items() if k != 'CARGO_BUILD_BUILD_DIR'}, cross)
+
+    def test_actual_command_child_receives_cross_specific_environment(self):
+        lane = self.root / 'child-env'; lane.mkdir()
+        command = [sys.executable, '-c',
+                   'import json,os; print(json.dumps({k:os.environ.get(k) for k in '
+                   '["CARGO_BUILD_BUILD_DIR","CARGO_TARGET_DIR"]}))']
+        b.command(command, lane, lane, 'native-env')
+        b.command(command, lane, lane, 'cross-env', for_cross=True)
+        native = json.loads((lane / 'logs/native-env.log').read_text())
+        cross = json.loads((lane / 'logs/cross-env.log').read_text())
+        self.assertEqual(native['CARGO_BUILD_BUILD_DIR'], str(lane / 'target'))
+        self.assertIsNone(cross['CARGO_BUILD_BUILD_DIR'])
+        self.assertEqual(cross['CARGO_TARGET_DIR'], native['CARGO_TARGET_DIR'])
+
     def test_architecture_refuses_unknown_and_mismatched_format(self):
         for target in (*b.TARGETS,'universal-apple-darwin'):
             path=self.root/target;path.write_bytes(self.executable(target));self.assertTrue(b.architecture(path))
