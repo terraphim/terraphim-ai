@@ -38,6 +38,7 @@ export interface AutocompleteResponse {
 
 export class TerraphimServerConnection {
   private config: TerraphimServerConfig;
+  private configurationRevision = 0;
 
   constructor() {
     this.config = this.loadConfiguration();
@@ -55,11 +56,30 @@ export class TerraphimServerConnection {
   }
 
   public updateConfiguration(): void {
-    this.config = this.loadConfiguration();
+    const next = this.loadConfiguration();
+    if (JSON.stringify(next) !== JSON.stringify(this.config)) {
+      this.config = next;
+      this.configurationRevision += 1;
+    }
+  }
+
+  public getConfigurationRevision(): number {
+    return this.configurationRevision;
   }
 
   public getServerUrl(): string {
-    return this.config.serverUrl;
+    const url = new URL(this.config.serverUrl);
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw new Error('Set terraphimIt.serverUrl to an HTTP or HTTPS Terraphim server.');
+    }
+    const hostname = url.hostname.toLowerCase();
+    const loopback = hostname === 'localhost' || hostname.endsWith('.localhost') ||
+      hostname.startsWith('127.') || ['0.0.0.0', '[::]', '[::1]'].includes(hostname) ||
+      /^\[::ffff:(?:7f[0-9a-f]{2}:|0:0\])/.test(hostname);
+    if (!this.config.enableLocalServer && loopback) {
+      throw new Error('Local Terraphim server is disabled. Set terraphimIt.serverUrl to your remote server or enable terraphimIt.enableLocalServer.');
+    }
+    return url.href.replace(/\/$/, '');
   }
 
   public getAtomicServerUrl(): string {
@@ -78,12 +98,13 @@ export class TerraphimServerConnection {
    * Check if the Terraphim server is healthy
    */
   public async healthCheck(): Promise<{ healthy: boolean; message: string; version?: string }> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
-      const healthUrl = `${this.config.serverUrl}/health`;
+      const healthUrl = `${this.getServerUrl()}/health`;
       console.log(`Checking server health at: ${healthUrl}`);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(healthUrl, {
         method: 'GET',
@@ -93,8 +114,6 @@ export class TerraphimServerConnection {
           'Content-Type': 'application/json'
         }
       });
-
-      clearTimeout(timeoutId);
 
       if (response.ok) {
         const healthData = await response.text();
@@ -126,6 +145,8 @@ export class TerraphimServerConnection {
         healthy: false,
         message: message
       };
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -134,7 +155,7 @@ export class TerraphimServerConnection {
    */
   public async searchDocuments(query: string, limit: number = 10): Promise<SearchResponse> {
     try {
-      const searchUrl = `${this.config.serverUrl}/documents/search`;
+      const searchUrl = `${this.getServerUrl()}/documents/search`;
       const searchRequest: SearchRequest = {
         search_term: query,
         skip: 0,
@@ -146,6 +167,7 @@ export class TerraphimServerConnection {
 
       const response = await fetch(searchUrl, {
         method: 'POST',
+        signal: AbortSignal.timeout(5000),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
@@ -174,12 +196,13 @@ export class TerraphimServerConnection {
    */
   public async getAutocompleteSuggestions(query: string, limit: number = 10): Promise<AutocompleteResponse> {
     try {
-      const autocompleteUrl = `${this.config.serverUrl}/autocomplete/${encodeURIComponent(this.config.selectedRole)}/${encodeURIComponent(query)}`;
+      const autocompleteUrl = `${this.getServerUrl()}/autocomplete/${encodeURIComponent(this.config.selectedRole)}/${encodeURIComponent(query)}`;
 
       console.log(`Getting autocomplete suggestions at: ${autocompleteUrl}`);
 
       const response = await fetch(autocompleteUrl, {
         method: 'GET',
+        signal: AbortSignal.timeout(5000),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'

@@ -2,25 +2,24 @@
 import { Store, Agent } from '@tomic/lib';
 import * as vscode from 'vscode';
 import { initOntologies } from '../ontologies';
-import { serverConnection } from './serverConnection';
-
-let store: Store;
+let store: Store | undefined;
+let storeServerUrl: string | undefined;
+let storeAgent: string | undefined;
 
 export function getStore(agent?: string): Store {
-  if (!store) {
-    // Get the atomic server URL from configuration
-    const atomicServerUrl = serverConnection.getAtomicServerUrl();
-
-    if (!agent) {
-      store = new Store({
-        serverUrl: atomicServerUrl,
-      });
-    } else {
-      store = new Store({
-        serverUrl: atomicServerUrl,
-        agent: Agent.fromSecret(agent),
-      });
-    }
+  const config = vscode.workspace.getConfiguration('terraphimIt');
+  const atomicServerUrl = config.get<string>('atomicServerUrl') || 'https://common.terraphim.io/drive/h6grD0ID';
+  const selectedAgent = agent ?? config.get<string>('agent') ?? '';
+  if (!store || storeServerUrl !== atomicServerUrl || storeAgent !== selectedAgent) {
+    // Construct before replacing the cache: malformed credentials must not
+    // silently select an anonymous agent or retain a partially updated store.
+    const nextStore = new Store({
+      serverUrl: atomicServerUrl,
+      ...(selectedAgent ? { agent: Agent.fromSecret(selectedAgent) } : {}),
+    });
+    store = nextStore;
+    storeServerUrl = atomicServerUrl;
+    storeAgent = selectedAgent;
 
     initOntologies();
     console.log(`Initialized Atomic Store with server: ${atomicServerUrl}`);
@@ -33,7 +32,9 @@ export function getStore(agent?: string): Store {
  * Reset the store instance - useful when configuration changes
  */
 export function resetStore(): void {
-  store = undefined as any;
+  store = undefined;
+  storeServerUrl = undefined;
+  storeAgent = undefined;
   console.log('Store instance reset');
 }
 
@@ -41,9 +42,7 @@ export function resetStore(): void {
  * Get store with updated configuration
  */
 export function getUpdatedStore(agent?: string): Store {
-  // Update server connection configuration
-  serverConnection.updateConfiguration();
-  // Reset and recreate store with new config
+  // Configuration is read when constructing the store.
   resetStore();
   return getStore(agent);
 }

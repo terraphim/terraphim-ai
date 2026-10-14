@@ -2,7 +2,7 @@
   "name": "terraphim-it",
   "displayName": "Terraphim It",
   "description": "Intelligent Markdown editor with alternatives, knowledge-graph synonyms and role-based suggestions",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "applied-knowledge-systems",
   "private": true,
   "license": "Apache-2.0",
@@ -79,7 +79,7 @@
         "terraphimIt.enableLocalServer": {
           "type": "boolean",
           "default": true,
-          "description": "Use local Terraphim server instead of remote servers"
+          "description": "Allow localhost and loopback server URLs. When disabled, set serverUrl to your remote Terraphim server; there is no automatic remote fallback."
         },
         "terraphimIt.selectedRole": {
           "type": "string",
@@ -108,7 +108,7 @@
     "watch": "npx tsc -watch -p ./",
     "update-ontologies": "npx ad-generate ontologies",
     "build-rust": "python3 scripts/legacy_assets.py --build",
-    "test:host": "node --test tests/hostProtocol.test.cjs",
+    "test:host": "node --test tests/hostProtocol.test.cjs tests/completionCache.test.cjs",
     "test:assets": "python3 -m unittest discover -s tests -p \"*_test.py\"",
     "test:export": "node --test tests/knowledgeGraphExport.test.cjs tests/exportIntent.test.cjs tests/exportTarget.test.cjs",
     "editor:fetch": "python3 scripts/released_editor.py",

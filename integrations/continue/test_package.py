@@ -12,7 +12,7 @@ class PackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             package(root)
-            archive = root / 'terraphim-continue-integration-0.1.0.zip'
+            archive = root / 'terraphim-continue-integration-0.1.1.zip'
             with zipfile.ZipFile(archive) as bundle:
                 self.assertEqual(bundle.namelist(), ['terraphim-continue/' + name for name in FILES] + ['terraphim-continue/source.json'])
             self.assertEqual((root / 'terraphim-continue-SHA256SUMS').read_text(), hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name + '\n')

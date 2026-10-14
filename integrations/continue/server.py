@@ -94,7 +94,7 @@ async def serve(args):
                 return await execute(name, arguments)
 
     async with stdio_server() as (read, write):
-        await server.run(read, write, InitializationOptions(server_name='terraphim-continue', server_version='0.1.0', capabilities=server.get_capabilities(notification_options=NotificationOptions(), experimental_capabilities={})))
+        await server.run(read, write, InitializationOptions(server_name='terraphim-continue', server_version='0.1.1', capabilities=server.get_capabilities(notification_options=NotificationOptions(), experimental_capabilities={})))
 
 
 if __name__ == '__main__':

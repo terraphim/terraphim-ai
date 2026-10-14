@@ -4,6 +4,7 @@ import { CollectionBuilder, core, Store } from '@tomic/lib';
 import { getStore } from './helpers/getStore';
 import { serverConnection } from './helpers/serverConnection';
 import { replaceLinks } from './helpers/linkReplacement';
+import { CompletionCache } from './helpers/completionCache';
 import {
   airportOntology,
   type SystemOperatorAnalyticalLens,
@@ -23,8 +24,6 @@ interface EngineeringData {
 
 export function activate(context: vscode.ExtensionContext) {
   registerAlternativeControl(context);
-  let agent: string | undefined;
-  let store: Store | undefined;
   let activeProvider: vscode.Disposable | undefined;
 
   const disposable = vscode.commands.registerCommand(
@@ -41,23 +40,21 @@ export function activate(context: vscode.ExtensionContext) {
       // Get the configuration
       const config = vscode.workspace.getConfiguration('terraphimIt');
 
-      // Only ask for agent if it's not set and hasn't been asked before
+      let agent = config.get<string>('agent');
+      // Read current settings on every command, including changes since activation.
       if (!agent) {
-        agent = config.get<string>('agent');
-        if (!agent) {
-          agent = await vscode.window.showInputBox({
-            prompt: 'Enter the agent to use for Terraphim IT (optional)',
-            placeHolder: 'Agent String'
-          });
+        agent = await vscode.window.showInputBox({
+          prompt: 'Enter the agent to use for Terraphim IT (optional)',
+          placeHolder: 'Agent String'
+        });
 
-          // Save the agent to configuration if provided
-          if (agent) {
-            await config.update('agent', agent, vscode.ConfigurationTarget.Global);
-          }
+        // Save the agent to configuration if provided
+        if (agent) {
+          await config.update('agent', agent, vscode.ConfigurationTarget.Global);
         }
       }
       try {
-        store = getStore(agent);
+        const store = getStore(agent);
         const results = await get_all_resources(store);
         const replacedText = await replaceLinks(text, JSON.stringify(results));
         if (document.isClosed || document.version !== version || document.getText() !== text) {
@@ -83,8 +80,11 @@ export function activate(context: vscode.ExtensionContext) {
   const autocompleteDisposable = vscode.commands.registerCommand(
     'extension.terraphimAIAutocomplete',
     async function () {
-      if (!store) {
-        store = getStore(agent);
+      try {
+        getStore(); // Validate current credentials before claiming activation.
+      } catch (error) {
+        vscode.window.showErrorMessage(`Cannot enable Atomic autocomplete: ${error instanceof Error ? error.message : 'invalid configuration'}`);
+        return false;
       }
       // Deactivate the existing provider if any
       if (activeProvider) {
@@ -94,12 +94,13 @@ export function activate(context: vscode.ExtensionContext) {
       // Register the completion provider
       const provider = vscode.languages.registerCompletionItemProvider(
         { scheme: 'file', language: '*' },
-        new TerraphimCompletionProvider(store),
+        new TerraphimCompletionProvider(),
         ' ' // Trigger on space
       );
       activeProvider = provider;
       context.subscriptions.push(provider);
       vscode.window.showInformationMessage('Terraphim AI Autocomplete activated');
+      return true;
     }
   );
 
@@ -158,6 +159,14 @@ export function activate(context: vscode.ExtensionContext) {
   const configChangeDisposable = vscode.workspace.onDidChangeConfiguration(event => {
     if (event.affectsConfiguration('terraphimIt')) {
       serverConnection.updateConfiguration();
+      if (event.affectsConfiguration('terraphimIt.serverUrl') || event.affectsConfiguration('terraphimIt.enableLocalServer')) {
+        try {
+          serverConnection.getServerUrl();
+        } catch (error) {
+          vscode.window.showWarningMessage(`Terraphim server configuration: ${error instanceof Error ? error.message : 'invalid server URL'}`);
+          return;
+        }
+      }
       vscode.window.showInformationMessage('Terraphim IT configuration updated');
     }
   });
@@ -167,11 +176,6 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 class TerraphimCompletionProvider implements vscode.CompletionItemProvider {
-  private store: Store;
-
-  constructor(store: Store) {
-    this.store = store;
-  }
 
   async provideCompletionItems(
     document: vscode.TextDocument,
@@ -184,19 +188,26 @@ class TerraphimCompletionProvider implements vscode.CompletionItemProvider {
       return [];
     }
 
-    const results = await get_all_resources(this.store);
-    return Object.entries(results.data).map(([key, value]) => {
-      const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Text);
-      item.detail = value.description;
-      item.documentation = new vscode.MarkdownString(`[${value.nterm}](${value.url})`);
-      return item;
-    });
+    try {
+      // Check identity after loading too: settings may change during the request.
+      const store = getStore();
+      const results = await get_all_resources(store);
+      if (getStore() !== store) return [];
+      return Object.entries(results.data).map(([key, value]) => {
+        const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Text);
+        item.detail = value.description;
+        item.documentation = new vscode.MarkdownString(`[${value.nterm}](${value.url})`);
+        return item;
+      });
+    } catch (error) {
+      vscode.window.showWarningMessage(`Atomic autocomplete could not load suggestions: ${error instanceof Error ? error.message : 'check endpoint and agent settings'}`);
+      return [];
+    }
   }
 }
 
 class TerraphimServerCompletionProvider implements vscode.CompletionItemProvider {
-  private lastQuery: string = '';
-  private lastResults: vscode.CompletionItem[] = [];
+  private cache = new CompletionCache<vscode.CompletionItem>();
 
   async provideCompletionItems(
     document: vscode.TextDocument,
@@ -204,6 +215,7 @@ class TerraphimServerCompletionProvider implements vscode.CompletionItemProvider
     token: vscode.CancellationToken,
     context: vscode.CompletionContext
   ): Promise<vscode.CompletionItem[] | vscode.CompletionList> {
+    const revision = serverConnection.getConfigurationRevision();
     const wordRange = document.getWordRangeAtPosition(position) || (position.character > 0 ? document.getWordRangeAtPosition(position.translate(0, -1)) : undefined);
     if (!wordRange) {
       return [];
@@ -214,42 +226,43 @@ class TerraphimServerCompletionProvider implements vscode.CompletionItemProvider
       return [];
     }
 
-    if (word !== this.lastQuery) {
-      this.lastQuery = word;
+    const {request, cached} = this.cache.begin(word, revision);
+    if (cached) return cached;
+    let results: vscode.CompletionItem[] = [];
 
-      try {
-        // Try autocomplete endpoint first
-        const autocompleteResponse = await serverConnection.getAutocompleteSuggestions(word, 10);
-        if (autocompleteResponse.status === 'success' && autocompleteResponse.suggestions.length > 0) {
-          this.lastResults = autocompleteResponse.suggestions.map(suggestion => {
-            const item = new vscode.CompletionItem(suggestion.term, vscode.CompletionItemKind.Text);
-            item.sortText = suggestion.score.toString().padStart(8, '0');
+    try {
+      // Try autocomplete endpoint first
+      const autocompleteResponse = await serverConnection.getAutocompleteSuggestions(word, 10);
+      // Do not send the old query to a newly selected endpoint in the fallback.
+      if (!this.cache.isCurrent(request, serverConnection.getConfigurationRevision())) return [];
+      if (autocompleteResponse.status === 'success' && autocompleteResponse.suggestions.length > 0) {
+        results = autocompleteResponse.suggestions.map(suggestion => {
+          const item = new vscode.CompletionItem(suggestion.term, vscode.CompletionItemKind.Text);
+          item.sortText = suggestion.score.toString().padStart(8, '0');
+          return item;
+        });
+      } else {
+        // Fallback to search endpoint
+        const searchResponse = await serverConnection.searchDocuments(word, 10);
+        if (searchResponse.status === 'success' && searchResponse.results.length > 0) {
+          results = searchResponse.results.map(result => {
+            const item = new vscode.CompletionItem(result.title, vscode.CompletionItemKind.Text);
+            item.detail = result.description || result.body || '';
+            item.documentation = new vscode.MarkdownString(`[${result.title}](${result.url})`);
+            if (result.rank) {
+              item.sortText = result.rank.toString().padStart(3, '0');
+            }
             return item;
           });
         } else {
-          // Fallback to search endpoint
-          const searchResponse = await serverConnection.searchDocuments(word, 10);
-          if (searchResponse.status === 'success' && searchResponse.results.length > 0) {
-            this.lastResults = searchResponse.results.map(result => {
-              const item = new vscode.CompletionItem(result.title, vscode.CompletionItemKind.Text);
-              item.detail = result.description || result.body || '';
-              item.documentation = new vscode.MarkdownString(`[${result.title}](${result.url})`);
-              if (result.rank) {
-                item.sortText = result.rank.toString().padStart(3, '0');
-              }
-              return item;
-            });
-          } else {
-            this.lastResults = [];
-          }
+          results = [];
         }
-      } catch (error) {
-        console.error('Server completion failed:', error);
-        this.lastResults = [];
       }
+    } catch (error) {
+      console.error('Server completion failed:', error);
+      results = [];
     }
-
-    return this.lastResults;
+    return this.cache.commit(request, serverConnection.getConfigurationRevision(), results);
   }
 }
 

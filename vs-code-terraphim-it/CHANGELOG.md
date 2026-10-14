@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 (preview)
+
+- Read the configured Atomic agent on first autocomplete activation and rebuild the store when its agent or endpoint changes. Clearing the agent selects anonymous access; invalid credentials refuse activation.
+- Apply `enableLocalServer` to every server request: disabling it refuses localhost and loopback URLs with an actionable warning. An explicit remote `serverUrl` is required; no remote fallback is selected automatically.
+- Discard stale autocomplete responses when the role, endpoint, agent or query changes while loading.
+- Correct the Atomic autocomplete instructions: it triggers after a space, not merely after two characters.
+- Include runnable `terraphim-grep` synonym-search and `terraphim-agent` memory examples, with separate CLI installation and links to the public walkthroughs.
+
 ## 0.1.2 (preview)
 
 - Verify the federated service principal and its Azure DevOps profile before Marketplace publication; retain non-secret identity evidence and refuse an unconfirmed profile.
