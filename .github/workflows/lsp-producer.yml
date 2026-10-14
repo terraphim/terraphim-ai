@@ -1,0 +1,223 @@
+name: Build private-source LSP artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Reviewed release/lsp/requests/<tag>.json on main'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lsp-producer-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    permissions:
+      contents: read
+      actions: read
+    if: github.repository == 'terraphim/terraphim-ai' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Validate reviewed main request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: python3 .github/scripts/release/lsp_handoff.py check-request --tag "$TAG" --receipt resolve-receipt.json
+      - name: Preserve safe resolution receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lsp-resolve-${{ github.run_attempt }}
+          path: resolve-receipt.json
+          if-no-files-found: error
+
+  qualify:
+    needs: resolve
+    environment: lsp-producer
+    runs-on:
+      group: lsp-private
+      labels: [self-hosted, Linux, X64]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Qualify private exact source without exposing raw logs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITEA_LSP_SOURCE_TOKEN: ${{ secrets.GITEA_LSP_SOURCE_TOKEN }}
+          CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: python3 .github/scripts/release/lsp_private_producer.py --tag "$TAG" --lane qualify --output public-lane --receipt producer-receipt.json
+      - name: Upload only validated safe qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lsp-lane-${{ github.run_attempt }}-qualify
+          path: public-lane/*
+          if-no-files-found: error
+      - name: Preserve fixed-code producer outcome
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lsp-outcome-${{ github.run_attempt }}-qualify
+          path: producer-receipt.json
+          if-no-files-found: error
+
+  linux:
+    needs: [resolve, qualify]
+    environment: lsp-producer
+    runs-on:
+      group: lsp-private
+      labels: [self-hosted, Linux, X64]
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Build isolated private Linux lane
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITEA_LSP_SOURCE_TOKEN: ${{ secrets.GITEA_LSP_SOURCE_TOKEN }}
+          CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          LANE: ${{ matrix.target }}
+        run: python3 .github/scripts/release/lsp_private_producer.py --tag "$TAG" --lane "$LANE" --output public-lane --receipt producer-receipt.json
+      - name: Upload only validated safe lane
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lsp-lane-${{ github.run_attempt }}-${{ matrix.target }}
+          path: public-lane/*
+          if-no-files-found: error
+      - name: Preserve fixed-code producer outcome
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lsp-outcome-${{ github.run_attempt }}-${{ matrix.target }}
+          path: producer-receipt.json
+          if-no-files-found: error
+
+  macos:
+    needs: [resolve, qualify]
+    environment: lsp-producer
+    runs-on:
+      group: lsp-private
+      labels: [self-hosted, macOS]
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Build isolated private macOS lane
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITEA_LSP_SOURCE_TOKEN: ${{ secrets.GITEA_LSP_SOURCE_TOKEN }}
+          CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: python3 .github/scripts/release/lsp_private_producer.py --tag "$TAG" --lane macos --output public-lane --receipt producer-receipt.json
+      - name: Upload only validated safe lane
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lsp-lane-${{ github.run_attempt }}-macos
+          path: public-lane/*
+          if-no-files-found: error
+      - name: Preserve fixed-code producer outcome
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lsp-outcome-${{ github.run_attempt }}-macos
+          path: producer-receipt.json
+          if-no-files-found: error
+
+  assemble:
+    needs: [resolve, qualify, linux, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Download only this run attempt's lane artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: lsp-lane-${{ github.run_attempt }}-*
+          path: lanes
+      - name: Assemble frozen public-safe bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path('lanes')
+          for path in root.iterdir():
+              path.rename(root / path.name.removeprefix('lsp-lane-' + os.environ['ATTEMPT'] + '-'))
+          PY
+          python3 .github/scripts/release/lsp_handoff.py assemble --tag "$TAG" --lanes lanes --output frozen --receipt assembly-receipt.json
+      - name: Upload immutable frozen release artifact
+        id: frozen
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lsp-frozen-${{ inputs.tag }}-attempt${{ github.run_attempt }}
+          path: frozen/*
+          if-no-files-found: error
+          retention-days: 90
+      - name: Record handoff artifact coordinates
+        env:
+          ARTIFACT_ID: ${{ steps.frozen.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.frozen.outputs.artifact-digest }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          Path('artifact-coordinate.json').write_text(json.dumps({'id': int(os.environ['ARTIFACT_ID']), 'digest': 'sha256:' + os.environ['ARTIFACT_DIGEST']}) + '\n')
+          PY
+      - name: Preserve safe assembly and artifact coordinates
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lsp-assembly-${{ github.run_attempt }}
+          path: |
+            assembly-receipt.json
+            artifact-coordinate.json
+          if-no-files-found: error

@@ -1,0 +1,1178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terraphim.ai/schemas/lsp-lane-receipt.schema.json",
+  "title": "LSP lane-receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "producer",
+    "receipt"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "workflow",
+        "controlCommit",
+        "runId",
+        "runAttempt",
+        "event"
+      ],
+      "properties": {
+        "repository": {
+          "const": "terraphim/terraphim-ai"
+        },
+        "workflow": {
+          "const": ".github/workflows/lsp-producer.yml"
+        },
+        "controlCommit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "runId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "runAttempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event": {
+          "const": "workflow_dispatch"
+        }
+      }
+    },
+    "receipt": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "lane",
+            "status",
+            "sourceCommit",
+            "sourceTag",
+            "version",
+            "toolchain",
+            "recipeSha256",
+            "signing",
+            "commands",
+            "assets"
+          ],
+          "properties": {
+            "schema": {
+              "const": 1
+            },
+            "lane": {
+              "const": "qualify"
+            },
+            "status": {
+              "const": "PASS"
+            },
+            "sourceCommit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "sourceTag": {
+              "type": "string",
+              "pattern": "^terraphim_lsp-v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "toolchain": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+            },
+            "recipeSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "signing": {
+              "const": "not-applicable"
+            },
+            "commands": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "recipe-tests"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "install-toolchain"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "fmt"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "clippy"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "test"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 5,
+              "maxItems": 5
+            },
+            "assets": {
+              "type": "array",
+              "items": false,
+              "minItems": 0,
+              "maxItems": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "lane",
+            "status",
+            "sourceCommit",
+            "sourceTag",
+            "version",
+            "toolchain",
+            "recipeSha256",
+            "signing",
+            "commands",
+            "assets"
+          ],
+          "properties": {
+            "schema": {
+              "const": 1
+            },
+            "lane": {
+              "const": "x86_64-unknown-linux-gnu"
+            },
+            "status": {
+              "const": "PASS"
+            },
+            "sourceCommit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "sourceTag": {
+              "type": "string",
+              "pattern": "^terraphim_lsp-v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "toolchain": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+            },
+            "recipeSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "signing": {
+              "const": "not-applicable"
+            },
+            "commands": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "install-toolchain"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "fetch"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "build"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "architecture"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "version"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 5,
+              "maxItems": 5
+            },
+            "assets": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "sha256",
+                    "bytes"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "terraphim-lsp-x86_64-unknown-linux-gnu"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 134217728
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 1,
+              "maxItems": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "lane",
+            "status",
+            "sourceCommit",
+            "sourceTag",
+            "version",
+            "toolchain",
+            "recipeSha256",
+            "signing",
+            "commands",
+            "assets"
+          ],
+          "properties": {
+            "schema": {
+              "const": 1
+            },
+            "lane": {
+              "const": "x86_64-unknown-linux-musl"
+            },
+            "status": {
+              "const": "PASS"
+            },
+            "sourceCommit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "sourceTag": {
+              "type": "string",
+              "pattern": "^terraphim_lsp-v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "toolchain": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+            },
+            "recipeSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "signing": {
+              "const": "not-applicable"
+            },
+            "commands": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "install-toolchain"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "install-cross"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "fetch"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "build"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "architecture"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "version"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 6,
+              "maxItems": 6
+            },
+            "assets": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "sha256",
+                    "bytes"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "terraphim-lsp-x86_64-unknown-linux-musl"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 134217728
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 1,
+              "maxItems": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "lane",
+            "status",
+            "sourceCommit",
+            "sourceTag",
+            "version",
+            "toolchain",
+            "recipeSha256",
+            "signing",
+            "commands",
+            "assets"
+          ],
+          "properties": {
+            "schema": {
+              "const": 1
+            },
+            "lane": {
+              "const": "aarch64-unknown-linux-musl"
+            },
+            "status": {
+              "const": "PASS"
+            },
+            "sourceCommit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "sourceTag": {
+              "type": "string",
+              "pattern": "^terraphim_lsp-v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "toolchain": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+            },
+            "recipeSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "signing": {
+              "const": "not-applicable"
+            },
+            "commands": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "install-toolchain"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "install-cross"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "fetch"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "build"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "architecture"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 5,
+              "maxItems": 5
+            },
+            "assets": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "sha256",
+                    "bytes"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "terraphim-lsp-aarch64-unknown-linux-musl"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 134217728
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 1,
+              "maxItems": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "lane",
+            "status",
+            "sourceCommit",
+            "sourceTag",
+            "version",
+            "toolchain",
+            "recipeSha256",
+            "signing",
+            "commands",
+            "assets"
+          ],
+          "properties": {
+            "schema": {
+              "const": 1
+            },
+            "lane": {
+              "const": "macos"
+            },
+            "status": {
+              "const": "PASS"
+            },
+            "sourceCommit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "sourceTag": {
+              "type": "string",
+              "pattern": "^terraphim_lsp-v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "toolchain": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+            },
+            "recipeSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "signing": {
+              "const": "unsigned"
+            },
+            "commands": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "install-toolchain"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "fetch"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "build-arm64"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "build-x86_64"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "lipo"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "architecture-arm64"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "architecture-x86_64"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "architecture-universal"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "version-native"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "exitCode",
+                    "logSha256"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "version-universal"
+                    },
+                    "exitCode": {
+                      "const": 0
+                    },
+                    "logSha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 10,
+              "maxItems": 10
+            },
+            "assets": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "sha256",
+                    "bytes"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "terraphim-lsp-aarch64-apple-darwin"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 134217728
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "sha256",
+                    "bytes"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "terraphim-lsp-universal-apple-darwin"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 134217728
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "sha256",
+                    "bytes"
+                  ],
+                  "properties": {
+                    "name": {
+                      "const": "terraphim-lsp-x86_64-apple-darwin"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 134217728
+                    }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        }
+      ]
+    }
+  }
+}
