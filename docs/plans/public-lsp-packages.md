@@ -20,7 +20,7 @@ change. The original `alternative.add` result remains unchanged.
 
 - `terraphim_lsp_core` is version `1.23.1`, with public dependencies on types
   `1.22.3`, automata `2.1.0`, alternatives `0.1.1` and Lab `0.1.1`.
-- `terraphim_lsp` is the `1.22.0-rc.5` candidate and depends on core `1.23.1`.
+- `terraphim_lsp` is the `1.22.0-rc.6` candidate and depends on core `1.23.1`.
 - Both packages restrict publication to crates.io and include the Apache-2.0
   licence notice and their own test fixtures. No private Git history, registry
   credentials or operational files are part of the snapshot.
@@ -64,7 +64,7 @@ outside the source checkout. A second job reproduces the qualified archive
 before requesting publication credentials.
 
 Core `terraphim_lsp_core-v1.23.1` is already published. The next server tag is
-`terraphim_lsp-v1.22.0-rc.5`; the published RC4 crate and source tag remain immutable. Existing crates use the `crates-io` environment and
+`terraphim_lsp-v1.22.0-rc.6`; the published RC4/RC5 crates and source tags remain immutable. Existing crates use the `crates-io` environment and
 crates.io trusted publishing. A first-ever crate name uses a deliberate manual
 run on its exact tag with `auth_mode=bootstrap` and the `crates-io-bootstrap`
 environment. This temporary path reads the existing `CARGO_REGISTRY_TOKEN`
@@ -126,3 +126,22 @@ and synonym-export protocol checks; ARM64 was architecture-checked without a
 native runtime claim. These diagnostic outputs are not published release assets.
 RC5 changes the server release identity and build helper; core 1.23.1 remains
 unchanged. The normal release workflow must qualify and publish the new source.
+
+## Build-log filename correction
+
+RC5 successfully published its crate and built all six binaries. Final assembly
+then rejected real log names such as `build-x86_64-unknown-linux-musl.log`: the
+validator excluded underscores even though the producer uses target triples in
+its filenames. The validator now accepts only the exact `fetch-<target>.log`
+and `build-<target>.log` names for each known target, or `universal.log` for the
+combined macOS asset. Test fixtures use these actual producer names, and the
+full saved RC5 artifact set is reassembled locally as regression evidence.
+
+RC6 uses the established tag/OIDC workflow with this validator correction;
+server runtime code and core 1.23.1 remain unchanged. RC5 diagnostic assembly
+outputs are not published binaries. The previous crate and tag remain intact.
+
+The current workflow names producer artifacts by run attempt. A failed-publish-
+only retry would request a newer attempt's artifacts that were never produced;
+such a retry is not a supported recovery route. Do not move a tag, replace
+artifacts, or relax protected-environment rules to recover a publication.

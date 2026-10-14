@@ -67,12 +67,17 @@ class PublicBinaryTests(unittest.TestCase):
             target=name.removeprefix('terraphim-lsp-');path=folder/name;path.write_bytes(self.executable(target))
         for name in b.RAW:
             target=name.removeprefix('terraphim-lsp-');path=folder/name;logs=folder/'logs'/target;logs.mkdir(parents=True)
-            log=logs/'build.log';log.write_text('Fixture build log\n')
+            log=logs/('universal.log' if target.startswith('universal') else 'build-'+target+'.log');log.write_text('Fixture build log\n')
             argv=['rustup','run','1.96','cargo','build','--locked','--offline','--release','--target',target,'--bin','terraphim-lsp']
             extra={}
             if target.startswith('universal'):
                 argv=['lipo','-create'];extra={'inputHashes':{n:b.publisher.digest(folder/n) for n in b.RAW if n in ('terraphim-lsp-aarch64-apple-darwin','terraphim-lsp-x86_64-apple-darwin')}}
-            record={'schema':1,'status':'PASS','source':source,'target':target,'asset':{'name':name,'sha256':b.publisher.digest(path),'bytes':path.stat().st_size},'architectures':b.architecture(path),'host':{'system':'Fixture','machine':'Fixture'},'nativeVersion':{'status':'PASS','exitCode':0,'stdout':'terraphim-lsp 1.22.0-rc.4\n'},'commands':[{'argv':argv,'exitCode':0,'log':log.name,'sha256':b.publisher.digest(log)}],'extra':extra}
+            build_commands=[]
+            if not target.startswith('universal'):
+                fetched=logs/('fetch-'+target+'.log');fetched.write_text('Fixture fetch log\n')
+                build_commands.append({'argv':['rustup','run','1.96','cargo','fetch','--locked','--target',target],'exitCode':0,'log':fetched.name,'sha256':b.publisher.digest(fetched)})
+            build_commands.append({'argv':argv,'exitCode':0,'log':log.name,'sha256':b.publisher.digest(log)})
+            record={'schema':1,'status':'PASS','source':source,'target':target,'asset':{'name':name,'sha256':b.publisher.digest(path),'bytes':path.stat().st_size},'architectures':b.architecture(path),'host':{'system':'Fixture','machine':'Fixture'},'nativeVersion':{'status':'PASS','exitCode':0,'stdout':'terraphim-lsp 1.22.0-rc.4\n'},'commands':build_commands,'extra':extra}
             smoke=folder/'smoke'/target;smoke.mkdir(parents=True)
             (smoke/'input.md').write_text('Risk: delivery may slip.\n')
             (smoke/'brief.md').write_text('Risk: delivery may slip.\nFixture annotation: Concern\n')
@@ -110,6 +115,18 @@ class PublicBinaryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'failed'):
             b.command([sys.executable,'-c','raise SystemExit(4)'],lane,lane,'real-failure')
         self.assertTrue((lane/'logs/real-failure.log').is_file())
+
+    def test_actual_producer_log_names_save_real_subprocess_output(self):
+        lane=self.root/'producer-names';lane.mkdir()
+        names=['universal', *[step+'-'+target for target in b.TARGETS for step in ('fetch','build')]]
+        for name in names:
+            with self.subTest(name=name):
+                record=b.command([sys.executable,'-c','print("actual producer-name output")'],lane,lane,name)
+                log=lane/'logs'/(name+'.log')
+                self.assertEqual(record['log'],name+'.log')
+                self.assertEqual(log.read_text(),'actual producer-name output\n')
+                self.assertEqual(record['sha256'],b.publisher.digest(log))
+                self.assertEqual(record['exitCode'],0)
 
     def test_cross_environment_omits_host_build_dir_without_changing_native(self):
         lane = self.root / 'lane'
@@ -163,6 +180,16 @@ class PublicBinaryTests(unittest.TestCase):
         self.assertEqual({p.name for p in paths},set(b.publisher.RELEASE_FILES))
         self.assertEqual(b.bundle(folder,q,self.expected),paths)
 
+    def test_log_names_must_match_the_exact_producer_target(self):
+        folder,q=self.fixture_bundle();target='x86_64-unknown-linux-musl';p=folder/(target+'.json')
+        record=json.loads(p.read_text())
+        self.assertEqual([c['log'] for c in record['commands']],['fetch-'+target+'.log','build-'+target+'.log'])
+        for name in ['../build-'+target+'.log','build-aarch64-unknown-linux-musl.log','build.log','BUILD-'+target+'.log','build-'+target+'.log/other']:
+            with self.subTest(name=name):
+                record['commands'][-1]['log']=name;p.write_text(json.dumps(record))
+                with self.assertRaisesRegex(ValueError,'Invalid build log name'):
+                    b.bundle(folder,q,self.expected,write=True)
+
     def test_mutated_asset_and_extra_file_refused(self):
         folder,q=self.fixture_bundle();b.bundle(folder,q,self.expected,write=True)
         (folder/b.RAW[0]).write_bytes(b'changed')
@@ -170,7 +197,7 @@ class PublicBinaryTests(unittest.TestCase):
 
     def test_changed_build_log_and_wrong_target_refused(self):
         folder,q=self.fixture_bundle();target=b.RAW[0].removeprefix('terraphim-lsp-')
-        log=folder/'logs'/target/'build.log';log.write_text('changed')
+        log=folder/'logs'/target/('build-'+target+'.log');log.write_text('changed')
         with self.assertRaisesRegex(ValueError,'Build log'):b.bundle(folder,q,self.expected,write=True)
 
     def test_skipped_native_test_and_changed_source_refused(self):
@@ -179,7 +206,7 @@ class PublicBinaryTests(unittest.TestCase):
 
     def test_wrong_build_target_is_refused(self):
         folder,q=self.fixture_bundle();p=folder/'aarch64-unknown-linux-musl.json';record=json.loads(p.read_text())
-        record['commands'][0]['argv'][-3]='x86_64-unknown-linux-musl';p.write_text(json.dumps(record))
+        record['commands'][-1]['argv'][-3]='x86_64-unknown-linux-musl';p.write_text(json.dumps(record))
         with self.assertRaisesRegex(ValueError,'Build target'):b.bundle(folder,q,self.expected,write=True)
 
     def test_extra_asset_is_refused(self):
