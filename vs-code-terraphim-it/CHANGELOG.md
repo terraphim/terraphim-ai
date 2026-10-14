@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 (preview)
+
+- Bundle the verified editor v0.1.0-rc.2 release built with public Terraphim crate dependencies.
+- Check the editor release manifest against its pinned source commit before importing any assets.
+- Verify and retain the public source repository and Cargo.lock checksum when the editor release supplies them.
+- Publish the qualified GitHub VSIX independently of marketplace setup; disabled marketplace targets are explicitly reported as not published.
+
 ## 0.1.0 (preview)
 
 - Extend the existing Terraphim It extension with the shared Alternative Control Markdown editor.

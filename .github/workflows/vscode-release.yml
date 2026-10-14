@@ -84,12 +84,34 @@ jobs:
           name: vscode-publication-${{ github.sha }}
           path: vs-code-terraphim-it/publication.json
           if-no-files-found: error
-  marketplace:
+  marketplace-plan:
     needs: release
+    runs-on: ubuntu-24.04
+    outputs:
+      registries: ${{ steps.plan.outputs.registries }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Report disabled targets and plan explicitly enabled attempts
+        id: plan
+        env:
+          VSCODE_PUBLISH_VISUAL_STUDIO_MARKETPLACE: ${{ vars.VSCODE_PUBLISH_VISUAL_STUDIO_MARKETPLACE }}
+          VSCODE_PUBLISH_OPEN_VSX: ${{ vars.VSCODE_PUBLISH_OPEN_VSX }}
+        run: python3 vs-code-terraphim-it/scripts/plan_marketplaces.py --receipt marketplace-plan.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: vscode-marketplace-plan-${{ github.sha }}
+          path: marketplace-plan.json
+          if-no-files-found: error
+  marketplace:
+    needs: [release, marketplace-plan]
+    if: needs.marketplace-plan.outputs.registries != '[]' && needs.marketplace-plan.outputs.registries != ''
     strategy:
       fail-fast: false
       matrix:
-        registry: [visual-studio-marketplace, open-vsx]
+        registry: ${{ fromJSON(needs.marketplace-plan.outputs.registries) }}
     runs-on: ubuntu-24.04
     environment: ${{ matrix.registry }}
     permissions:
