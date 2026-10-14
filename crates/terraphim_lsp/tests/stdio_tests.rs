@@ -15,8 +15,38 @@ fn frame(message: &serde_json::Value) -> Vec<u8> {
     format!("Content-Length: {}\r\n\r\n{body}", body.len()).into_bytes()
 }
 
+/// Observe an actual response before advancing the client handshake. Answer
+/// refresh requests while preserving every raw server message for assertions.
+fn receive_response(
+    receiver: &mpsc::Receiver<String>,
+    stdin: &mut std::process::ChildStdin,
+    seen: &mut Vec<String>,
+    id: i64,
+) -> serde_json::Value {
+    loop {
+        let message = receiver
+            .recv_timeout(Duration::from_secs(30))
+            .unwrap_or_else(|_| panic!("no response {id}; received {seen:?}"));
+        let value: serde_json::Value = serde_json::from_str(&message).unwrap();
+        seen.push(message);
+        if value["method"] == "workspace/diagnostic/refresh" {
+            stdin
+                .write_all(&frame(&serde_json::json!({
+                    "jsonrpc": "2.0", "id": value["id"], "result": null,
+                })))
+                .unwrap();
+            stdin.flush().unwrap();
+        }
+        if value["id"] == id && value.get("method").is_none() {
+            assert!(value.get("error").is_none(), "response {id}: {value}");
+            return value;
+        }
+    }
+}
+
 /// Drive one session and return every server message, as JSON text, in
-/// order. Ends the session once the trim command has been answered.
+/// order. Complete initialize before sending normal traffic, and shutdown
+/// before exit, just as a conforming LSP client does.
 fn session(workspace: serde_json::Value) -> Vec<String> {
     let mut child = Command::new(env!("CARGO_BIN_EXE_terraphim-lsp"))
         .stdin(Stdio::piped())
@@ -69,25 +99,27 @@ fn session(workspace: serde_json::Value) -> Vec<String> {
             "params": {"command": "terraphim.trim.preview",
                        "arguments": [{"uri": uri, "level": "tighten"}]}}),
     ];
-    for message in &messages {
+    stdin.write_all(&frame(&messages[0])).unwrap();
+    stdin.flush().unwrap();
+    let mut seen = Vec::new();
+    let initialized = receive_response(&receiver, &mut stdin, &mut seen, 1);
+    assert!(initialized["result"]["capabilities"].is_object());
+    // The raw plural diagnostics capability has reached tower-lsp intact.
+    // Sending these frames before its reply races asynchronous initialization.
+    for message in &messages[1..] {
         stdin.write_all(&frame(message)).unwrap();
     }
     stdin.flush().unwrap();
 
-    let mut seen = Vec::new();
-    while let Ok(message) = receiver.recv_timeout(Duration::from_secs(30)) {
-        let answered = message.contains(r#""id":2"#) && message.contains("candidates");
-        seen.push(message);
-        if answered {
-            break;
-        }
-    }
-    // Let anything already queued behind the answer arrive, then end.
+    let trim = receive_response(&receiver, &mut stdin, &mut seen, 2);
+    assert!(trim["result"]["candidates"].is_u64(), "{trim}");
     stdin
         .write_all(&frame(
             &serde_json::json!({"jsonrpc": "2.0", "id": 3, "method": "shutdown"}),
         ))
         .unwrap();
+    stdin.flush().unwrap();
+    receive_response(&receiver, &mut stdin, &mut seen, 3);
     stdin
         .write_all(&frame(
             &serde_json::json!({"jsonrpc": "2.0", "method": "exit"}),
@@ -130,7 +162,11 @@ fn no_advertised_refresh_means_none_is_sent() {
         serde_json::json!({"diagnostics": {"refreshSupport": false}}),
     ] {
         let seen = session(workspace);
-        assert!(seen.iter().any(|m| m.contains(r#""id":2"#)), "{seen:?}");
+        assert!(
+            seen.iter()
+                .any(|m| m.contains(r#""id":2"#) && m.contains("candidates")),
+            "the trim command ran: {seen:?}"
+        );
         assert_eq!(refreshes(&seen), 0, "{seen:?}");
     }
 }
