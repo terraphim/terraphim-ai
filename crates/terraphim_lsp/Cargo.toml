@@ -50,7 +50,7 @@ resolver = "2"
 members = [".", "../terraphim_lsp_core"]
 
 [workspace.package]
-version = "1.22.0-rc.4"
+version = "1.22.0-rc.5"
 edition = "2024"
 rust-version = "1.91"
 
