@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4 (preview)
+
+- Require the exact indexed prerelease and downloaded package payload before CI reports marketplace availability.
+- Verify Cursor and Windsurf catalogs separately from Open VSX publication; retain complete catalog responses.
+- Require Open VSX trusted-publishing metadata and remove the obsolete PAT bootstrap route. Namespace ownership and trusted-publisher setup still gate its publication.
+- Document immutable release readback and separate catalog availability from native host qualification.
+
 ## 0.1.3 (preview)
 
 - Read the configured Atomic agent on first autocomplete activation and rebuild the store when its agent or endpoint changes. Clearing the agent selects anonymous access; invalid credentials refuse activation.
