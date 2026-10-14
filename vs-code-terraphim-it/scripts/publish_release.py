@@ -2,12 +2,14 @@
 """Publish qualified VSIX bytes through a resumable draft; never replace assets or tags."""
 import argparse
 import hashlib
+from itertools import islice
 import json
 from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
+import time
 from urllib.parse import urlparse
 import zipfile
 from xml.etree.ElementTree import ParseError
@@ -17,6 +19,7 @@ import legacy_assets
 
 REPO_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*")
 SHA_RE = re.compile(r"[0-9a-f]{40}")
+RELEASE_LOOKUP_DELAYS = (0, 2, 2, 2, 2)
 
 
 def digest(path):
@@ -99,6 +102,25 @@ def release(repo, tag):
     return select_release(pages, tag)
 
 
+def recover_visible_release(snapshots):
+    """Consume at most five reads; only an absent draft permits another read."""
+    for current in islice(snapshots, len(RELEASE_LOOKUP_DELAYS)):
+        if current is not None:
+            return current
+    raise ValueError("Created draft is not yet readable; rerun the same qualified artifact")
+
+
+def recovered_release(repo, tag):
+    """Allow eight seconds of backoff for creation/listing consistency."""
+    def snapshots():
+        for delay in RELEASE_LOOKUP_DELAYS:
+            if delay:
+                time.sleep(delay)
+            yield release(repo, tag)
+
+    return recover_visible_release(snapshots())
+
+
 def verify_remote_tag(repo, tag, source):
     value = api(f"repos/{repo}/git/ref/tags/{tag}")["object"]
     for _ in range(5):
@@ -167,9 +189,7 @@ def publish(repo, tag, files, source):
                              "Registry availability is verified separately.\n")
             gh("release", "create", tag, "--repo", f"github.com/{repo}", "--verify-tag",
                "--draft", "--prerelease", "--latest=false", "--title", tag, "--notes-file", str(notes))
-            current = release(repo, tag)
-        if current is None:
-            raise ValueError("Draft release could not be recovered")
+            current = recovered_release(repo, tag)
         missing = resume_plan(current, tag, files)
         # Verify every existing asset before mutating an incomplete draft.
         for path in files:
