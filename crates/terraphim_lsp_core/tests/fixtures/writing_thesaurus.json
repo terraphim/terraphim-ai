@@ -1,0 +1,20 @@
+{
+  "name": "writing-fixture",
+  "data": {
+    "decision": { "id": 1, "nterm": "decision" },
+    "choice": { "id": 1, "nterm": "decision" },
+    "judgment": { "id": 1, "nterm": "decision" },
+    "option": { "id": 1, "nterm": "decision" },
+    "eraser": { "id": 2, "nterm": "eraser" },
+    "rubber": { "id": 2, "nterm": "eraser" },
+    "llm": { "id": 3, "nterm": "llm", "display_value": "LLM" },
+    "large language model": { "id": 3, "nterm": "llm", "display_value": "LLM" },
+    "café": { "id": 4, "nterm": "café" },
+    "coffee shop": { "id": 4, "nterm": "café" },
+    "coffeehouse": { "id": 4, "nterm": "café" },
+    "honour": { "id": 5, "nterm": "honour" },
+    "privilege": { "id": 5, "nterm": "honour" },
+    "rust": { "id": 6, "nterm": "rust programming language", "display_value": "Rust programming language", "url": "https://rust-lang.org" },
+    "paperclip": { "id": 7, "nterm": "paperclip" }
+  }
+}

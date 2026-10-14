@@ -1,0 +1,276 @@
+//! `workspace/executeCommand` commands and their arguments.
+//!
+//! Every command takes a single JSON object as its only argument. Commands
+//! that act on a document accept an optional `version`: when given and the
+//! server holds a different version of the document, the request fails with
+//! `ContentModified` (-32801) instead of acting on text the client no longer
+//! shows.
+//!
+//! | Command | Arguments | Result |
+//! |---|---|---|
+//! | [`ADD_ALTERNATIVE`] | `uri`, `range`, `text`, `kind?`, `version?` | a `WorkspaceEdit` rewriting the annotation block |
+//! | [`ADD_ALTERNATIVE_AND_APPLY`] | same as [`ADD_ALTERNATIVE`] | `{ applied: true, uri, version }` after the client applies and reports the edit |
+//! | [`LAB_MARK`] | `uri`, `action`, `version?` | `{ action, marks }`; the marks are published as diagnostics |
+//! | [`LAB_CLEAR`] | `uri` | `null`; Lab marks removed |
+//! | [`TRIM_PREVIEW`] | `uri`, `level`, `version?` | `{ level, candidates, status, words_before, words_after, percent }`; candidates published as faded hints, then the status card |
+//! | [`TRIM_CLEAR`] | `uri` | `null`; trim hints removed |
+//! | [`TRIM_KEEP`] | `uri`, `cut`, `version?` | like [`TRIM_PREVIEW`]; the cut is un-faded, then the card is re-sent |
+//! | [`TRIM_MAKE_CUTS`] | `uri`, `version?` | `{ edits, words_after }`, plus `edit` (a `WorkspaceEdit`) when the client cannot take `workspace/applyEdit` |
+//! | [`EXPORT`] | `uri`, `version?` | `{ markdown, uri?, written }`: the clean Markdown (ghosts cut, no annotation block, no overflow); written to `uri` (`<stem>.clean.md`) with `workspace/applyEdit` when the client allows it |
+//! | [`TRIM_NEXT`] | `uri`, `position`, `version?` | `{ range }` of the next faded span after `position` (wrapping), selected with `window/showDocument`; `null` when nothing is faded |
+//!
+//! `action` is one of `typos_and_punctuation`, `weakest_sentences`,
+//! `long_sentences`, `convoluted_sentences`, `off_tone`,
+//! `hedges_and_filler`; `level` one of `original` (same as clearing),
+//! `slight`, `tighten`, `sharper`, `half`.
+//!
+//! Requested Lab actions and the trim level stick to the document until
+//! cleared. Their results are dropped on every edit (stale ranges are worse
+//! than none) and recomputed on save when `lab.trigger` is `save` (the
+//! default), or on the next command when it is `command`.
+//!
+//! Lab runs happen on the blocking pool without holding the document lock.
+//! If the document changes while `terraphim.lab.mark` or
+//! `terraphim.trim.preview` is computing, the results are dropped (never
+//! published) and the command fails with `ContentModified`; the requested
+//! action or level is kept for the next save or command. If another Lab
+//! command (or a clear) changes the requested state of the same version
+//! meanwhile, the earlier run is superseded and never installed; the
+//! superseded command recomputes from the current state, so every command
+//! result matches what is installed.
+
+use serde::Deserialize;
+use serde_json::Value;
+use tower_lsp::jsonrpc::{Error, ErrorCode};
+use tower_lsp::lsp_types::{Position, Range, Url};
+
+use terraphim_lsp_core::{CutId, LabAction, SpanKind, TrimLevel};
+
+/// Add a human-written alternative for a range to the annotation block.
+///
+/// The result is a `WorkspaceEdit` (versioned when the client accepts
+/// `documentChanges`, like the code actions) that replaces the trailing
+/// block and nothing else. The server does not apply it: the client applies
+/// the returned edit, so a client that never asked for it is never edited.
+pub const ADD_ALTERNATIVE: &str = "terraphim.alternative.add";
+
+/// Add an alternative through a generic LSP command picker, applying it once.
+///
+/// Requires `workspace.applyEdit` and versioned `documentChanges`. The server
+/// requests the annotation edit and waits for the matching document change;
+/// the result is an acknowledgement, never another edit to apply. No selection
+/// or text is inferred: the caller supplies [`AddAlternativeArgs`].
+pub const ADD_ALTERNATIVE_AND_APPLY: &str = "terraphim.alternative.add_and_apply";
+
+/// Run one Lab action on a document and publish its marks as diagnostics
+/// (one code per mark kind; typo and punctuation marks get "Apply fix: X"
+/// quick fixes).
+pub const LAB_MARK: &str = "terraphim.lab.mark";
+
+/// Remove a document's Lab marks and forget the actions requested for it.
+pub const LAB_CLEAR: &str = "terraphim.lab.clear";
+
+/// Publish the spans a trim level would cut as faded (`Unnecessary`) hints.
+pub const TRIM_PREVIEW: &str = "terraphim.trim.preview";
+
+/// Remove a document's trim preview.
+pub const TRIM_CLEAR: &str = "terraphim.trim.clear";
+
+/// Keep one faded cut of the trim preview (un-fade it) and recompute the
+/// status card.
+pub const TRIM_KEEP: &str = "terraphim.trim.keep";
+
+/// Delete every still-faded span of the trim preview ("Make the cuts"):
+/// the server sends the edit with `workspace/applyEdit`, or returns it to a
+/// client that cannot take that request.
+pub const TRIM_MAKE_CUTS: &str = "terraphim.trim.make_cuts";
+
+/// Select the next faded span after a position ("Walk through").
+pub const TRIM_NEXT: &str = "terraphim.trim.next";
+
+/// Export the clean Markdown of a document (R-9.3): ghosts cut, annotation
+/// block and overflow omitted. The server never writes to disk itself: it
+/// asks the client to create `<stem>.clean.md` beside the document with
+/// `workspace/applyEdit`, and returns the text either way.
+pub const EXPORT: &str = "terraphim.export";
+
+/// Export document synonyms to `<stem>.knowledge-graph.json` via the client.
+/// Returns `{ graph, uri, written }`, preserving the original document and role.
+pub const EXPORT_KNOWLEDGE_GRAPH: &str = "terraphim.export_knowledge_graph";
+
+/// Every command the server executes, as advertised in
+/// `executeCommandProvider.commands`.
+pub const ALL: &[&str] = &[
+    ADD_ALTERNATIVE,
+    ADD_ALTERNATIVE_AND_APPLY,
+    LAB_MARK,
+    LAB_CLEAR,
+    TRIM_PREVIEW,
+    TRIM_CLEAR,
+    TRIM_KEEP,
+    TRIM_MAKE_CUTS,
+    TRIM_NEXT,
+    EXPORT,
+    EXPORT_KNOWLEDGE_GRAPH,
+];
+
+/// Arguments of [`ADD_ALTERNATIVE`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AddAlternativeArgs {
+    /// The document.
+    pub uri: Url,
+    /// The body range the alternative is for.
+    pub range: Range,
+    /// The alternative text.
+    pub text: String,
+    /// Span granularity (`word`, `sentence` or `paragraph`); inferred from
+    /// the range's text when omitted.
+    #[serde(default)]
+    pub kind: Option<SpanKind>,
+    /// The document version the range refers to.
+    #[serde(default)]
+    pub version: Option<i32>,
+}
+
+/// Arguments of [`LAB_MARK`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LabMarkArgs {
+    /// The document.
+    pub uri: Url,
+    /// The action to run.
+    pub action: LabAction,
+    /// The document version the client expects.
+    #[serde(default)]
+    pub version: Option<i32>,
+}
+
+/// Arguments of [`TRIM_PREVIEW`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrimPreviewArgs {
+    /// The document.
+    pub uri: Url,
+    /// The level to preview.
+    pub level: TrimLevel,
+    /// The document version the client expects.
+    #[serde(default)]
+    pub version: Option<i32>,
+}
+
+/// Arguments of [`TRIM_KEEP`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrimKeepArgs {
+    /// The document.
+    pub uri: Url,
+    /// The cut to keep, as offered by the "Keep" code action.
+    pub cut: CutId,
+    /// The document version the client expects.
+    #[serde(default)]
+    pub version: Option<i32>,
+}
+
+/// Arguments of [`TRIM_MAKE_CUTS`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrimMakeCutsArgs {
+    /// The document.
+    pub uri: Url,
+    /// The document version the client expects.
+    #[serde(default)]
+    pub version: Option<i32>,
+}
+
+/// Arguments of [`TRIM_NEXT`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrimNextArgs {
+    /// The document.
+    pub uri: Url,
+    /// Where to start looking; the next span starts after it.
+    pub position: Position,
+    /// The document version the client expects.
+    #[serde(default)]
+    pub version: Option<i32>,
+}
+
+/// Arguments of [`EXPORT`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExportArgs {
+    /// The document.
+    pub uri: Url,
+    /// The document version the client expects.
+    #[serde(default)]
+    pub version: Option<i32>,
+}
+
+/// Arguments of [`LAB_CLEAR`] and [`TRIM_CLEAR`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DocumentArgs {
+    /// The document.
+    pub uri: Url,
+}
+
+/// Parse a command's single object argument.
+pub fn single_argument<T: serde::de::DeserializeOwned>(
+    command: &str,
+    arguments: Vec<Value>,
+) -> Result<T, Error> {
+    let [argument]: [Value; 1] = arguments
+        .try_into()
+        .map_err(|_| invalid_params(format!("{command} takes exactly one object argument")))?;
+    serde_json::from_value(argument)
+        .map_err(|error| invalid_params(format!("{command}: invalid arguments: {error}")))
+}
+
+/// An `InvalidParams` error with `message`.
+pub fn invalid_params(message: impl Into<String>) -> Error {
+    Error {
+        code: ErrorCode::InvalidParams,
+        message: message.into().into(),
+        data: None,
+    }
+}
+
+/// A `ContentModified` error: the client's version is not the server's.
+pub fn content_modified(expected: i32, held: i32) -> Error {
+    Error {
+        code: ErrorCode::ContentModified,
+        message: format!("document is at version {held}, not {expected}").into(),
+        data: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parses_one_object_argument() {
+        let args: AddAlternativeArgs = single_argument(
+            ADD_ALTERNATIVE,
+            vec![json!({
+                "uri": "file:///a.md",
+                "range": {"start": {"line": 0, "character": 1}, "end": {"line": 0, "character": 4}},
+                "text": "x",
+                "kind": "sentence"
+            })],
+        )
+        .unwrap();
+        assert_eq!(args.kind, Some(SpanKind::Sentence));
+        assert_eq!(args.version, None);
+    }
+
+    #[test]
+    fn rejects_wrong_arity_and_shapes() {
+        let none = single_argument::<AddAlternativeArgs>(ADD_ALTERNATIVE, vec![]);
+        assert_eq!(none.unwrap_err().code, ErrorCode::InvalidParams);
+        let bad = single_argument::<AddAlternativeArgs>(ADD_ALTERNATIVE, vec![json!({"uri": 3})]);
+        assert_eq!(bad.unwrap_err().code, ErrorCode::InvalidParams);
+    }
+}

@@ -1,26 +1,28 @@
-name: Publish reviewed LSP handoff
-
+name: Build and publish public-registry LSP binaries
 on:
-  push:
-    tags:
-      - 'terraphim_lsp-v*'
-
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      source-sha:
+        required: true
+        type: string
+      toolchain:
+        required: true
+        type: string
 permissions:
   contents: read
-
 concurrency:
-  group: lsp-publish-${{ github.ref_name }}
+  group: lsp-public-binaries-${{ inputs.tag }}
   cancel-in-progress: false
-
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
 jobs:
-  publish:
-    if: github.repository == 'terraphim/terraphim-ai' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/terraphim_lsp-v')
-    environment: lsp-releases
+  qualify:
+    if: github.repository == 'terraphim/terraphim-ai' && github.ref == format('refs/tags/{0}', inputs.tag) && github.sha == inputs.source-sha
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write
-      actions: read
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -29,16 +31,176 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
-          python-version: '3.11'
-      - name: Verify provenance and publish immutable frozen bytes
+          python-version: '3.12'
+      - name: Install exact Rust toolchain
+        env:
+          TOOLCHAIN: ${{ inputs.toolchain }}
+        run: rustup toolchain install "$TOOLCHAIN" --profile minimal --component clippy
+      - name: Test the actual published crate and registry lock
+        env:
+          TAG: ${{ inputs.tag }}
+          SOURCE: ${{ inputs.source-sha }}
+          TOOLCHAIN: ${{ inputs.toolchain }}
+        run: |
+          set -euo pipefail
+          python3 scripts/lsp_public_binary.py prepare --tag "$TAG" --source "$SOURCE" --toolchain "$TOOLCHAIN" --lane "$RUNNER_TEMP/qualification"
+          python3 scripts/lsp_public_binary.py qualify --tag "$TAG" --source "$SOURCE" --toolchain "$TOOLCHAIN" --lane "$RUNNER_TEMP/qualification"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: lsp-public-qualification-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/qualification/qualification.json
+            ${{ runner.temp }}/qualification/source.json
+            ${{ runner.temp }}/qualification/failure.json
+            ${{ runner.temp }}/qualification/logs/*
+          if-no-files-found: error
+  linux:
+    needs: qualify
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install exact Rust toolchain
+        env:
+          TOOLCHAIN: ${{ inputs.toolchain }}
+          TARGET: ${{ matrix.target }}
+        run: rustup toolchain install "$TOOLCHAIN" --profile minimal --target "$TARGET"
+      - name: Install reviewed cross compiler wrapper
+        if: endsWith(matrix.target, '-musl')
+        env:
+          TOOLCHAIN: ${{ inputs.toolchain }}
+          CARGO_HOME: ${{ runner.temp }}/cross-cargo
+        run: |
+          rustup run "$TOOLCHAIN" cargo install cross --locked --git https://github.com/cross-rs/cross --rev 29d00c7803f221f1b3f35e561b03792368fb8339 --root "$RUNNER_TEMP/cross-tool"
+          echo "$RUNNER_TEMP/cross-tool/bin" >> "$GITHUB_PATH"
+      - name: Build exact published registry bytes
+        env:
+          TAG: ${{ inputs.tag }}
+          SOURCE: ${{ inputs.source-sha }}
+          TOOLCHAIN: ${{ inputs.toolchain }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          python3 scripts/lsp_public_binary.py prepare --tag "$TAG" --source "$SOURCE" --toolchain "$TOOLCHAIN" --lane "$RUNNER_TEMP/lane"
+          args=()
+          if [[ "$TARGET" == *-musl ]]; then
+            image="ghcr.io/cross-rs/$TARGET:0.2.5"
+            docker pull "$image"
+            digest="$(docker image inspect "$image" --format '{{index .RepoDigests 0}}')"
+            args+=(--cross-image "$digest")
+          fi
+          python3 scripts/lsp_public_binary.py build --tag "$TAG" --source "$SOURCE" --toolchain "$TOOLCHAIN" --lane "$RUNNER_TEMP/lane" --target "$TARGET" "${args[@]}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lsp-public-${{ matrix.target }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lane/dist/**
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: failure()
+        with:
+          name: lsp-build-failure-${{ matrix.target }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/lane/source.json
+            ${{ runner.temp }}/lane/failure.json
+            ${{ runner.temp }}/lane/logs/*
+          if-no-files-found: warn
+  macos:
+    needs: qualify
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install exact Rust toolchain
+        env:
+          TOOLCHAIN: ${{ inputs.toolchain }}
+        run: rustup toolchain install "$TOOLCHAIN" --profile minimal --target aarch64-apple-darwin --target x86_64-apple-darwin
+      - name: Build both architectures and universal binary from registry bytes
+        env:
+          TAG: ${{ inputs.tag }}
+          SOURCE: ${{ inputs.source-sha }}
+          TOOLCHAIN: ${{ inputs.toolchain }}
+        run: |
+          set -euo pipefail
+          python3 scripts/lsp_public_binary.py prepare --tag "$TAG" --source "$SOURCE" --toolchain "$TOOLCHAIN" --lane "$RUNNER_TEMP/lane"
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            python3 scripts/lsp_public_binary.py build --tag "$TAG" --source "$SOURCE" --toolchain "$TOOLCHAIN" --lane "$RUNNER_TEMP/lane" --target "$target"
+          done
+          python3 scripts/lsp_public_binary.py universal --tag "$TAG" --source "$SOURCE" --toolchain "$TOOLCHAIN" --lane "$RUNNER_TEMP/lane"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lsp-public-macos-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lane/dist/**
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: failure()
+        with:
+          name: lsp-build-failure-macos-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/lane/source.json
+            ${{ runner.temp }}/lane/failure.json
+            ${{ runner.temp }}/lane/logs/*
+          if-no-files-found: warn
+  publish:
+    needs: [qualify, linux, macos]
+    environment: lsp-releases
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: lsp-public-qualification-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qualification
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: lsp-public-*-unknown-linux-*-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/dist
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: lsp-public-macos-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/dist
+      - name: Verify six assets and publish immutable frozen bytes
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-        run: python3 .github/scripts/release/lsp_handoff.py publish --tag "$TAG" --receipt publication-receipt.json
-      - name: Preserve publication or fixed-code failure receipt
+          TAG: ${{ inputs.tag }}
+          SOURCE: ${{ inputs.source-sha }}
+          TOOLCHAIN: ${{ inputs.toolchain }}
+        run: |
+          set -euo pipefail
+          python3 scripts/lsp_public_binary.py assemble --tag "$TAG" --source "$SOURCE" --toolchain "$TOOLCHAIN" --assets "$RUNNER_TEMP/dist" --qualification "$RUNNER_TEMP/qualification" --receipt "$RUNNER_TEMP/publication-receipt.json"
+          python3 scripts/lsp_public_binary.py publish --tag "$TAG" --source "$SOURCE" --toolchain "$TOOLCHAIN" --assets "$RUNNER_TEMP/dist" --qualification "$RUNNER_TEMP/qualification" --receipt "$RUNNER_TEMP/publication-receipt.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: lsp-publication-${{ github.run_id }}-${{ github.run_attempt }}
-          path: publication-receipt.json
+          path: ${{ runner.temp }}/publication-receipt.json
           if-no-files-found: error

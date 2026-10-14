@@ -93,6 +93,14 @@ jobs:
             fi
           fi
 
+          # LSP package tags have a single reviewed public-registry publisher.
+          case "$RELEASE_TAG" in
+            terraphim_lsp-v*|terraphim_lsp_core-v*)
+              echo "::error::LSP tags are owned by publish-lsp-crates.yml"
+              exit 1
+              ;;
+          esac
+
           echo "Resolving release tag: $RELEASE_TAG"
           OBJECT_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
           OBJECT_SHA="$(jq -r '.object.sha' <<<"$OBJECT_JSON")"
@@ -403,15 +411,21 @@ jobs:
       - name: Build LSP binary
         if: "!matrix.use_cross"
         shell: bash
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
         run: |
           rustup run stable cargo build --release \
+            --manifest-path crates/terraphim_lsp/Cargo.toml \
             --target ${{ matrix.target }} -p terraphim_lsp --bin terraphim-lsp
 
       - name: Build LSP binary (cross / musl)
         if: matrix.use_cross
         shell: bash
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
         run: |
           rustup run stable cross build --release \
+            --manifest-path crates/terraphim_lsp/Cargo.toml \
             --target ${{ matrix.target }} -p terraphim_lsp --bin terraphim-lsp
           ls -la "target/${{ matrix.target }}/release/terraphim-lsp"
 

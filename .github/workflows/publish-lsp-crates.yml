@@ -1,0 +1,205 @@
+name: Publish reviewed LSP crates
+on:
+  push:
+    tags: ['terraphim_lsp_core-v*', 'terraphim_lsp-v*']
+  workflow_dispatch:
+    inputs:
+      auth_mode:
+        description: 'Bootstrap is only for a crate name never published before'
+        required: true
+        default: trusted
+        type: choice
+        options: [trusted, bootstrap]
+permissions:
+  contents: read
+concurrency:
+  group: crates-${{ github.ref_name }}
+  cancel-in-progress: false
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  CARGO_TERM_COLOR: never
+jobs:
+  qualify:
+    if: github.repository == 'terraphim/terraphim-ai' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      crate: ${{ steps.request.outputs.crate }}
+      version: ${{ steps.request.outputs.version }}
+      toolchain: ${{ steps.request.outputs.toolchain }}
+      manifest: ${{ steps.request.outputs.manifest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Validate tag, manifests, ownership and dependency order
+        id: request
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/lsp-crates-target
+          TAG: ${{ github.ref_name }}
+          MODE: ${{ inputs.auth_mode || 'trusted' }}
+        run: python3 scripts/lsp_crates_release.py validate --tag "$TAG" --mode "$MODE" --receipt "$RUNNER_TEMP/request.json"
+      - name: Install pinned toolchain
+        env:
+          TOOLCHAIN: ${{ steps.request.outputs.toolchain }}
+        run: |
+          rustup toolchain install "$TOOLCHAIN" --profile minimal --component rustfmt --component clippy
+          rustup target add wasm32-unknown-unknown --toolchain "$TOOLCHAIN"
+      - name: Verify source and build the publishable package
+        env:
+          CRATE: ${{ steps.request.outputs.crate }}
+          VERSION: ${{ steps.request.outputs.version }}
+          TOOLCHAIN: ${{ steps.request.outputs.toolchain }}
+          MANIFEST: ${{ steps.request.outputs.manifest }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/lsp-crates-target
+          TAG: ${{ github.ref_name }}
+          CARGO_HOME: ${{ runner.temp }}/crates-cargo
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_lsp_crates_release.py' -v
+          cargo +"$TOOLCHAIN" fmt --manifest-path "$MANIFEST" --all --check
+          cargo +"$TOOLCHAIN" clippy --locked --manifest-path "$MANIFEST" -p "$CRATE" --all-targets -- -D warnings
+          cargo +"$TOOLCHAIN" test --locked --manifest-path "$MANIFEST" -p "$CRATE" --all-targets
+          cargo +"$TOOLCHAIN" test --locked --manifest-path "$MANIFEST" -p "$CRATE" --doc
+          if [ "$CRATE" = "terraphim_lsp_core" ]; then
+            cargo +"$TOOLCHAIN" check --locked --manifest-path "$MANIFEST" -p "$CRATE" --target wasm32-unknown-unknown --lib
+          fi
+          cargo +"$TOOLCHAIN" package --locked --manifest-path "$MANIFEST" --registry crates-io -p "$CRATE"
+          python3 scripts/lsp_crates_release.py unpack --tag "$TAG" --unpack-dir "$RUNNER_TEMP/unpacked" --receipt "$RUNNER_TEMP/archive-validation.json"
+          cd "$RUNNER_TEMP/unpacked/$CRATE-$VERSION"
+          cargo +"$TOOLCHAIN" test --locked --manifest-path Cargo.toml --all-targets
+          cargo +"$TOOLCHAIN" test --locked --manifest-path Cargo.toml --doc
+          cd "$GITHUB_WORKSPACE"
+          python3 scripts/lsp_crates_release.py package --tag "$TAG" --receipt "$RUNNER_TEMP/qualified-package.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: crate-qualified-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qualified-package.json
+          if-no-files-found: error
+  publish:
+    needs: qualify
+    if: inputs.auth_mode != 'bootstrap'
+    environment: crates-io
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: crate-qualified-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qualified
+      - name: Reproduce qualified bytes before authentication
+        env:
+          CRATE: ${{ needs.qualify.outputs.crate }}
+          TOOLCHAIN: ${{ needs.qualify.outputs.toolchain }}
+          MANIFEST: ${{ needs.qualify.outputs.manifest }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/lsp-crates-target
+          TAG: ${{ github.ref_name }}
+          CARGO_HOME: ${{ runner.temp }}/crates-cargo
+        run: |
+          set -euo pipefail
+          python3 scripts/lsp_crates_release.py validate --tag "$TAG" --mode trusted --receipt "$RUNNER_TEMP/recheck.json"
+          rustup toolchain install "$TOOLCHAIN" --profile minimal
+          cargo +"$TOOLCHAIN" package --locked --manifest-path "$MANIFEST" --registry crates-io -p "$CRATE"
+          python3 scripts/lsp_crates_release.py compare --tag "$TAG" --expected "$RUNNER_TEMP/qualified/qualified-package.json" --receipt "$RUNNER_TEMP/reproduced.json"
+      - name: Obtain temporary crates.io publish token
+        id: auth
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18
+      - name: Publish and verify actual registry checksum
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          CRATE: ${{ needs.qualify.outputs.crate }}
+          TOOLCHAIN: ${{ needs.qualify.outputs.toolchain }}
+          MANIFEST: ${{ needs.qualify.outputs.manifest }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/lsp-crates-target
+          TAG: ${{ github.ref_name }}
+          CARGO_HOME: ${{ runner.temp }}/crates-cargo
+        run: |
+          set -euo pipefail
+          cargo +"$TOOLCHAIN" publish --locked --manifest-path "$MANIFEST" --registry crates-io -p "$CRATE"
+          python3 scripts/lsp_crates_release.py readback --tag "$TAG" --expected "$RUNNER_TEMP/qualified/qualified-package.json" --receipt "$RUNNER_TEMP/published.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: crate-published-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/published.json
+          if-no-files-found: error
+  bootstrap:
+    needs: qualify
+    if: github.event_name == 'workflow_dispatch' && inputs.auth_mode == 'bootstrap'
+    environment: crates-io-bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: crate-qualified-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qualified
+      - name: Reproduce first-publication package before authentication
+        env:
+          CRATE: ${{ needs.qualify.outputs.crate }}
+          TOOLCHAIN: ${{ needs.qualify.outputs.toolchain }}
+          MANIFEST: ${{ needs.qualify.outputs.manifest }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/lsp-crates-target
+          TAG: ${{ github.ref_name }}
+          CARGO_HOME: ${{ runner.temp }}/crates-cargo
+        run: |
+          set -euo pipefail
+          python3 scripts/lsp_crates_release.py validate --tag "$TAG" --mode bootstrap --receipt "$RUNNER_TEMP/recheck.json"
+          rustup toolchain install "$TOOLCHAIN" --profile minimal
+          cargo +"$TOOLCHAIN" package --locked --manifest-path "$MANIFEST" --registry crates-io -p "$CRATE"
+          python3 scripts/lsp_crates_release.py compare --tag "$TAG" --expected "$RUNNER_TEMP/qualified/qualified-package.json" --receipt "$RUNNER_TEMP/reproduced.json"
+      - name: Bootstrap previously unpublished crate and verify checksum
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CRATE: ${{ needs.qualify.outputs.crate }}
+          TOOLCHAIN: ${{ needs.qualify.outputs.toolchain }}
+          MANIFEST: ${{ needs.qualify.outputs.manifest }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/lsp-crates-target
+          TAG: ${{ github.ref_name }}
+          CARGO_HOME: ${{ runner.temp }}/crates-cargo
+        run: |
+          set -euo pipefail
+          test -n "$CARGO_REGISTRY_TOKEN"
+          cargo +"$TOOLCHAIN" publish --locked --manifest-path "$MANIFEST" --registry crates-io -p "$CRATE"
+          python3 scripts/lsp_crates_release.py readback --tag "$TAG" --expected "$RUNNER_TEMP/qualified/qualified-package.json" --receipt "$RUNNER_TEMP/published.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: crate-bootstrapped-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/published.json
+          if-no-files-found: error
+  binaries:
+    needs: [qualify, publish, bootstrap]
+    if: >-
+      always() && needs.qualify.result == 'success' &&
+      needs.qualify.outputs.crate == 'terraphim_lsp' &&
+      (needs.publish.result == 'success' || needs.bootstrap.result == 'success')
+    permissions:
+      contents: write
+    uses: ./.github/workflows/lsp-publish.yml
+    with:
+      tag: ${{ github.ref_name }}
+      source-sha: ${{ github.sha }}
+      toolchain: ${{ needs.qualify.outputs.toolchain }}

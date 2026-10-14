@@ -3,7 +3,10 @@
 //! Builds LSP completion items from a knowledge-graph thesaurus and the
 //! current document context.
 
+use terraphim_lsp_core::LineIndex;
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Position};
+
+use crate::convert;
 
 use terraphim_types::Thesaurus;
 
@@ -39,12 +42,17 @@ pub fn build_completions(thesaurus: &Thesaurus, word: &str) -> Vec<CompletionIte
 /// Extract the word prefix at the given position.
 ///
 /// Returns the contiguous run of alphanumeric characters (and hyphens/underscores)
-/// immediately preceding or containing the cursor.
+/// immediately preceding or containing the cursor. `position.character`
+/// counts UTF-16 code units, as LSP positions do.
 pub fn word_at_position(text: &str, position: Position) -> String {
-    let lines: Vec<&str> = text.lines().collect();
-    let line = lines.get(position.line as usize).unwrap_or(&"");
-    let col = position.character as usize;
-    let before = &line[..col.min(line.len())];
+    let index = LineIndex::new(text);
+    let cursor = convert::byte_offset(&index, position);
+    if convert::position(&index, cursor).line != position.line {
+        // The position is past the last line.
+        return String::new();
+    }
+    let line_start = text[..cursor].rfind('\n').map_or(0, |newline| newline + 1);
+    let before = &text[line_start..cursor];
 
     before
         .split(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
@@ -107,5 +115,32 @@ mod tests {
             character: 12,
         };
         assert_eq!(word_at_position(text, pos), "tok");
+    }
+
+    #[test]
+    fn test_word_at_position_counts_utf16_and_never_panics() {
+        // '😀' is two UTF-16 units; character 4 is after "😀 r".
+        let text = "😀 rust\ncafé tok";
+        let pos = Position {
+            line: 0,
+            character: 4,
+        };
+        assert_eq!(word_at_position(text, pos), "r");
+        let pos = Position {
+            line: 1,
+            character: 8,
+        };
+        assert_eq!(word_at_position(text, pos), "tok");
+        // Inside the surrogate pair and past the last line.
+        let pos = Position {
+            line: 0,
+            character: 1,
+        };
+        assert_eq!(word_at_position(text, pos), "");
+        let pos = Position {
+            line: 9,
+            character: 0,
+        };
+        assert_eq!(word_at_position(text, pos), "");
     }
 }

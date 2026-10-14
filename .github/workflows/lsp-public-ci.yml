@@ -1,0 +1,90 @@
+name: Public LSP workspace
+on:
+  pull_request:
+    paths:
+      - 'crates/terraphim_lsp/**'
+      - 'crates/terraphim_lsp_core/**'
+      - 'scripts/lsp_crates_release.py'
+      - 'tests/test_lsp_crates_release.py'
+      - 'release/lsp-crates.json'
+      - '.github/workflows/lsp-public-ci.yml'
+      - 'Cargo.toml'
+      - '.cargo/**'
+  push:
+    branches: [main, 'codex/**']
+    paths:
+      - 'crates/terraphim_lsp/**'
+      - 'crates/terraphim_lsp_core/**'
+      - 'scripts/lsp_crates_release.py'
+      - 'tests/test_lsp_crates_release.py'
+      - 'release/lsp-crates.json'
+      - '.github/workflows/lsp-public-ci.yml'
+      - 'Cargo.toml'
+      - '.cargo/**'
+permissions:
+  contents: read
+concurrency:
+  group: public-lsp-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  CARGO_TERM_COLOR: never
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Verify standalone workspace and public registry lock
+        id: source
+        run: python3 scripts/lsp_crates_release.py check-source --receipt "$RUNNER_TEMP/source-contract.json"
+      - name: Install reviewed Rust toolchain
+        env:
+          TOOLCHAIN: ${{ steps.source.outputs.toolchain }}
+        run: |
+          rustup toolchain install "$TOOLCHAIN" --profile minimal --component rustfmt --component clippy
+          rustup target add wasm32-unknown-unknown --toolchain "$TOOLCHAIN"
+      - name: Qualify native server, shared core and WASM
+        env:
+          TOOLCHAIN: ${{ steps.source.outputs.toolchain }}
+          MANIFEST: ${{ steps.source.outputs.manifest }}
+          CARGO_HOME: ${{ runner.temp }}/lsp-cargo
+          CARGO_TARGET_DIR: ${{ runner.temp }}/lsp-target
+          CARGO_BUILD_BUILD_DIR: ${{ runner.temp }}/lsp-build
+          RUSTC_WRAPPER: ''
+          RUSTC_WORKSPACE_WRAPPER: ''
+        run: |
+          set -euo pipefail
+          cargo +"$TOOLCHAIN" fmt --manifest-path "$MANIFEST" --all --check
+          cargo +"$TOOLCHAIN" clippy --locked --manifest-path "$MANIFEST" --workspace --all-targets -- -D warnings
+          cargo +"$TOOLCHAIN" test --locked --manifest-path "$MANIFEST" --workspace --all-targets
+          cargo +"$TOOLCHAIN" test --locked --manifest-path "$MANIFEST" --workspace --doc
+          cargo +"$TOOLCHAIN" check --locked --manifest-path "$MANIFEST" -p terraphim_lsp_core --target wasm32-unknown-unknown --lib
+          cargo +"$TOOLCHAIN" package --locked --manifest-path "$MANIFEST" -p terraphim_lsp_core
+          cargo +"$TOOLCHAIN" package --locked --manifest-path "$MANIFEST" -p terraphim_lsp --list > "$RUNNER_TEMP/server-package-files.txt"
+          python3 - <<'PYCODE'
+          import importlib.util, os
+          from pathlib import Path
+          spec = importlib.util.spec_from_file_location("release", "scripts/lsp_crates_release.py")
+          r = importlib.util.module_from_spec(spec); spec.loader.exec_module(r)
+          root = Path.cwd(); plan = r.load_plan(root); core = plan["packages"][0]
+          archive = r.package_archive(root, core, os.environ)
+          r.unpack_package(archive, core, r.git(root, "rev-parse", "HEAD"), Path(os.environ["RUNNER_TEMP"]) / "unpacked", root)
+          PYCODE
+          core_version="$(python3 -c 'import json; print(json.load(open("release/lsp-crates.json"))["packages"][0]["version"])')"
+          cd "$RUNNER_TEMP/unpacked/terraphim_lsp_core-$core_version"
+          cargo +"$TOOLCHAIN" test --locked --all-targets
+          cargo +"$TOOLCHAIN" test --locked --doc
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: lsp-source-contract-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/source-contract.json
+            ${{ runner.temp }}/server-package-files.txt
+          if-no-files-found: error

@@ -34,7 +34,7 @@ GITHUB_RELEASE_WRITER_PATTERN = re.compile(
     r"github-publish-release\.sh|"
     r"\bpython[0-9.]*\s+[\"']?(?:[\w./-]+/)?publish_release\.py\b|"
     r"\bpython[0-9.]*\s+[\"']?(?:[\w./-]+/)?publish_lsp_release\.py\b|"
-    r"\bpython[0-9.]*\s+[\"']?(?:[\w./-]+/)?lsp_handoff\.py[\"']?\s+publish\b",
+    r"\bpython[0-9.]*\s+[\"']?(?:[\w./-]+/)?(?:lsp_handoff|lsp_public_binary)\.py[\"']?\s+publish\b",
     re.IGNORECASE,
 )
 
@@ -395,7 +395,8 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
     def test_release_writer_detector_includes_python_publication_helper(self) -> None:
         for syntax in ("python3 scripts/publish_release.py --tag x",
                        'python "vs-code-terraphim-it/scripts/publish_release.py"',
-                       "python3.12 './scripts/publish_release.py' --repo org/repo"):
+                       "python3.12 './scripts/publish_release.py' --repo org/repo",
+                       "python3 scripts/lsp_public_binary.py publish --tag x"):
             with self.subTest(syntax=syntax):
                 self.assertRegex(syntax, GITHUB_RELEASE_WRITER_PATTERN)
         self.assertNotRegex("python3 scripts/verify_registry.py", GITHUB_RELEASE_WRITER_PATTERN)

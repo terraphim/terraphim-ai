@@ -39,16 +39,20 @@ class WorkflowTest(unittest.TestCase):
                 if 'upload-artifact@' in step.get('uses', ''):
                     self.assertIn(step['with']['path'], ('public-lane/*', 'producer-receipt.json'))
 
-    def test_publisher_separate_hosted_tag_only_and_no_build_or_private_credentials(self):
-        value = self.publisher; self.assertEqual(value.get('on', value.get(True)), {'push': {'tags': ['terraphim_lsp-v*']}})
+    def test_public_registry_publisher_is_called_only_after_crate_publication(self):
+        value = self.publisher
+        self.assertEqual(set(value.get('on', value.get(True))), {'workflow_call'})
+        self.assertEqual(set(value.get('on', value.get(True))['workflow_call']['inputs']), {'tag', 'source-sha', 'toolchain'})
         job = value['jobs']['publish']; self.assertEqual(job['runs-on'], 'ubuntu-latest')
         self.assertEqual(job['environment'], 'lsp-releases')
-        self.assertEqual(job['permissions'], {'contents': 'write', 'actions': 'read'})
+        self.assertEqual(job['permissions'], {'contents': 'write'})
+        self.assertEqual(job['needs'], ['qualify', 'linux', 'macos'])
         text = (ROOT/'.github/workflows/lsp-publish.yml').read_text()
-        for forbidden in ('secrets.', 'cargo', 'GITEA_', 'OP_SERVICE', 'workflow_dispatch'):
+        for forbidden in ('secrets.', 'GITEA_', 'OP_SERVICE', 'lsp_handoff.py publish'):
             self.assertNotIn(forbidden, text)
-        self.assertIn('lsp_handoff.py publish', text)
+        self.assertIn('lsp_public_binary.py publish', text)
         self.assertTrue(GITHUB_RELEASE_WRITER_PATTERN.search(text))
+        self.assertIn("github.sha == inputs.source-sha", value['jobs']['qualify']['if'])
 
     def test_exact_checkouts_and_pinned_actions(self):
         for value in (self.producer, self.publisher):
