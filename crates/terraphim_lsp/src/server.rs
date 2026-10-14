@@ -90,6 +90,9 @@ pub struct TerraphimLspServer {
     kg_loads: AtomicU64,
     cut_operations: Arc<AtomicU64>,
     documents: Arc<RwLock<HashMap<Url, OpenDocument>>>,
+    /// JSON buffers are tracked only to protect export destinations. When both
+    /// maps are needed, always lock documents before passive_buffers.
+    passive_buffers: RwLock<HashMap<Url, ExportBuffer>>,
     /// Last acknowledged generated text, used to refuse changed output buffers.
     exported: RwLock<HashMap<Url, String>>,
     /// Whether the client accepts `WorkspaceEdit.documentChanges`
@@ -154,6 +157,40 @@ impl Kg {
             engine: KgEngine::empty(),
             path: Some(path),
         }
+    }
+}
+
+/// Raw text used for export safety, never for Markdown analysis.
+#[derive(Debug, Clone)]
+struct ExportBuffer {
+    text: String,
+    version: i32,
+    incarnation: Arc<()>,
+    kind: BufferKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BufferKind {
+    Markdown,
+    Json,
+    Jsonc,
+}
+
+impl ExportBuffer {
+    fn markdown(document: &OpenDocument) -> Self {
+        Self {
+            text: document.text.clone(),
+            version: document.version,
+            incarnation: Arc::clone(&document.incarnation),
+            kind: BufferKind::Markdown,
+        }
+    }
+
+    fn unchanged(&self, other: &Self) -> bool {
+        self.kind == other.kind
+            && self.version == other.version
+            && self.text == other.text
+            && Arc::ptr_eq(&self.incarnation, &other.incarnation)
     }
 }
 
@@ -394,6 +431,7 @@ impl TerraphimLspServer {
             kg_loads: AtomicU64::new(0),
             cut_operations: Arc::new(AtomicU64::new(0)),
             documents: Arc::new(RwLock::new(HashMap::new())),
+            passive_buffers: RwLock::new(HashMap::new()),
             exported: RwLock::new(HashMap::new()),
             versioned_edits: Arc::new(AtomicBool::new(false)),
             inlay_hint_refresh: AtomicBool::new(false),
@@ -627,19 +665,9 @@ impl TerraphimLspServer {
             .map(|document| document.text.clone())
     }
 
-    /// Record the latest text and version of a document. Requested Lab
-    /// actions and the trim level survive; their results, computed for the
-    /// old text, are dropped.
-    async fn store_document(&self, uri: &Url, text: &str, version: i32) {
-        let mut documents = self.documents.write().await;
-        if documents
-            .get(uri)
-            .is_some_and(|document| version <= document.version)
-        {
-            log::debug!("terraphim_lsp: ignored non-increasing document version {version}");
-            return;
-        }
-        let document = documents.entry(uri.clone()).or_default();
+    /// Update known Markdown state while its map is locked. Callers enforce
+    /// monotonic changes; didOpen may start a new version sequence at zero.
+    fn update_document(document: &mut OpenDocument, text: &str, version: i32) {
         document.text = text.to_string();
         document.version = version;
         document.reanchoring = None;
@@ -658,8 +686,66 @@ impl TerraphimLspServer {
         document.trim = None;
         document.trim_made = None;
         document.trim_walk = None;
+    }
+
+    #[cfg(test)]
+    async fn store_document(&self, uri: &Url, text: &str, version: i32) {
+        let mut documents = self.documents.write().await;
+        if documents
+            .get(uri)
+            .is_some_and(|document| version <= document.version)
+        {
+            return;
+        }
+        Self::update_document(documents.entry(uri.clone()).or_default(), text, version);
         drop(documents);
         self.changed.notify_waiters();
+    }
+
+    fn export_buffer_from(
+        documents: &HashMap<Url, OpenDocument>,
+        passive: &HashMap<Url, ExportBuffer>,
+        uri: &Url,
+    ) -> Option<ExportBuffer> {
+        documents
+            .get(uri)
+            .map(ExportBuffer::markdown)
+            .or_else(|| passive.get(uri).cloned())
+    }
+
+    async fn export_buffer(&self, uri: &Url) -> Option<ExportBuffer> {
+        let documents = self.documents.read().await;
+        let passive = self.passive_buffers.read().await;
+        Self::export_buffer_from(&documents, &passive, uri)
+    }
+
+    /// Revalidate both lifecycles together after filesystem inspection yields.
+    async fn export_snapshots_current(
+        &self,
+        source: &Url,
+        snapshot: &OpenDocument,
+        target: &Url,
+        original_target: Option<&ExportBuffer>,
+    ) -> Result<bool> {
+        let documents = self.documents.read().await;
+        let passive = self.passive_buffers.read().await;
+        if !documents.get(source).is_some_and(|current| {
+            current.version == snapshot.version
+                && current.text == snapshot.text
+                && Arc::ptr_eq(&current.incarnation, &snapshot.incarnation)
+        }) {
+            return Err(tower_lsp::jsonrpc::Error {
+                code: tower_lsp::jsonrpc::ErrorCode::ContentModified,
+                message: "Source document changed or closed while preparing export".into(),
+                data: None,
+            });
+        }
+        let current = Self::export_buffer_from(&documents, &passive, target);
+        Ok(match (original_target, current.as_ref()) {
+            (None, None) => true,
+            (Some(before), Some(after)) => before.unchanged(after),
+            _ => false,
+        })
     }
 
     /// What a Lab run needs from a document, taken under a brief lock so
@@ -1399,14 +1485,16 @@ impl TerraphimLspServer {
         let Ok(target_path) = target.to_file_path() else {
             return false;
         };
-        let mut protected: Vec<PathBuf> = self
-            .documents
-            .read()
-            .await
-            .keys()
-            .filter(|uri| *uri != target)
-            .filter_map(|uri| uri.to_file_path().ok())
-            .collect();
+        let mut protected: Vec<PathBuf> = {
+            let documents = self.documents.read().await;
+            let passive = self.passive_buffers.read().await;
+            documents
+                .keys()
+                .chain(passive.keys())
+                .filter(|uri| *uri != target)
+                .filter_map(|uri| uri.to_file_path().ok())
+                .collect()
+        };
         if let Ok(path) = source.to_file_path() {
             protected.push(path);
         }
@@ -1456,12 +1544,12 @@ impl TerraphimLspServer {
         target: &Url,
         markdown: &str,
     ) -> Result<bool> {
+        let open = self.export_buffer(target).await;
         if !self.export_target_is_separate(source, target).await {
             self.client.show_message(MessageType::WARNING,
                 "terraphim-lsp: choose an independent export file; the destination may alias the source or another open document.").await;
             return Ok(false);
         }
-        let open = self.documents.read().await.get(target).cloned();
         let disk = if let Ok(path) = target.to_file_path() {
             match tokio::fs::read_to_string(path).await {
                 Ok(text) => Some(text),
@@ -1525,23 +1613,13 @@ impl TerraphimLspServer {
         if !self.export_target_is_separate(source, target).await {
             return Ok(false);
         }
-        // Filesystem checks above yield to didChange/close/open notifications.
-        // Check both version and text immediately before dispatch; reopening a
-        // different document at the same URI can restart its version sequence.
         if !self
-            .documents
-            .read()
-            .await
-            .get(source)
-            .is_some_and(|current| {
-                current.version == snapshot.version && current.text == snapshot.text
-            })
+            .export_snapshots_current(source, snapshot, target, open.as_ref())
+            .await?
         {
-            return Err(tower_lsp::jsonrpc::Error {
-                code: tower_lsp::jsonrpc::ErrorCode::ContentModified,
-                message: "Source document changed or closed while preparing export".into(),
-                data: None,
-            });
+            self.client.show_message(MessageType::WARNING,
+                "terraphim-lsp: the export buffer changed while preparing export; try again after saving or closing it.").await;
+            return Ok(false);
         }
         let applied = match self.client.apply_edit(edit).await {
             Ok(response) => response.applied,
@@ -2226,12 +2304,43 @@ impl LanguageServer for TerraphimLspServer {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let uri = params.text_document.uri;
-        let text = params.text_document.text;
-        // Opening starts a new client version sequence, including version 0.
-        self.documents.write().await.remove(&uri);
-        self.store_document(&uri, &text, params.text_document.version)
-            .await;
+        let item = params.text_document;
+        let uri = item.uri;
+        let kind = match item.language_id.as_str() {
+            "json" => BufferKind::Json,
+            "jsonc" => BufferKind::Jsonc,
+            _ => BufferKind::Markdown,
+        };
+        let was_markdown = {
+            let mut documents = self.documents.write().await;
+            let mut passive = self.passive_buffers.write().await;
+            let was_markdown = documents.remove(&uri).is_some();
+            passive.remove(&uri);
+            if kind == BufferKind::Markdown {
+                let mut document = OpenDocument::default();
+                Self::update_document(&mut document, &item.text, item.version);
+                documents.insert(uri.clone(), document);
+            } else {
+                passive.insert(
+                    uri.clone(),
+                    ExportBuffer {
+                        text: item.text,
+                        version: item.version,
+                        incarnation: Arc::new(()),
+                        kind,
+                    },
+                );
+            }
+            was_markdown
+        };
+        self.changed.notify_waiters();
+        if kind != BufferKind::Markdown {
+            if was_markdown {
+                // Clear diagnostics from the former language without analysing JSON.
+                self.send_push(uri, vec![], None).await;
+            }
+            return;
+        }
         if self.settings().lab.trigger == LabTrigger::Save {
             self.refresh_lab_and_publish(&uri).await;
         } else {
@@ -2241,6 +2350,9 @@ impl LanguageServer for TerraphimLspServer {
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
         let uri = params.text_document.uri;
+        if !self.documents.read().await.contains_key(&uri) {
+            return;
+        }
         if self.settings().reanchor_on_save {
             self.reanchor_on_save(&uri).await;
         }
@@ -2271,8 +2383,32 @@ impl LanguageServer for TerraphimLspServer {
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let uri = params.text_document.uri;
         let version = params.text_document.version;
-        if let Some(change) = params.content_changes.into_iter().last() {
-            self.store_document(&uri, &change.text, version).await;
+        let Some(change) = params.content_changes.into_iter().last() else {
+            return;
+        };
+        let markdown_changed = {
+            let mut documents = self.documents.write().await;
+            let mut passive = self.passive_buffers.write().await;
+            if let Some(document) = documents.get_mut(&uri) {
+                if version <= document.version {
+                    return;
+                }
+                Self::update_document(document, &change.text, version);
+                true
+            } else if let Some(buffer) = passive.get_mut(&uri) {
+                if version <= buffer.version {
+                    return;
+                }
+                buffer.text = change.text;
+                buffer.version = version;
+                false
+            } else {
+                // A delayed change after close must not create Markdown state.
+                return;
+            }
+        };
+        self.changed.notify_waiters();
+        if markdown_changed {
             self.push_open(&uri).await;
         }
     }
@@ -2282,11 +2418,17 @@ impl LanguageServer for TerraphimLspServer {
     /// owns the results it pulled and stops pulling (and drops them) for a
     /// closed document, so neither a push nor a refresh is needed.
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
-        self.documents
-            .write()
-            .await
-            .remove(&params.text_document.uri);
-        self.send_push(params.text_document.uri, vec![], None).await;
+        let uri = params.text_document.uri;
+        let was_markdown = {
+            let mut documents = self.documents.write().await;
+            let mut passive = self.passive_buffers.write().await;
+            passive.remove(&uri);
+            documents.remove(&uri).is_some()
+        };
+        self.changed.notify_waiters();
+        if was_markdown {
+            self.send_push(uri, vec![], None).await;
+        }
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
