@@ -15,8 +15,29 @@ fn frame(message: &serde_json::Value) -> Vec<u8> {
     format!("Content-Length: {}\r\n\r\n{body}", body.len()).into_bytes()
 }
 
-/// Observe an actual response before advancing the client handshake. Answer
-/// refresh requests while preserving every raw server message for assertions.
+/// Preserve every frame and acknowledge server requests as a real client does.
+fn receive_message(
+    receiver: &mpsc::Receiver<String>,
+    stdin: &mut std::process::ChildStdin,
+    seen: &mut Vec<String>,
+) -> serde_json::Value {
+    let message = receiver
+        .recv_timeout(Duration::from_secs(30))
+        .unwrap_or_else(|_| panic!("no next server frame; received {seen:?}"));
+    let value: serde_json::Value = serde_json::from_str(&message).unwrap();
+    seen.push(message);
+    if value["method"] == "workspace/diagnostic/refresh" {
+        stdin
+            .write_all(&frame(&serde_json::json!({
+                "jsonrpc": "2.0", "id": value["id"], "result": null,
+            })))
+            .unwrap();
+        stdin.flush().unwrap();
+    }
+    value
+}
+
+/// Observe an actual response before advancing the client handshake.
 fn receive_response(
     receiver: &mpsc::Receiver<String>,
     stdin: &mut std::process::ChildStdin,
@@ -24,19 +45,7 @@ fn receive_response(
     id: i64,
 ) -> serde_json::Value {
     loop {
-        let message = receiver
-            .recv_timeout(Duration::from_secs(30))
-            .unwrap_or_else(|_| panic!("no response {id}; received {seen:?}"));
-        let value: serde_json::Value = serde_json::from_str(&message).unwrap();
-        seen.push(message);
-        if value["method"] == "workspace/diagnostic/refresh" {
-            stdin
-                .write_all(&frame(&serde_json::json!({
-                    "jsonrpc": "2.0", "id": value["id"], "result": null,
-                })))
-                .unwrap();
-            stdin.flush().unwrap();
-        }
+        let value = receive_message(receiver, stdin, seen);
         if value["id"] == id && value.get("method").is_none() {
             assert!(value.get("error").is_none(), "response {id}: {value}");
             return value;
@@ -48,6 +57,7 @@ fn receive_response(
 /// order. Complete initialize before sending normal traffic, and shutdown
 /// before exit, just as a conforming LSP client does.
 fn session(workspace: serde_json::Value) -> Vec<String> {
+    let expects_refresh = workspace["diagnostics"]["refreshSupport"] == true;
     let mut child = Command::new(env!("CARGO_BIN_EXE_terraphim-lsp"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -113,6 +123,14 @@ fn session(workspace: serde_json::Value) -> Vec<String> {
 
     let trim = receive_response(&receiver, &mut stdin, &mut seen, 2);
     assert!(trim["result"]["candidates"].is_u64(), "{trim}");
+    // The refresh is deliberately spawned: the command response is not a
+    // barrier for that independent server request. Keep the client alive and
+    // acknowledge it before shutdown, whichever message arrived first.
+    if expects_refresh {
+        while refreshes(&seen) == 0 {
+            receive_message(&receiver, &mut stdin, &mut seen);
+        }
+    }
     stdin
         .write_all(&frame(
             &serde_json::json!({"jsonrpc": "2.0", "id": 3, "method": "shutdown"}),
