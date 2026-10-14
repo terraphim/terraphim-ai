@@ -31,23 +31,25 @@ jobs:
           
           # Extract quality signal
           QUALITY=$(echo "$OUTPUT" | grep "Quality:" | awk '{print $2}')
-          echo "quality=$QUALITY" >> $GITHUB_OUTPUT
+          echo "quality=$QUALITY" >> "$GITHUB_OUTPUT"
           
           # Count violations
           VIOLATIONS=$(echo "$OUTPUT" | grep "violation(s) found" | awk '{print $2}')
-          echo "violations=$VIOLATIONS" >> $GITHUB_OUTPUT
+          echo "violations=$VIOLATIONS" >> "$GITHUB_OUTPUT"
           
           # Determine status
           if echo "$OUTPUT" | grep -q "✗.*violation"; then
-            echo "status=fail" >> $GITHUB_OUTPUT
+            echo "status=fail" >> "$GITHUB_OUTPUT"
           else
-            echo "status=pass" >> $GITHUB_OUTPUT
+            echo "status=pass" >> "$GITHUB_OUTPUT"
           fi
           
           # Save full output for comment
-          echo "output<<EOF" >> $GITHUB_OUTPUT
-          echo "$OUTPUT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "output<<EOF"
+            echo "$OUTPUT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Fetch Baseline (PR only)
         if: github.event_name == 'pull_request'
@@ -59,10 +61,10 @@ jobs:
             python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('content','').strip())" 2>/dev/null || echo "0")
           
           if [ "$BASELINE" = "0" ] || [ -z "$BASELINE" ]; then
-            echo "baseline=0" >> $GITHUB_OUTPUT
+            echo "baseline=0" >> "$GITHUB_OUTPUT"
             echo "No baseline found"
           else
-            echo "baseline=$BASELINE" >> $GITHUB_OUTPUT
+            echo "baseline=$BASELINE" >> "$GITHUB_OUTPUT"
             echo "Baseline: $BASELINE"
           fi
 
@@ -74,16 +76,16 @@ jobs:
           BASELINE=${{ steps.baseline.outputs.baseline }}
           
           if [ "$BASELINE" = "0" ] || [ -z "$BASELINE" ]; then
-            echo "delta=unknown" >> $GITHUB_OUTPUT
-            echo "degraded=false" >> $GITHUB_OUTPUT
+            echo "delta=unknown" >> "$GITHUB_OUTPUT"
+            echo "degraded=false" >> "$GITHUB_OUTPUT"
           else
             DELTA=$((CURRENT - BASELINE))
-            echo "delta=$DELTA" >> $GITHUB_OUTPUT
+            echo "delta=$DELTA" >> "$GITHUB_OUTPUT"
             
-            if [ $DELTA -lt -100 ]; then
-              echo "degraded=true" >> $GITHUB_OUTPUT
+            if [ "$DELTA" -lt -100 ]; then
+              echo "degraded=true" >> "$GITHUB_OUTPUT"
             else
-              echo "degraded=false" >> $GITHUB_OUTPUT
+              echo "degraded=false" >> "$GITHUB_OUTPUT"
             fi
           fi
 
@@ -133,33 +135,33 @@ jobs:
           
           COMMENT="## Sentrux Quality Gate $STATUS_ICON
 
-**Quality Signal:** $QUALITY / 10000
-**Violations:** $VIOLATIONS
-**Status:** $STATUS
-"
+          **Quality Signal:** $QUALITY / 10000
+          **Violations:** $VIOLATIONS
+          **Status:** $STATUS
+          "
           
           if [ "$DELTA" != "unknown" ]; then
             COMMENT="${COMMENT}**Delta:** $DELTA_ICON $DELTA points (baseline: $BASELINE)
-"
+          "
             if [ "$DEGRADED" = "true" ]; then
               COMMENT="${COMMENT}
-🔴 **Quality degraded by more than 100 points!**
-"
+          🔴 **Quality degraded by more than 100 points!**
+          "
             fi
           else
             COMMENT="${COMMENT}**Delta:** No baseline available
-"
+          "
           fi
           
           COMMENT="${COMMENT}
-<details>
-<summary>Full Report</summary>
+          <details>
+          <summary>Full Report</summary>
 
-\`\`\`
-${{ steps.sentrux.outputs.output }}
-\`\`\`
-</details>
-"
+          \`\`\`
+          ${{ steps.sentrux.outputs.output }}
+          \`\`\`
+          </details>
+          "
           
           # Post comment
           curl -s -X POST -H "Authorization: token $GITEA_TOKEN" \
