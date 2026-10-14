@@ -92,11 +92,13 @@ Configure the extension through VS Code settings:
 ### Server Configuration
 - `terraphimIt.serverUrl`: Main Terraphim server URL (default: `http://localhost:8000`)
 - `terraphimIt.atomicServerUrl`: Atomic server URL for knowledge base (default: `https://common.terraphim.io/drive/h6grD0ID`)
-- `terraphimIt.enableLocalServer`: Use local server instead of remote (default: `true`)
+- `terraphimIt.enableLocalServer`: Allow localhost and loopback URLs (default: `true`). When `false`, set `serverUrl` to your remote Terraphim server. Local URLs are refused with a configuration warning; the extension never selects a remote service automatically. This checks the configured URL, not DNS resolution.
 
 ### Role and Agent Configuration
 - `terraphimIt.selectedRole`: Default role for searches and autocomplete (default: `Terraphim Engineer`)
 - `terraphimIt.agent`: Agent string for authentication (optional)
+
+Endpoint and agent changes take effect on the next Atomic request, including an already enabled autocomplete provider. Clearing `agent` selects anonymous access. Server endpoint and role changes invalidate cached completion results.
 
 ## Getting Started
 
@@ -136,8 +138,8 @@ Uses atomic store integration:
 ### Autocomplete Usage
 1. Enable your preferred autocomplete provider
 2. Start typing in any file
-3. Autocomplete suggestions will appear as you type
-4. Suggestions are triggered after 2+ characters and on space
+3. For **Terraphim AI Autocomplete**, type a space after your text. It offers terms from the Atomic knowledge base; typing two characters alone does not trigger Atomic results. Manual completion also requires a trailing space.
+4. For **Terraphim Server Autocomplete**, type at least two characters and invoke completion, or type a space after that word. The configured server supplies the suggestions.
 
 ### Server Health Check
 Use the health check command to verify:
@@ -188,7 +190,7 @@ The editor importer verifies published hashes. The existing link wrapper reuses 
 
 **Autocomplete not working:**
 - Ensure you've activated an autocomplete provider
-- Check that you're typing at least 2 characters
+- For Atomic autocomplete, place the cursor after a space. For server autocomplete, use a word with at least two characters.
 - Verify server connectivity if using server-based providers
 
 **Authentication errors:**

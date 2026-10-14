@@ -35,7 +35,9 @@ class TransportTests(unittest.TestCase):
                     '--graph', str(local_graph), '--corpus', str(corpus)])
                 async with stdio_client(params) as streams:
                     async with ClientSession(*streams) as session:
-                        await session.initialize()
+                        initialized = await session.initialize()
+                        self.assertEqual(initialized.serverInfo.version, json.loads((HERE / 'integration.json').read_text())['version'])
+                        receipt['serverVersion'] = initialized.serverInfo.version
                         tools = await session.list_tools()
                         self.assertEqual([t.name for t in tools.tools], ['terraphim_retrieve'])
                         result = await session.call_tool('terraphim_retrieve', {'query': 'Concern'})

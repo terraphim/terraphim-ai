@@ -24,6 +24,9 @@ exports.run = async () => {
   try {
     const extension = vscode.extensions.getExtension('applied-knowledge-systems.terraphim-it');
     assert.ok(extension); await extension.activate();
+    await require('./nativeConfiguration.cjs').checkConfiguration(extension, output);
+    await vscode.commands.executeCommand('notifications.clearAll');
+    report.checks.push('packaged extension passes real native agent, endpoint, role and local-server configuration regressions; isolated settings restored');
     report.extensionPath = extension.extensionPath;
     report.assetLockSha256 = digest(await fs.readFile(path.join(extension.extensionPath,'media/editor-build.json')));
     const {replaceLinks} = require(path.join(extension.extensionPath,'out/helpers/linkReplacement.js'));

@@ -5,6 +5,7 @@ exports.serverConnection = exports.TerraphimServerConnection = void 0;
 const vscode = require("vscode");
 class TerraphimServerConnection {
     constructor() {
+        this.configurationRevision = 0;
         this.config = this.loadConfiguration();
     }
     loadConfiguration() {
@@ -17,10 +18,28 @@ class TerraphimServerConnection {
         };
     }
     updateConfiguration() {
-        this.config = this.loadConfiguration();
+        const next = this.loadConfiguration();
+        if (JSON.stringify(next) !== JSON.stringify(this.config)) {
+            this.config = next;
+            this.configurationRevision += 1;
+        }
+    }
+    getConfigurationRevision() {
+        return this.configurationRevision;
     }
     getServerUrl() {
-        return this.config.serverUrl;
+        const url = new URL(this.config.serverUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+            throw new Error('Set terraphimIt.serverUrl to an HTTP or HTTPS Terraphim server.');
+        }
+        const hostname = url.hostname.toLowerCase();
+        const loopback = hostname === 'localhost' || hostname.endsWith('.localhost') ||
+            hostname.startsWith('127.') || ['0.0.0.0', '[::]', '[::1]'].includes(hostname) ||
+            /^\[::ffff:(?:7f[0-9a-f]{2}:|0:0\])/.test(hostname);
+        if (!this.config.enableLocalServer && loopback) {
+            throw new Error('Local Terraphim server is disabled. Set terraphimIt.serverUrl to your remote server or enable terraphimIt.enableLocalServer.');
+        }
+        return url.href.replace(/\/$/, '');
     }
     getAtomicServerUrl() {
         return this.config.atomicServerUrl;
@@ -35,11 +54,12 @@ class TerraphimServerConnection {
      * Check if the Terraphim server is healthy
      */
     async healthCheck() {
+        let timeoutId;
         try {
-            const healthUrl = `${this.config.serverUrl}/health`;
+            const healthUrl = `${this.getServerUrl()}/health`;
             console.log(`Checking server health at: ${healthUrl}`);
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
             const response = await fetch(healthUrl, {
                 method: 'GET',
                 signal: controller.signal,
@@ -48,7 +68,6 @@ class TerraphimServerConnection {
                     'Content-Type': 'application/json'
                 }
             });
-            clearTimeout(timeoutId);
             if (response.ok) {
                 const healthData = await response.text();
                 return {
@@ -83,13 +102,16 @@ class TerraphimServerConnection {
                 message: message
             };
         }
+        finally {
+            clearTimeout(timeoutId);
+        }
     }
     /**
      * Search documents using the Terraphim server
      */
     async searchDocuments(query, limit = 10) {
         try {
-            const searchUrl = `${this.config.serverUrl}/documents/search`;
+            const searchUrl = `${this.getServerUrl()}/documents/search`;
             const searchRequest = {
                 search_term: query,
                 skip: 0,
@@ -99,6 +121,7 @@ class TerraphimServerConnection {
             console.log(`Searching documents at: ${searchUrl}`, searchRequest);
             const response = await fetch(searchUrl, {
                 method: 'POST',
+                signal: AbortSignal.timeout(5000),
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
@@ -125,10 +148,11 @@ class TerraphimServerConnection {
      */
     async getAutocompleteSuggestions(query, limit = 10) {
         try {
-            const autocompleteUrl = `${this.config.serverUrl}/autocomplete/${encodeURIComponent(this.config.selectedRole)}/${encodeURIComponent(query)}`;
+            const autocompleteUrl = `${this.getServerUrl()}/autocomplete/${encodeURIComponent(this.config.selectedRole)}/${encodeURIComponent(query)}`;
             console.log(`Getting autocomplete suggestions at: ${autocompleteUrl}`);
             const response = await fetch(autocompleteUrl, {
                 method: 'GET',
+                signal: AbortSignal.timeout(5000),
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
