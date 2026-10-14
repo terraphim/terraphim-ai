@@ -6,6 +6,14 @@ The view bundles the released terraphim-editor v0.1.0-rc.2 UI, WASM and source-p
 
 **Export Document Knowledge Graph** waits for the current edit to be acknowledged, reads that exact source, and uses the shared Rust `synonyms::` parser/types to create the portable graph. It refuses malformed annotations or ambiguous concepts. The document and active role are unchanged. Save, undo, redo and reopen determine which aliases exist in the export.
 
+## Companion command-line tools
+
+The [packaged README](https://github.com/terraphim/terraphim-ai/blob/main/vs-code-terraphim-it/README.md#use-the-graph-with-terraphim-grep-and-terraphim-agent) includes runnable examples for both separately installed CLIs: `terraphim-grep` consumes the exported synonym graph, and `terraphim-agent` captures authored text and reads the saved memory item by its returned ID. The commands are checked against [clients v1.21.20](https://github.com/terraphim/terraphim-clients/releases/tag/v1.21.20). Neither executable is bundled with the extension, and agent memory capture does not import a graph or configure a role.
+
+The same packaged README supplies the Microsoft Marketplace and Open VSX listing content, including compatible Cursor installs. README changes reach those listings with the next qualified VSIX release; updating repository documentation alone does not update an existing immutable package. The Continue integration ships its own [README and direct CLI examples](https://github.com/terraphim/terraphim-ai/tree/main/integrations/continue#use-both-clis-directly) through its separate release workflow.
+
+## Building and publication
+
 A fresh checkout runs `npm ci --ignore-scripts`, `npm run editor:fetch`, `npm run compile`, `npm run lint`, `npm run test:assets`, `npm run test:host`, `npm run test:export`, then `npm run package:vsix`. Release inputs are pinned by URL/commit/SHA-256 in `editor-release.json`; every imported file is checked. Runtime dependencies are included. Generated binaries stay out of Git.
 
 CI builds one VSIX and tests that package in native Linux, macOS and Windows VS Code profiles. Tag release and marketplace workflows promote the same verified package. Publisher identity setup is documented in `docs/plans/design-extension-marketplaces.md` in the repository.

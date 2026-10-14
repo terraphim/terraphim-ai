@@ -1,0 +1,19 @@
+{
+  "action": "show",
+  "id": "a95a88a6-4d17-4359-a7be-5231f26ea724",
+  "lesson": null,
+  "memory_item": {
+    "access_count": 0,
+    "associations": {},
+    "content": "Risk requires a Decision: approve a second supplier as the mitigation.",
+    "created_at": "2026-10-14T18:36:58.842432Z",
+    "id": "a95a88a6-4d17-4359-a7be-5231f26ea724",
+    "importance": "Medium",
+    "item_type": "Experience",
+    "last_accessed": null,
+    "tags": [
+      "provenance:public-project-brief"
+    ]
+  },
+  "status": "ok"
+}

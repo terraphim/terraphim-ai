@@ -1,0 +1,13 @@
+test_project_install_preserves_existing_configuration (test_install.InstallTests.test_project_install_preserves_existing_configuration) ... ok
+test_symlink_directory_refused (test_install.InstallTests.test_symlink_directory_refused) ... ok
+test_complete_allowlisted_bundle_and_refuse_overwrite (test_package.PackageTests.test_complete_allowlisted_bundle_and_refuse_overwrite) ... ok
+test_actual_git_tag_gate_and_moved_tag_refusal (test_source.SourceTests.test_actual_git_tag_gate_and_moved_tag_refusal) ... ok
+test_lightweight_and_annotated_tag_identity (test_source.SourceTests.test_lightweight_and_annotated_tag_identity) ... ok
+test_real_retrieval_and_refusals (test_transport.TransportTests.test_real_retrieval_and_refusals) ... 2026-10-14T18:39:03.186811Z  WARN fff_search::file_picker: No git repository found for path: /var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/tmp28vhpcy7/corpus
+Tool 'terraphim_answer' not listed, no validation will be performed
+ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 2.325s
+
+OK

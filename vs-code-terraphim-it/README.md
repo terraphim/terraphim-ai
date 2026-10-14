@@ -6,14 +6,61 @@ Keep alternatives beside your writing, swap wording, and share their knowledge g
 2. Select a word such as **Risk**, add **Concern** as an alternative, and choose which wording is active.
 3. Save the document. VS Code owns persistence and undo/redo; the annotation block preserves the alternatives.
 4. Run **Terraphim: Export Document Knowledge Graph**, or use the editor's **Share with search** dialog. Save the JSON and export clean Markdown into a corpus folder.
-5. Search it with a released CLI:
+5. Use the exported graph with `terraphim-grep`, then preserve a useful decision with `terraphim-agent` as shown below.
+
+Exporting a graph is explicit: it does not automatically modify a shared role or upload your document.
+
+## Use the graph with terraphim-grep and terraphim-agent
+
+Install the two CLIs separately from the [Terraphim clients v1.21.20 release](https://github.com/terraphim/terraphim-clients/releases/tag/v1.21.20). Choose the archives for your operating system, verify them against that release's `SHA256SUMS`, extract them and put the executables on your `PATH`. The extension bundles its editor engine; it does not install either CLI. These examples were checked with both CLIs at **1.21.20** on macOS ARM64. Run the following in a terminal; the memory readback also uses Python 3.
 
 ```sh
-terraphim-grep concern --paths ./briefs --thesaurus ./brief.knowledge-graph.json --search-only --json
-terraphim-grep concern --paths ./briefs --thesaurus ./brief.knowledge-graph.json --answer --json
+terraphim-grep --version
+terraphim-agent --version
 ```
 
-The first command retrieves matching sources. `--answer` additionally uses your configured synthesis provider. Exporting a graph is explicit: it does not automatically modify a shared role or upload your document.
+### Search by an alternative
+
+For a small example, write `Risk: supplier delays require a backup plan.` in the editor, add **Concern** as an alternative, and keep **Risk** active. Export the graph as `brief.knowledge-graph.json` and clean Markdown as `briefs/decision.md`. Keep only the clean brief in `briefs`, so a hit for Concern comes from the synonym graph rather than annotation text.
+
+The concept can also be written as a knowledge-base note using Logseq-compatible `synonyms::` syntax:
+
+```markdown
+# Risk
+synonyms:: Concern
+```
+
+The editor export is the compiled JSON representation used by the search command.
+
+```sh
+terraphim-grep concern --search-only --haystack all \
+  --paths ./briefs --thesaurus ./brief.knowledge-graph.json --json -n 3
+```
+
+The returned `chunks` include the Risk sentence, while `answer` is `null`. See the [editor → synonym → search walkthrough](https://terraphim.ai/how-tos/synonym-search/) for the video and downloadable examples.
+
+For a corpus with several relevant passages, request synthesis explicitly:
+
+```sh
+terraphim-grep concern --answer --haystack all \
+  --paths ./briefs --thesaurus ./brief.knowledge-graph.json --json -n 3
+```
+
+`--answer` uses your configured synthesis provider and can send retrieved context to it. Inspect the returned passages and citations alongside the answer. A small or unmatched corpus can return no generated answer.
+
+### Save a decision in agent memory
+
+`terraphim-agent` can retain authored text for later readback. This command writes to the current user's OS-local memory store (independent of the working directory); it does not import the editor's graph or configure a retrieval role.
+
+```sh
+terraphim-agent --format json memory capture \
+  --content 'Risk requires a Decision: approve a second supplier as the mitigation.' \
+  --provenance-tag 'public-project-brief' > captured-memory.json
+memory_id="$(python3 -c 'import json; print(json.load(open("captured-memory.json"))["memory_id"])')"
+terraphim-agent memory show "$memory_id" --json
+```
+
+The readback's `memory_item.content` contains the authored sentence and its tags include `provenance:public-project-brief`. Use the returned ID, rather than copying an ID from an example. The [agent memory walkthrough](https://terraphim.ai/posts/cold-start-tax-agentic-memory/) explains retrieval and role setup; the [hooks walkthrough](https://terraphim.ai/posts/native-hook-support/) covers reviewed command corrections and actual tool execution.
 
 This preview targets desktop VS Code 1.126+. Editing and KG export run locally using bundled Terraphim WASM. Suggestions from the built-in graph are synonyms, not generated LLM rewrites. [Integration details and current acceptance scope](README-alternative-control.md).
 
@@ -53,7 +100,7 @@ Configure the extension through VS Code settings:
 
 ## Getting Started
 
-1. **Install the preview VSIX** from a qualified build; marketplace publication is a separate release gate
+1. **Install Terraphim It** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=applied-knowledge-systems.terraphim-it) or [Open VSX](https://open-vsx.org/extension/applied-knowledge-systems/terraphim-it). Compatible Cursor installations use the Open VSX package.
 2. **Configure your server** settings in VS Code preferences
 3. **Start your Terraphim server** (if using local server):
    ```bash

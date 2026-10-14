@@ -1,0 +1,16 @@
+{
+  "changedTest": "integrations/continue/test_transport.py",
+  "current": {
+    "critical": 2,
+    "warning": 5,
+    "exitCode": 1
+  },
+  "base": {
+    "critical": 2,
+    "warning": 3,
+    "exitCode": 1
+  },
+  "review": "The two taint findings identify the pre-existing intentionally selected released test executable from TERRAPHIM_GREP_BINARY, passed as argv without shell. Existing unbounded baseline subprocess is unchanged. Two new warnings identify json.loads calls on test fixture/actual MCP output: malformed JSON must fail this assertion-based integration test, not be swallowed. No production runtime changed.",
+  "actionlint": "PASS .github/workflows/continue-integration.yml",
+  "diffCheck": "PASS"
+}

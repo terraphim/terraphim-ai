@@ -1,0 +1,13 @@
+{
+  "chunks": [],
+  "answer": null,
+  "concepts": [],
+  "sufficiency": "RlmInsufficient",
+  "sufficiency_explanation": "No chunks or knowledge-graph concepts matched the query; there is nothing to synthesise an answer from.",
+  "stats": {
+    "search_latency_ms": 3,
+    "rlm_latency_ms": null,
+    "chunks_returned": 0,
+    "kg_hits": 0
+  }
+}
