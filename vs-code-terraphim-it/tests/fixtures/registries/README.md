@@ -1,0 +1,1 @@
+Public anonymous exact-ID catalog responses captured on 14 October 2026. Microsoft offered 0.1.3; Cursor and Windsurf offered 0.1.0. These are parser fixtures, not mocked services or evidence of a later publication. Live CI queries every registry again.

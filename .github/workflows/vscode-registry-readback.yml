@@ -1,0 +1,50 @@
+name: VS Code registry readback
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing immutable VS Code release tag (no rebuild or publication)
+        type: string
+        required: true
+        default: terraphim_vscode-v0.1.3
+      registry:
+        description: Catalog to verify; all runs four independent checks
+        type: choice
+        required: true
+        default: all
+        options: [all, marketplace, openvsx, cursor, windsurf]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        registry: [marketplace, openvsx, cursor, windsurf]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Download and verify frozen released bytes
+        if: inputs.registry == 'all' || inputs.registry == matrix.registry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: python3 vs-code-terraphim-it/scripts/download_registry_release.py --tag "$RELEASE_TAG" --directory registry-input
+      - name: Verify exact catalog entry and actual package download
+        if: inputs.registry == 'all' || inputs.registry == matrix.registry
+        env:
+          REGISTRY: ${{ matrix.registry }}
+        run: python3 vs-code-terraphim-it/scripts/verify_registry.py --registry "$REGISTRY" --vsix registry-input/terraphim-it.vsix --manifest registry-input/release-manifest.json --receipt registry-result.json --attempts 1 --delay 0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always() && (inputs.registry == 'all' || inputs.registry == matrix.registry)
+        with:
+          name: registry-${{ matrix.registry }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            registry-result.json
+            registry-input/release-readback.json
+          if-no-files-found: error

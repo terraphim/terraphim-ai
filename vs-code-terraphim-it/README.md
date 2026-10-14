@@ -102,7 +102,7 @@ Endpoint and agent changes take effect on the next Atomic request, including an 
 
 ## Getting Started
 
-1. **Install Terraphim It** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=applied-knowledge-systems.terraphim-it) or [Open VSX](https://open-vsx.org/extension/applied-knowledge-systems/terraphim-it). Compatible Cursor installations use the Open VSX package.
+1. **Install Terraphim It** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=applied-knowledge-systems.terraphim-it) or [Open VSX](https://open-vsx.org/extension/applied-knowledge-systems/terraphim-it). Cursor and Windsurf discover Open VSX packages through their own catalogs; availability and indexing can differ. The [GitHub release](https://github.com/terraphim/terraphim-ai/releases?q=terraphim_vscode) also provides the exact VSIX for a manual install.
 2. **Configure your server** settings in VS Code preferences
 3. **Start your Terraphim server** (if using local server):
    ```bash
@@ -218,3 +218,26 @@ For issues and questions:
 ## License
 
 Apache License 2.0 — see LICENSE.txt.
+
+## Release and catalog verification
+
+Tagged releases build one VSIX, qualify that exact package in native Linux, macOS
+and Windows hosts, and publish those frozen bytes. Microsoft publication uses
+GitHub-to-Azure federation; Open VSX uses its trusted-publishing OIDC exchange.
+The Open VSX release gate also requires its exact-version metadata to attest
+`publishedWithTrustedPublishing: true`; a matching manually published package
+cannot substitute for that proof. Open VSX publication stays disabled until namespace ownership and its trusted
+publisher are configured. There is no PAT bootstrap or fallback.
+
+CI requires an exact prerelease entry in the selected catalog **and** compares
+every downloaded `extension/*` file with the qualified VSIX. Cursor and Windsurf
+have independent catalog/download receipts after Open VSX publication; an Open
+VSX upload alone does not establish their availability. These receipts verify
+catalog/package identity, not native functionality in those two hosts.
+
+The read-only **VS Code registry readback** workflow can verify an existing
+immutable release against any of the four catalogs. It downloads the published
+VSIX, checks the release asset digests, checksums, qualification manifest and tag
+commit, and performs fresh anonymous catalog/download checks. It never rebuilds,
+reuploads or changes a release. A missing version fails the selected check and
+retains its failure receipt. Later indexing can be checked by rerunning readback.

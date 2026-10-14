@@ -161,23 +161,51 @@ jobs:
         run: npm exec -- vsce publish --azure-credential --packagePath terraphim-it.vsix --pre-release
       - name: Publish exact VSIX to Open VSX with trusted publishing
         continue-on-error: true
-        if: matrix.registry == 'open-vsx' && vars.OVSX_BOOTSTRAP_FIRST_PUBLISH != 'true'
+        if: matrix.registry == 'open-vsx'
         run: python3 scripts/publish_openvsx.py --vsix terraphim-it.vsix --manifest release-manifest.json
-      - name: Bootstrap the first Open VSX version explicitly
-        continue-on-error: true
-        if: matrix.registry == 'open-vsx' && vars.OVSX_BOOTSTRAP_FIRST_PUBLISH == 'true'
-        env:
-          OVSX_BOOTSTRAP_PAT: ${{ secrets.OVSX_BOOTSTRAP_PAT }}
-        # Open VSX cannot register a trusted publisher before an active version
-        # exists. Only this environment setting enables the one-time bootstrap;
-        # a failed OIDC attempt never falls back to a stored token.
-        run: python3 scripts/publish_openvsx.py --bootstrap --vsix terraphim-it.vsix --manifest release-manifest.json
       - name: Verify exact published registry payload
         env:
           REGISTRY: ${{ matrix.registry }}
         run: |
-          if [[ "$REGISTRY" == visual-studio-marketplace ]]; then registry=marketplace; else registry=openvsx; fi
-          python3 scripts/verify_registry.py --registry "$registry" --vsix terraphim-it.vsix --manifest release-manifest.json --receipt registry.json
+          if [[ "$REGISTRY" == visual-studio-marketplace ]]; then
+            registry=marketplace; extra=()
+          else
+            registry=openvsx; extra=(--require-trusted-publishing)
+          fi
+          python3 scripts/verify_registry.py --registry "$registry" --vsix terraphim-it.vsix --manifest release-manifest.json --receipt registry.json --attempts 20 --delay 30 "${extra[@]}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: vscode-registry-${{ matrix.registry }}-${{ github.sha }}
+          path: vs-code-terraphim-it/registry.json
+          if-no-files-found: error
+
+  downstream-catalogs:
+    needs: [release, marketplace-plan, marketplace]
+    if: ${{ always() && needs.release.result == 'success' && contains(needs.marketplace-plan.outputs.registries, 'open-vsx') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        registry: [cursor, windsurf]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: vs-code-terraphim-it
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: vscode-package-${{ github.sha }}
+          path: vs-code-terraphim-it
+      - name: Verify downstream catalog and its actual download separately
+        env:
+          REGISTRY: ${{ matrix.registry }}
+        run: python3 scripts/verify_registry.py --registry "$REGISTRY" --vsix terraphim-it.vsix --manifest release-manifest.json --receipt registry.json --attempts 20 --delay 30
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

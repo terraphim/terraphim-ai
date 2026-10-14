@@ -1,11 +1,12 @@
 """Registry comparison uses real ZIP payloads; no network substitutes or remote writes."""
+import copy
 import json
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
 import zipfile
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import verify_registry as registry
@@ -13,6 +14,65 @@ import verify_vsix_test
 
 
 class RegistryTest(unittest.TestCase):
+    def fixture(self, registry):
+        name = "microsoft" if registry == "marketplace" else registry
+        return json.loads((Path(__file__).parent / "fixtures/registries" / (name + ".json")).read_text())
+
+    def test_real_catalog_responses_bind_exact_version_channel_and_download(self):
+        for name in ["marketplace", "cursor", "windsurf"]:
+            manifest = {**verify_vsix_test.VsixTest.manifest, "version": "0.1.3" if name == "marketplace" else "0.1.0"}
+            selected = registry.catalog_version(self.fixture(name), manifest, name)
+            url = registry.catalog_download(selected, manifest, name)
+            self.assertIn("/" + manifest["version"] + "/", url)
+        # A directly available 0.1.3 asset cannot qualify an older indexed catalog.
+        for name in ["cursor", "windsurf"]:
+            with self.assertRaises(registry.NotIndexed):
+                registry.catalog_version(self.fixture(name), {**manifest, "version": "0.1.3"}, name)
+
+    def test_catalog_rejects_ambiguous_channel_platform_and_validation(self):
+        original = self.fixture("marketplace")
+        manifest = {**verify_vsix_test.VsixTest.manifest, "version": "0.1.3"}
+        for mutation in ["duplicate-extension", "duplicate-version", "stable", "platform", "private", "unvalidated"]:
+            data = copy.deepcopy(original)
+            extension = data["results"][0]["extensions"][0]
+            version = extension["versions"][0]
+            if mutation == "duplicate-extension":
+                data["results"][0]["extensions"].append(copy.deepcopy(extension))
+            elif mutation == "duplicate-version":
+                extension["versions"].append(copy.deepcopy(version))
+            elif mutation == "stable":
+                version["properties"] = [{"key": registry.PRERELEASE_PROPERTY, "value": "false"}]
+            elif mutation == "platform":
+                version["targetPlatform"] = "linux-x64"
+            elif mutation == "private":
+                extension["flags"] = "validated"
+            else:
+                version["flags"] = ""
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                registry.catalog_version(data, manifest, "marketplace")
+
+    def test_openvsx_oidc_attestation_cannot_be_replaced_by_matching_bytes(self):
+        registry.require_trusted_publication({"publishedWithTrustedPublishing": True})
+        for value in [False, None, "true", 1]:
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "attest trusted publishing"):
+                registry.require_trusted_publication({"publishedWithTrustedPublishing": value})
+        with self.assertRaises(ValueError):
+            registry.require_trusted_publication({})
+
+    def test_catalog_asset_url_and_duplicates_fail_closed(self):
+        for name in ["marketplace", "cursor", "windsurf"]:
+            manifest = {**verify_vsix_test.VsixTest.manifest, "version": "0.1.3" if name == "marketplace" else "0.1.0"}
+            selected = registry.catalog_version(self.fixture(name), manifest, name)
+            original = registry.catalog_download(selected, manifest, name)
+            for url in [original + "?token=no", original.replace("https:", "http:"),
+                        original.replace("/" + manifest["version"] + "/", "/9.9.9/"),
+                        "https://attacker.invalid/package.vsix", original.replace("https://", "https://user@")]:
+                changed = {**selected, "files": [{"assetType": registry.VSIX_ASSET, "source": url}]}
+                with self.subTest(name=name, url=url), self.assertRaises(ValueError):
+                    registry.catalog_download(changed, manifest, name)
+            with self.assertRaises(ValueError):
+                registry.catalog_download({**selected, "files": selected["files"] * 2}, manifest, name)
+
     def test_outer_signing_and_zip_compression_can_differ_with_exact_payload(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -95,7 +155,7 @@ class RegistryTest(unittest.TestCase):
             result = subprocess.run([sys.executable, str(Path(registry.__file__)),
                                      "--registry", "marketplace", "--vsix", str(original),
                                      "--manifest", str(manifest), "--receipt", str(receipt)],
-                                    text=True, capture_output=True)
+                                    text=True, capture_output=True, timeout=10, check=False)
             self.assertEqual(result.returncode, 1)
             self.assertEqual(json.loads(receipt.read_text())["status"], "FAILED")
             self.assertIn("clean source", result.stderr)
