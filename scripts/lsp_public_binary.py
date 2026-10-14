@@ -428,9 +428,11 @@ def bundle(folder, qualification, expected, write=False):
             require(protocol == {'status': 'NOT_RUN_CROSS_TARGET'}, 'Unexecuted target has misleading protocol evidence')
         commands = record.get('commands')
         require(isinstance(commands, list) and commands, 'Missing executed build commands')
+        allowed_logs = {'universal.log'} if target.startswith('universal') else {
+            'fetch-' + target + '.log', 'build-' + target + '.log'}
         for command_record in commands:
             require(isinstance(command_record, dict) and isinstance(command_record.get('log'), str)
-                    and re.fullmatch(r'[a-z0-9-]+\.log', command_record['log']), 'Invalid build log name')
+                    and command_record['log'] in allowed_logs, 'Invalid build log name')
             log = folder / 'logs' / target / command_record['log']
             require(command_record.get('exitCode') == 0 and log.is_file() and not log.is_symlink()
                     and publisher.digest(log) == command_record.get('sha256'), 'Build log differs')
