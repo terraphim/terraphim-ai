@@ -6,6 +6,7 @@ import hmac
 import io
 import json
 from pathlib import Path, PurePosixPath
+import re
 import tarfile
 import tempfile
 import urllib.request
@@ -13,6 +14,8 @@ import urllib.request
 from editor_assets import ROOT, import_assets, verify
 
 LOCK = ROOT / "editor-release.json"
+PUBLIC_REPOSITORY = "https://github.com/terraphim/terraphim-editor"
+PROVENANCE_FIELDS = ("sourceRepository", "cargoLockSha256")
 
 
 def checked(data, digest):
@@ -21,9 +24,37 @@ def checked(data, digest):
     return data
 
 
+def release_manifest(raw, source):
+    """Bind archive metadata to the reviewed source pin before writing assets."""
+    manifest = json.loads(raw)
+    if not isinstance(manifest, dict) or not isinstance(source, dict):
+        raise ValueError("Invalid released editor manifest or source pin")
+    head = source.get("sourceCommit")
+    assets = manifest.get("assets")
+    if (type(manifest.get("schema")) is not int or manifest["schema"] != 1
+            or not isinstance(head, str) or re.fullmatch(r"[0-9a-f]{40}", head) is None
+            or manifest.get("sourceHead") != head
+            or not isinstance(assets, dict) or not assets
+            or any(not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+                   for digest in assets.values())):
+        raise ValueError("Released editor manifest identity or asset digests mismatch")
+    # Historical RC1 has no public-dependency receipt. A newer manifest must
+    # carry both fields and match an explicit source pin; do not silently drop
+    # the Cargo lock identity or relabel older bytes as a public-crates build.
+    if any(key in manifest or key in source for key in PROVENANCE_FIELDS):
+        lock = manifest.get("cargoLockSha256")
+        if (manifest.get("sourceRepository") != PUBLIC_REPOSITORY
+                or source.get("sourceRepository") != PUBLIC_REPOSITORY
+                or not isinstance(lock, str) or re.fullmatch(r"[0-9a-f]{64}", lock) is None
+                or source.get("cargoLockSha256") != lock):
+            raise ValueError("Released editor public dependency provenance mismatch")
+    return manifest
+
+
 def materialize(archive, manifest, bridge, destination, source):
     """Validate the entire archive before writing only regular admitted files."""
-    assets = json.loads(manifest)["assets"]
+    metadata = release_manifest(manifest, source)
+    assets = metadata["assets"]
     files = {}
     total = 0
     with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as bundle:
@@ -53,6 +84,9 @@ def materialize(archive, manifest, bridge, destination, source):
             "assets": {name: hashlib.sha256(data).hexdigest()
                        for name, data in sorted(files.items())},
             "qualification": "Released editor assets; host acceptance is separate"}
+    for key in PROVENANCE_FIELDS:
+        if key in metadata:
+            lock[key] = metadata[key]
     (destination / "host-assets.json").write_text(json.dumps(lock, indent=2) + "\n")
     verify(destination)
 
