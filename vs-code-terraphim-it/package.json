@@ -114,7 +114,8 @@
     "editor:fetch": "python3 scripts/released_editor.py",
     "package:vsix": "vsce package --pre-release --out terraphim-it.vsix",
     "test:native": "node tests/runPackaged.cjs",
-    "test:legacy": "node --test tests/legacyLinks.test.cjs"
+    "test:legacy": "node --test tests/legacyLinks.test.cjs",
+    "test:shortcut-ui": "node tests/nativeStashShortcut.cjs"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",
@@ -125,7 +126,8 @@
     "typescript": "^5.6",
     "@vscode/vsce": "4.0.0",
     "ovsx": "1.2.0",
-    "@vscode/test-electron": "3.1.0"
+    "@vscode/test-electron": "3.1.0",
+    "playwright-core": "1.62.1"
   },
   "dependencies": {
     "@tomic/cli": "0.40.0",
