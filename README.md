@@ -607,9 +607,8 @@ sudo dpkg -i terraphim-ai-desktop_*.deb
 ```
 
 #### Docker
-```bash
-docker run ghcr.io/terraphim/terraphim-server:latest
-```
+
+The public server image is `ghcr.io/terraphim/terraphim-ai:latest`. It needs an explicit role configuration and the dependencies for your haystacks. See [Released server qualification](docs/vscode-released-server-qualification.md) for the exact tested image, configuration, runtime dependencies and released VS Code extension results.
 
 #### Direct Download
 Download pre-built binaries from [GitHub Releases](https://github.com/terraphim/terraphim-ai/releases).
