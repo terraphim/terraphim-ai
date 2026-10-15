@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Keep the handled Overflow stash shortcut inside Alternative Control, so it does not also open Extensions and move keyboard focus. Unhandled shortcuts retain native VS Code behavior.
+
 ## 0.1.4 (preview)
 
 - Require the exact indexed prerelease and downloaded package payload before CI reports marketplace availability.

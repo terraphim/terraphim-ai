@@ -12,6 +12,12 @@
   let loading;
   let adopting = false;
   let startupSync;
+  // VS Code forwards webview keydowns even after preventDefault. Keep the
+  // consumed stash shortcut local; unhandled keys still reach the workbench.
+  container.addEventListener('keydown', event => {
+    if (event.defaultPrevented && !event.isComposing && (event.ctrlKey || event.metaKey)
+        && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'x') event.stopPropagation();
+  });
   const serialise = () => {
     const md = editor.markdownEditor;
     const api = md.documentApi();
