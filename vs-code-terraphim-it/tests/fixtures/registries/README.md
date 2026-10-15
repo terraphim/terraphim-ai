@@ -1,1 +1,7 @@
 Public anonymous exact-ID catalog responses captured on 14 October 2026. Microsoft offered 0.1.3; Cursor and Windsurf offered 0.1.0. These are parser fixtures, not mocked services or evidence of a later publication. Live CI queries every registry again.
+
+`cursor-latest-prerelease-014.json` is the anonymous 15 October 2026 response to the same exact-ID query with flags `65682` (files, properties, asset URI and Microsoft's documented `IncludeLatestPrereleaseAndStableVersionOnly`). It offers prerelease 0.1.4 while the original flags-147 query still returned 0.1.0. The verifier retains both responses and still requires the exact qualified version and downloaded payload.
+
+The Windsurf latest-resource parser test reuses the full extension object from the captured Windsurf catalog response. It tests the official client's `IRawGalleryExtension` envelope and exact-version refusal; it does not claim a successful live latest-resource request. CI performs that request separately.
+
+Primary contracts: [Microsoft query flags](https://learn.microsoft.com/en-us/javascript/api/azure-devops-extension-api/extensionqueryflags?view=azdevops-ext-latest), and [`getLatestRawGalleryExtension` in the official VS Code client](https://github.com/microsoft/vscode/blob/main/src/vs/platform/extensionManagement/common/extensionGalleryService.ts). The released Windsurf/Devin client advertises `<serviceUrl>/{publisher}/{name}/latest`; latest metadata is only a discovery candidate, never permission to accept another version.

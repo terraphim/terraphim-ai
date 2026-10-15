@@ -31,6 +31,14 @@ class NotIndexed(ValueError):
     """The exact qualified version is not yet offered in this catalog."""
 
 
+class CatalogReadError(ValueError):
+    """Retain the bounded public response when discovery cannot complete."""
+
+    def __init__(self, message, evidence):
+        super().__init__(message)
+        self.evidence = evidence
+
+
 IDENTIFIER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
 
@@ -100,11 +108,44 @@ def require_trusted_publication(metadata):
         raise ValueError("Open VSX does not attest trusted publishing for this exact version")
 
 
-def gallery_query(manifest):
-    """Use the same exact-ID query and version/assets flags as Gallery clients."""
+def gallery_query(manifest, *, latest_prerelease=False):
+    """Request version/assets metadata, including the documented latest-channel mode."""
     publisher, name, _ = identity(manifest)
     return {"filters": [{"criteria": [{"filterType": 7, "value": f"{publisher}.{name}"}],
-                         "pageNumber": 1, "pageSize": 100}], "flags": 147}
+                         "pageNumber": 1, "pageSize": 100}],
+            # IncludeLatestPrereleaseAndStableVersionOnly (65536) replaces
+            # IncludeVersions (1); keep files (2), properties (16), asset URI (128).
+            "flags": 65682 if latest_prerelease else 147}
+
+
+def catalog_modes(registry):
+    """Use an official client discovery fallback only after an absent version."""
+    return ("query",) + {"cursor": ("latest-prerelease",),
+                         "windsurf": ("latest-resource",)}.get(registry, ())
+
+
+def catalog_request(registry, manifest, mode):
+    """Describe anonymous supported client routes; latest is discovery, not admission."""
+    if mode not in catalog_modes(registry):
+        raise ValueError("Unsupported catalog discovery mode")
+    publisher, name, _ = identity(manifest)
+    if mode == "latest-resource":
+        # Released Windsurf/Devin's ExtensionLatestVersionUriTemplate:
+        # <serviceUrl>/{publisher}/{name}/latest -> full IRawGalleryExtension.
+        return {"method": "GET", "url": GALLERY_URLS[registry].removesuffix("/extensionquery")
+                + f"/{publisher}/{name}/latest"}
+    return {"method": "POST", "url": GALLERY_URLS[registry],
+            "request": gallery_query(manifest, latest_prerelease=mode == "latest-prerelease")}
+
+
+def catalog_response(raw, mode):
+    """Normalize the official resource envelope before the same exact-version checks."""
+    metadata = json.loads(raw)
+    if mode == "latest-resource":
+        if not isinstance(metadata, dict):
+            raise ValueError("Latest-resource response must be full extension metadata")
+        metadata = {"results": [{"extensions": [metadata]}]}
+    return metadata
 
 
 def catalog_version(metadata, manifest, registry):
@@ -163,28 +204,74 @@ def catalog_download(selected, manifest, registry):
     return url
 
 
-def read_catalog(registry, manifest, root):
-    """Anonymous, bounded read-only POST; never inherit curl config or credentials."""
+def read_catalog(registry, manifest, root, mode="query"):
+    """Bounded anonymous read. HTTP errors, including rate limits, are never retried here."""
+    spec = catalog_request(registry, manifest, mode)
     request = root / "query.json"
     response = root / "catalog.json"
-    request.write_text(json.dumps(gallery_query(manifest)))
-    result = subprocess.run([
-        "curl", "--disable", "--fail", "--silent", "--show-error", "--proto", "=https",
+    headers = root / "headers.txt"
+    evidence = {**spec, "mode": mode, "requestCacheControl": "no-cache",
+                "checkedAt": datetime.now(UTC).isoformat()}
+    command = [
+        "curl", "--disable", "--silent", "--show-error", "--proto", "=https",
         "--connect-timeout", "15", "--max-time", "60", "--max-filesize", str(8 * 1024 * 1024),
-        "--request", "POST", "--header", "Content-Type: application/json",
-        "--header", "Accept: application/json;api-version=7.2-preview.1",
-        "--header", "Cache-Control: no-cache",
-        "--data-binary", "@" + str(request), "--output", str(response),
-        "--write-out", "%{http_code}", GALLERY_URLS[registry],
-    ], text=True, capture_output=True, timeout=70, check=False)
+        "--request", spec["method"], "--header", "Content-Type: application/json",
+        "--header", "Accept: application/json;api-version=7.2-preview"
+        + ("" if mode == "latest-resource" else ".1"),
+        "--header", "Cache-Control: no-cache", "--dump-header", str(headers),
+        "--output", str(response), "--write-out", "%{http_code}",
+    ]
+    if "request" in spec:
+        request.write_text(json.dumps(spec["request"]))
+        command.extend(["--data-binary", "@" + str(request)])
+    command.append(spec["url"])
+    try:
+        result = subprocess.run(command, text=True, capture_output=True, timeout=70, check=False)
+    except subprocess.SubprocessError as error:
+        raise CatalogReadError("Anonymous catalog request did not complete", evidence) from error
+    raw = response.read_bytes() if response.exists() else b""
+    evidence.update(httpStatus=result.stdout, curlCode=result.returncode,
+                    responseSha256=hashlib.sha256(raw).hexdigest(), responseBytes=len(raw),
+                    responseBody=raw.decode("utf-8", errors="replace"))
+    # Retain only Retry-After, never cookies or other incidental response headers.
+    if headers.exists():
+        evidence["retryAfter"] = [line.partition(":")[2].strip()
+                                  for line in headers.read_text(errors="replace").splitlines()
+                                  if line.lower().startswith("retry-after:")]
     if result.returncode or result.stdout != "200":
-        raise ValueError(f"Anonymous catalog query failed: HTTP {result.stdout}; curl {result.returncode}")
-    raw = response.read_bytes()
-    metadata = json.loads(raw)
-    return metadata, {"url": GALLERY_URLS[registry], "request": gallery_query(manifest),
-                      "requestCacheControl": "no-cache",
-                      "responseSha256": hashlib.sha256(raw).hexdigest(), "responseBytes": len(raw),
-                      "responseBody": raw.decode("utf-8")}
+        raise CatalogReadError(
+            f"Anonymous catalog request failed: HTTP {result.stdout}; curl {result.returncode}; "
+            "no automatic HTTP retry (honor any recorded Retry-After)", evidence)
+    try:
+        metadata = catalog_response(raw, mode)
+    except (ValueError, TypeError) as error:
+        raise CatalogReadError("Catalog response is not valid extension metadata", evidence) from error
+    return metadata, evidence
+
+
+def discover_version(registry, manifest, root, attempts):
+    """Record every actual response; fallback only for an absent exact version."""
+    for mode in catalog_modes(registry):
+        directory = root / mode
+        directory.mkdir()
+        try:
+            metadata, evidence = read_catalog(registry, manifest, directory, mode)
+        except CatalogReadError as error:
+            error.evidence.update(status="FAILED", error=str(error))
+            attempts.append(error.evidence)
+            raise
+        attempts.append(evidence)
+        try:
+            selected = catalog_version(metadata, manifest, registry)
+        except NotIndexed as error:
+            evidence.update(status="NOT_INDEXED", error=str(error))
+            continue
+        except (ValueError, KeyError, TypeError, AttributeError, IndexError) as error:
+            evidence.update(status="FAILED", error=str(error))
+            raise
+        evidence.update(status="INDEXED", version=selected)
+        return selected
+    raise NotIndexed("Exact universal version is absent from all supported catalog discovery routes")
 
 
 def qualify(package, manifest):
@@ -229,18 +316,13 @@ def main():
             for attempt in range(args.attempts):
                 directory = root / str(attempt)
                 directory.mkdir()
-                metadata, evidence = read_catalog(args.registry, expected, directory)
-                evidence["checkedAt"] = datetime.now(UTC).isoformat()
-                result["attempts"].append(evidence)
                 try:
-                    selected = catalog_version(metadata, expected, args.registry)
-                except NotIndexed as error:
-                    evidence.update(status="NOT_INDEXED", error=str(error))
+                    selected = discover_version(args.registry, expected, directory, result["attempts"])
+                except NotIndexed:
                     if attempt + 1 == args.attempts:
                         raise
                     time.sleep(args.delay)
                     continue
-                evidence.update(status="INDEXED", version=selected)
                 break
             url = catalog_download(selected, expected, args.registry)
             if args.registry == "openvsx":
