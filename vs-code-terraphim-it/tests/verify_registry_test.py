@@ -40,6 +40,63 @@ class RegistryTest(unittest.TestCase):
         self.assertEqual(registry.catalog_download(selected, manifest, "openvsx"),
                          "https://open-vsx.org/api/applied-knowledge-systems/terraphim-it/0.1.4/file/applied-knowledge-systems.terraphim-it-0.1.4.vsix")
 
+    def test_captured_cursor_prerelease_query_exposes_exact_released_version(self):
+        manifest = {**verify_vsix_test.VsixTest.manifest, "version": "0.1.4"}
+        with self.assertRaises(registry.NotIndexed):
+            registry.catalog_version(self.fixture("cursor"), manifest, "cursor")
+        data = self.fixture("cursor-latest-prerelease-014")
+        selected = registry.catalog_version(data, manifest, "cursor")
+        self.assertEqual(selected["version"], "0.1.4")
+        self.assertIn("/0.1.4/", registry.catalog_download(selected, manifest, "cursor"))
+        # A latest-channel response cannot qualify a different frozen version.
+        with self.assertRaises(registry.NotIndexed):
+            registry.catalog_version(data, {**manifest, "version": "0.1.3"}, "cursor")
+        selected["properties"] = [{"key": registry.PRERELEASE_PROPERTY, "value": "false"}]
+        with self.assertRaisesRegex(ValueError, "prerelease channel"):
+            registry.catalog_version(data, manifest, "cursor")
+
+    def test_supported_fallbacks_preserve_exact_identity_and_channel_metadata(self):
+        manifest = verify_vsix_test.VsixTest.manifest
+        self.assertEqual(registry.catalog_modes("marketplace"), ("query",))
+        self.assertEqual(registry.catalog_modes("openvsx"), ("query",))
+        self.assertEqual(registry.catalog_modes("cursor"), ("query", "latest-prerelease"))
+        self.assertEqual(registry.catalog_modes("windsurf"), ("query", "latest-resource"))
+        original = registry.catalog_request("cursor", manifest, "query")
+        latest = registry.catalog_request("cursor", manifest, "latest-prerelease")
+        self.assertEqual(original["request"]["flags"], 147)
+        self.assertEqual(latest["request"]["flags"], 65682)
+        self.assertEqual(original["request"]["filters"], latest["request"]["filters"])
+        self.assertEqual(registry.catalog_request("windsurf", manifest, "latest-resource"), {
+            "method": "GET",
+            "url": "https://marketplace.windsurf.com/vscode/gallery/applied-knowledge-systems/terraphim-it/latest",
+        })
+        for name, mode in [("marketplace", "latest-resource"), ("openvsx", "latest-prerelease"),
+                           ("cursor", "latest-resource"), ("windsurf", "latest-prerelease")]:
+            with self.subTest(name=name, mode=mode), self.assertRaises(ValueError):
+                registry.catalog_request(name, manifest, mode)
+        for key, value in [("publisher", "../escape"), ("name", "x?token=x"), ("version", "latest")]:
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                registry.catalog_request("windsurf", {**manifest, key: value}, "latest-resource")
+
+    def test_resource_envelope_still_requires_full_exact_version_metadata(self):
+        # Same IRawGalleryExtension contract returned by the official latest
+        # resource route; use captured catalog metadata, not an invented package.
+        extension = self.fixture("windsurf")["results"][0]["extensions"][0]
+        manifest = verify_vsix_test.VsixTest.manifest
+        data = registry.catalog_response(json.dumps(extension), "latest-resource")
+        selected = registry.catalog_version(data, manifest, "windsurf")
+        self.assertIn("/0.1.0/", registry.catalog_download(selected, manifest, "windsurf"))
+        with self.assertRaises(registry.NotIndexed):
+            registry.catalog_version(data, {**manifest, "version": "0.1.4"}, "windsurf")
+        for raw in ["null", "[]", '"asset URL"']:
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                registry.catalog_response(raw, "latest-resource")
+        for change in [{"publisher": {"publisherName": "other"}}, {"versions": []},
+                       {"versions": [{"version": "0.1.0", "files": selected["files"]}]}]:
+            data = registry.catalog_response(json.dumps({**extension, **change}), "latest-resource")
+            with self.subTest(change=change), self.assertRaises((ValueError, KeyError)):
+                registry.catalog_version(data, manifest, "windsurf")
+
     def test_catalog_rejects_ambiguous_channel_platform_and_validation(self):
         original = self.fixture("marketplace")
         manifest = {**verify_vsix_test.VsixTest.manifest, "version": "0.1.3"}
