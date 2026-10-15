@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.1.5 (preview)
 
 - Keep the handled Overflow stash shortcut inside Alternative Control, so it does not also open Extensions and move keyboard focus. Unhandled shortcuts retain native VS Code behavior.
+
+- Known limitation: live alternative typing is still not grouped into one native Undo step, and Escape does not reliably cancel the whole pending alternative ([#995](https://github.com/terraphim/terraphim-ai/issues/995)). This release fixes the separate stash shortcut conflict.
 
 ## 0.1.4 (preview)
 
