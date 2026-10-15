@@ -29,6 +29,17 @@ class RegistryTest(unittest.TestCase):
             with self.assertRaises(registry.NotIndexed):
                 registry.catalog_version(self.fixture(name), {**manifest, "version": "0.1.3"}, name)
 
+    def test_real_stale_and_revalidated_catalogs_do_not_conflate_publication_with_indexing(self):
+        manifest = {**verify_vsix_test.VsixTest.manifest, "version": "0.1.4"}
+        # Same public query captured consecutively; the default response was
+        # stale while Cache-Control:no-cache exposed the admitted version.
+        with self.assertRaises(registry.NotIndexed):
+            registry.catalog_version(self.fixture("openvsx-stale-014"), manifest, "openvsx")
+        selected = registry.catalog_version(self.fixture("openvsx-revalidated-014"), manifest, "openvsx")
+        self.assertEqual(selected["version"], "0.1.4")
+        self.assertEqual(registry.catalog_download(selected, manifest, "openvsx"),
+                         "https://open-vsx.org/api/applied-knowledge-systems/terraphim-it/0.1.4/file/applied-knowledge-systems.terraphim-it-0.1.4.vsix")
+
     def test_catalog_rejects_ambiguous_channel_platform_and_validation(self):
         original = self.fixture("marketplace")
         manifest = {**verify_vsix_test.VsixTest.manifest, "version": "0.1.3"}

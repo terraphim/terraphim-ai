@@ -173,6 +173,7 @@ def read_catalog(registry, manifest, root):
         "--connect-timeout", "15", "--max-time", "60", "--max-filesize", str(8 * 1024 * 1024),
         "--request", "POST", "--header", "Content-Type: application/json",
         "--header", "Accept: application/json;api-version=7.2-preview.1",
+        "--header", "Cache-Control: no-cache",
         "--data-binary", "@" + str(request), "--output", str(response),
         "--write-out", "%{http_code}", GALLERY_URLS[registry],
     ], text=True, capture_output=True, timeout=70, check=False)
@@ -181,6 +182,7 @@ def read_catalog(registry, manifest, root):
     raw = response.read_bytes()
     metadata = json.loads(raw)
     return metadata, {"url": GALLERY_URLS[registry], "request": gallery_query(manifest),
+                      "requestCacheControl": "no-cache",
                       "responseSha256": hashlib.sha256(raw).hexdigest(), "responseBytes": len(raw),
                       "responseBody": raw.decode("utf-8")}
 

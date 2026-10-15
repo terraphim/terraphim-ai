@@ -1,0 +1,124 @@
+{
+  "results": [
+    {
+      "extensions": [
+        {
+          "extensionId": "01a1397c-abbb-7196-a7d0-5f21bae87581",
+          "extensionName": "terraphim-it",
+          "displayName": "Terraphim It",
+          "shortDescription": "Intelligent Markdown editor with alternatives, knowledge-graph synonyms and role-based suggestions",
+          "publisher": {
+            "displayName": "applied-knowledge-systems",
+            "publisherId": "01a1397c-abbf-7660-af01-72a592315dce",
+            "publisherName": "applied-knowledge-systems",
+            "domain": null,
+            "isDomainVerified": null
+          },
+          "versions": [
+            {
+              "version": "0.1.0",
+              "lastUpdated": "2026-10-14T08:17:11.286382Z",
+              "assetUri": "https://open-vsx.org/vscode/asset/applied-knowledge-systems/terraphim-it/0.1.0",
+              "fallbackAssetUri": "https://open-vsx.org/vscode/asset/applied-knowledge-systems/terraphim-it/0.1.0",
+              "files": [
+                {
+                  "assetType": "Microsoft.VisualStudio.Code.Manifest",
+                  "source": "https://open-vsx.org/api/applied-knowledge-systems/terraphim-it/0.1.0/file/package.json"
+                },
+                {
+                  "assetType": "Microsoft.VisualStudio.Services.Content.Details",
+                  "source": "https://open-vsx.org/api/applied-knowledge-systems/terraphim-it/0.1.0/file/readme.md"
+                },
+                {
+                  "assetType": "Microsoft.VisualStudio.Services.Content.License",
+                  "source": "https://open-vsx.org/api/applied-knowledge-systems/terraphim-it/0.1.0/file/LICENSE.txt"
+                },
+                {
+                  "assetType": "Microsoft.VisualStudio.Services.VSIXPackage",
+                  "source": "https://open-vsx.org/api/applied-knowledge-systems/terraphim-it/0.1.0/file/applied-knowledge-systems.terraphim-it-0.1.0.vsix"
+                },
+                {
+                  "assetType": "Microsoft.VisualStudio.Services.Content.Changelog",
+                  "source": "https://open-vsx.org/api/applied-knowledge-systems/terraphim-it/0.1.0/file/changelog.md"
+                },
+                {
+                  "assetType": "Microsoft.VisualStudio.Services.VsixManifest",
+                  "source": "https://open-vsx.org/api/applied-knowledge-systems/terraphim-it/0.1.0/file/extension.vsixmanifest"
+                },
+                {
+                  "assetType": "Microsoft.VisualStudio.Services.VsixSignature",
+                  "source": "https://open-vsx.org/api/applied-knowledge-systems/terraphim-it/0.1.0/file/applied-knowledge-systems.terraphim-it-0.1.0.sigzip"
+                },
+                {
+                  "assetType": "Microsoft.VisualStudio.Services.PublicKey",
+                  "source": "https://open-vsx.org/api/-/public-key/14ccb407-4e79-41ed-be5a-6d608325c45a"
+                }
+              ],
+              "properties": [
+                {
+                  "key": "Microsoft.VisualStudio.Services.Branding.Color",
+                  "value": ""
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Services.Branding.Theme",
+                  "value": ""
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Services.Links.Source",
+                  "value": "https://github.com/terraphim/terraphim-ai.git"
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Code.SponsorLink",
+                  "value": ""
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Code.Engine",
+                  "value": "^1.126.0"
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Code.ExtensionDependencies",
+                  "value": ""
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Code.ExtensionPack",
+                  "value": ""
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Code.LocalizedLanguages",
+                  "value": ""
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Code.PreRelease",
+                  "value": "true"
+                }
+              ],
+              "targetPlatform": "universal"
+            }
+          ],
+          "statistics": [],
+          "tags": [],
+          "releaseDate": "2026-10-14T08:17:11.286382Z",
+          "publishedDate": "2026-10-14T08:17:11.286382Z",
+          "lastUpdated": "2026-10-14T08:20:45.453003Z",
+          "categories": [
+            "AI",
+            "Other",
+            "Snippets"
+          ],
+          "flags": ""
+        }
+      ],
+      "resultMetadata": [
+        {
+          "metadataType": "ResultCount",
+          "metadataItems": [
+            {
+              "name": "TotalCount",
+              "count": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
