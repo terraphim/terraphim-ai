@@ -32,12 +32,19 @@ async function waitFor(check, description, timeout = 15000) {
   const initial = 'Risk needs mitigation.\n';
   const vsix = path.resolve(process.env.TERRAPHIM_HISTORY_VSIX || path.join(root, 'terraphim-it.vsix'));
   await fs.mkdir(workspace);
+  const autosave = process.env.TERRAPHIM_HISTORY_AUTOSAVE === '1';
+  if (autosave) {
+    await fs.mkdir(path.join(profile,'User'),{recursive:true});
+    await fs.writeFile(path.join(profile,'User/settings.json'),JSON.stringify({'files.autoSave':'afterDelay','files.autoSaveDelay':200}));
+  }
   await fs.mkdir(output, { recursive: true });
   await fs.writeFile(filename, initial, { flag: 'wx' });
   await fs.writeFile(path.join(workspace, 'native.md'), 'Native Markdown control.\n', { flag: 'wx' });
   await fs.writeFile(path.join(output, 'input.md'), initial);
   const receipt = { status: 'RUNNING', scope: 'Real isolated Linux VS Code UI whole-alternative history regression',
-    packageSha256: crypto.createHash('sha256').update(await fs.readFile(vsix)).digest('hex'), checks: [] };
+    autosaveDuringLiveAddition: autosave, packageSha256: crypto.createHash('sha256').update(await fs.readFile(vsix)).digest('hex'), checks: [] };
+  await fs.copyFile(__filename,path.join(output,'executed-harness.cjs'));
+  receipt.modes={autosave,split:process.env.TERRAPHIM_HISTORY_SPLIT==='1',external:process.env.TERRAPHIM_HISTORY_EXTERNAL==='1'};
   let app;
   let launchError;
   let browser;
@@ -85,7 +92,7 @@ async function waitFor(check, description, timeout = 15000) {
       frame = page.frames().filter(f => f.url().includes('fake.html')).at(-1);
       return frame && await frame.getByRole('textbox', {name:'Markdown source', exact:true}).isVisible();
     }, 'actual Terraphim webview', 60000);
-    const source = frame.getByRole('textbox', {name:'Markdown source', exact:true});
+    let source = frame.getByRole('textbox', {name:'Markdown source', exact:true});
     const toggle = frame.getByTitle('Toggle Write_On mode');
     if (await toggle.getAttribute('aria-pressed') !== 'true') await toggle.click();
 
@@ -95,7 +102,9 @@ async function waitFor(check, description, timeout = 15000) {
       try { await waitFor(async () => {
         saved = await fs.readFile(filename, 'utf8');
         const graph = JSON.parse(await exportKnowledgeGraph(saved, path.join(root, 'media/editor')));
-        return saved.split('\n')[0] === expectedBody &&
+        return (await source.innerText()).split('\n')[0] === expectedBody &&
+          await page.locator('.tabs-container .tab.dirty').count() === 0 &&
+          saved.split('\n')[0] === expectedBody &&
           JSON.stringify(Object.keys(graph.data).sort()) === JSON.stringify(expectedTerms);
       }, name + ' actual saved Markdown and graph');
       } catch(error) {
@@ -115,9 +124,25 @@ async function waitFor(check, description, timeout = 15000) {
       receipt.checks.push({id:name,status:'PASS',sourceSha256:crypto.createHash('sha256').update(saved).digest('hex'),terms:expectedTerms});
       return saved;
     }
+    async function focusView(targetFrame) {
+      const textbox=targetFrame.getByRole('textbox',{name:'Markdown source',exact:true});
+      const box=await textbox.boundingBox();
+      assert.ok(box,'Target custom view must be visible before choosing its native group');
+      const groups=page.locator('.editor-group-container');
+      let selected=false;
+      for(let index=0;index<await groups.count();index++) {
+        const group=groups.nth(index), bounds=await group.boundingBox();
+        const x=box.x+box.width/2,y=box.y+Math.min(12,box.height/2);
+        if(bounds&&x>=bounds.x&&x<=bounds.x+bounds.width&&y>=bounds.y&&y<=bounds.y+bounds.height) {
+          await group.locator('.tab').last().click();selected=true;break;
+        }
+      }
+      assert.equal(selected,true,'Find actual native tab group containing the observed custom view');
+      await textbox.click({position:{x:12,y:12}});
+    }
     async function chooseRisk() {
       await page.keyboard.press('Escape');
-      await source.click({position:{x:100,y:60}});
+      await source.click({position:{x:12,y:12}});
       await page.keyboard.press('Control+Home');
       await page.keyboard.down('Shift');
       for(let i=0;i<4;i++) await page.keyboard.press('ArrowRight');
@@ -128,12 +153,20 @@ async function waitFor(check, description, timeout = 15000) {
     }
     await chooseRisk();
     await frame.locator('.te-alt-input--new').click();
-    await page.keyboard.type('Concern',{delay:100});
+    if (autosave) {
+      let partial='';
+      for (const character of 'Concern') {
+        partial+=character;
+        await page.keyboard.type(character);
+        await waitFor(async()=> (await fs.readFile(filename,'utf8')).split('\n')[0]===partial+' needs mitigation.','actual autosave '+partial);
+        await fs.copyFile(filename,path.join(output,'autosave-'+partial.length+'.md'));
+      }
+    } else await page.keyboard.type('Concern',{delay:100});
     await page.keyboard.press('Enter');
     await page.keyboard.press('Control+s');
     const accepted = await capture('01-added-concern',['concern','risk'],'Concern needs mitigation.');
     await page.keyboard.press('Escape');
-    await source.click({position:{x:100,y:60}});
+    await source.click({position:{x:12,y:12}});
     await page.keyboard.press('Control+z');
     await page.keyboard.press('Control+s');
     const undone = await capture('02-whole-undo',[],'Risk needs mitigation.');
@@ -147,23 +180,141 @@ async function waitFor(check, description, timeout = 15000) {
     await page.keyboard.press('Control+z');
     await chooseRisk();
     await frame.locator('.te-alt-input--new').click();
-    await page.keyboard.type('Concern',{delay:80});
+    await page.keyboard.type('Worry',{delay:80});
     await page.keyboard.press('Enter');
     const newAlternative = frame.locator('.te-alt-input--new');
     await newAlternative.click();
     await page.keyboard.type('Hazard',{delay:80});
     await page.keyboard.press('Escape');
     await page.keyboard.press('Control+s');
-    const canceled = await capture('04-escape-preserves-A',['concern','risk'],'Concern needs mitigation.');
-    await source.click({position:{x:100,y:60}});
+    const canceled = await capture('04-escape-preserves-A',['risk','worry'],'Worry needs mitigation.');
+    await source.click({position:{x:12,y:12}});
     await page.keyboard.press('Control+Shift+z');
     await page.keyboard.press('Control+s');
-    assert.equal(await capture('05-redo-cannot-revive-B',['concern','risk'],'Concern needs mitigation.'),canceled);
+    assert.equal(await capture('05-redo-cannot-revive-B',['risk','worry'],'Worry needs mitigation.'),canceled);
+    await page.keyboard.press('Control+w');
+    await page.keyboard.press('Control+Shift+E');
+    await page.getByLabel('Files Explorer',{exact:true}).getByText('history.md',{exact:true}).dblclick();
+    await page.keyboard.press('Control+Shift+P');
+    await page.getByRole('textbox',{name:'Type the name of a command to run.',exact:true}).fill('>Terraphim: Open Alternative Control');
+    await page.getByText('Terraphim: Open Alternative Control',{exact:true}).click();
+    await waitFor(async()=>{
+      frame=page.frames().filter(f=>f.url().includes('fake.html')).at(-1);
+      return frame && await frame.getByRole('textbox',{name:'Markdown source',exact:true}).isVisible();
+    },'actual saved document reopen',60000);
+    source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
+    await waitFor(async()=>(await source.innerText()).split('\n')[0]==='Worry needs mitigation.','reopened accepted document content',60000);
+    assert.equal(await capture('06-saved-reopen',['risk','worry'],'Worry needs mitigation.'),canceled);
+
+
+    if (process.env.TERRAPHIM_HISTORY_EXTERNAL === '1') {
+      assert.notEqual(process.env.TERRAPHIM_HISTORY_SPLIT,'1','External and split sequences use independent profiles');
+      assert.equal(autosave,false,'External draft test requires autosave off');
+      const external='Risk changed externally.\n';
+      await fs.writeFile(filename,external);
+      await waitFor(async()=>(await source.innerText()).split('\n')[0]==='Risk changed externally.','idle authoritative external adoption');
+      await fs.writeFile(path.join(output,'07-idle-external.md'),await fs.readFile(filename));
+      receipt.checks.push({id:'07-idle-external-adoption',status:'PASS'});
+      await chooseRisk();
+      await frame.locator('.te-alt-input--new').click();
+      await page.keyboard.type('Concern',{delay:80});
+      await page.keyboard.press('Enter');
+      await page.keyboard.press('Escape');
+      await waitFor(async()=>(await source.innerText()).split('\n')[0]==='Concern changed externally.','local unsaved custom draft');
+      const divergent='Different external decision.\n';
+      await fs.writeFile(filename,divergent);
+      await frame.getByRole('button',{name:'Open recovery draft',exact:true}).waitFor();
+      assert.equal(await fs.readFile(filename,'utf8'),divergent);
+      await fs.writeFile(path.join(output,'08-external-conflict-disk.md'),await fs.readFile(filename));
+      await page.screenshot({path:path.join(output,'08-external-conflict.png')});
+      await frame.getByRole('button',{name:'Open recovery draft',exact:true}).click();
+      const originalFrame=frame;
+      let recoveryFrame;
+      await waitFor(async()=>{
+        for(const candidate of page.frames().filter(f=>f.url().includes('fake.html')&&f!==originalFrame)) {
+          const textbox=candidate.getByRole('textbox',{name:'Markdown source',exact:true});
+          if(await textbox.isVisible()&&(await textbox.innerText()).split('\n')[0]==='Concern changed externally.')recoveryFrame=candidate;
+        }
+        return !!recoveryFrame;
+      },'real recovery draft contains unsaved source',60000);
+      await fs.writeFile(path.join(output,'08-recovery-visible-source.txt'),await recoveryFrame.getByRole('textbox',{name:'Markdown source',exact:true}).innerText());
+      assert.equal(await fs.readFile(filename,'utf8'),divergent,'opening recovery must preserve divergent disk');
+      receipt.checks.push({id:'08-conflicting-draft-recovery',status:'PASS'});
+      // Switch to the original actual tab without discarding the recovery tab.
+      await page.getByRole('tab',{name:'history.md',exact:true}).last().click();
+      frame=originalFrame;source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
+      await frame.getByRole('button',{name:'Use current document',exact:true}).click();
+      await waitFor(async()=>(await source.innerText()).split('\n')[0]==='Different external decision.','explicit current-file choice');
+      assert.equal(await fs.readFile(filename,'utf8'),divergent);
+      await fs.unlink(filename);
+      await frame.getByRole('button',{name:'Use current document',exact:true}).waitFor();
+      await fs.writeFile(filename,divergent);
+      await frame.getByRole('button',{name:'Use current document',exact:true}).click();
+      await waitFor(async()=>!(await frame.getByRole('button',{name:'Use current document',exact:true}).isVisible()),'recover from read failure after exact file restoration');
+      assert.equal((await source.innerText()).split('\n')[0],'Different external decision.');
+      assert.equal(await fs.readFile(filename,'utf8'),divergent);
+      await page.screenshot({path:path.join(output,'09-delete-restore-recovered.png')});
+      receipt.checks.push({id:'09-delete-restore-recovery',status:'PASS'});
+    }
+    if (process.env.TERRAPHIM_HISTORY_SPLIT === '1') {
+      const leftFrame=frame, leftSource=source;
+      await source.click({position:{x:12,y:12}});
+      await page.keyboard.press('Control+\\');
+      let rightFrame;
+      await waitFor(async()=>{
+        const candidates=page.frames().filter(f=>f.url().includes('fake.html')&&f!==leftFrame);
+        for(const candidate of candidates) {
+          if(await candidate.getByRole('textbox',{name:'Markdown source',exact:true}).isVisible())rightFrame=candidate;
+        }
+        return !!rightFrame;
+      },'second actual view of one resource',60000);
+      frame=rightFrame;source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
+      await waitFor(async()=>(await source.innerText()).split('\n')[0]==='Worry needs mitigation.','second view accepted initial content');
+      const rightToggle=frame.getByTitle('Toggle Write_On mode');
+      if(await rightToggle.getAttribute('aria-pressed')!=='true')await rightToggle.click();
+      await source.click({position:{x:12,y:12}});
+      await page.keyboard.press('Control+Home');
+      await page.keyboard.down('Shift');
+      for(let i=0;i<5;i++)await page.keyboard.press('ArrowRight');
+      await page.keyboard.up('Shift');
+      assert.equal(await frame.evaluate(()=>getSelection().toString()),'Worry');
+      await page.keyboard.press('Control+Shift+A');
+      await frame.locator('.te-alt-input--new').click();
+      await page.keyboard.type('Hazard',{delay:80});
+      await page.keyboard.press('Enter');
+      await page.keyboard.press('Control+s');
+      const shared=await capture('07-split-second-view-add',['hazard','risk','worry'],'Hazard needs mitigation.');
+      await waitFor(async()=>(await leftSource.innerText()).split('\n')[0]==='Hazard needs mitigation.','first view adopts second accepted edit');
+      await page.keyboard.press('Escape');
+      frame=leftFrame;source=leftSource;
+      await focusView(frame);
+      await page.keyboard.press('Control+z');
+      await page.keyboard.press('Control+s');
+      assert.equal(await capture('08-split-first-view-undo',['risk','worry'],'Worry needs mitigation.'),canceled);
+      frame=rightFrame;source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
+      await focusView(frame);
+      await page.keyboard.press('Control+Shift+z');
+      await page.keyboard.press('Control+s');
+      assert.equal(await capture('09-split-second-view-redo',['hazard','risk','worry'],'Hazard needs mitigation.'),shared);
+      await focusView(leftFrame);
+      await page.keyboard.press('Control+w');
+      frame=rightFrame;source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
+      await focusView(frame);
+      await page.keyboard.press('Control+z');
+      await page.keyboard.press('Control+s');
+      assert.equal(await capture('10-split-survivor-history',['risk','worry'],'Worry needs mitigation.'),canceled);
+    }
     receipt.status='PASS';
   } catch (caught) {
     error = caught;
     receipt.status = 'FAIL';
     receipt.error = String(caught.stack || caught);
+    await fs.writeFile(path.join(output,'failure-saved.md'),await fs.readFile(filename,'utf8')).catch(()=>{});
+    if(page) {
+      const visible=page.frames().filter(f=>f.url().includes('fake.html')).at(-1);
+      if(visible) await visible.getByRole('textbox',{name:'Markdown source',exact:true}).innerText().then(text=>fs.writeFile(path.join(output,'failure-visible-source.txt'),text)).catch(()=>{});
+    }
+    if(page) await fs.writeFile(path.join(output,'failure-native-tabs.json'),JSON.stringify(await page.getByRole('tab').evaluateAll(elements=>elements.map(element=>({text:element.textContent,label:element.getAttribute('aria-label'),title:element.getAttribute('title'),class:element.className}))),null,2)).catch(()=>{});
     if (page) await page.screenshot({path:path.join(output,'failure.png')}).catch(() => {});
   } finally {
     if (browser) await browser.close();
