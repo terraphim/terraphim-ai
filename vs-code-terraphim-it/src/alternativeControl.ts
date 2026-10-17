@@ -153,7 +153,11 @@ class AlternativeControlProvider implements vscode.CustomEditorProvider<Alternat
    const same=sameTarget;
    const other=this.resources.get(target.toString());
    if(!same && other && other.source!==other.diskSource) throw new Error('Save As target has unsaved Alternative Control changes');
-   if(!same) {let now:string|undefined;try {now=await this.readDisk(target);}catch(error){if(!(error instanceof vscode.FileSystemError && error.code==='FileNotFound'))throw error;}
+   if(!same) {
+    await assertSeparateExportTarget(doc.uri.toString(),target.toString(),[
+     ...vscode.workspace.textDocuments.filter(item=>item.isDirty).map(item=>item.uri.toString()),
+     ...[...this.resources.values()].filter(item=>item.source!==item.diskSource||item.blocked).map(item=>item.uri.toString())]);
+    let now:string|undefined;try {now=await this.readDisk(target);}catch(error){if(!(error instanceof vscode.FileSystemError && error.code==='FileNotFound'))throw error;}
     if(now!==targetBefore)throw new Error('Save As target changed while preparing the snapshot');}
    if(same && target.scheme!=='untitled' && await this.readDisk(target)!==doc.diskSource) {
     await this.block(doc,'File changed before save',await this.readDisk(target));throw new Error('File changed before save');

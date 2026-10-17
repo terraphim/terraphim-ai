@@ -224,6 +224,10 @@ class AlternativeControlProvider {
             if (!same && other && other.source !== other.diskSource)
                 throw new Error('Save As target has unsaved Alternative Control changes');
             if (!same) {
+                await (0, export_target_cjs_1.assertSeparateExportTarget)(doc.uri.toString(), target.toString(), [
+                    ...vscode.workspace.textDocuments.filter(item => item.isDirty).map(item => item.uri.toString()),
+                    ...[...this.resources.values()].filter(item => item.source !== item.diskSource || item.blocked).map(item => item.uri.toString())
+                ]);
                 let now;
                 try {
                     now = await this.readDisk(target);
