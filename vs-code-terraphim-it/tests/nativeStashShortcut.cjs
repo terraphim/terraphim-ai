@@ -29,7 +29,7 @@ async function waitFor(check, description, timeout = 15000) {
   const extensions = path.join(run, 'extensions');
   const workspace = path.join(run, 'workspace');
   const filename = path.join(workspace, 'shortcut.md');
-  const initial = 'Keep this line.\n\nMove this paragraph.\n';
+  const initial = 'Decision: keep this line.\n\nMove this paragraph.\n';
   const selected = 'Move this paragraph.';
   const vsix = path.resolve(process.env.TERRAPHIM_SHORTCUT_VSIX || path.join(root, 'terraphim-it.vsix'));
   await fs.mkdir(workspace);
@@ -122,6 +122,47 @@ async function waitFor(check, description, timeout = 15000) {
     console.log('Verified next shortcut scenario');
     receipt.checks.push({ id:'immediate-native-undo-redo', status:'PASS' });
 
+    // A known local-role concept gives three actual KG alternatives. The
+    // consumed AI shortcut must not also open the native Source Control view.
+    await source.click({position:{x:100,y:80}});
+    await page.keyboard.press('Control+Home');
+    await page.keyboard.down('Shift');
+    for (let n=0; n<'Decision'.length; n++) await page.keyboard.press('ArrowRight');
+    await page.keyboard.up('Shift');
+    assert.equal(await frame.evaluate(() => getSelection().toString()),'Decision');
+    await page.keyboard.press('Control+Shift+G');
+    await waitFor(async () => await frame.locator('.te-alt-glyph--ai').count()===3,'three actual KG suggestions');
+    const aiFocus = await frame.evaluate(() => document.hasFocus());
+    const aiHostText = await page.locator('body').innerText();
+    assert.equal(aiFocus,true,'consumed AI shortcut must retain webview focus');
+    assert.equal(await page.getByRole('heading',{name:'Source Control',exact:true}).count(),0,'consumed AI shortcut must not open native Source Control');
+    await page.screenshot({path:path.join(output,'after-ai-shortcut.png')});
+    await fs.writeFile(path.join(output,'after-ai-shortcut-ui.json'),JSON.stringify({focused:aiFocus,hostText:aiHostText},null,2)+'\n');
+    await page.keyboard.press('Control+s');
+    await waitFor(async () => (await fs.readFile(filename,'utf8')).includes('"source": "ai"'),'saved KG suggestions');
+    const aiSaved = await fs.readFile(filename,'utf8');
+    assert.equal((aiSaved.match(/"source": "ai"/g)||[]).length,3);
+    await fs.writeFile(path.join(output,'ai-suggestions.md'),aiSaved);
+    receipt.checks.push({id:'consumed-ai-shortcut-focus-and-saved-synonyms',status:'PASS'});
+    await page.keyboard.press('Escape');
+    await source.click({position:{x:100,y:80}});
+    await page.keyboard.press('Control+z');
+    await page.keyboard.press('Control+s');
+    await waitFor(async () => await fs.readFile(filename,'utf8') === await fs.readFile(path.join(output,'stashed.md'),'utf8'),'native Undo of KG request');
+    await fs.copyFile(filename,path.join(output,'ai-suggestions-undo.md'));
+
+    // A caret in a word outside the role's vocabulary cannot request AI
+    // alternatives. Its untouched shortcut must still open native Source Control.
+    await source.click({position:{x:100,y:80}});
+    await page.keyboard.press('Control+Home');
+    for (let n=0; n<12; n++) await page.keyboard.press('ArrowRight');
+    assert.equal(await frame.evaluate(() => getSelection().toString()),'');
+    await page.keyboard.press('Control+Shift+G');
+    await page.getByRole('heading',{name:'Source Control',exact:true}).waitFor();
+    await page.screenshot({path:path.join(output,'unhandled-ai-without-concept.png')});
+    assert.equal(await fs.readFile(filename,'utf8'),await fs.readFile(path.join(output,'stashed.md'),'utf8'));
+    receipt.checks.push({id:'unhandled-ai-without-concept-native-source-control',status:'PASS'});
+
     // The editor does not consume stash with an empty selection.
     await source.click({ position:{x:100,y:80} });
     await page.keyboard.press('Control+Home');
@@ -154,6 +195,11 @@ async function waitFor(check, description, timeout = 15000) {
     assert.equal(await fs.readFile(path.join(workspace,'native.md'),'utf8'),'Native Markdown control.\n');
     console.log('Verified next shortcut scenario');
     receipt.checks.push({id:'native-editor-extensions',status:'PASS'});
+    await page.keyboard.press('Control+Shift+G');
+    await page.getByRole('heading',{name:'Source Control',exact:true}).waitFor();
+    await page.screenshot({path:path.join(output,'native-editor-source-control.png')});
+    assert.equal(await fs.readFile(path.join(workspace,'native.md'),'utf8'),'Native Markdown control.\n');
+    receipt.checks.push({id:'native-editor-source-control',status:'PASS'});
     receipt.status = 'PASS';
   } catch (caught) {
     error = caught;

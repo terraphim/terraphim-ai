@@ -1,5 +1,8 @@
 # Alternative Control in the existing Terraphim It extension
 
+
+Recoverable host notices can be dismissed while editing continues. Conflict recovery and fatal errors remain blocking so an unacknowledged draft cannot overwrite the native document. Version 0.1.6 does not fix grouped native Undo or whole-alternative Escape cancellation ([#995](https://github.com/terraphim/terraphim-ai/issues/995)).
+
 This preview is an opt-in custom Markdown editor in `applied-knowledge-systems.terraphim-it`. Open a Markdown file with **Terraphim: Open Alternative Control**. Click the word counter for Write_On. Existing server and Atomic commands remain available in trusted workspaces.
 
 The view bundles the released terraphim-editor v0.1.0-rc.2 UI, WASM and source-pinned host bridge. The bundle records its public source repository and Cargo.lock checksum. Each view has its own session; VS Code owns document revisions, persistence and undo/redo. Exact source/revision checks protect asynchronous proposals. External edits retain conflicting drafts for recovery. Native export refuses the source itself and dirty output buffers. Browser persistence is disabled in this host.

@@ -5,6 +5,7 @@
   const container = document.getElementById('editor');
   const notice = document.getElementById('host-notice');
   const assets = document.body.dataset.assets;
+  const hostNotice = new TerraphimHostNotice(notice);
   const exports = new TerraphimExportIntent();
   let editor;
   let bridge;
@@ -12,11 +13,11 @@
   let loading;
   let adopting = false;
   let startupSync;
-  // VS Code forwards webview keydowns even after preventDefault. Keep the
-  // consumed stash shortcut local; unhandled keys still reach the workbench.
+  // VS Code forwards webview keydowns even after preventDefault. Keep only
+  // keys already consumed by this editor local; unhandled keys still reach
+  // the workbench. This includes AI alternatives, formatting and stash.
   container.addEventListener('keydown', event => {
-    if (event.defaultPrevented && !event.isComposing && (event.ctrlKey || event.metaKey)
-        && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'x') event.stopPropagation();
+    if (event.defaultPrevented && !event.isComposing) event.stopPropagation();
   });
   const serialise = () => {
     const md = editor.markdownEditor;
@@ -62,6 +63,7 @@
     exports.clear();
     container.inert = true;
     vscode.setState({ resource:bridge.current.resource, draft:info.draft });
+    hostNotice.blocking();
     notice.replaceChildren(); notice.hidden = false;
     const text = document.createElement('p'); text.textContent = `${info.reason}. Your local draft is retained.`;
     const recover = document.createElement('button'); recover.textContent = 'Open recovery draft';
@@ -91,7 +93,7 @@
         if (!role.ok) throw new Error(`Local role returned ${role.status}`);
         editor.markdownEditor.loadThesaurus(await role.text());
       } catch (error) {
-        notice.hidden = false; notice.textContent = `Terraphim local role unavailable: ${String(error)}`;
+        hostNotice.recoverable(`Terraphim local role unavailable: ${String(error)}`);
       }
       editor.openDocument(bindings.host_presentation_source(message.source),message.resource);
       bridge = new TerraphimHostBridge({
@@ -156,7 +158,7 @@
     } catch (error) { fail(error); }
   }
   function fail(error) {
-    container.inert = true; notice.hidden = false;
+    container.inert = true; hostNotice.blocking(); notice.hidden = false;
     notice.textContent = `Terraphim could not complete the operation: ${String(error)}`;
   }
   window.addEventListener('message',event => {
@@ -184,7 +186,7 @@
         const accepted = bridge.receive(message);
         exports.settle(message,accepted);
         if (accepted && !bridge.paused && message.type === 'reject' && message.reason) {
-          notice.hidden = false; notice.textContent = `Terraphim: ${message.reason}`;
+          hostNotice.recoverable(`Terraphim: ${message.reason}`);
         }
         if (!bridge.pending && !bridge.paused && bridge.latest === bridge.current.source) vscode.setState(undefined);
       }

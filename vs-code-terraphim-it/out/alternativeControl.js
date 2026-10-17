@@ -229,6 +229,7 @@ function html(webview, media) {
     const assets = webview.asWebviewUri(vscode.Uri.joinPath(media, 'editor')).toString() + '/';
     const script = webview.asWebviewUri(vscode.Uri.joinPath(media, 'alternative-control.js')).toString();
     const hostStyle = webview.asWebviewUri(vscode.Uri.joinPath(media, 'alternative-control.css')).toString();
+    const hostNotice = webview.asWebviewUri(vscode.Uri.joinPath(media, 'host-notice.js')).toString();
     const intent = webview.asWebviewUri(vscode.Uri.joinPath(media, 'export-intent.js')).toString();
     const nonce = (0, crypto_1.randomUUID)();
     return `<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -239,6 +240,7 @@ function html(webview, media) {
 <script nonce="${nonce}" src="${escape(assets)}terraphim-editor.min.js"></script>
 <script nonce="${nonce}" src="${escape(assets)}host-session.js"></script>
 <script nonce="${nonce}" src="${escape(intent)}"></script>
+<script nonce="${nonce}" src="${escape(hostNotice)}"></script>
 <script nonce="${nonce}" src="${escape(script)}"></script></body></html>`;
 }
 //# sourceMappingURL=alternativeControl.js.map

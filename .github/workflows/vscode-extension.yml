@@ -91,7 +91,12 @@ jobs:
       - name: Exercise actual packaged extension in native host
         run: |
           if [[ "$RUNNER_OS" == Linux ]]; then xvfb-run -a npm run test:native; else npm run test:native; fi
-      - name: Exercise consumed and unhandled stash shortcuts in the actual UI
+      - name: Exercise recoverable notices in an actual browser DOM
+        if: runner.os == 'Linux'
+        run: |
+          npx playwright-core install --with-deps chromium
+          npm run test:notice-ui
+      - name: Exercise consumed and unhandled editor shortcuts in the actual UI
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:shortcut-ui
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

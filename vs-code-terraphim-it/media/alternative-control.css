@@ -1,3 +1,8 @@
 html,body { margin:0; height:100%; overflow:hidden; }
 #editor { height:100vh; }
 #host-notice { position:fixed; z-index:10000; inset:1rem; padding:1rem; background:var(--vscode-editor-background); color:var(--vscode-editor-foreground); border:1px solid var(--vscode-focusBorder); }
+
+#host-notice[data-kind="notice"] { inset:1rem 1rem auto; max-height:25vh; overflow:auto; display:flex; align-items:center; gap:1rem; }
+#host-notice[data-kind="notice"][hidden] { display:none; }
+#host-notice[data-kind="notice"] span { flex:1; }
+#host-notice button { flex:none; }

@@ -2,7 +2,7 @@
   "name": "terraphim-it",
   "displayName": "Terraphim It",
   "description": "Intelligent Markdown editor with alternatives, knowledge-graph synonyms and role-based suggestions",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "applied-knowledge-systems",
   "private": true,
   "license": "Apache-2.0",
@@ -115,7 +115,8 @@
     "package:vsix": "vsce package --pre-release --out terraphim-it.vsix",
     "test:native": "node tests/runPackaged.cjs",
     "test:legacy": "node --test tests/legacyLinks.test.cjs",
-    "test:shortcut-ui": "node tests/nativeStashShortcut.cjs"
+    "test:shortcut-ui": "node tests/nativeStashShortcut.cjs",
+    "test:notice-ui": "node --test tests/hostNotice.test.cjs"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",
