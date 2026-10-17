@@ -88,8 +88,8 @@ def verify(package, expected, asset_lock, legacy_inputs=None):
                 raise ValueError("Link replacement asset bytes changed: " + name)
         if not archive.read("extension/rust-lib/pkg/terraphim_it_bg.wasm").startswith(b"\x00asm"):
             raise ValueError("Link replacement WASM is invalid")
-        for name in ("out/extension.js", "out/alternativeControl.js", "out/helpers/linkReplacement.js", "media/knowledge-graph.cjs",
-                     "media/export-intent.js", "media/export-target.cjs", "media/host-notice.js", "media/alternative-control.js", "LICENSE.txt", "readme.md",
+        for name in ("out/extension.js", "out/alternativeControl.js", "out/checkpointStage.js", "out/helpers/linkReplacement.js", "media/knowledge-graph.cjs",
+                     "media/export-intent.js", "media/export-target.cjs", "media/host-notice.js", "media/history-checkpoint.js", "media/alternative-control.js", "LICENSE.txt", "readme.md",
                      "node_modules/@tomic/lib/package.json"):
             if "extension/" + name not in names:
                 raise ValueError("Missing runtime file: " + name)
