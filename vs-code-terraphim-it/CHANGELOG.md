@@ -2,6 +2,8 @@
 
 ## 0.1.6 (preview)
 
+- Keep all already-consumed editor keydowns inside the view, including the AI-alternatives shortcut that otherwise also opened Source Control. Unhandled keys and native editors keep their normal workbench behavior.
+
 - Keep recoverable host notices compact and dismissible so a stale command or unavailable local role does not cover the entire editor. Conflicting drafts and fatal failures retain their blocking recovery/error presentation.
 - Add an actual browser pointer/keyboard regression and a real-WASM stale-command recovery regression to CI; require the notice helper in verified packages.
 - Known limitation: grouped native Undo and whole-alternative Escape cancellation remain open under [#995](https://github.com/terraphim/terraphim-ai/issues/995). This update fixes notice presentation and does not change native history ownership.

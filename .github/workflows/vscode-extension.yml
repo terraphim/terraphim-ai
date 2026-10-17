@@ -96,7 +96,7 @@ jobs:
         run: |
           npx playwright-core install --with-deps chromium
           npm run test:notice-ui
-      - name: Exercise consumed and unhandled stash shortcuts in the actual UI
+      - name: Exercise consumed and unhandled editor shortcuts in the actual UI
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:shortcut-ui
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
