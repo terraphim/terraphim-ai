@@ -157,15 +157,30 @@ test('actual checkpoint enforces the exact UTF-8 16MiB encoded boundary',async()
   assert.throws(()=>validateCheckpoint(oversized,saved.presentationSource,body),/limit/);
  } finally {await page.close();}
 });
-test('full admitted near-16MiB source captures without silently reducing the document bound',async()=>{
+test('full admitted near-16MiB source survives chunk transport and actual history transfer',async()=>{
  const source='x'.repeat(16*1024*1024-1024);
  assert.ok(Buffer.byteLength(source)<16*1024*1024);
- const page=await editorPage(source);
+ const a=await editorPage(source);let b;
  try {
-  const saved=await checkpoint(page);
-  assert.equal(saved.presentationSource,source);
-  assert.equal(saved.history[saved.historyIndex].text,source);
- } finally {await page.close();}
+  await a.evaluate(()=>editor.surface.replaceRange(editor.surface.getText().length,editor.surface.getText().length,'!',{source:'api'}));
+  const saved=await checkpoint(a);
+  assert.equal(saved.presentationSource.length,source.length+1);
+  const {chunks,LIMIT,CHUNK_UNITS}=require('../media/history-checkpoint.js');
+  const transport=chunks(saved);
+  assert.equal(transport.bytes,Buffer.byteLength(JSON.stringify(saved)));
+  assert.ok(transport.bytes>LIMIT,'aggregate history must not shrink the admitted document bound');
+  assert.ok(transport.parts.length>1);
+  assert.ok(transport.parts.every(part=>part.length<=CHUNK_UNITS && Buffer.byteLength(JSON.stringify({part}))<LIMIT));
+  const reconstructed=JSON.parse(transport.parts.join(''));
+  assert.deepEqual(reconstructed,saved);
+  b=await editorPage(); await b.evaluate(source=>actual.openDocument(source),reconstructed.presentationSource);
+  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource),reconstructed);
+  assert.equal(await b.evaluate(()=>editor.surface.undo()),true);
+  assert.equal(await b.evaluate(()=>editor.surface.getText().length),source.length);
+  assert.equal(await b.evaluate(()=>editor.surface.redo()),true);
+  assert.equal(await b.evaluate(()=>editor.surface.getText().length),source.length+1);
+  assert.equal(await b.evaluate(()=>editor.surface.getText().endsWith('!')),true);
+ } finally {await a.close();await b?.close();}
 });
 test('annotation-only source CAS refuses a foreign checkpoint despite identical visible body',async()=>{
  const a=await editorPage();let b;
