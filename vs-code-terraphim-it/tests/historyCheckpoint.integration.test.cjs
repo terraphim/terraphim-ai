@@ -93,7 +93,7 @@ test('actual history transfers between real WASM instances and replays complete 
   const saved=await checkpoint(a); const accepted=await state(a);
   b=await editorPage();
   await b.evaluate(source=>actual.openDocument(source),saved.presentationSource);
-  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource),saved);
+  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource,editor),saved);
   assert.equal((await state(b)).source,accepted.source);
   assert.equal(await b.evaluate(()=>editor.surface.undo()),true);
   const undone=await state(b); assert.equal(undone.body,'Risk needs a decision.\n'); assert.ok(!undone.source.includes('Concern'));
@@ -116,7 +116,7 @@ test('unsaved A survives B cancellation and transferred Undo/Redo cannot resurre
   assert.equal(cancelled.canRedo,false);
   const saved=await checkpoint(a);
   b=await editorPage(); await b.evaluate(source=>actual.openDocument(source),saved.presentationSource);
-  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource),saved);
+  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource,editor),saved);
   assert.equal(await b.evaluate(()=>editor.surface.undo()),true);
   assert.equal((await state(b)).body,'Risk needs a decision.\n');
   assert.equal(await b.evaluate(()=>editor.surface.redo()),true);
@@ -130,7 +130,7 @@ test('transferred history remains a valid base for the next live action and full
   await startAlternative(a,'C'); await a.locator('.te-alt-input:not(.te-alt-input--new):not([readonly])').pressSequentially('oncern');
   const saved=await checkpoint(a); b=await editorPage();
   await b.evaluate(source=>actual.openDocument(source),saved.presentationSource);
-  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource),saved);
+  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource,editor),saved);
   await b.evaluate(()=>editor.altPanel.open({spanId:editor.documentApi().document_annotations().spans[0].id}));
   await b.locator('.te-alt-input--new').pressSequentially('A');
   await b.locator('.te-alt-input:not(.te-alt-input--new):not([readonly])').last().pressSequentially('larm');
@@ -174,7 +174,7 @@ test('full admitted near-16MiB source survives chunk transport and actual histor
   const reconstructed=JSON.parse(transport.parts.join(''));
   assert.deepEqual(reconstructed,saved);
   b=await editorPage(); await b.evaluate(source=>actual.openDocument(source),reconstructed.presentationSource);
-  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource),reconstructed);
+  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource,editor),reconstructed);
   assert.equal(await b.evaluate(()=>editor.surface.undo()),true);
   assert.equal(await b.evaluate(()=>editor.surface.getText().length),source.length);
   assert.equal(await b.evaluate(()=>editor.surface.redo()),true);
@@ -192,7 +192,7 @@ test('annotation-only source CAS refuses a foreign checkpoint despite identical 
   await b.evaluate(()=>editor.altPanel.finishLive()); await b.evaluate(()=>editor.altPanel.setActiveIndex(0));
   const before=await state(b); assert.equal(before.body,(await state(a)).body); assert.notEqual(before.source,saved.presentationSource);
   await assert.rejects(b.evaluate(saved=>{const api=editor.documentApi();editor.alignDocumentModel(api);
-    TerraphimHistoryCheckpoint.restore(editor.surface,saved,api.save_document());},saved),/source mismatch/);
+    TerraphimHistoryCheckpoint.restore(editor.surface,saved,api.save_document(),editor);},saved),/source mismatch/);
   assert.deepEqual(await state(b),before,'refused foreign checkpoint does not mutate actual accepted source/history');
  } finally {await a.close();await b?.close();}
 });
@@ -207,4 +207,77 @@ test('real-checkpoint non-finite positions and references are rejected without e
   assert.throws(()=>validateCheckpoint(invalidReference,saved.presentationSource,body),/non-finite|finite JSON/);
   assert.deepEqual(await checkpoint(page),saved,'refused validation leaves actual editor history unchanged');
  } finally {await page.close();}
+});
+test('real ghost receipt and Overflow history survive transfer with exact annotated Undo/Redo',async()=>{
+ const original='Risk remains. Perhaps we might basically need to possibly review the very complex arrangement because the supplier could in some ways delay the launch.\n';
+ const a=await editorPage(original);let b;
+ try {
+  await a.evaluate(()=>{
+    try {
+      editor.documentApi().kg_load_thesaurus(JSON.stringify({name:'History fixture',data:{risk:{id:1,nterm:'risk',display_value:'Risk',pinned:false}}}));
+      editor.documentApi().trim_plan_json();
+      editor.commitTrimGhosts('sharper',[]);
+    } catch(error) {throw new Error(JSON.stringify(error));}
+  });
+  const ghosted=await state(a);assert.ok(ghosted.annotations.ghosts.length>0,'actual Rust trim creates ghost receipt');
+  await a.evaluate(()=>editor.stashRange(0,4));
+  const final=await state(a);assert.ok(final.source.includes('Risk'));
+  const saved=await checkpoint(a);
+  b=await editorPage();await b.evaluate(source=>actual.openDocument(source),saved.presentationSource);
+  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource,editor),saved);
+  assert.equal(await b.evaluate(()=>editor.surface.undo()),true);
+  assert.equal((await state(b)).source,ghosted.source);
+  const ghostUndo=await b.evaluate(()=>({ok:editor.surface.undo(),notice:editor.notice,warning:editor.warning,conflict:editor.ghostHistoryConflict}));
+  assert.equal(ghostUndo.ok,true,JSON.stringify(ghostUndo));
+  assert.equal((await state(b)).body,original);assert.equal((await state(b)).annotations.ghosts.length,0);
+  assert.equal(await b.evaluate(()=>editor.surface.redo()),true);assert.equal((await state(b)).source,ghosted.source);
+  assert.equal(await b.evaluate(()=>editor.surface.redo()),true);assert.equal((await state(b)).source,final.source);
+ } finally {await a.close();await b?.close();}
+});
+test('real Unicode UTF-16 anchors and CRLF presentation survive whole-action transfer',async()=>{
+ const prefix='🧠 Café e\u0301 Ελληνικά Риск. ';
+ const a=await editorPage(prefix+'Risk needs a decision.\r\n');let b;
+ try {
+  assert.notEqual(prefix.length,[...prefix].length,'non-BMP fixture distinguishes UTF-16 anchors');
+  await a.evaluate(start=>editor.altPanel.open({start,end:start+4,kind:'word'}),prefix.length);
+  await a.locator('.te-alt-input--new').pressSequentially('C');
+  const first=await checkpoint(a);
+  const canonical=await a.evaluate(source=>actual.bindings.host_presentation_source(source.replace(/\n/g,'\r\n')),first.presentationSource);
+  assert.equal(canonical,first.presentationSource,'existing Rust presentation conversion canonicalizes CRLF');
+  const base=await a.evaluate(()=>editor.surface.history.indexOf(editor.altPanel.live.base));
+  await a.locator('.te-alt-input:not(.te-alt-input--new):not([readonly])').pressSequentially('oncern');
+  assert.equal(await a.evaluate(()=>editor.surface.history.indexOf(editor.altPanel.live.base)),base);
+  await a.locator('.te-alt-input:not(.te-alt-input--new):not([readonly])').press('Enter');
+  const accepted=await state(a);assert.equal(accepted.annotations.spans[0].anchor.start,prefix.length);
+  const saved=await checkpoint(a);
+  b=await editorPage();await b.evaluate(source=>actual.openDocument(source),saved.presentationSource);
+  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource,editor),saved);
+  assert.equal((await state(b)).source,accepted.source);
+  assert.equal(await b.evaluate(()=>editor.surface.undo()),true);
+  assert.equal((await state(b)).body,prefix+'Risk needs a decision.\n');
+  assert.equal(await b.evaluate(()=>editor.surface.redo()),true);
+  assert.equal((await state(b)).source,accepted.source);
+  assert.equal((await state(b)).annotations.spans[0].anchor.start,prefix.length);
+ } finally {await a.close();await b?.close();}
+});
+test('real alternative swap and annotated move steps transfer in accepted order',async()=>{
+ const a=await editorPage();let b;
+ try {
+  await startAlternative(a,'C');await a.locator('.te-alt-input:not(.te-alt-input--new):not([readonly])').pressSequentially('oncern');
+  await a.locator('.te-alt-input:not(.te-alt-input--new):not([readonly])').press('Enter');
+  const authored=await state(a);
+  await a.evaluate(()=>{editor.altPanel.close();editor.swapAlternative(editor.documentApi().document_annotations().spans[0].id,0);});
+  const swapped=await state(a);
+  await a.evaluate(()=>editor.moveRange(0,4,editor.surface.getText().length));
+  const moved=await state(a);const saved=await checkpoint(a);
+  assert.ok(saved.history.some(entry=>entry.edits?.some(step=>step.swap)));
+  assert.ok(saved.history.some(entry=>entry.edits?.some(step=>step.move)));
+  b=await editorPage();await b.evaluate(source=>actual.openDocument(source),saved.presentationSource);
+  await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource,editor),saved);
+  assert.equal(await b.evaluate(()=>editor.surface.undo()),true);assert.equal((await state(b)).source,swapped.source);
+  assert.equal(await b.evaluate(()=>editor.surface.undo()),true);assert.equal((await state(b)).source,authored.source);
+  assert.equal(await b.evaluate(()=>editor.surface.undo()),true);assert.equal((await state(b)).body,'Risk needs a decision.\n');
+  for(let i=0;i<3;i++)assert.equal(await b.evaluate(()=>editor.surface.redo()),true);
+  assert.equal((await state(b)).source,moved.source);
+ }finally{await a.close();await b?.close();}
 });
