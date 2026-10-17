@@ -96,12 +96,20 @@ async function waitFor(check, description, timeout = 15000) {
     const toggle = frame.getByTitle('Toggle Write_On mode');
     if (await toggle.getAttribute('aria-pressed') !== 'true') await toggle.click();
 
-    const { exportKnowledgeGraph } = require('../media/knowledge-graph.cjs');
+    const installedNames=(await fs.readdir(extensions,{withFileTypes:true})).filter(entry=>entry.isDirectory()&&entry.name.startsWith('applied-knowledge-systems.terraphim-it-'));
+    assert.equal(installedNames.length,1,'Use only the package installed into this isolated profile');
+    const installedRoot=path.join(extensions,installedNames[0].name);
+    const installedManifest=JSON.parse(await fs.readFile(path.join(installedRoot,'package.json'),'utf8'));
+    assert.equal(installedManifest.publisher,'applied-knowledge-systems');
+    assert.equal(installedManifest.name,'terraphim-it');
+    receipt.installedVersion=installedManifest.version;
+    const installedAssets=path.join(installedRoot,'media/editor');
+    const { exportKnowledgeGraph } = require(path.join(installedRoot,'media/knowledge-graph.cjs'));
     async function capture(name, expectedTerms, expectedBody) {
       let saved;
       try { await waitFor(async () => {
         saved = await fs.readFile(filename, 'utf8');
-        const graph = JSON.parse(await exportKnowledgeGraph(saved, path.join(root, 'media/editor')));
+        const graph = JSON.parse(await exportKnowledgeGraph(saved, installedAssets));
         return (await source.innerText()).split('\n')[0] === expectedBody &&
           await page.locator('.tabs-container .tab.dirty').count() === 0 &&
           saved.split('\n')[0] === expectedBody &&
@@ -110,11 +118,11 @@ async function waitFor(check, description, timeout = 15000) {
       } catch(error) {
         const observed = await fs.readFile(filename,'utf8');
         await fs.writeFile(path.join(output,name+'.observed.md'),observed);
-        await fs.writeFile(path.join(output,name+'.observed-graph.json'),await exportKnowledgeGraph(observed,path.join(root,'media/editor')));
+        await fs.writeFile(path.join(output,name+'.observed-graph.json'),await exportKnowledgeGraph(observed,installedAssets));
         throw error;
       }
       await fs.writeFile(path.join(output, name + '.md'), saved);
-      const graph = JSON.parse(await exportKnowledgeGraph(saved, path.join(root, 'media/editor')));
+      const graph = JSON.parse(await exportKnowledgeGraph(saved, installedAssets));
       await fs.writeFile(path.join(output, name + '.knowledge-graph.json'), JSON.stringify(graph,null,2)+'\n');
       if (expectedTerms.length) {
         assert.equal(new Set(Object.values(graph.data).map(term=>term.id)).size,1);
