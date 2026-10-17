@@ -225,3 +225,20 @@ test('bundled local role enables real WASM protected trim and KG alternatives', 
     assert.ok(JSON.stringify(terms).includes('judgment'));
   } finally { bindings.kg_clear_thesaurus(); engine.free(); }
 });
+
+
+test('actual WASM recovers a stale native-history save refusal and accepts the next exact edit', async () => {
+  const {bridge,sent,conflicts} = await setup('history-rejection', 'Concern');
+  bridge.command('save'); const oldSave = sent[0];
+  // Host history advanced before its queued save was processed. The refusal
+  // carries the exact current native source; revision guards remain enforced.
+  assert.equal(bridge.receive({...oldSave,type:'reject',revision:2,source:'Conc',
+    reason:'Document changed before this operation'}),true);
+  assert.equal(bridge.paused,false); assert.equal(bridge.commandPending,null);
+  assert.equal(bridge.current.source,'Conc'); assert.deepEqual(conflicts,[]);
+  bridge.submit('Alarm'); const next=sent.at(-1);
+  assert.equal(next.type,'proposal'); assert.equal(next.revision,2);
+  assert.equal(next.beforeHash,bridge.current.sourceHash);
+  bridge.receive(ack(next,3)); assert.equal(bridge.current.source,'Alarm');
+  bridge.dispose();
+});
