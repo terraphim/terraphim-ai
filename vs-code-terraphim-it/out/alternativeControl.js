@@ -4,15 +4,45 @@ exports.registerAlternativeControl = registerAlternativeControl;
 const vscode = require("vscode");
 const crypto_1 = require("crypto");
 const knowledge_graph_cjs_1 = require("../media/knowledge-graph.cjs");
+const v8_1 = require("v8");
+const checkpointStage_1 = require("./checkpointStage");
+const history_checkpoint_1 = require("../media/history-checkpoint");
 const export_target_cjs_1 = require("../media/export-target.cjs");
 const VIEW = 'terraphimIt.alternativeControl';
 const LIMIT = 16 * 1024 * 1024;
 const hash = (source) => (0, crypto_1.createHash)('sha256').update(source, 'utf8').digest('hex');
+class AlternativeDocument {
+    constructor(uri, source, diskSource, onDispose) {
+        this.uri = uri;
+        this.source = source;
+        this.diskSource = diskSource;
+        this.onDispose = onDispose;
+        this.views = new Set();
+        this.queue = Promise.resolve();
+        this.revision = 1;
+        this.historyGeneration = 0;
+        this.disposed = false;
+        this.commandSave = false;
+        this.blocked = false;
+        this.backups = new Map();
+    }
+    dispose() {
+        this.disposed = true;
+        this.onDispose();
+        for (const view of this.views) {
+            view.stage.clear();
+            if (view.flush) {
+                clearTimeout(view.flush.timer);
+                view.flush.reject(new Error('Document disposed'));
+            }
+        }
+        this.views.clear();
+    }
+}
 function registerAlternativeControl(context) {
     const provider = new AlternativeControlProvider(context.extensionUri);
-    context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW, provider, {
-        supportsMultipleEditorsPerDocument: true,
-        webviewOptions: { retainContextWhenHidden: true },
+    context.subscriptions.push(provider, vscode.window.registerCustomEditorProvider(VIEW, provider, {
+        supportsMultipleEditorsPerDocument: true, webviewOptions: { retainContextWhenHidden: true },
     }));
     context.subscriptions.push(vscode.commands.registerCommand('terraphimIt.openAlternativeControl', async () => {
         const uri = vscode.window.activeTextEditor?.document.uri;
@@ -24,202 +54,433 @@ function registerAlternativeControl(context) {
                 await vscode.commands.executeCommand('vscode.openWith', selected[0], VIEW);
         }
     }));
-    context.subscriptions.push(vscode.commands.registerCommand('terraphimIt.exportKnowledgeGraph', () => provider.requestKnowledgeGraphExport()));
+    context.subscriptions.push(vscode.commands.registerCommand('terraphimIt.exportKnowledgeGraph', () => provider.activeCommand('request-export')));
+    for (const command of ['undo', 'redo'])
+        context.subscriptions.push(vscode.commands.registerCommand('terraphimIt.' + command, () => provider.activeCommand('request-history', command)));
 }
 class AlternativeControlProvider {
     constructor(extensionUri) {
         this.extensionUri = extensionUri;
         this.resources = new Map();
+        this.changes = new vscode.EventEmitter();
+        this.onDidChangeCustomDocument = this.changes.event;
+        this.subscriptions = [];
+        this.subscriptions.push(vscode.workspace.onDidChangeTextDocument(event => {
+            if (!event.contentChanges.length)
+                return;
+            const doc = this.resources.get(event.document.uri.toString());
+            if (doc && event.document.getText() !== doc.source)
+                void this.external(doc, true);
+        }));
+        const watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
+        for (const event of [watcher.onDidChange, watcher.onDidCreate, watcher.onDidDelete])
+            this.subscriptions.push(event(uri => {
+                const doc = this.resources.get(uri.toString());
+                if (doc)
+                    void this.external(doc).catch(error => this.block(doc, String(error)));
+            }));
+        this.subscriptions.push(watcher);
     }
-    async requestKnowledgeGraphExport() {
-        for (const [resource, state] of this.resources) {
-            for (const view of state.views) {
-                if (view.panel.active) {
-                    await view.panel.webview.postMessage({ protocol: 1, type: 'request-export', resource,
-                        session: view.session, format: 'knowledge-graph' });
+    dispose() { this.subscriptions.forEach(item => item.dispose()); this.changes.dispose(); }
+    media() { return vscode.Uri.joinPath(this.extensionUri, 'media'); }
+    enqueue(doc, operation) {
+        const next = doc.queue.then(() => { if (doc.disposed)
+            throw new Error('Document disposed'); return operation(); });
+        doc.queue = next.catch(() => undefined);
+        return next;
+    }
+    async readDisk(uri) {
+        if (uri.scheme === 'untitled')
+            return '';
+        return new TextDecoder('utf-8', { fatal: true }).decode(await vscode.workspace.fs.readFile(uri));
+    }
+    normal(uri) { return vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString() && !d.isClosed); }
+    checkSize(source) { if (Buffer.byteLength(source, 'utf8') > LIMIT)
+        throw new Error('Document exceeds source/message limit'); }
+    clearStage(view) { view.stage.clear(); }
+    sync(doc, view, type = 'sync', extra = {}) {
+        const source = doc.source, revision = doc.revision, historyGeneration = doc.historyGeneration, checkpoint = doc.checkpoint;
+        const send = async () => {
+            if (['reject', 'resource-conflict', 'sync', 'init'].includes(type))
+                this.clearStage(view);
+            const token = checkpoint ? (0, crypto_1.randomUUID)() : undefined;
+            if (checkpoint) {
+                const encoded = (0, history_checkpoint_1.chunks)(checkpoint);
+                for (let index = 0; index < encoded.parts.length; index++)
+                    await view.panel.webview.postMessage({ protocol: 1, type: 'checkpoint-chunk', resource: doc.uri.toString(), session: view.session,
+                        revision, sourceHash: hash(source), historyGeneration, token, index, total: encoded.parts.length, bytes: encoded.bytes, text: encoded.parts[index] });
+            }
+            return view.panel.webview.postMessage({ protocol: 1, type, resource: doc.uri.toString(), session: view.session,
+                revision, source, checkpointToken: token, historyGeneration, active: view.panel.active, viewEpoch: view.epoch, ...extra });
+        };
+        const result = (view.sending ?? Promise.resolve(true)).then(send);
+        view.sending = result.catch(() => false);
+        return result;
+    }
+    stageIdentity(doc, view) {
+        return { resource: doc.uri.toString(), session: view.session, revision: doc.revision, sourceHash: hash(doc.source), historyGeneration: doc.historyGeneration };
+    }
+    stage(doc, view, message) {
+        const heap = (0, v8_1.getHeapStatistics)(), capacity = Math.min(503 * LIMIT, Math.floor((heap.heap_size_limit - heap.used_heap_size) / 4));
+        view.stage.receive(message, this.stageIdentity(doc, view), capacity);
+    }
+    consumeStage(doc, view, message) {
+        return view.stage.consume(message.checkpointToken, this.stageIdentity(doc, view));
+    }
+    async broadcast(doc, extra = {}) {
+        await Promise.all([...doc.views].map(view => this.sync(doc, view, 'sync', extra)));
+    }
+    async block(doc, reason, externalSource) {
+        doc.blocked = true;
+        if (externalSource !== undefined)
+            doc.conflictSource = externalSource;
+        await Promise.all([...doc.views].map(view => this.sync(doc, view, 'resource-conflict', { reason })));
+    }
+    async external(doc, fromNormal = false) {
+        await this.enqueue(doc, async () => {
+            const source = fromNormal ? this.normal(doc.uri)?.getText() ?? await this.readDisk(doc.uri) : await this.readDisk(doc.uri);
+            if (source === doc.diskSource && !this.normal(doc.uri)?.isDirty)
+                return;
+            if (doc.blocked) {
+                await this.block(doc, 'External document changes need an explicit recovery choice', source);
+                return;
+            }
+            if (source === doc.source) {
+                if (this.normal(doc.uri)?.isDirty !== true)
+                    doc.diskSource = source;
+                return;
+            }
+            if (doc.source !== doc.diskSource || this.normal(doc.uri)?.isDirty) {
+                await this.block(doc, 'External document changes need an explicit recovery choice', source);
+                return;
+            }
+            this.checkSize(source);
+            doc.source = source;
+            doc.diskSource = source;
+            doc.checkpoint = undefined;
+            doc.revision++;
+            doc.historyGeneration++;
+            await this.broadcast(doc);
+        });
+    }
+    async openCustomDocument(uri, options, _token) {
+        const disk = await this.readDisk(uri);
+        const source = options.backupId ? await this.readDisk(vscode.Uri.parse(options.backupId)) : this.normal(uri)?.getText() ?? disk;
+        this.checkSize(source);
+        const doc = new AlternativeDocument(uri, source, disk, () => { if (this.resources.get(uri.toString()) === doc)
+            this.resources.delete(uri.toString()); });
+        this.resources.set(uri.toString(), doc);
+        return doc;
+    }
+    async activeCommand(type, command) {
+        for (const doc of this.resources.values())
+            for (const view of doc.views)
+                if (view.panel.active && vscode.window.state.focused) {
+                    const nonce = type === 'request-history' ? (0, crypto_1.randomUUID)() : undefined;
+                    if (nonce)
+                        view.historyCommand = { nonce, epoch: view.epoch };
+                    await view.panel.webview.postMessage({ protocol: 1, type, resource: doc.uri.toString(), session: view.session, command, historyCommandNonce: nonce, viewEpoch: view.epoch, format: 'knowledge-graph' });
                     return;
                 }
+        await vscode.window.showInformationMessage('Open and focus Terraphim Alternative Control first.');
+    }
+    async flush(doc) {
+        await Promise.all([...doc.views].map(view => {
+            if (view.flush)
+                return Promise.reject(new Error('A document snapshot is already pending'));
+            return new Promise((resolve, reject) => {
+                const nonce = (0, crypto_1.randomUUID)();
+                const timer = setTimeout(() => { view.flush = undefined; reject(new Error('Editor snapshot did not settle; draft retained')); }, 15000);
+                view.flush = { nonce, resolve, reject, timer };
+                void view.panel.webview.postMessage({ protocol: 1, type: 'flush-request', resource: doc.uri.toString(), session: view.session, nonce });
+            });
+        }));
+    }
+    async persist(doc, target, token, alreadyFlushed = false) {
+        const sameTarget = target.toString() === doc.uri.toString();
+        let targetBefore;
+        if (!sameTarget) {
+            try {
+                targetBefore = await this.readDisk(target);
+            }
+            catch (error) {
+                if (!(error instanceof vscode.FileSystemError && error.code === 'FileNotFound'))
+                    throw error;
             }
         }
-        await vscode.window.showInformationMessage('Open a Markdown document with Terraphim Alternative Control to export its knowledge graph.');
+        if (!alreadyFlushed)
+            await this.flush(doc);
+        await this.enqueue(doc, async () => {
+            if (token.isCancellationRequested)
+                throw new vscode.CancellationError();
+            if (doc.blocked)
+                throw new Error('Resolve external document conflict before saving');
+            const sibling = this.normal(target);
+            if (sibling?.isDirty)
+                throw new Error('Save the unsaved normal Markdown editor before saving this custom document');
+            const source = doc.source, revision = doc.revision;
+            const same = sameTarget;
+            const other = this.resources.get(target.toString());
+            if (!same && other && other.source !== other.diskSource)
+                throw new Error('Save As target has unsaved Alternative Control changes');
+            if (!same) {
+                await (0, export_target_cjs_1.assertSeparateExportTarget)(doc.uri.toString(), target.toString(), [
+                    ...vscode.workspace.textDocuments.filter(item => item.isDirty).map(item => item.uri.toString()),
+                    ...[...this.resources.values()].filter(item => item.source !== item.diskSource || item.blocked).map(item => item.uri.toString())
+                ]);
+                let now;
+                try {
+                    now = await this.readDisk(target);
+                }
+                catch (error) {
+                    if (!(error instanceof vscode.FileSystemError && error.code === 'FileNotFound'))
+                        throw error;
+                }
+                if (now !== targetBefore)
+                    throw new Error('Save As target changed while preparing the snapshot');
+            }
+            if (same && target.scheme !== 'untitled' && await this.readDisk(target) !== doc.diskSource) {
+                await this.block(doc, 'File changed before save', await this.readDisk(target));
+                throw new Error('File changed before save');
+            }
+            if (token.isCancellationRequested)
+                throw new vscode.CancellationError();
+            await vscode.workspace.fs.writeFile(target, Buffer.from(source, 'utf8'));
+            const actual = await this.readDisk(target);
+            if (actual !== source)
+                throw new Error('Saved file readback differs; draft retained');
+            if (same && !doc.disposed)
+                doc.diskSource = source;
+            if (doc.disposed || token.isCancellationRequested)
+                throw new vscode.CancellationError();
+            // A serialized save cannot acknowledge a later revision or clear its draft.
+            if (doc.revision !== revision || doc.source !== source)
+                throw new Error('Newer source remains unsaved');
+        });
     }
-    resolveCustomTextEditor(document, panel) {
-        const resource = document.uri.toString();
-        let state = this.resources.get(resource);
-        if (!state) {
-            state = { views: new Set(), queue: Promise.resolve() };
-            this.resources.set(resource, state);
-        }
-        const current = state;
-        const view = { session: (0, crypto_1.randomUUID)(), panel, lastRequest: 0 };
-        current.views.add(view);
-        const media = vscode.Uri.joinPath(this.extensionUri, 'media');
+    async saveCustomDocument(doc, token) { await this.persist(doc, doc.uri, token, doc.commandSave); }
+    async saveCustomDocumentAs(doc, target, token) { await this.persist(doc, target, token); }
+    async revertCustomDocument(doc, token) {
+        const source = await this.readDisk(doc.uri);
+        if (token.isCancellationRequested)
+            throw new vscode.CancellationError();
+        await this.enqueue(doc, async () => {
+            doc.source = source;
+            doc.diskSource = source;
+            doc.conflictSource = undefined;
+            doc.blocked = false;
+            doc.checkpoint = undefined;
+            doc.revision++;
+            doc.historyGeneration++;
+            await this.broadcast(doc, { reverted: true });
+        });
+    }
+    async backupCustomDocument(doc, context, token) {
+        await this.flush(doc);
+        const source = await this.enqueue(doc, async () => doc.source);
+        if (token.isCancellationRequested)
+            throw new vscode.CancellationError();
+        await vscode.workspace.fs.writeFile(context.destination, Buffer.from(source, 'utf8'));
+        if (await this.readDisk(context.destination) !== source)
+            throw new Error('Recovery snapshot readback differs');
+        if (token.isCancellationRequested)
+            throw new vscode.CancellationError();
+        const id = context.destination.toString(), epoch = (0, crypto_1.randomUUID)();
+        doc.backups.set(id, epoch);
+        return { id, delete: () => {
+                void (async () => {
+                    if (doc.backups.get(id) !== epoch)
+                        return;
+                    if (await this.readDisk(context.destination) !== source)
+                        return;
+                    if (doc.backups.get(id) !== epoch)
+                        return;
+                    doc.backups.delete(id);
+                    await vscode.workspace.fs.delete(context.destination);
+                })().catch(() => undefined);
+            } };
+    }
+    async resolveCustomEditor(doc, panel, _token) {
+        const resource = doc.uri.toString(), view = { session: (0, crypto_1.randomUUID)(), panel, lastRequest: 0, epoch: 0, stage: new checkpointStage_1.CheckpointStage() };
+        doc.views.add(view);
+        const media = this.media();
         panel.webview.options = { enableScripts: true, localResourceRoots: [media] };
         panel.webview.html = html(panel.webview, media);
         let disposed = false;
-        const sync = (type = 'sync', extra = {}) => panel.webview.postMessage({
-            protocol: 1, type, resource, session: view.session, revision: document.version,
-            source: document.getText(), ...extra,
-        });
-        const writeExport = async (message, output, format) => {
-            let terminal = 'command-complete';
-            let reason;
-            const unchanged = () => !disposed && !document.isClosed && document.version === message.revision
-                && hash(document.getText()) === message.sourceHash;
-            try {
-                if (typeof output !== 'string' || Buffer.byteLength(output, 'utf8') > LIMIT)
-                    throw new Error('Invalid export output');
-                if (!unchanged())
-                    throw new Error('Document changed while preparing export');
-                const graph = format === 'knowledge-graph';
-                const target = await vscode.window.showSaveDialog({
-                    filters: graph ? { 'Knowledge graph': ['json'] } : { Markdown: ['md'] },
-                    defaultUri: document.uri.with({ path: document.uri.path.replace(/\.md$/i, '') + (graph ? '.knowledge-graph.json' : '.clean.md') }),
-                });
-                if (!target || disposed)
-                    return;
-                if (!unchanged())
-                    throw new Error('Document changed while choosing export destination');
-                await (0, export_target_cjs_1.assertSeparateExportTarget)(resource, target.toString(), vscode.workspace.textDocuments.filter(d => d.isDirty).map(d => d.uri.toString()));
-                if (!unchanged())
-                    throw new Error('Document changed while checking export destination');
-                if (target.toString() === resource || vscode.workspace.textDocuments.some(d => d.uri.toString() === target.toString() && d.isDirty)) {
-                    throw new Error('Choose a separate output file with no unsaved changes.');
-                }
-                await vscode.workspace.fs.writeFile(target, Buffer.from(output, 'utf8'));
-                await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(target));
-            }
-            catch (error) {
-                terminal = 'reject';
-                reason = String(error);
-            }
-            finally {
-                await sync(terminal, { id: message.id, reason });
-            }
-        };
-        const changed = vscode.workspace.onDidChangeTextDocument(event => {
-            if (event.document.uri.toString() !== resource || event.contentChanges.length === 0)
-                return;
-            const origin = current.inFlight?.source === document.getText() ? current.inFlight : undefined;
-            void sync('sync', { originSession: origin?.session, originId: origin?.id });
-        });
+        const stateListener = panel.onDidChangeViewState(() => { view.epoch++; view.historyCommand = undefined; void panel.webview.postMessage({ protocol: 1, type: 'view-state', resource, session: view.session, active: panel.active, viewEpoch: view.epoch }); });
         const listener = panel.webview.onDidReceiveMessage((value) => {
             if (!value || typeof value !== 'object')
                 return;
             const message = value;
             if (message.type === 'ready') {
-                void sync('init');
+                void this.sync(doc, view, 'init');
                 return;
             }
             if (message.protocol !== 1 || message.resource !== resource || message.session !== view.session)
                 return;
-            current.queue = current.queue.then(async () => {
-                if (disposed || document.isClosed)
-                    return;
-                if (['export-result', 'export-refused'].includes(message.type) && message.id !== view.exportPending)
-                    return;
-                if (message.type === 'export-refused') {
-                    view.exportPending = undefined;
-                    await sync('reject', { id: message.id, reason: 'Export snapshot changed before it could be produced' });
+            if (message.type === 'checkpoint-chunk') {
+                try {
+                    this.stage(doc, view, message);
+                }
+                catch { /* The matching proposal receives the retained stage refusal. */ }
+                return;
+            }
+            if (message.type === 'flush-refused' && message.nonce === view.flush?.nonce) {
+                const pending = view.flush;
+                clearTimeout(pending.timer);
+                view.flush = undefined;
+                pending.reject(new Error('A view retains a conflicting draft; resolve it before saving'));
+                return;
+            }
+            if (message.type === 'flush-complete' && message.nonce === view.flush?.nonce) {
+                const pending = view.flush;
+                clearTimeout(pending.timer);
+                view.flush = undefined;
+                if (message.revision === doc.revision && message.sourceHash === hash(doc.source) && message.historyGeneration === doc.historyGeneration)
+                    pending.resolve();
+                else
+                    pending.reject(new Error('Snapshot changed before save'));
+                return;
+            }
+            if (message.type === 'save') {
+                // Release no source proposal until the native Save lifecycle has finished.
+                // That lifecycle skips a second webview flush because this exact command
+                // was already sent behind the acknowledged source/history barrier.
+                if (!panel.active || !vscode.window.state.focused || message.revision !== doc.revision || message.sourceHash !== hash(doc.source) || !Number.isSafeInteger(message.id) || (message.id ?? 0) <= view.lastRequest || doc.commandSave) {
+                    void this.sync(doc, view, 'reject', { id: message.id, reason: 'Return focus to this exact document before saving' });
                     return;
                 }
-                const source = document.getText();
+                view.lastRequest = message.id;
+                doc.commandSave = true;
+                void vscode.commands.executeCommand('workbench.action.files.save').then(() => this.sync(doc, view, 'command-complete', { id: message.id }), error => this.sync(doc, view, 'reject', { id: message.id, reason: String(error) })).then(() => { doc.commandSave = false; }, () => { doc.commandSave = false; });
+                return;
+            }
+            void this.enqueue(doc, async () => {
+                if (disposed)
+                    return;
+                if (message.type === 'resolve-conflict') {
+                    if (message.revision !== doc.revision || message.sourceHash !== hash(doc.source))
+                        throw new Error('Stale conflict recovery request');
+                    if (doc.blocked) {
+                        const disk = await this.readDisk(doc.uri);
+                        doc.diskSource = disk;
+                        doc.source = this.normal(doc.uri)?.isDirty ? this.normal(doc.uri).getText() : disk;
+                        doc.conflictSource = undefined;
+                        doc.blocked = false;
+                        doc.checkpoint = undefined;
+                        doc.revision++;
+                        doc.historyGeneration++;
+                        this.changes.fire({ document: doc });
+                        await this.broadcast(doc, { reverted: true });
+                    }
+                    return;
+                }
                 const expected = message.type === 'proposal' ? message.beforeHash : message.sourceHash;
-                if (message.revision !== document.version || expected !== hash(source)) {
-                    if (message.type === 'export-result')
-                        view.exportPending = undefined;
-                    await sync('reject', { id: message.id, reason: 'Document changed before this operation' });
+                if (message.revision !== doc.revision || expected !== hash(doc.source)) {
+                    await this.sync(doc, view, 'reject', { id: message.id, reason: 'Document changed before this operation' });
                     return;
                 }
-                if (message.type === 'proposal') {
-                    if (typeof message.source !== 'string' || Buffer.byteLength(message.source, 'utf8') > LIMIT
-                        || !Number.isSafeInteger(message.id) || (message.id ?? 0) <= view.lastRequest
-                        || hash(message.source) !== message.sourceHash) {
-                        await sync('reject', { id: message.id, reason: 'Invalid text proposal' });
+                if (message.type === 'recover-draft') {
+                    if (typeof message.source !== 'string')
                         return;
-                    }
-                    if (message.source === source) {
-                        await sync('reject', { id: message.id, reason: 'No document change' });
-                        return;
-                    }
-                    view.lastRequest = message.id;
-                    const edit = new vscode.WorkspaceEdit();
-                    edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(source.length)), message.source);
-                    current.inFlight = { session: view.session, id: message.id, source: message.source };
-                    try {
-                        const applied = await vscode.workspace.applyEdit(edit);
-                        if (applied && document.getText() === message.source)
-                            await sync('ack', { id: message.id });
-                        else
-                            await sync('reject', { id: message.id, reason: 'Host did not produce the exact proposed output' });
-                    }
-                    finally {
-                        current.inFlight = undefined;
-                    }
-                }
-                else if (message.type === 'recover-draft') {
-                    if (typeof message.source !== 'string' || Buffer.byteLength(message.source, 'utf8') > LIMIT)
-                        return;
+                    this.checkSize(message.source);
                     const recovered = await vscode.workspace.openTextDocument({ language: 'markdown', content: message.source });
                     if (!disposed)
                         await vscode.commands.executeCommand('vscode.openWith', recovered.uri, VIEW);
+                    return;
                 }
-                else if (message.type === 'export-result') {
-                    // Keep the command barrier until the destination dialog and output
-                    // write finish, including cancellation and refusal paths.
-                    view.exportPending = undefined;
-                    await writeExport(message, message.source, 'markdown');
-                }
-                else if (message.type === 'undo' || message.type === 'redo') {
-                    // These commands route through the focused editor. A queued request
-                    // must never alter a different document after the user switches tabs.
-                    if (!panel.active || !vscode.window.state.focused) {
-                        await sync('reject', { id: message.id, reason: 'Return focus to this editor before changing its history' });
-                        return;
+                if (message.type === 'proposal' || message.type === 'history-update') {
+                    if (doc.blocked)
+                        throw new Error('Resolve external document conflict before editing');
+                    if (!Number.isSafeInteger(message.id) || (message.id ?? 0) <= view.lastRequest || message.historyGeneration !== doc.historyGeneration)
+                        throw new Error('Stale history/source transaction');
+                    view.lastRequest = message.id;
+                    const checkCommand = () => {
+                        if (message.historyCommandNonce && (!panel.active || !vscode.window.state.focused || !view.historyCommand
+                            || view.historyCommand.nonce !== message.historyCommandNonce || view.historyCommand.epoch !== message.viewEpoch || view.epoch !== message.viewEpoch))
+                            throw new Error('History command no longer targets the active view');
+                    };
+                    checkCommand();
+                    const source = message.type === 'proposal' ? message.source : doc.source;
+                    if (typeof source !== 'string')
+                        throw new Error('Invalid source proposal');
+                    this.checkSize(source);
+                    if (message.type === 'proposal' && source === doc.source)
+                        throw new Error('No document change');
+                    if (message.type === 'proposal' && hash(source) !== message.sourceHash)
+                        throw new Error('Proposed hash mismatch');
+                    const projection = await (0, knowledge_graph_cjs_1.checkpointProjection)(source, vscode.Uri.joinPath(media, 'editor').fsPath);
+                    const checkpoint = (0, history_checkpoint_1.validateCheckpoint)(this.consumeStage(doc, view, message), projection.presentationSource, projection.body, true);
+                    checkCommand();
+                    if (message.historyCommandNonce)
+                        view.historyCommand = undefined;
+                    doc.checkpoint = checkpoint;
+                    doc.historyGeneration++;
+                    if (source !== doc.source) {
+                        doc.source = source;
+                        doc.revision++;
+                        this.changes.fire({ document: doc });
                     }
-                    await vscode.commands.executeCommand(message.type);
+                    await this.sync(doc, view, message.type === 'proposal' ? 'ack' : 'history-ack', { id: message.id });
+                    await Promise.all([...doc.views].filter(item => item !== view).map(item => this.sync(doc, item, 'sync')));
+                    return;
                 }
-                else if (message.type === 'save') {
-                    if (!await document.save())
-                        throw new Error('Document save was cancelled or refused');
-                }
-                else if (message.type === 'open') {
+                if (message.type === 'open') {
                     const selected = await vscode.window.showOpenDialog({ canSelectMany: false, filters: { Markdown: ['md'] } });
                     if (selected?.[0] && !disposed)
                         await vscode.commands.executeCommand('vscode.openWith', selected[0], VIEW);
                 }
                 else if (message.type === 'export') {
-                    if (!Number.isSafeInteger(message.id) || (message.id ?? 0) <= view.lastRequest
-                        || !['markdown', 'knowledge-graph'].includes(message.format || 'markdown')) {
-                        await sync('reject', { id: message.id, reason: 'Invalid export request' });
-                        return;
-                    }
+                    if (!Number.isSafeInteger(message.id) || (message.id ?? 0) <= view.lastRequest)
+                        throw new Error('Invalid export request');
                     view.lastRequest = message.id;
-                    if (message.format === 'knowledge-graph') {
-                        const output = await (0, knowledge_graph_cjs_1.exportKnowledgeGraph)(source, vscode.Uri.joinPath(media, 'editor').fsPath);
-                        await writeExport(message, output, 'knowledge-graph');
-                    }
+                    if (message.format === 'knowledge-graph')
+                        await this.writeExport(doc, view, message, await (0, knowledge_graph_cjs_1.exportKnowledgeGraph)(doc.source, vscode.Uri.joinPath(media, 'editor').fsPath), 'knowledge-graph');
                     else {
                         view.exportPending = message.id;
-                        await panel.webview.postMessage({
-                            protocol: 1, type: 'export-request', id: message.id, resource, session: view.session,
-                            revision: document.version, sourceHash: hash(document.getText()),
-                        });
+                        await panel.webview.postMessage({ protocol: 1, type: 'export-request', id: message.id, resource, session: view.session, revision: doc.revision, sourceHash: hash(doc.source) });
+                        return;
                     }
                 }
-                if (['undo', 'redo', 'save', 'open'].includes(message.type)) {
-                    await sync('command-complete', { id: message.id });
+                else if (message.type === 'export-result' || message.type === 'export-refused') {
+                    if (message.id !== view.exportPending)
+                        return;
+                    view.exportPending = undefined;
+                    if (message.type === 'export-refused')
+                        throw new Error('Export snapshot changed before it could be produced');
+                    await this.writeExport(doc, view, message, message.source, 'markdown');
                 }
-            }).catch(error => { void sync('reject', { id: message.id, reason: String(error) }); });
+                await this.sync(doc, view, 'command-complete', { id: message.id });
+            }).catch(error => { void this.sync(doc, view, 'reject', { id: message.id, reason: String(error) }); });
         });
-        panel.onDidDispose(() => {
-            disposed = true;
-            listener.dispose();
-            changed.dispose();
-            current.views.delete(view);
-            if (current.views.size === 0)
-                this.resources.delete(resource);
-        });
+        panel.onDidDispose(() => { disposed = true; listener.dispose(); stateListener.dispose(); this.clearStage(view); if (view.flush) {
+            clearTimeout(view.flush.timer);
+            view.flush.reject(new Error('View closed before snapshot completed'));
+        } doc.views.delete(view); });
+    }
+    async writeExport(doc, view, message, output, format) {
+        const resource = doc.uri.toString(), unchanged = () => !doc.disposed && doc.revision === message.revision && hash(doc.source) === message.sourceHash;
+        this.checkSize(output);
+        if (!unchanged())
+            throw new Error('Document changed while preparing export');
+        const graph = format === 'knowledge-graph';
+        const target = await vscode.window.showSaveDialog({ filters: graph ? { 'Knowledge graph': ['json'] } : { Markdown: ['md'] }, defaultUri: doc.uri.with({ path: doc.uri.path.replace(/\.md$/i, '') + (graph ? '.knowledge-graph.json' : '.clean.md') }) });
+        if (!target)
+            return;
+        if (!unchanged())
+            throw new Error('Document changed while choosing export destination');
+        const dirtyTargets = () => [...vscode.workspace.textDocuments.filter(d => d.isDirty).map(d => d.uri.toString()),
+            ...[...this.resources.values()].filter(item => item.source !== item.diskSource || item.blocked).map(item => item.uri.toString())];
+        await (0, export_target_cjs_1.assertSeparateExportTarget)(resource, target.toString(), dirtyTargets());
+        if (!unchanged())
+            throw new Error('Document changed while checking export destination');
+        await (0, export_target_cjs_1.assertSeparateExportTarget)(resource, target.toString(), dirtyTargets());
+        if (!unchanged())
+            throw new Error('Document changed before export write');
+        await vscode.workspace.fs.writeFile(target, Buffer.from(output, 'utf8'));
+        if (await this.readDisk(target) !== output)
+            throw new Error('Export readback differs');
+        await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(target));
     }
 }
 function escape(value) {
@@ -229,6 +490,7 @@ function html(webview, media) {
     const assets = webview.asWebviewUri(vscode.Uri.joinPath(media, 'editor')).toString() + '/';
     const script = webview.asWebviewUri(vscode.Uri.joinPath(media, 'alternative-control.js')).toString();
     const hostStyle = webview.asWebviewUri(vscode.Uri.joinPath(media, 'alternative-control.css')).toString();
+    const historyCheckpoint = webview.asWebviewUri(vscode.Uri.joinPath(media, 'history-checkpoint.js')).toString();
     const hostNotice = webview.asWebviewUri(vscode.Uri.joinPath(media, 'host-notice.js')).toString();
     const intent = webview.asWebviewUri(vscode.Uri.joinPath(media, 'export-intent.js')).toString();
     const nonce = (0, crypto_1.randomUUID)();
@@ -241,6 +503,7 @@ function html(webview, media) {
 <script nonce="${nonce}" src="${escape(assets)}host-session.js"></script>
 <script nonce="${nonce}" src="${escape(intent)}"></script>
 <script nonce="${nonce}" src="${escape(hostNotice)}"></script>
+<script nonce="${nonce}" src="${escape(historyCheckpoint)}"></script>
 <script nonce="${nonce}" src="${escape(script)}"></script></body></html>`;
 }
 //# sourceMappingURL=alternativeControl.js.map

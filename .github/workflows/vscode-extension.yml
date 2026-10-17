@@ -105,3 +105,111 @@ jobs:
           name: vscode-native-${{ matrix.os }}-${{ github.sha }}
           path: vs-code-terraphim-it/native-results
           if-no-files-found: error
+
+  alternative-history:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [default, autosave, split, external]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: vs-code-terraphim-it
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: vscode-package-${{ github.sha }}
+          path: vs-code-terraphim-it
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check frozen package identity
+        run: python3 -c "import hashlib,json,pathlib; p=pathlib.Path('terraphim-it.vsix'); assert hashlib.sha256(p.read_bytes()).hexdigest()==json.load(open('release-manifest.json'))['sha256']"
+      - name: Exercise actual packaged Alternative Control history
+        env:
+          TERRAPHIM_HISTORY_AUTOSAVE: ${{ matrix.mode == 'autosave' && '1' || '0' }}
+          TERRAPHIM_HISTORY_SPLIT: ${{ matrix.mode == 'split' && '1' || '0' }}
+          TERRAPHIM_HISTORY_EXTERNAL: ${{ matrix.mode == 'external' && '1' || '0' }}
+          TERRAPHIM_HISTORY_OUTPUT: native-results/history-${{ matrix.mode }}
+        run: xvfb-run -a npm run test:history-ui
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: vscode-history-${{ matrix.mode }}-${{ github.sha }}
+          path: vs-code-terraphim-it/native-results
+          if-no-files-found: error
+          retention-days: 30
+
+  history-components:
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: vs-code-terraphim-it
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: vscode-package-${{ github.sha }}
+          path: vs-code-terraphim-it
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Restore exact packaged component inputs
+        run: |
+          python3 - <<'PYTHON'
+          import hashlib, json, pathlib, zipfile
+          package = pathlib.Path('terraphim-it.vsix')
+          digest = hashlib.sha256(package.read_bytes()).hexdigest()
+          assert digest == json.load(open('release-manifest.json'))['sha256']
+          inputs = {}
+          with zipfile.ZipFile(package) as archive:
+              for entry in archive.infolist():
+                  if entry.is_dir() or not entry.filename.startswith('extension/media/'):
+                      continue
+                  relative = pathlib.PurePosixPath(entry.filename).relative_to('extension')
+                  assert '..' not in relative.parts and not relative.is_absolute()
+                  target = pathlib.Path(*relative.parts)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  data = archive.read(entry)
+                  target.write_bytes(data)
+                  inputs[str(relative)] = hashlib.sha256(data).hexdigest()
+          output = pathlib.Path('native-results')
+          output.mkdir(exist_ok=True)
+          (output / 'history-component-inputs.json').write_text(json.dumps({'packageSha256': digest, 'runtimeInputs': inputs}, indent=2) + '\n')
+          PYTHON
+          python3 scripts/editor_assets.py
+      - name: Install explicit real Chromium runtime
+        run: npx playwright-core install --with-deps chromium
+      - name: Exercise complete existing-editor and real-WASM checkpoint suite
+        run: |
+          TERRAPHIM_BROWSER_EXECUTABLE="$(node -p "require('playwright-core').chromium.executablePath()")"
+          export TERRAPHIM_BROWSER_EXECUTABLE
+          test -x "$TERRAPHIM_BROWSER_EXECUTABLE"
+          set -o pipefail
+          npm run test:history-checkpoint 2>&1 | tee native-results/history-components.tap
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: vscode-history-components-${{ github.sha }}
+          path: vs-code-terraphim-it/native-results
+          if-no-files-found: error
+          retention-days: 30

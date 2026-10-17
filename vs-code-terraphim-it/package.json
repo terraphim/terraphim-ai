@@ -56,6 +56,16 @@
       {
         "command": "terraphimIt.exportKnowledgeGraph",
         "title": "Terraphim: Export Document Knowledge Graph"
+      },
+      {
+        "command": "terraphimIt.undo",
+        "title": "Terraphim: Undo (Alternative Control)",
+        "icon": "$(undo)"
+      },
+      {
+        "command": "terraphimIt.redo",
+        "title": "Terraphim: Redo (Alternative Control)",
+        "icon": "$(redo)"
       }
     ],
     "configuration": {
@@ -99,7 +109,21 @@
         ],
         "priority": "option"
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "terraphimIt.undo",
+          "when": "activeCustomEditorId == terraphimIt.alternativeControl",
+          "group": "navigation@0"
+        },
+        {
+          "command": "terraphimIt.redo",
+          "when": "activeCustomEditorId == terraphimIt.alternativeControl",
+          "group": "navigation@1"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "python3 scripts/editor_assets.py && python3 scripts/legacy_assets.py && npm run compile",
@@ -108,7 +132,7 @@
     "watch": "npx tsc -watch -p ./",
     "update-ontologies": "npx ad-generate ontologies",
     "build-rust": "python3 scripts/legacy_assets.py --build",
-    "test:host": "node --test tests/hostProtocol.test.cjs tests/completionCache.test.cjs",
+    "test:host": "node --test tests/hostProtocol.test.cjs tests/completionCache.test.cjs tests/checkpointStage.test.cjs",
     "test:assets": "python3 -m unittest discover -s tests -p \"*_test.py\"",
     "test:export": "node --test tests/knowledgeGraphExport.test.cjs tests/exportIntent.test.cjs tests/exportTarget.test.cjs",
     "editor:fetch": "python3 scripts/released_editor.py",
@@ -116,7 +140,9 @@
     "test:native": "node tests/runPackaged.cjs",
     "test:legacy": "node --test tests/legacyLinks.test.cjs",
     "test:shortcut-ui": "node tests/nativeStashShortcut.cjs",
-    "test:notice-ui": "node --test tests/hostNotice.test.cjs"
+    "test:notice-ui": "node --test tests/hostNotice.test.cjs",
+    "test:history-checkpoint": "node --test tests/historyCheckpoint.test.cjs tests/historyCheckpoint.integration.test.cjs",
+    "test:history-ui": "node tests/nativeAlternativeHistory.cjs"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",

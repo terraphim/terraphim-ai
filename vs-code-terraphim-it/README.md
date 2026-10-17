@@ -4,7 +4,7 @@ Keep alternatives beside your writing, swap wording, and share their knowledge g
 
 1. Open a Markdown file and run **Terraphim: Open Alternative Control**.
 2. Select a word such as **Risk**, add **Concern** as an alternative, and choose which wording is active.
-3. Save the document. VS Code owns persistence and undo/redo; the annotation block preserves the alternatives.
+3. Save the document. VS Code manages persistence; Alternative Control keeps its existing editor history and preserves alternatives in the annotation block. Use the editor keyboard shortcuts or **Terraphim: Undo/Redo (Alternative Control)** title commands.
 4. Run **Terraphim: Export Document Knowledge Graph**, or use the editor's **Share with search** dialog. Save the JSON and export clean Markdown into a corpus folder.
 5. Use the exported graph with `terraphim-grep`, then preserve a useful decision with `terraphim-agent` as shown below.
 
@@ -161,6 +161,7 @@ npm run compile
 npm run lint
 npm run test:assets
 npm run test:host
+npm run test:history-checkpoint
 npm run test:export
 npm run test:legacy
 npm run package:vsix

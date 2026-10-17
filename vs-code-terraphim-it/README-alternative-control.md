@@ -1,11 +1,11 @@
 # Alternative Control in the existing Terraphim It extension
 
 
-Recoverable host notices can be dismissed while editing continues. Conflict recovery and fatal errors remain blocking so an unacknowledged draft cannot overwrite the native document. Version 0.1.6 does not fix grouped native Undo or whole-alternative Escape cancellation ([#995](https://github.com/terraphim/terraphim-ai/issues/995)).
+Recoverable host notices can be dismissed while editing continues. Conflict recovery and fatal errors remain blocking so an unacknowledged draft cannot overwrite the native document. Released version 0.1.6 does not fix grouped native Undo or whole-alternative Escape cancellation ([#995](https://github.com/terraphim/terraphim-ai/issues/995)).
 
 This preview is an opt-in custom Markdown editor in `applied-knowledge-systems.terraphim-it`. Open a Markdown file with **Terraphim: Open Alternative Control**. Click the word counter for Write_On. Existing server and Atomic commands remain available in trusted workspaces.
 
-The view bundles the released terraphim-editor v0.1.0-rc.2 UI, WASM and source-pinned host bridge. The bundle records its public source repository and Cargo.lock checksum. Each view has its own session; VS Code owns document revisions, persistence and undo/redo. Exact source/revision checks protect asynchronous proposals. External edits retain conflicting drafts for recovery. Native export refuses the source itself and dirty output buffers. Browser persistence is disabled in this host.
+The view bundles the released terraphim-editor v0.1.0-rc.2 UI, WASM and source-pinned host bridge. The bundle records its public source repository and Cargo.lock checksum. Each view has its own session. The next source candidate uses native custom-document persistence and transports checkpoints of the existing editor history across views; qualification is still in progress. Exact source/revision checks protect asynchronous proposals. External edits retain conflicting drafts for recovery. Native export refuses the source itself and dirty output buffers. Browser persistence is disabled in this host.
 
 **Export Document Knowledge Graph** waits for the current edit to be acknowledged, reads that exact source, and uses the shared Rust `synonyms::` parser/types to create the portable graph. It refuses malformed annotations or ambiguous concepts. The document and active role are unchanged. Save, undo, redo and reopen determine which aliases exist in the export.
 
@@ -61,3 +61,11 @@ no long-lived secrets. See Microsoft's documented
 [principal profile lookup](https://learn.microsoft.com/en-us/azure/devops/extend/publish/command-line?view=azure-devops#publish-with-a-microsoft-entra-token).
 
 Acceptance reports distinguish actual saved files, engine tests and visual UI checks. The original 41 visual requirements are not all accepted. This is a scoped preview; stock Zed visual limitations and the separate Zed fork remain outside this VSIX's claims.
+
+## Alternative Control history (next candidate; qualification pending)
+
+Use the editor keyboard Undo/Redo shortcuts or the accessible **Terraphim: Undo (Alternative Control)** and **Terraphim: Redo (Alternative Control)** title/command-palette controls. These commands are scoped to this custom view. Native Edit-menu Undo/Redo does not operate Alternative Control; ordinary Markdown editors retain their native history.
+
+Typing a new alternative remains live. Enter or leaving keeps it as one action; Escape cancels the complete addition without placing it in Redo. Saving uses native Save, Save All, autosave and backup hooks. The native dirty marker can remain after Undo returns to saved bytes until Save/Revert/autosave completes. Recovered source includes annotations; prior-session Undo history is not restored.
+
+Other custom/text views and external filesystem edits cannot silently replace a retained draft. Resolve a reported conflict explicitly or open a recovery draft. Checkpoint transport stages bounded chunks separately from source proposals and retains the existing Rust source/revision/hash guards. A capacity refusal retains the local draft; it does not silently trim history. Issue #995 stays open until exact released packages pass the approved contract.

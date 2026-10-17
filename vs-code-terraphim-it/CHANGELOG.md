@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — qualification pending
+
+- Reuse Alternative Control's existing editor history for whole-alternative Undo/Redo and Escape, with scoped Terraphim title commands and native custom-document save/autosave/backup integration.
+- Transport opaque existing-history checkpoints across views with exact source/revision/generation guards and bounded chunks. Preserve conflicting drafts and protect dirty text/custom export targets.
+- Native Edit-menu Undo/Redo does not operate this view. The native dirty marker can remain until Save/Revert/autosave; prior-session Undo is not restored by recovery. Issue #995 remains open pending released-package qualification.
+
 ## 0.1.6 (preview)
 
 - Keep all already-consumed editor keydowns inside the view, including the AI-alternatives shortcut that otherwise also opened Source Control. Unhandled keys and native editors keep their normal workbench behavior.

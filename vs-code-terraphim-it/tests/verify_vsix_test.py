@@ -29,7 +29,7 @@ class VsixTest(unittest.TestCase):
                    'extension.vsixmanifest':XML.encode(),
                    'extension/media/editor-build.json':lock, 'extension/media/editor/host-assets.json':lock,
                    'extension/media/editor/engine.wasm':data}
-        for name in ['out/extension.js','out/alternativeControl.js','out/helpers/linkReplacement.js','media/knowledge-graph.cjs','media/export-intent.js','media/export-target.cjs','media/host-notice.js','media/alternative-control.js','LICENSE.txt','readme.md','node_modules/@tomic/lib/package.json']:
+        for name in ['out/extension.js','out/alternativeControl.js','out/checkpointStage.js','out/helpers/linkReplacement.js','media/knowledge-graph.cjs','media/export-intent.js','media/export-target.cjs','media/host-notice.js','media/history-checkpoint.js','media/alternative-control.js','LICENSE.txt','readme.md','node_modules/@tomic/lib/package.json']:
             entries['extension/'+name] = b'fixture'
         legacy_data = {"rust-lib/pkg/terraphim_it.js": b'package parser fixture',
                        "rust-lib/pkg/terraphim_it_bg.wasm": b'\x00asm\x01\x00\x00\x00'}

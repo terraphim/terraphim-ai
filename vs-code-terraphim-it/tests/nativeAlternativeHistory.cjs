@@ -1,0 +1,341 @@
+/* Actual packaged VS Code UI regression; no injected events or editor models. */
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const net = require('node:net');
+const { spawn, execFileSync } = require('node:child_process');
+const { once } = require('node:events');
+const { setTimeout: delay } = require('node:timers/promises');
+const { chromium } = require('playwright-core');
+
+async function waitFor(check, description, timeout = 15000) {
+  const until = Date.now() + timeout;
+  while (Date.now() < until) {
+    if (await check()) return;
+    await delay(100);
+  }
+  throw new Error('Timed out: ' + description);
+}
+
+(async () => {
+  assert.equal(process.platform, 'linux', 'This visible-host CI regression is Linux-only');
+  const root = path.resolve(__dirname, '..');
+  const run = await fs.mkdtemp(path.join(os.tmpdir(), 'ts-'));
+  const output = path.resolve(process.env.TERRAPHIM_HISTORY_OUTPUT || path.join(root, 'native-results', path.basename(run)));
+  const profile = path.join(run, 'profile');
+  const extensions = path.join(run, 'extensions');
+  const workspace = path.join(run, 'workspace');
+  const filename = path.join(workspace, 'history.md');
+  const initial = 'Risk needs mitigation.\n';
+  const vsix = path.resolve(process.env.TERRAPHIM_HISTORY_VSIX || path.join(root, 'terraphim-it.vsix'));
+  await fs.mkdir(workspace);
+  const autosave = process.env.TERRAPHIM_HISTORY_AUTOSAVE === '1';
+  if (autosave) {
+    await fs.mkdir(path.join(profile,'User'),{recursive:true});
+    await fs.writeFile(path.join(profile,'User/settings.json'),JSON.stringify({'files.autoSave':'afterDelay','files.autoSaveDelay':200}));
+  }
+  await fs.mkdir(output, { recursive: true });
+  await fs.writeFile(filename, initial, { flag: 'wx' });
+  await fs.writeFile(path.join(workspace, 'native.md'), 'Native Markdown control.\n', { flag: 'wx' });
+  await fs.writeFile(path.join(output, 'input.md'), initial);
+  const receipt = { status: 'RUNNING', scope: 'Real isolated Linux VS Code UI whole-alternative history regression',
+    autosaveDuringLiveAddition: autosave, packageSha256: crypto.createHash('sha256').update(await fs.readFile(vsix)).digest('hex'), checks: [] };
+  await fs.copyFile(__filename,path.join(output,'executed-harness.cjs'));
+  receipt.modes={autosave,split:process.env.TERRAPHIM_HISTORY_SPLIT==='1',external:process.env.TERRAPHIM_HISTORY_EXTERNAL==='1'};
+  let app;
+  let launchError;
+  let browser;
+  let page;
+  let log;
+  let error;
+  try {
+    const executable = process.env.TERRAPHIM_VSCODE_EXECUTABLE || await require('@vscode/test-electron').downloadAndUnzipVSCode('1.126.0');
+    const cli = path.join(path.dirname(executable), 'bin', 'code');
+    const flags = ['--user-data-dir', profile, '--extensions-dir', extensions, '--no-sandbox', '--disable-gpu',
+      '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust'];
+    const env = { ...process.env };
+    delete env.ELECTRON_RUN_AS_NODE;
+    receipt.hostVersion = execFileSync(cli, [...flags, '--version'], { env, encoding:'utf8', timeout:60000 }).trim();
+    const install = execFileSync(cli, [...flags, '--install-extension', vsix], { env, encoding:'utf8', timeout:60000 });
+    await fs.writeFile(path.join(output, 'install.txt'), install);
+    const reservation = net.createServer();
+    reservation.listen(0, '127.0.0.1');
+    await once(reservation, 'listening');
+    const port = reservation.address().port;
+    await new Promise(resolve => reservation.close(resolve));
+    log = await fs.open(path.join(output, 'host.log'), 'wx');
+    app = spawn(executable, [...flags, `--remote-debugging-port=${port}`, workspace, filename],
+      { env, stdio:['ignore', log.fd, log.fd] });
+    app.once('error', caught => { launchError = caught; });
+    await waitFor(async () => {
+      if (launchError) throw launchError;
+      if (app.exitCode !== null) throw new Error(`VS Code exited before CDP: ${app.exitCode}`);
+      try {
+        const response = await fetch(`http://127.0.0.1:${port}/json/version`, { signal:AbortSignal.timeout(1000) });
+        return response.ok;
+      } catch { return false; }
+    }, 'actual host CDP', 60000);
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
+    await waitFor(async () => browser.contexts()[0].pages().length > 0, 'workbench page');
+    page = browser.contexts()[0].pages()[0];
+    page.setDefaultTimeout(15000);
+    await page.bringToFront();
+    await page.getByRole('tab', { name:'history.md', exact:true }).click();
+    await page.keyboard.press('Control+Shift+P');
+    await page.getByRole('textbox', {name:'Type the name of a command to run.', exact:true}).fill('>Terraphim: Open Alternative Control');
+    await page.getByText('Terraphim: Open Alternative Control', {exact:true}).click();
+    let frame;
+    await waitFor(async () => {
+      frame = page.frames().filter(f => f.url().includes('fake.html')).at(-1);
+      return frame && await frame.getByRole('textbox', {name:'Markdown source', exact:true}).isVisible();
+    }, 'actual Terraphim webview', 60000);
+    let source = frame.getByRole('textbox', {name:'Markdown source', exact:true});
+    const toggle = frame.getByTitle('Toggle Write_On mode');
+    if (await toggle.getAttribute('aria-pressed') !== 'true') await toggle.click();
+
+    const installedNames=(await fs.readdir(extensions,{withFileTypes:true})).filter(entry=>entry.isDirectory()&&entry.name.startsWith('applied-knowledge-systems.terraphim-it-'));
+    assert.equal(installedNames.length,1,'Use only the package installed into this isolated profile');
+    const installedRoot=path.join(extensions,installedNames[0].name);
+    const installedManifest=JSON.parse(await fs.readFile(path.join(installedRoot,'package.json'),'utf8'));
+    assert.equal(installedManifest.publisher,'applied-knowledge-systems');
+    assert.equal(installedManifest.name,'terraphim-it');
+    receipt.installedVersion=installedManifest.version;
+    const installedAssets=path.join(installedRoot,'media/editor');
+    const { exportKnowledgeGraph } = require(path.join(installedRoot,'media/knowledge-graph.cjs'));
+    async function capture(name, expectedTerms, expectedBody) {
+      let saved;
+      try { await waitFor(async () => {
+        saved = await fs.readFile(filename, 'utf8');
+        const graph = JSON.parse(await exportKnowledgeGraph(saved, installedAssets));
+        return (await source.innerText()).split('\n')[0] === expectedBody &&
+          await page.locator('.tabs-container .tab.dirty').count() === 0 &&
+          saved.split('\n')[0] === expectedBody &&
+          JSON.stringify(Object.keys(graph.data).sort()) === JSON.stringify(expectedTerms);
+      }, name + ' actual saved Markdown and graph');
+      } catch(error) {
+        const observed = await fs.readFile(filename,'utf8');
+        await fs.writeFile(path.join(output,name+'.observed.md'),observed);
+        await fs.writeFile(path.join(output,name+'.observed-graph.json'),await exportKnowledgeGraph(observed,installedAssets));
+        throw error;
+      }
+      await fs.writeFile(path.join(output, name + '.md'), saved);
+      const graph = JSON.parse(await exportKnowledgeGraph(saved, installedAssets));
+      await fs.writeFile(path.join(output, name + '.knowledge-graph.json'), JSON.stringify(graph,null,2)+'\n');
+      if (expectedTerms.length) {
+        assert.equal(new Set(Object.values(graph.data).map(term=>term.id)).size,1);
+        assert.equal(new Set(Object.values(graph.data).map(term=>term.nterm)).size,1);
+      }
+      await page.screenshot({path:path.join(output,name+'.png')});
+      receipt.checks.push({id:name,status:'PASS',sourceSha256:crypto.createHash('sha256').update(saved).digest('hex'),terms:expectedTerms});
+      return saved;
+    }
+    async function focusView(targetFrame) {
+      const textbox=targetFrame.getByRole('textbox',{name:'Markdown source',exact:true});
+      const box=await textbox.boundingBox();
+      assert.ok(box,'Target custom view must be visible before choosing its native group');
+      const groups=page.locator('.editor-group-container');
+      let selected=false;
+      for(let index=0;index<await groups.count();index++) {
+        const group=groups.nth(index), bounds=await group.boundingBox();
+        const x=box.x+box.width/2,y=box.y+Math.min(12,box.height/2);
+        if(bounds&&x>=bounds.x&&x<=bounds.x+bounds.width&&y>=bounds.y&&y<=bounds.y+bounds.height) {
+          await group.locator('.tab').last().click();selected=true;break;
+        }
+      }
+      assert.equal(selected,true,'Find actual native tab group containing the observed custom view');
+      await textbox.click({position:{x:12,y:12}});
+    }
+    async function chooseRisk() {
+      await page.keyboard.press('Escape');
+      await source.click({position:{x:12,y:12}});
+      await page.keyboard.press('Control+Home');
+      await page.keyboard.down('Shift');
+      for(let i=0;i<4;i++) await page.keyboard.press('ArrowRight');
+      await page.keyboard.up('Shift');
+      assert.equal(await frame.evaluate(()=>getSelection().toString()),'Risk');
+      await page.keyboard.press('Control+Shift+A');
+      await frame.locator('.te-alt-input--new').waitFor({state:'visible'});
+    }
+    await chooseRisk();
+    await frame.locator('.te-alt-input--new').click();
+    if (autosave) {
+      let partial='';
+      for (const character of 'Concern') {
+        partial+=character;
+        await page.keyboard.type(character);
+        await waitFor(async()=> (await fs.readFile(filename,'utf8')).split('\n')[0]===partial+' needs mitigation.','actual autosave '+partial);
+        await fs.copyFile(filename,path.join(output,'autosave-'+partial.length+'.md'));
+      }
+    } else await page.keyboard.type('Concern',{delay:100});
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Control+s');
+    const accepted = await capture('01-added-concern',['concern','risk'],'Concern needs mitigation.');
+    await page.keyboard.press('Escape');
+    await source.click({position:{x:12,y:12}});
+    await page.keyboard.press('Control+z');
+    await page.keyboard.press('Control+s');
+    const undone = await capture('02-whole-undo',[],'Risk needs mitigation.');
+    assert.equal(undone,initial,'whole Undo must restore exact original bytes');
+    await page.keyboard.press('Control+Shift+z');
+    await page.keyboard.press('Control+s');
+    assert.equal(await capture('03-whole-redo',['concern','risk'],'Concern needs mitigation.'),accepted);
+
+    // A remains unsaved while B is typed and cancelled; a following Redo may
+    // never revive B. All observations are real UI and filesystem readbacks.
+    await page.keyboard.press('Control+z');
+    await chooseRisk();
+    await frame.locator('.te-alt-input--new').click();
+    await page.keyboard.type('Worry',{delay:80});
+    await page.keyboard.press('Enter');
+    const newAlternative = frame.locator('.te-alt-input--new');
+    await newAlternative.click();
+    await page.keyboard.type('Hazard',{delay:80});
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+s');
+    const canceled = await capture('04-escape-preserves-A',['risk','worry'],'Worry needs mitigation.');
+    await source.click({position:{x:12,y:12}});
+    await page.keyboard.press('Control+Shift+z');
+    await page.keyboard.press('Control+s');
+    assert.equal(await capture('05-redo-cannot-revive-B',['risk','worry'],'Worry needs mitigation.'),canceled);
+    await page.keyboard.press('Control+w');
+    await page.keyboard.press('Control+Shift+E');
+    await page.getByLabel('Files Explorer',{exact:true}).getByText('history.md',{exact:true}).dblclick();
+    await page.keyboard.press('Control+Shift+P');
+    await page.getByRole('textbox',{name:'Type the name of a command to run.',exact:true}).fill('>Terraphim: Open Alternative Control');
+    await page.getByText('Terraphim: Open Alternative Control',{exact:true}).click();
+    await waitFor(async()=>{
+      frame=page.frames().filter(f=>f.url().includes('fake.html')).at(-1);
+      return frame && await frame.getByRole('textbox',{name:'Markdown source',exact:true}).isVisible();
+    },'actual saved document reopen',60000);
+    source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
+    await waitFor(async()=>(await source.innerText()).split('\n')[0]==='Worry needs mitigation.','reopened accepted document content',60000);
+    assert.equal(await capture('06-saved-reopen',['risk','worry'],'Worry needs mitigation.'),canceled);
+
+
+    if (process.env.TERRAPHIM_HISTORY_EXTERNAL === '1') {
+      assert.notEqual(process.env.TERRAPHIM_HISTORY_SPLIT,'1','External and split sequences use independent profiles');
+      assert.equal(autosave,false,'External draft test requires autosave off');
+      const external='Risk changed externally.\n';
+      await fs.writeFile(filename,external);
+      await waitFor(async()=>(await source.innerText()).split('\n')[0]==='Risk changed externally.','idle authoritative external adoption');
+      await fs.writeFile(path.join(output,'07-idle-external.md'),await fs.readFile(filename));
+      receipt.checks.push({id:'07-idle-external-adoption',status:'PASS'});
+      await chooseRisk();
+      await frame.locator('.te-alt-input--new').click();
+      await page.keyboard.type('Concern',{delay:80});
+      await page.keyboard.press('Enter');
+      await page.keyboard.press('Escape');
+      await waitFor(async()=>(await source.innerText()).split('\n')[0]==='Concern changed externally.','local unsaved custom draft');
+      const divergent='Different external decision.\n';
+      await fs.writeFile(filename,divergent);
+      await frame.getByRole('button',{name:'Open recovery draft',exact:true}).waitFor();
+      assert.equal(await fs.readFile(filename,'utf8'),divergent);
+      await fs.writeFile(path.join(output,'08-external-conflict-disk.md'),await fs.readFile(filename));
+      await page.screenshot({path:path.join(output,'08-external-conflict.png')});
+      await frame.getByRole('button',{name:'Open recovery draft',exact:true}).click();
+      const originalFrame=frame;
+      let recoveryFrame;
+      await waitFor(async()=>{
+        for(const candidate of page.frames().filter(f=>f.url().includes('fake.html')&&f!==originalFrame)) {
+          const textbox=candidate.getByRole('textbox',{name:'Markdown source',exact:true});
+          if(await textbox.isVisible()&&(await textbox.innerText()).split('\n')[0]==='Concern changed externally.')recoveryFrame=candidate;
+        }
+        return !!recoveryFrame;
+      },'real recovery draft contains unsaved source',60000);
+      await fs.writeFile(path.join(output,'08-recovery-visible-source.txt'),await recoveryFrame.getByRole('textbox',{name:'Markdown source',exact:true}).innerText());
+      assert.equal(await fs.readFile(filename,'utf8'),divergent,'opening recovery must preserve divergent disk');
+      receipt.checks.push({id:'08-conflicting-draft-recovery',status:'PASS'});
+      // Switch to the original actual tab without discarding the recovery tab.
+      await page.getByRole('tab',{name:'history.md',exact:true}).last().click();
+      frame=originalFrame;source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
+      await frame.getByRole('button',{name:'Use current document',exact:true}).click();
+      await waitFor(async()=>(await source.innerText()).split('\n')[0]==='Different external decision.','explicit current-file choice');
+      assert.equal(await fs.readFile(filename,'utf8'),divergent);
+      await fs.unlink(filename);
+      await frame.getByRole('button',{name:'Use current document',exact:true}).waitFor();
+      await fs.writeFile(filename,divergent);
+      await frame.getByRole('button',{name:'Use current document',exact:true}).click();
+      await waitFor(async()=>!(await frame.getByRole('button',{name:'Use current document',exact:true}).isVisible()),'recover from read failure after exact file restoration');
+      assert.equal((await source.innerText()).split('\n')[0],'Different external decision.');
+      assert.equal(await fs.readFile(filename,'utf8'),divergent);
+      await page.screenshot({path:path.join(output,'09-delete-restore-recovered.png')});
+      receipt.checks.push({id:'09-delete-restore-recovery',status:'PASS'});
+    }
+    if (process.env.TERRAPHIM_HISTORY_SPLIT === '1') {
+      const leftFrame=frame, leftSource=source;
+      await source.click({position:{x:12,y:12}});
+      await page.keyboard.press('Control+\\');
+      let rightFrame;
+      await waitFor(async()=>{
+        const candidates=page.frames().filter(f=>f.url().includes('fake.html')&&f!==leftFrame);
+        for(const candidate of candidates) {
+          if(await candidate.getByRole('textbox',{name:'Markdown source',exact:true}).isVisible())rightFrame=candidate;
+        }
+        return !!rightFrame;
+      },'second actual view of one resource',60000);
+      frame=rightFrame;source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
+      await waitFor(async()=>(await source.innerText()).split('\n')[0]==='Worry needs mitigation.','second view accepted initial content');
+      const rightToggle=frame.getByTitle('Toggle Write_On mode');
+      if(await rightToggle.getAttribute('aria-pressed')!=='true')await rightToggle.click();
+      await source.click({position:{x:12,y:12}});
+      await page.keyboard.press('Control+Home');
+      await page.keyboard.down('Shift');
+      for(let i=0;i<5;i++)await page.keyboard.press('ArrowRight');
+      await page.keyboard.up('Shift');
+      assert.equal(await frame.evaluate(()=>getSelection().toString()),'Worry');
+      await page.keyboard.press('Control+Shift+A');
+      await frame.locator('.te-alt-input--new').click();
+      await page.keyboard.type('Hazard',{delay:80});
+      await page.keyboard.press('Enter');
+      await page.keyboard.press('Control+s');
+      const shared=await capture('07-split-second-view-add',['hazard','risk','worry'],'Hazard needs mitigation.');
+      await waitFor(async()=>(await leftSource.innerText()).split('\n')[0]==='Hazard needs mitigation.','first view adopts second accepted edit');
+      await page.keyboard.press('Escape');
+      frame=leftFrame;source=leftSource;
+      await focusView(frame);
+      await page.keyboard.press('Control+z');
+      await page.keyboard.press('Control+s');
+      assert.equal(await capture('08-split-first-view-undo',['risk','worry'],'Worry needs mitigation.'),canceled);
+      frame=rightFrame;source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
+      await focusView(frame);
+      await page.keyboard.press('Control+Shift+z');
+      await page.keyboard.press('Control+s');
+      assert.equal(await capture('09-split-second-view-redo',['hazard','risk','worry'],'Hazard needs mitigation.'),shared);
+      await focusView(leftFrame);
+      await page.keyboard.press('Control+w');
+      frame=rightFrame;source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
+      await focusView(frame);
+      await page.keyboard.press('Control+z');
+      await page.keyboard.press('Control+s');
+      assert.equal(await capture('10-split-survivor-history',['risk','worry'],'Worry needs mitigation.'),canceled);
+    }
+    receipt.status='PASS';
+  } catch (caught) {
+    error = caught;
+    receipt.status = 'FAIL';
+    receipt.error = String(caught.stack || caught);
+    await fs.writeFile(path.join(output,'failure-saved.md'),await fs.readFile(filename,'utf8')).catch(()=>{});
+    if(page) {
+      const visible=page.frames().filter(f=>f.url().includes('fake.html')).at(-1);
+      if(visible) await visible.getByRole('textbox',{name:'Markdown source',exact:true}).innerText().then(text=>fs.writeFile(path.join(output,'failure-visible-source.txt'),text)).catch(()=>{});
+    }
+    if(page) await fs.writeFile(path.join(output,'failure-native-tabs.json'),JSON.stringify(await page.getByRole('tab').evaluateAll(elements=>elements.map(element=>({text:element.textContent,label:element.getAttribute('aria-label'),title:element.getAttribute('title'),class:element.className}))),null,2)).catch(()=>{});
+    if (page) await page.screenshot({path:path.join(output,'failure.png')}).catch(() => {});
+  } finally {
+    if (browser) await browser.close();
+    if (app && app.pid && app.exitCode === null) {
+      const exited = once(app,'exit');
+      app.kill('SIGTERM');
+      const stop = setTimeout(() => app.kill('SIGKILL'), 10000);
+      await exited;
+      clearTimeout(stop);
+    }
+    if (log) await log.close();
+    await fs.writeFile(path.join(output,'receipt.json'),JSON.stringify(receipt,null,2)+'\n');
+    console.log(JSON.stringify({status:receipt.status,output,checks:receipt.checks.length}));
+  }
+  if (error) throw error;
+})().catch(error => { console.error(error); process.exitCode=1; });
