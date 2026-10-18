@@ -35,10 +35,9 @@ the explicit version links above for prereleases.
 
 [Try the browser editor](https://terraphim.ai/editor/): add **Concern** as an
 alternative to **Risk**, save the annotated Markdown, then export its knowledge
-graph. Authored groups use `synonyms:: Risk, Concern`. Supply the exported graph
-explicitly to the released `terraphim-grep` client to retrieve related passages.
-Sharing does not silently change the active role; optional synthesis is a
-separate operation.
+graph. Knowledge notes can also declare aliases with `synonyms:: Risk, Concern`.
+Supply the exported graph explicitly to the released `terraphim-grep` client to
+retrieve related passages. Synthesis is optional.
 
 Follow the [saved-output
 walkthrough](https://terraphim.ai/how-tos/synonym-search/) for the exact search
