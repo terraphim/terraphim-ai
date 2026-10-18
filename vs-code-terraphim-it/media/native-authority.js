@@ -4,7 +4,7 @@
  if(document.body.dataset.authority!=='true')return;
  const vscode=acquireVsCodeApi(),container=document.getElementById('editor'),notice=document.getElementById('host-notice');
  const hostNotice=new TerraphimHostNotice(notice),assets=document.body.dataset.assets;
- let editor,bindings,base,recoveryPending=false,ready=false,sequence=0,draftSequence=0,receivedDraft=0,clearedDraft=0,acceptedCheckpoint,historyCommand,retainedRegistration,quarantinedDraft;
+ let editor,bindings,base,recoveryPending=false,ready=false,sequence=0,draftSequence=0,receivedDraft=0,clearedDraft=0,acceptedCheckpoint,historyCommand,retainedRegistration,quarantinedDraft,blockingControls;
  let roleGeneration='0',providerGeneration='0',activeView=false,viewEpoch=0,paused=false,adopting=false;
  const requests=new Map(),stages=new Map();let stageTimer;let sending=Promise.resolve(),settling=Promise.resolve(),hostHistory=Promise.resolve(),synchronizing=Promise.resolve();
  const md=()=>editor.markdownEditor;
@@ -25,11 +25,22 @@
   return true;
  }
  function quarantine(reason,value){quarantinedDraft=value;block(reason,value);}
- function block(reason,localDraft){if(quarantinedDraft!==undefined)localDraft=quarantinedDraft;paused=true;hostNotice.blocking();notice.hidden=false;notice.replaceChildren();
-  const text=document.createElement('p');text.textContent=`${reason}. Accepted source and received drafts are retained. Recovery starts fresh Undo history.`;
-  const copy=document.createElement('button');copy.textContent='Open recovery draft';copy.onclick=()=>{if(localDraft!==undefined){const retained=document.createElement('textarea');retained.readOnly=true;retained.setAttribute('aria-label','Retained external-change recovery data');retained.value=localDraft;notice.append(retained);retained.focus();retained.select();}else vscode.postMessage({...identity(),type:'recover-archive'});};
-  const recover=document.createElement('button');recover.textContent='Recover current file with fresh history';recover.onclick=()=>{void requestRecovery(recover);};
-  if(localDraft!==undefined){text.textContent=`${reason}. This version remains in this view; copy the retained data before closing it.`;copy.textContent='Select retained recovery data';notice.append(text,copy);}else notice.append(text,copy,recover);container.inert=true;
+ function block(reason,localDraft){if(quarantinedDraft!==undefined)localDraft=quarantinedDraft;paused=true;
+  const local=localDraft!==undefined;
+  // Keep a held pointer's target stable when only the blocking reason changes.
+  // A recovery-mode change must still remove the old action and its authority.
+  let controls=blockingControls;
+  if(notice.dataset.kind!=='blocking'||!controls||controls.local!==local||controls.text.parentNode!==notice||controls.copy.parentNode!==notice||!local&&controls.recover.parentNode!==notice){
+   notice.replaceChildren();const text=document.createElement('p'),copy=document.createElement('button'),recover=document.createElement('button');
+   controls={text,copy,recover,local,localDraft};blockingControls=controls;
+   copy.onclick=()=>{if(controls.local){const retained=document.createElement('textarea');retained.readOnly=true;retained.setAttribute('aria-label','Retained external-change recovery data');retained.value=controls.localDraft;notice.append(retained);retained.focus();retained.select();}else vscode.postMessage({...identity(),type:'recover-archive'});};
+   recover.textContent='Recover current file with fresh history';recover.onclick=()=>{void requestRecovery(recover);};
+   notice.append(text,copy);if(!local)notice.append(recover);
+  }
+  controls.localDraft=localDraft;
+  controls.text.textContent=local?`${reason}. This version remains in this view; copy the retained data before closing it.`:`${reason}. Accepted source and received drafts are retained. Recovery starts fresh Undo history.`;
+  controls.copy.textContent=local?'Select retained recovery data':'Open recovery draft';
+  hostNotice.blocking();notice.hidden=false;container.inert=true;
  }
  async function requestRecovery(button){
   if(recoveryPending)return;recoveryPending=true;button.disabled=true;const epoch=base.authorityEpoch;

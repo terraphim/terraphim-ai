@@ -31,6 +31,30 @@ const { runTests } = require('@vscode/test-electron');
     launchArgs: ['--user-data-dir', path.join(run, 'profile'), '--extensions-dir', path.join(run, 'extensions'),
       '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust', '--no-sandbox'],
     });
+    // Connect to the actual workbench before the webview is created so CDP
+    // observes its child target. The pointer and duplicate block are fixture inputs.
+    const pointerOutput = path.join(receipt, 'notice-held-pointer');
+    await fs.mkdir(pointerOutput);
+    const server = require('node:net').createServer();
+    await new Promise((resolve, reject) => {server.once('error', reject); server.listen(0, '127.0.0.1', resolve);});
+    const pointerPort = server.address().port;
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    await runTests({
+      version: '1.126.0',
+      vscodeExecutablePath: process.env.TERRAPHIM_VSCODE_EXECUTABLE,
+      extensionDevelopmentPath: path.join(extracted, 'extension'),
+      extensionTestsPath: path.join(__dirname, 'nativeRecoveryNoticePointer.cjs'),
+      extensionTestsEnv: {
+        TERRAPHIM_RETAINED_OUTPUT: pointerOutput,
+        TERRAPHIM_POINTER_NODE: process.execPath,
+        TERRAPHIM_POINTER_HELPER: path.join(__dirname, 'nativeRecoveryNoticeMouse.cjs'),
+        TERRAPHIM_POINTER_PORT: String(pointerPort),
+        TERRAPHIM_POINTER_PLAYWRIGHT: require.resolve('playwright-core'),
+      },
+      launchArgs: ['--user-data-dir', path.join(run, 'pointer-profile'), '--extensions-dir', path.join(run, 'pointer-extensions'),
+        '--remote-debugging-port=' + pointerPort, '--remote-debugging-address=127.0.0.1',
+        '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust', '--no-sandbox'],
+    });
   } catch (error) {
     failure = error;
   } finally {
