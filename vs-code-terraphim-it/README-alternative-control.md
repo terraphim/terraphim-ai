@@ -5,7 +5,13 @@ Recoverable host notices can be dismissed while editing continues. Conflict reco
 
 This preview is an opt-in custom Markdown editor in `applied-knowledge-systems.terraphim-it`. Open a Markdown file with **Terraphim: Open Alternative Control**. Click the word counter for Write_On. Existing server and Atomic commands remain available in trusted workspaces.
 
-The view bundles the released terraphim-editor v0.1.0-rc.2 UI, WASM and source-pinned host bridge. The bundle records its public source repository and Cargo.lock checksum. Each view has its own session. The next source candidate uses native custom-document persistence and transports checkpoints of the existing editor history across views; qualification is still in progress. Exact source/revision checks protect asynchronous proposals. External edits retain conflicting drafts for recovery. Native export refuses the source itself and dirty output buffers. Browser persistence is disabled in this host.
+The 0.1.7 source candidate uses one `ResourceAuthority` for each canonical Markdown resource. That authority owns the live Rust/WASM document session outside individual views; each view renders its accepted projection. The existing editor history remains the Undo/Redo engine, with guarded checkpoints and native-issued receipts preserved across view handoffs. Source, revision, authority epoch and history-generation checks protect asynchronous operations. Native custom-document Save, Save All, autosave and backup manage persistence. External edits retain conflicting drafts for explicit recovery. A recovered worker or process starts fresh history rather than reconstructing old receipts. Native export refuses the source itself and dirty output buffers. Browser persistence is disabled in this host.
+
+### Engine verification and downloads
+
+The locally tested 0.1.7 preview imports the held **v0.1.0-rc.4 CI candidate**, built from public editor source [`5fbe719667575db4415c2aa03cf706e51692c9c6`](https://github.com/terraphim/terraphim-editor/tree/5fbe719667575db4415c2aa03cf706e51692c9c6). RC4 publication and final extension-package admission remain pending; this is not an available release download or an all-host qualification claim. The checked-in released pin remains historical until RC4 is published and its anonymous downloads are verified.
+
+The final `editor-release.json` must bind the published archive, asset manifest, immutable source bridge and Cargo.lock by SHA-256. The importer checks every archive member and refuses replacing a different existing build. Prepublication checks use its existing hash-checked `--cache` input route and keep those previews separate from released packages. Released 0.1.6 and its RC2 engine remain historical package behavior; source documentation does not update an already published package.
 
 **Export Document Knowledge Graph** waits for the current edit to be acknowledged, reads that exact source, and uses the shared Rust `synonyms::` parser/types to create the portable graph. It refuses malformed annotations or ambiguous concepts. The document and active role are unchanged. Save, undo, redo and reopen determine which aliases exist in the export.
 
@@ -17,7 +23,7 @@ The same packaged README supplies the Microsoft Marketplace and Open VSX listing
 
 ## Building and publication
 
-A fresh checkout runs `npm ci --ignore-scripts`, `npm run editor:fetch`, `npm run compile`, `npm run lint`, `npm run test:assets`, `npm run test:host`, `npm run test:export`, then `npm run package:vsix`. Release inputs are pinned by URL/commit/SHA-256 in `editor-release.json`; every imported file is checked. Runtime dependencies are included. Generated binaries stay out of Git.
+After the candidate's released pin is admitted, a fresh checkout runs `npm ci --ignore-scripts`, `npm audit --audit-level=high`, `npm run editor:fetch`, `npm run compile`, `npm run lint`, `npm run test:assets`, `npm run test:host`, `npm run test:export`, then `npm run package:vsix`. Release inputs are pinned by URL/commit/SHA-256 in `editor-release.json`; every imported file is checked. Runtime dependencies are included. Generated binaries stay out of Git.
 
 CI builds one VSIX and tests that package in native Linux, macOS and Windows VS Code profiles. Tag release and marketplace workflows promote the same verified package. Publisher identity setup is documented in `docs/plans/design-extension-marketplaces.md` in the repository.
 
