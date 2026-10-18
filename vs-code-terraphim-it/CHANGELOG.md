@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.7 (preview; qualification pending)
+
+- Keep one guarded native document authority across views, preserve issued Ghost history through typing and exact Undo/Redo, and retain later raw drafts and caret changes during acknowledgement.
+- Recover explicitly from worker/process failure with retained drafts and fresh history; keep Save/Save As acknowledgement and final persisted-snapshot guards.
+- Let interactive Open/export destination dialogs finish without expiring the document mutation deadline; mutation/reconciliation deadlines remain bounded.
+- This entry describes the release candidate. Exact final CI package, native host and marketplace admission remain required before publication.
+
+- Reuse Alternative Control's existing editor history for whole-alternative Undo/Redo and Escape, with scoped Terraphim title commands and native custom-document save/autosave/backup integration.
+- Transport opaque existing-history checkpoints across views with exact source/revision/generation guards and bounded chunks. Preserve conflicting drafts and protect dirty text/custom export targets.
+- Native Edit-menu Undo/Redo does not operate this view. The native dirty marker can remain until Save/Revert/autosave; prior-session Undo is not restored by recovery. Issue #995 remains open pending released-package qualification.
+
 ## 0.1.6 (preview)
 
 - Keep all already-consumed editor keydowns inside the view, including the AI-alternatives shortcut that otherwise also opened Source Control. Unhandled keys and native editors keep their normal workbench behavior.

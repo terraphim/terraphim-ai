@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -321,7 +322,17 @@ class ReleaseRecoveryWorkflowContract(unittest.TestCase):
         self.assertIn("environment: extension-releases", release)
         self.assertIn("python3 scripts/publish_release.py", release)
         self.assertIn('TAG: ${{ github.ref_name }}', release)
-        self.assertIn("check_native(", release)
+        native_step = step_run_block(release, "Require receipts from all three hosts for the exact package")
+        native_script = textwrap.dedent(native_step.split("run: |\n", 1)[1])
+        native_python = native_script.split("python3 - <<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
+        native_tree = ast.parse(native_python)
+        self.assertTrue(any(isinstance(node, ast.ImportFrom) and node.module == "publish_release"
+                            and any(alias.name == "check_native_pair" and alias.asname is None
+                                    for alias in node.names) for node in ast.walk(native_tree)))
+        native_calls = [node.func.id for node in ast.walk(native_tree)
+                        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
+        self.assertEqual(native_calls.count("check_native_pair"), 1)
+        self.assertNotIn("check_native", native_calls)
 
     def test_actual_extension_tag_guards_reject_standard_and_other_component_tags(self) -> None:
         # Execute the literal pre-mutation guard, not a reimplementation or publisher mock.

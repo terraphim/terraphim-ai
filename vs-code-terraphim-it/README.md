@@ -4,7 +4,7 @@ Keep alternatives beside your writing, swap wording, and share their knowledge g
 
 1. Open a Markdown file and run **Terraphim: Open Alternative Control**.
 2. Select a word such as **Risk**, add **Concern** as an alternative, and choose which wording is active.
-3. Save the document. VS Code owns persistence and undo/redo; the annotation block preserves the alternatives.
+3. Save the document. VS Code manages persistence; Alternative Control keeps its existing editor history and preserves alternatives in the annotation block. Use the editor keyboard shortcuts or **Terraphim: Undo/Redo (Alternative Control)** title commands.
 4. Run **Terraphim: Export Document Knowledge Graph**, or use the editor's **Share with search** dialog. Save the JSON and export clean Markdown into a corpus folder.
 5. Use the exported graph with `terraphim-grep`, then preserve a useful decision with `terraphim-agent` as shown below.
 
@@ -62,7 +62,7 @@ terraphim-agent memory show "$memory_id" --json
 
 The readback's `memory_item.content` contains the authored sentence and its tags include `provenance:public-project-brief`. Use the returned ID, rather than copying an ID from an example. The [agent memory walkthrough](https://terraphim.ai/posts/cold-start-tax-agentic-memory/) explains retrieval and role setup; the [hooks walkthrough](https://terraphim.ai/posts/native-hook-support/) covers reviewed command corrections and actual tool execution.
 
-This preview targets desktop VS Code 1.126+. Editing and KG export run locally using bundled Terraphim WASM. Suggestions from the built-in graph are synonyms, not generated LLM rewrites. [Integration details and current acceptance scope](README-alternative-control.md).
+This preview targets desktop VS Code 1.126+. Editing and KG export run locally using bundled Terraphim WASM. Suggestions from the built-in graph are synonyms, not generated LLM rewrites. [Integration details and current acceptance scope](https://github.com/terraphim/terraphim-ai/blob/main/vs-code-terraphim-it/README-alternative-control.md).
 
 ## Existing server and Atomic commands
 
@@ -161,6 +161,7 @@ npm run compile
 npm run lint
 npm run test:assets
 npm run test:host
+npm run test:history-checkpoint
 npm run test:export
 npm run test:legacy
 npm run package:vsix

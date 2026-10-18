@@ -37,4 +37,11 @@ async function exportKnowledgeGraph(source, assetDirectory) {
   return bindings.export_knowledge_graph() + '\n';
 }
 
-module.exports = { exportKnowledgeGraph };
+async function checkpointProjection(source, assetDirectory) {
+  const bindings = await loadBindings(assetDirectory);
+  const presentationSource = bindings.host_presentation_source(source);
+  const engine = new bindings.TerraphimHostSession('checkpoint:validation','validation',1,presentationSource);
+  try { return {presentationSource,body:JSON.parse(engine.snapshot()).projection.body}; }
+  finally { engine.free(); }
+}
+module.exports = { exportKnowledgeGraph, checkpointProjection };

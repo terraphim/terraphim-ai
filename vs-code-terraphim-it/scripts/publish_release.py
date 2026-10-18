@@ -80,6 +80,22 @@ def check_native(receipt, package_sha256):
         raise ValueError("Native launcher did not pass on this exact VSIX")
 
 
+def check_native_pair(receipts, package_sha256, platform):
+    """Require each independently executed launcher for one exact OS/package."""
+    expected = {"lifecycle", "retained-recovery"}
+    if (not isinstance(platform, str) or platform not in {"linux", "darwin", "win32"}
+            or not isinstance(receipts, list) or len(receipts) != len(expected)
+            or any(not isinstance(receipt, dict) for receipt in receipts)):
+        raise ValueError("Expected exactly two typed native launcher receipts")
+    kinds = [receipt.get("kind") for receipt in receipts]
+    if any(not isinstance(kind, str) or kind not in expected for kind in kinds) or len(set(kinds)) != len(expected):
+        raise ValueError("Missing, duplicate or unexpected native launcher kind")
+    for receipt in receipts:
+        if receipt.get("platform") != platform:
+            raise ValueError("Native launcher platform differs from its host")
+        check_native(receipt, package_sha256)
+
+
 def gh(*args):
     return subprocess.check_output(["gh", *args], text=True)
 

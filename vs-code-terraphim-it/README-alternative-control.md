@@ -1,11 +1,17 @@
 # Alternative Control in the existing Terraphim It extension
 
 
-Recoverable host notices can be dismissed while editing continues. Conflict recovery and fatal errors remain blocking so an unacknowledged draft cannot overwrite the native document. Version 0.1.6 does not fix grouped native Undo or whole-alternative Escape cancellation ([#995](https://github.com/terraphim/terraphim-ai/issues/995)).
+Recoverable host notices can be dismissed while editing continues. Conflict recovery and fatal errors remain blocking so an unacknowledged draft cannot overwrite the native document. Released version 0.1.6 does not fix grouped native Undo or whole-alternative Escape cancellation ([#995](https://github.com/terraphim/terraphim-ai/issues/995)).
 
 This preview is an opt-in custom Markdown editor in `applied-knowledge-systems.terraphim-it`. Open a Markdown file with **Terraphim: Open Alternative Control**. Click the word counter for Write_On. Existing server and Atomic commands remain available in trusted workspaces.
 
-The view bundles the released terraphim-editor v0.1.0-rc.2 UI, WASM and source-pinned host bridge. The bundle records its public source repository and Cargo.lock checksum. Each view has its own session; VS Code owns document revisions, persistence and undo/redo. Exact source/revision checks protect asynchronous proposals. External edits retain conflicting drafts for recovery. Native export refuses the source itself and dirty output buffers. Browser persistence is disabled in this host.
+The 0.1.7 preview uses one `ResourceAuthority` for each canonical Markdown resource. That authority owns the live Rust/WASM document session outside individual views; each view renders its accepted projection. The existing editor history remains the Undo/Redo engine, with guarded checkpoints and native-issued receipts preserved across view handoffs. Source, revision, authority epoch and history-generation checks protect asynchronous operations. Native custom-document Save, Save All, autosave and backup manage persistence. External edits retain conflicting drafts for explicit recovery. A recovered worker or process starts fresh history rather than reconstructing old receipts. Native export refuses the source itself and dirty output buffers. Browser persistence is disabled in this host.
+
+### Engine verification and downloads
+
+The 0.1.7 preview imports the published [**v0.1.0-rc.4 editor prerelease**](https://github.com/terraphim/terraphim-editor/releases/tag/v0.1.0-rc.4), built from immutable public source [`5fbe719667575db4415c2aa03cf706e51692c9c6`](https://github.com/terraphim/terraphim-editor/tree/5fbe719667575db4415c2aa03cf706e51692c9c6). All six release files were downloaded anonymously and matched the qualified attempt-2 CI artifact. The pinned archive SHA-256 is `1bffba5845ed470be01049262d8814cddaa870fc0f04c5400680f464e78ba8e4`; every imported engine file is verified. Editor and extension releases have separate manifests and CI qualification. Extension CI verifies the pinned engine files and the exact VSIX before publication.
+
+`editor-release.json` binds the published archive, asset manifest, immutable source bridge and Cargo.lock by SHA-256. The importer checks every archive member and refuses replacing a different existing build. Prepublication checks use its existing hash-checked `--cache` input route and keep those previews separate from released packages. Released 0.1.6 and its RC2 engine remain historical package behavior; source documentation does not update an already published package.
 
 **Export Document Knowledge Graph** waits for the current edit to be acknowledged, reads that exact source, and uses the shared Rust `synonyms::` parser/types to create the portable graph. It refuses malformed annotations or ambiguous concepts. The document and active role are unchanged. Save, undo, redo and reopen determine which aliases exist in the export.
 
@@ -17,7 +23,7 @@ The same packaged README supplies the Microsoft Marketplace and Open VSX listing
 
 ## Building and publication
 
-A fresh checkout runs `npm ci --ignore-scripts`, `npm run editor:fetch`, `npm run compile`, `npm run lint`, `npm run test:assets`, `npm run test:host`, `npm run test:export`, then `npm run package:vsix`. Release inputs are pinned by URL/commit/SHA-256 in `editor-release.json`; every imported file is checked. Runtime dependencies are included. Generated binaries stay out of Git.
+With the verified released pin, a fresh checkout runs `npm ci --ignore-scripts`, `npm audit --audit-level=high`, `npm run editor:fetch`, `npm run compile`, `npm run lint`, `npm run test:assets`, `npm run test:host`, `npm run test:export`, then `npm run package:vsix`. Release inputs are pinned by URL/commit/SHA-256 in `editor-release.json`; every imported file is checked. Runtime dependencies are included. Generated binaries stay out of Git.
 
 CI builds one VSIX and tests that package in native Linux, macOS and Windows VS Code profiles. Tag release and marketplace workflows promote the same verified package. Publisher identity setup is documented in `docs/plans/design-extension-marketplaces.md` in the repository.
 
@@ -61,3 +67,11 @@ no long-lived secrets. See Microsoft's documented
 [principal profile lookup](https://learn.microsoft.com/en-us/azure/devops/extend/publish/command-line?view=azure-devops#publish-with-a-microsoft-entra-token).
 
 Acceptance reports distinguish actual saved files, engine tests and visual UI checks. The original 41 visual requirements are not all accepted. This is a scoped preview; stock Zed visual limitations and the separate Zed fork remain outside this VSIX's claims.
+
+## Alternative Control history (0.1.7 preview)
+
+Use the editor keyboard Undo/Redo shortcuts or the accessible **Terraphim: Undo (Alternative Control)** and **Terraphim: Redo (Alternative Control)** title/command-palette controls. These commands are scoped to this custom view. Native Edit-menu Undo/Redo does not operate Alternative Control; ordinary Markdown editors retain their native history.
+
+Typing a new alternative remains live. Enter or leaving keeps it as one action; Escape cancels the complete addition without placing it in Redo. Saving uses native Save, Save All, autosave and backup hooks. The native dirty marker can remain after Undo returns to saved bytes until Save/Revert/autosave completes. Recovered source includes annotations; prior-session Undo history is not restored.
+
+Other custom/text views and external filesystem edits cannot silently replace a retained draft. Resolve a reported conflict explicitly or open a recovery draft. Checkpoint transport stages bounded chunks separately from source proposals and retains the existing Rust source/revision/hash guards. A capacity refusal retains the local draft; it does not silently trim history. Issue #995 stays open until exact released packages pass the approved contract.
