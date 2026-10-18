@@ -63,7 +63,7 @@ export class AlternativeControlProvider implements vscode.CustomEditorProvider<A
   this.subscriptions.push(vscode.workspace.onDidChangeTextDocument(event=>{
    if (!event.contentChanges.length) return;
    const doc=this.resources.get(event.document.uri.toString());
-   if (doc && event.document.getText()!==doc.source) void this.external(doc,true);
+   if (doc && event.document.getText()!==doc.source) void this.external(doc,true).catch(error=>this.block(doc,String(error)));
   }));
   const watcher=vscode.workspace.createFileSystemWatcher('**/*.md');
   for (const event of [watcher.onDidChange,watcher.onDidCreate,watcher.onDidDelete]) this.subscriptions.push(event(uri=>{
@@ -325,14 +325,20 @@ export class AlternativeControlProvider implements vscode.CustomEditorProvider<A
  }
  private async external(doc:AlternativeDocument,fromNormal=false):Promise<void> {
   await this.enqueue(doc,async()=>{
-   const source=fromNormal?this.normal(doc.uri)?.getText()??await this.readDisk(doc.uri):await this.readDisk(doc.uri);
+   const normal=this.normal(doc.uri);
+   let source=fromNormal&&normal?.isDirty?normal.getText():await this.readDisk(doc.uri);
+   // A clean normal editor may still display an earlier verified save.
+   // After disk IO, an actual unsaved normal edit remains the conflict input.
+   const currentNormal=this.normal(doc.uri);if(fromNormal&&currentNormal?.isDirty)source=currentNormal.getText();
    if(source===doc.diskSource && !this.normal(doc.uri)?.isDirty)return;
    if(doc.blocked){await this.block(doc,'External document changes need an explicit recovery choice',source);return;}
    if(source===doc.source) { if(this.normal(doc.uri)?.isDirty!==true) doc.diskSource=source;return; }
    if(doc.source!==doc.diskSource || doc.drafts.size || doc.pendingAuthority || this.normal(doc.uri)?.isDirty) {
     await this.block(doc,'External document changes need an explicit recovery choice',source);return;
    }
-   this.checkSize(source);await this.resetAuthority(doc,()=>{doc.source=source;doc.diskSource=source;doc.checkpoint=undefined;doc.revision++;doc.historyGeneration++;});
+   this.checkSize(source);await this.resetAuthority(doc,()=>{
+    if(doc.blocked||doc.drafts.size||doc.pendingAuthority||doc.source!==doc.diskSource||this.normal(doc.uri)?.isDirty)throw new Error('Pending input arrived during external adoption; explicit recovery is required');
+    doc.source=source;doc.diskSource=source;doc.checkpoint=undefined;doc.revision++;doc.historyGeneration++;});
    await this.broadcast(doc,{reverted:true,externalAdoption:true});
   });
  }

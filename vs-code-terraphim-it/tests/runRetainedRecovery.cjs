@@ -55,6 +55,17 @@ const { runTests } = require('@vscode/test-electron');
         '--remote-debugging-port=' + pointerPort, '--remote-debugging-address=127.0.0.1',
         '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust', '--no-sandbox'],
     });
+    const normalOutput = path.join(receipt, 'clean-normal-authority');
+    await fs.mkdir(normalOutput);
+    await runTests({
+      version: '1.126.0',
+      vscodeExecutablePath: process.env.TERRAPHIM_VSCODE_EXECUTABLE,
+      extensionDevelopmentPath: path.join(extracted, 'extension'),
+      extensionTestsPath: path.join(__dirname, 'nativeCleanNormalAuthority.cjs'),
+      extensionTestsEnv: {TERRAPHIM_RETAINED_OUTPUT: normalOutput},
+      launchArgs: ['--user-data-dir', path.join(run, 'normal-profile'), '--extensions-dir', path.join(run, 'normal-extensions'),
+        '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust', '--no-sandbox'],
+    });
   } catch (error) {
     failure = error;
   } finally {

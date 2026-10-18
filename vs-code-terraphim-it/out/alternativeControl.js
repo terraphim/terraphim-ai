@@ -89,7 +89,7 @@ class AlternativeControlProvider {
                 return;
             const doc = this.resources.get(event.document.uri.toString());
             if (doc && event.document.getText() !== doc.source)
-                void this.external(doc, true);
+                void this.external(doc, true).catch(error => this.block(doc, String(error)));
         }));
         const watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
         for (const event of [watcher.onDidChange, watcher.onDidCreate, watcher.onDidDelete])
@@ -554,7 +554,13 @@ class AlternativeControlProvider {
     }
     async external(doc, fromNormal = false) {
         await this.enqueue(doc, async () => {
-            const source = fromNormal ? this.normal(doc.uri)?.getText() ?? await this.readDisk(doc.uri) : await this.readDisk(doc.uri);
+            const normal = this.normal(doc.uri);
+            let source = fromNormal && normal?.isDirty ? normal.getText() : await this.readDisk(doc.uri);
+            // A clean normal editor may still display an earlier verified save.
+            // After disk IO, an actual unsaved normal edit remains the conflict input.
+            const currentNormal = this.normal(doc.uri);
+            if (fromNormal && currentNormal?.isDirty)
+                source = currentNormal.getText();
             if (source === doc.diskSource && !this.normal(doc.uri)?.isDirty)
                 return;
             if (doc.blocked) {
@@ -571,7 +577,15 @@ class AlternativeControlProvider {
                 return;
             }
             this.checkSize(source);
-            await this.resetAuthority(doc, () => { doc.source = source; doc.diskSource = source; doc.checkpoint = undefined; doc.revision++; doc.historyGeneration++; });
+            await this.resetAuthority(doc, () => {
+                if (doc.blocked || doc.drafts.size || doc.pendingAuthority || doc.source !== doc.diskSource || this.normal(doc.uri)?.isDirty)
+                    throw new Error('Pending input arrived during external adoption; explicit recovery is required');
+                doc.source = source;
+                doc.diskSource = source;
+                doc.checkpoint = undefined;
+                doc.revision++;
+                doc.historyGeneration++;
+            });
             await this.broadcast(doc, { reverted: true, externalAdoption: true });
         });
     }
