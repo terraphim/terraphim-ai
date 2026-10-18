@@ -1,0 +1,66 @@
+{
+  "repository": "https://github.com/terraphim/terraphim-editor",
+  "commit": "5319ecd215e1892f479999dc544fd85ab4222737",
+  "path": "tests/browser/native-authority-controller.integration.test.cjs",
+  "sha256": "83e485ecbbdb17e19145a3056cf51af6fb84ea4fd208bef56cea4ccb6e936619",
+  "testCount": 35,
+  "scope": "Byte-identical canonical35 test snapshot. Actual controller DOM and native Rust/WASM; includes Ghost receipt, pending-paint/caret and kept Blocks draft history regressions. Component verification, not native GUI acceptance.",
+  "historicalCommitScope": "Current snapshot bound to reviewed public source; earlier snapshots preserve their original provenance.",
+  "fixture": {
+    "path": "crates/terraphim_lab/tests/fixtures/public-project-brief.md",
+    "snapshotPath": "fixtures/public-project-brief.md",
+    "sha256": "efb29ad710b93fec0e8dc5e7be7e4018070b1a113a2bd07613adda5732bd59ef",
+    "bytes": 716,
+    "publicSource": {
+      "repository": "https://github.com/terraphim/terraphim-editor",
+      "commit": "016468ea0af0f011248f44d4ff32e2c8c01237e2",
+      "path": "crates/terraphim_lab/tests/fixtures/public-project-brief.md",
+      "sha256": "efb29ad710b93fec0e8dc5e7be7e4018070b1a113a2bd07613adda5732bd59ef",
+      "bytes": 716,
+      "url": "https://github.com/terraphim/terraphim-editor/blob/016468ea0af0f011248f44d4ff32e2c8c01237e2/crates/terraphim_lab/tests/fixtures/public-project-brief.md"
+    }
+  },
+  "previousSnapshots": [
+    {
+      "repository": "https://github.com/terraphim/terraphim-editor",
+      "commit": "452dcaca828b194b9cf7be0946e6181c08153399",
+      "path": "tests/browser/native-authority-controller.integration.test.cjs",
+      "sha256": "f20c941ae9f4e28e359750f56e1c358b8c859865fde2e4130ef651353e1c6655",
+      "testCount": 28,
+      "scope": "Byte-identical test-only snapshot. Runs actual browser controllers and actual packaged ResourceAuthority/Rust-WASM over loopback; no domain outcome mocks.",
+      "publicSource": {
+        "repository": "https://github.com/terraphim/terraphim-editor",
+        "commit": "10fa0367a27e949f8ed35722933fd1af81680f84",
+        "path": "tests/browser/native-authority-controller.integration.test.cjs",
+        "sha256": "f20c941ae9f4e28e359750f56e1c358b8c859865fde2e4130ef651353e1c6655",
+        "url": "https://github.com/terraphim/terraphim-editor/blob/10fa0367a27e949f8ed35722933fd1af81680f84/tests/browser/native-authority-controller.integration.test.cjs"
+      },
+      "historicalCommitScope": "Local implementation commit for original test snapshot; publicSource identifies byte-identical reviewable source."
+    },
+    {
+      "repository": "https://github.com/terraphim/terraphim-editor",
+      "commit": "45c98b12ff519ce2c9fa5a571787a49e440f6c87",
+      "path": "tests/browser/native-authority-controller.integration.test.cjs",
+      "sha256": "f90eca8bbd24927d0aa6c23148e9b3a5445508ea1bf5fb8a9fb3f7233c46af48",
+      "testCount": 29,
+      "scope": "Byte-identical canonical29 test snapshot. Actual controller DOM and native Rust/WASM; public brief fixture separately hash-admitted, outside VSIX runtime inputs.",
+      "historicalCommitScope": "Local implementation test commit retained; publicSource identifies the byte-identical reviewed public source. Engine build and package histories are separate and unchanged.",
+      "publicSource": {
+        "repository": "https://github.com/terraphim/terraphim-editor",
+        "commit": "016468ea0af0f011248f44d4ff32e2c8c01237e2",
+        "path": "tests/browser/native-authority-controller.integration.test.cjs",
+        "sha256": "f90eca8bbd24927d0aa6c23148e9b3a5445508ea1bf5fb8a9fb3f7233c46af48",
+        "bytes": 41621,
+        "url": "https://github.com/terraphim/terraphim-editor/blob/016468ea0af0f011248f44d4ff32e2c8c01237e2/tests/browser/native-authority-controller.integration.test.cjs"
+      }
+    }
+  ],
+  "publicSource": {
+    "repository": "https://github.com/terraphim/terraphim-editor",
+    "commit": "5319ecd215e1892f479999dc544fd85ab4222737",
+    "path": "tests/browser/native-authority-controller.integration.test.cjs",
+    "sha256": "83e485ecbbdb17e19145a3056cf51af6fb84ea4fd208bef56cea4ccb6e936619",
+    "bytes": 53578,
+    "url": "https://github.com/terraphim/terraphim-editor/blob/5319ecd215e1892f479999dc544fd85ab4222737/tests/browser/native-authority-controller.integration.test.cjs"
+  }
+}

@@ -1,6 +1,7 @@
 /* A VS Code adapter around the shared UI and host-session protocol. */
 (() => {
   'use strict';
+  if(document.body.dataset.authority==='true')return;
   const vscode = acquireVsCodeApi();
   const container = document.getElementById('editor');
   const notice = document.getElementById('host-notice');

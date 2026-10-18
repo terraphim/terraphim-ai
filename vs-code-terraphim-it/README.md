@@ -62,7 +62,7 @@ terraphim-agent memory show "$memory_id" --json
 
 The readback's `memory_item.content` contains the authored sentence and its tags include `provenance:public-project-brief`. Use the returned ID, rather than copying an ID from an example. The [agent memory walkthrough](https://terraphim.ai/posts/cold-start-tax-agentic-memory/) explains retrieval and role setup; the [hooks walkthrough](https://terraphim.ai/posts/native-hook-support/) covers reviewed command corrections and actual tool execution.
 
-This preview targets desktop VS Code 1.126+. Editing and KG export run locally using bundled Terraphim WASM. Suggestions from the built-in graph are synonyms, not generated LLM rewrites. [Integration details and current acceptance scope](README-alternative-control.md).
+This preview targets desktop VS Code 1.126+. Editing and KG export run locally using bundled Terraphim WASM. Suggestions from the built-in graph are synonyms, not generated LLM rewrites. [Integration details and current acceptance scope](https://github.com/terraphim/terraphim-ai/blob/main/vs-code-terraphim-it/README-alternative-control.md).
 
 ## Existing server and Atomic commands
 

@@ -47,7 +47,7 @@
   if (saved.presentationSource!==presentationSource) throw new Error('Checkpoint source mismatch');
   if (!Array.isArray(saved.history) || !saved.history.length || !Number.isSafeInteger(saved.historyIndex) || saved.historyIndex<0 || saved.historyIndex>=saved.history.length) throw new Error('Invalid history index');
   const coordinate=value=>Number.isSafeInteger(value)&&value>=0&&value<=0xffffffff;
-  const fields={ghost:['change','undo'],alt:['span','before','after'],move:['start','end','to'],swap:['span','from','to'],overflow:['before','after']};
+  const fields={ghost:['change','undo'],ghostEdit:['receipt','undo'],alt:['span','before','after'],move:['start','end','to'],swap:['span','from','to'],overflow:['before','after']};
   for (const entry of saved.history) {
    if (!entry || typeof entry.text!=='string' || typeof entry.source!=='string' || !Number.isFinite(entry.time)
     || !Number.isSafeInteger(entry.start) || !Number.isSafeInteger(entry.end) || entry.start<0 || entry.end<entry.start || entry.end>entry.text.length
@@ -62,6 +62,7 @@
      if((key==='alt'||key==='swap')&&typeof meta.span!=='string')throw new Error('Invalid history span');
      if(key==='swap'&&(!Number.isSafeInteger(meta.from)||!Number.isSafeInteger(meta.to)||meta.from<0||meta.to<0))throw new Error('Invalid history swap');
      if(key==='overflow'&&(typeof meta.before!=='string'||typeof meta.after!=='string'))throw new Error('Invalid history overflow');
+     if(key==='ghostEdit'&&(typeof meta.receipt!=='string'||!meta.receipt||typeof meta.undo!=='boolean'))throw new Error('Invalid history text Ghost receipt');
      if(key==='ghost'&&(typeof meta.undo!=='boolean'||!meta.change||typeof meta.change!=='object'||step.deletedText||step.insertedText))throw new Error('Invalid history ghost receipt');
      if(key==='alt'&&[meta.before,meta.after].some(value=>value!==null && (typeof value!=='object'||Array.isArray(value))))throw new Error('Invalid history alternative');
     }
@@ -81,7 +82,7 @@
     const group=history.slice(base+1,index+1);
     if (group.some(entry=>!entry.edits)) throw new Error('Live history cannot be transported losslessly');
     const merged={...group.at(-1),source:'alternatives',edits:group.flatMap(entry=>entry.edits)};
-    if (group.some(entry=>entry.ghostHistory || entry.edits.some(step=>step.ghost))) merged.ghostHistory=true;
+    if (group.some(entry=>entry.ghostHistory || entry.edits.some(step=>step.ghost || step.ghostEdit))) merged.ghostHistory=true;
     history.splice(base+1,count,merged); index=base+1;
    }
   }
@@ -89,7 +90,7 @@
  }
  function restore(surface,saved,presentationSource,owner) {
   const valid=validateCheckpoint(saved,presentationSource,surface.getText(),true);
-  if(valid.history.some(entry=>entry.ghostHistory || entry.edits?.some(step=>step.ghost))) {
+  if(valid.history.some(entry=>entry.ghostHistory || entry.edits?.some(step=>step.ghost || step.ghostEdit))) {
    if(!owner || typeof owner.replayGhostHistory!=='function' || typeof owner.ghostHistoryNotice!=='function')throw new Error('Existing MarkdownEditor ghost history owner is required');
    surface.ghostHistoryAdapter=owner;
   }

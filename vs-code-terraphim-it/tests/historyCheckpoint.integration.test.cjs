@@ -208,7 +208,7 @@ test('real-checkpoint non-finite positions and references are rejected without e
   assert.deepEqual(await checkpoint(page),saved,'refused validation leaves actual editor history unchanged');
  } finally {await page.close();}
 });
-test('real ghost receipt and Overflow history survive transfer with exact annotated Undo/Redo',async()=>{
+test('real issuing owner replays Ghost and Overflow; independent mirror refuses its foreign receipt',async()=>{
  const original='Risk remains. Perhaps we might basically need to possibly review the very complex arrangement because the supplier could in some ways delay the launch.\n';
  const a=await editorPage(original);let b;
  try {
@@ -223,15 +223,27 @@ test('real ghost receipt and Overflow history survive transfer with exact annota
   await a.evaluate(()=>editor.stashRange(0,4));
   const final=await state(a);assert.ok(final.source.includes('Risk'));
   const saved=await checkpoint(a);
+  // The original native owner must retain the full positive Ghost/Overflow contract.
+  assert.equal(await a.evaluate(()=>editor.surface.undo()),true);assert.equal((await state(a)).source,ghosted.source);
+  assert.equal(await a.evaluate(()=>editor.surface.undo()),true);assert.equal((await state(a)).body,original);assert.equal((await state(a)).annotations.ghosts.length,0);
+  assert.equal(await a.evaluate(()=>editor.surface.redo()),true);assert.equal((await state(a)).source,ghosted.source);
+  assert.equal(await a.evaluate(()=>editor.surface.redo()),true);assert.equal((await state(a)).source,final.source);
   b=await editorPage();await b.evaluate(source=>actual.openDocument(source),saved.presentationSource);
   await b.evaluate(saved=>TerraphimHistoryCheckpoint.restore(editor.surface,saved,saved.presentationSource,editor),saved);
   assert.equal(await b.evaluate(()=>editor.surface.undo()),true);
   assert.equal((await state(b)).source,ghosted.source);
-  const ghostUndo=await b.evaluate(()=>({ok:editor.surface.undo(),notice:editor.notice,warning:editor.warning,conflict:editor.ghostHistoryConflict}));
-  assert.equal(ghostUndo.ok,true,JSON.stringify(ghostUndo));
-  assert.equal((await state(b)).body,original);assert.equal((await state(b)).annotations.ghosts.length,0);
-  assert.equal(await b.evaluate(()=>editor.surface.redo()),true);assert.equal((await state(b)).source,ghosted.source);
-  assert.equal(await b.evaluate(()=>editor.surface.redo()),true);assert.equal((await state(b)).source,final.source);
+  const beforeRefusal=await state(b),historyBefore=await checkpoint(b);
+  // A source/checkpoint copy is not private native receipt authority. Positive
+  // receiving-view replay is exercised through the SAME ResourceAuthority worker
+  // in resourceAuthority.test.cjs, nativeAuthorityHistory.cjs and the shared DOM
+  // controller suite; this independent instance remains a mandatory negative guard.
+  const ghostUndo=await b.evaluate(()=>({ok:editor.surface.undo(),warning:editor.warning,warningKind:editor.warningKind}));
+  assert.equal(ghostUndo.ok,false,'independent native session cannot import an issued receipt');
+  assert.match(ghostUndo.warning,/Ghost history refused:.*unknown or stale ghost transaction receipt/);
+  assert.equal(ghostUndo.warningKind,'ghost-history');
+  assert.deepEqual(await state(b),beforeRefusal,'refused foreign receipt preserves actual source, annotations and history availability');
+  assert.deepEqual(await checkpoint(b),historyBefore,'refusal does not advance or rewrite ordered history');
+  assert.match(await b.locator('.te-warning-text').innerText(),/unknown or stale ghost transaction receipt/);
  } finally {await a.close();await b?.close();}
 });
 test('real Unicode UTF-16 anchors and CRLF presentation survive whole-action transfer',async()=>{

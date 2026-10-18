@@ -43,3 +43,9 @@ test('real timer expires unaccepted staged data and permits a fresh distinct sta
  await new Promise(resolve=>setTimeout(resolve,15));assert.throws(()=>stage.consume('issued-stage',snapshot),/Missing/);
  for(const message of messages)stage.receive({...message,token:'fresh'},snapshot,64*1024*1024);assert.ok(stage.consume('fresh',snapshot));
 });
+test('native authority epoch refuses stale chunks without retiring current staged checkpoint',async()=>{
+ const {stage,snapshot,checkpoint,messages}=await setup();const current={...snapshot,authorityEpoch:'current-epoch'};
+ for(const message of messages)stage.receive({...message,authorityEpoch:'current-epoch'},current,64*1024*1024);
+ assert.throws(()=>stage.receive({...messages[0],authorityEpoch:'retired-epoch'},current,64*1024*1024),/Stale/);
+ assert.deepEqual(stage.consume('issued-stage',current),checkpoint);
+});

@@ -1,22 +1,22 @@
 /** A bounded, one-shot transport for opaque existing-editor checkpoints. */
 export interface CheckpointIdentity {
- resource:string;session:string;revision:number;sourceHash:string;historyGeneration:number;
+ resource:string;session:string;authorityEpoch?:string;revision:number;sourceHash:string;historyGeneration:number;
 }
 interface Chunk extends CheckpointIdentity {
  protocol:number;type:string;token:string;index:number;total:number;bytes:number;text:string;
 }
 interface Pending {identity:CheckpointIdentity;token:string;total:number;bytes:number;parts:string[];size:number;timer:ReturnType<typeof setTimeout>;}
 const LIMIT=16*1024*1024, UNITS=256*1024;
-const same=(a:CheckpointIdentity,b:CheckpointIdentity)=>a.resource===b.resource&&a.session===b.session&&a.revision===b.revision&&a.sourceHash===b.sourceHash&&a.historyGeneration===b.historyGeneration;
+const same=(a:CheckpointIdentity,b:CheckpointIdentity)=>a.resource===b.resource&&a.session===b.session&&a.authorityEpoch===b.authorityEpoch&&a.revision===b.revision&&a.sourceHash===b.sourceHash&&a.historyGeneration===b.historyGeneration;
 export class CheckpointStage {
  private pending?:Pending;
  private refusal?:string;
  constructor(private readonly timeout=60000) {}
  clear():void {if(this.pending)clearTimeout(this.pending.timer);this.pending=undefined;this.refusal=undefined;}
  receive(value:unknown,identity:CheckpointIdentity,capacity:number):void {
+  const message=value as Chunk;
+  if(!message||message.protocol!==1||message.type!=='checkpoint-chunk'||!same(message,identity))throw new Error('Stale checkpoint stage');
   try {
-   const message=value as Chunk;
-   if(!message||message.protocol!==1||message.type!=='checkpoint-chunk'||!same(message,identity))throw new Error('Stale checkpoint stage');
    if(typeof message.token!=='string'||!message.token||message.token.length>64||!Number.isSafeInteger(message.index)||!Number.isSafeInteger(message.total)||!Number.isSafeInteger(message.bytes)
     ||message.index<0||message.total<1||typeof message.text!=='string'||!message.text.length||message.text.length>UNITS||Buffer.byteLength(JSON.stringify(message),'utf8')>LIMIT)throw new Error('Invalid checkpoint chunk');
    if(message.index===0) {

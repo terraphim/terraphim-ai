@@ -111,7 +111,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [default, autosave, split, external]
+        mode: [default, autosave, split, external, authority]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
@@ -141,7 +141,12 @@ jobs:
           TERRAPHIM_HISTORY_SPLIT: ${{ matrix.mode == 'split' && '1' || '0' }}
           TERRAPHIM_HISTORY_EXTERNAL: ${{ matrix.mode == 'external' && '1' || '0' }}
           TERRAPHIM_HISTORY_OUTPUT: native-results/history-${{ matrix.mode }}
-        run: xvfb-run -a npm run test:history-ui
+        run: |
+          if [[ "${{ matrix.mode }}" == authority ]]; then
+            xvfb-run -a npm run test:authority-ui
+          else
+            xvfb-run -a npm run test:history-ui
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -183,7 +188,7 @@ jobs:
           inputs = {}
           with zipfile.ZipFile(package) as archive:
               for entry in archive.infolist():
-                  if entry.is_dir() or not entry.filename.startswith('extension/media/'):
+                  if entry.is_dir() or not entry.filename.startswith(('extension/media/', 'extension/out/')):
                       continue
                   relative = pathlib.PurePosixPath(entry.filename).relative_to('extension')
                   assert '..' not in relative.parts and not relative.is_absolute()
@@ -197,6 +202,10 @@ jobs:
           (output / 'history-component-inputs.json').write_text(json.dumps({'packageSha256': digest, 'runtimeInputs': inputs}, indent=2) + '\n')
           PYTHON
           python3 scripts/editor_assets.py
+      - name: Exercise exact packaged resource worker and terminal journal
+        run: |
+          set -o pipefail
+          npm run test:authority 2>&1 | tee native-results/resource-authority.tap
       - name: Install explicit real Chromium runtime
         run: npx playwright-core install --with-deps chromium
       - name: Exercise complete existing-editor and real-WASM checkpoint suite
@@ -206,6 +215,13 @@ jobs:
           test -x "$TERRAPHIM_BROWSER_EXECUTABLE"
           set -o pipefail
           npm run test:history-checkpoint 2>&1 | tee native-results/history-components.tap
+      - name: Exercise all pinned shared controllers against exact packaged runtime
+        run: |
+          TERRAPHIM_BROWSER_EXECUTABLE="$(node -p "require('playwright-core').chromium.executablePath()")"
+          export TERRAPHIM_BROWSER_EXECUTABLE
+          test -x "$TERRAPHIM_BROWSER_EXECUTABLE"
+          set -o pipefail
+          npm run test:authority-controllers 2>&1 | tee native-results/authority-controllers.tap
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

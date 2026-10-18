@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CheckpointStage = void 0;
 const LIMIT = 16 * 1024 * 1024, UNITS = 256 * 1024;
-const same = (a, b) => a.resource === b.resource && a.session === b.session && a.revision === b.revision && a.sourceHash === b.sourceHash && a.historyGeneration === b.historyGeneration;
+const same = (a, b) => a.resource === b.resource && a.session === b.session && a.authorityEpoch === b.authorityEpoch && a.revision === b.revision && a.sourceHash === b.sourceHash && a.historyGeneration === b.historyGeneration;
 class CheckpointStage {
     constructor(timeout = 60000) {
         this.timeout = timeout;
@@ -10,10 +10,10 @@ class CheckpointStage {
     clear() { if (this.pending)
         clearTimeout(this.pending.timer); this.pending = undefined; this.refusal = undefined; }
     receive(value, identity, capacity) {
+        const message = value;
+        if (!message || message.protocol !== 1 || message.type !== 'checkpoint-chunk' || !same(message, identity))
+            throw new Error('Stale checkpoint stage');
         try {
-            const message = value;
-            if (!message || message.protocol !== 1 || message.type !== 'checkpoint-chunk' || !same(message, identity))
-                throw new Error('Stale checkpoint stage');
             if (typeof message.token !== 'string' || !message.token || message.token.length > 64 || !Number.isSafeInteger(message.index) || !Number.isSafeInteger(message.total) || !Number.isSafeInteger(message.bytes)
                 || message.index < 0 || message.total < 1 || typeof message.text !== 'string' || !message.text.length || message.text.length > UNITS || Buffer.byteLength(JSON.stringify(message), 'utf8') > LIMIT)
                 throw new Error('Invalid checkpoint chunk');
