@@ -10,6 +10,7 @@ const { spawn, execFileSync } = require('node:child_process');
 const { once } = require('node:events');
 const { setTimeout: delay } = require('node:timers/promises');
 const { chromium } = require('playwright-core');
+const {readOwnedRecoveryArchive} = require('./nativeRecoveryArchive.cjs');
 
 async function waitFor(check, description, timeout = 15000) {
   const until = Date.now() + timeout;
@@ -237,28 +238,49 @@ async function waitFor(check, description, timeout = 15000) {
       await page.screenshot({path:path.join(output,'08-external-conflict.png')});
       await frame.getByRole('button',{name:'Open recovery draft',exact:true}).click();
       const originalFrame=frame;
-      let recoveryFrame;
+      let recoveryArchive, recoveryTab;
       await waitFor(async()=>{
-        for(const candidate of page.frames().filter(f=>f.url().includes('fake.html')&&f!==originalFrame)) {
-          const textbox=candidate.getByRole('textbox',{name:'Markdown source',exact:true});
-          if(await textbox.isVisible()&&(await textbox.innerText()).split('\n')[0]==='Concern changed externally.')recoveryFrame=candidate;
-        }
-        return !!recoveryFrame;
-      },'real recovery draft contains unsaved source',60000);
-      await fs.writeFile(path.join(output,'08-recovery-visible-source.txt'),await recoveryFrame.getByRole('textbox',{name:'Markdown source',exact:true}).innerText());
+        const tabs=await page.locator('.tabs-container .tab.active').allTextContents();
+        recoveryTab=tabs.map(text=>text.trim()).find(text=>/^[0-9a-f-]{36}\.json$/.test(text));
+        if(!recoveryTab)return false;
+        recoveryArchive=await readOwnedRecoveryArchive(profile,recoveryTab,installedRoot);
+        return recoveryArchive.source.split('\n')[0]==='Concern changed externally.';
+      },'real opened recovery archive contains accepted unsaved source',60000);
+      await fs.writeFile(path.join(output,'08-recovery-archive.json'),recoveryArchive.bytes);
+      await fs.writeFile(path.join(output,'08-recovery-source.md'),recoveryArchive.source);
+      const recoveryGraph=JSON.parse(await exportKnowledgeGraph(recoveryArchive.source,installedAssets));
+      assert.deepEqual(Object.keys(recoveryGraph.data).sort(),['concern','risk']);
+      assert.equal(new Set(Object.values(recoveryGraph.data).map(term=>term.id)).size,1);
+      await fs.writeFile(path.join(output,'08-recovery-source.knowledge-graph.json'),JSON.stringify(recoveryGraph,null,2)+'\n');
+      await fs.writeFile(path.join(output,'08-recovery-archive-readback.json'),JSON.stringify({
+        actualActiveTab:recoveryTab,archivePath:recoveryArchive.archivePath,
+        archiveSHA256:recoveryArchive.sha256,sourceSHA256:crypto.createHash('sha256').update(recoveryArchive.source).digest('hex'),
+        retainedDrafts:recoveryArchive.drafts,sourceResource:filename,
+        scope:'Actual native-opened versioned archive read from owned profile; existing opaque drafts retained, none invented.'},null,2)+'\n');
+      await page.screenshot({path:path.join(output,'08-opened-recovery-archive.png')});
       assert.equal(await fs.readFile(filename,'utf8'),divergent,'opening recovery must preserve divergent disk');
       receipt.checks.push({id:'08-conflicting-draft-recovery',status:'PASS'});
       // Switch to the original actual tab without discarding the recovery tab.
       await page.getByRole('tab',{name:'history.md',exact:true}).last().click();
       frame=originalFrame;source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
-      await frame.getByRole('button',{name:'Use current document',exact:true}).click();
+      await frame.getByRole('button',{name:'Recover current file with fresh history',exact:true}).click();
       await waitFor(async()=>(await source.innerText()).split('\n')[0]==='Different external decision.','explicit current-file choice');
       assert.equal(await fs.readFile(filename,'utf8'),divergent);
+      await source.click({position:{x:12,y:12}});
+      await page.keyboard.press('Control+s');
+      assert.equal(await capture('08-current-choice-fresh-save',[],'Different external decision.'),divergent,
+        'fresh-history first Save must finish before Undo is issued');
+      await page.keyboard.press('Control+z');
+      await page.keyboard.press('Control+s');
+      assert.equal(await capture('08-current-choice-fresh-undo',[],'Different external decision.'),divergent,
+        'fresh-history Undo must not restore the archived alternative');
+      const retainedArchive=await readOwnedRecoveryArchive(profile,recoveryTab,installedRoot);
+      assert.ok(retainedArchive.bytes.equals(recoveryArchive.bytes),'fresh recovery and Undo retain the actual archived Concern version');
       await fs.unlink(filename);
-      await frame.getByRole('button',{name:'Use current document',exact:true}).waitFor();
+      await frame.getByRole('button',{name:'Recover current file with fresh history',exact:true}).waitFor();
       await fs.writeFile(filename,divergent);
-      await frame.getByRole('button',{name:'Use current document',exact:true}).click();
-      await waitFor(async()=>!(await frame.getByRole('button',{name:'Use current document',exact:true}).isVisible()),'recover from read failure after exact file restoration');
+      await frame.getByRole('button',{name:'Recover current file with fresh history',exact:true}).click();
+      await waitFor(async()=>!(await frame.getByRole('button',{name:'Recover current file with fresh history',exact:true}).isVisible()),'recover from read failure after exact file restoration');
       assert.equal((await source.innerText()).split('\n')[0],'Different external decision.');
       assert.equal(await fs.readFile(filename,'utf8'),divergent);
       await page.screenshot({path:path.join(output,'09-delete-restore-recovered.png')});
