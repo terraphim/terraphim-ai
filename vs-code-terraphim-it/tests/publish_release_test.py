@@ -1,5 +1,6 @@
 """Publication gates on real ZIP files and a real local Git repository; no remote writes."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -79,6 +80,57 @@ class PublicationTest(unittest.TestCase):
             report["sourceCommit"] = publication.git(root, "rev-parse", "HEAD")
             with self.assertRaisesRegex(ValueError, "tag differs"):
                 publication.check_source(root, report, self.tag)
+
+    def test_native_pair_requires_both_exact_typed_receipts(self):
+        # Receipt values use the actual preview package SHA; kind/platform are
+        # explicit parser inputs, not a claim of a new native execution.
+        digest = "5e188d767ec5dfa7e247b11b2c6d1b7bac70f5e005fd8b3c6628f7174543f982"
+        pair = [{"status": "PASS", "packageSha256": digest,
+                 "kind": kind, "platform": "darwin"}
+                for kind in ("lifecycle", "retained-recovery")]
+        publication.check_native_pair(pair, digest, "darwin")
+        invalid = [[], pair[:1], pair + [pair[0]], [pair[0], pair[0]],
+                   [pair[0], {**pair[1], "kind": "unexpected"}]]
+        for field, value in (("platform", "linux"), ("status", "FAIL"),
+                             ("packageSha256", "0" * 64), ("kind", None), ("kind", [])):
+            invalid.append([pair[0], {**pair[1], field: value}])
+        for receipts in invalid:
+            with self.subTest(receipts=receipts), self.assertRaises(ValueError):
+                publication.check_native_pair(receipts, digest, "darwin")
+        with self.assertRaises(ValueError):
+            publication.check_native_pair(pair, digest, "unexpected-os")
+
+    def test_actual_release_workflow_admits_only_complete_three_host_pairs(self):
+        workflow = (Path(__file__).resolve().parents[2]
+                    / ".github/workflows/vscode-release.yml").read_text()
+        gate = workflow.split("      - name: Require receipts from all three hosts for the exact package", 1)[1]
+        block = gate.split("          python3 - <<'PY'\n", 1)[1].split("          PY", 1)[0]
+        block = "\n".join(line[10:] for line in block.splitlines())
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "scripts").symlink_to(Path(publication.__file__).parent, target_is_directory=True)
+            digest, source = "a" * 64, "b" * 40
+            (root / "release-manifest.json").write_text(json.dumps(
+                {"sourceCommit": source, "sourceTreeDirty": False, "sha256": digest}))
+            files = []
+            for host, platform in (("ubuntu-24.04", "linux"), ("macos-14", "darwin"),
+                                   ("windows-2025", "win32")):
+                for kind in ("lifecycle", "retained-recovery"):
+                    path = root / "native-results" / f"vscode-native-{host}-{source}" / kind / "launcher.json"
+                    path.parent.mkdir(parents=True)
+                    path.write_text(json.dumps({"kind": kind, "platform": platform,
+                                                "status": "PASS", "packageSha256": digest}))
+                    files.append(path)
+            def execute():
+                return subprocess.run([sys.executable, "-c", block], cwd=root,
+                                      env={**os.environ, "SOURCE": source}, capture_output=True, text=True)
+            passed = execute()
+            self.assertEqual(passed.returncode, 0, passed.stderr)
+            original = files[-1].read_text()
+            files[-1].unlink()
+            self.assertNotEqual(execute().returncode, 0)
+            files[-1].write_text(original.replace(digest, "0" * 64))
+            self.assertNotEqual(execute().returncode, 0)
 
     def test_checksum_parser_and_native_binding_refuse_ambiguity(self):
         line = "a" * 64 + "  extension.vsix\n"

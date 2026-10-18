@@ -36,6 +36,8 @@ const { runTests } = require('@vscode/test-electron');
   } finally {
     await fs.mkdir(receipt, {recursive: true});
     await fs.writeFile(path.join(receipt, 'launcher.json'), JSON.stringify({
+      kind: 'lifecycle',
+      platform: process.platform,
       status: failure ? 'FAIL' : 'PASS',
       message: failure ? String(failure.message || failure) : 'Packaged lifecycle completed',
       package: 'terraphim-it.vsix',

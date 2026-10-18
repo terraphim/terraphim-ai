@@ -63,14 +63,13 @@ jobs:
           python3 - <<'PY'
           import json,os,pathlib,sys
           sys.path.insert(0,'scripts')
-          from publish_release import check_native
+          from publish_release import check_native_pair
           report=json.load(open('release-manifest.json'))
           assert report['sourceCommit']==os.environ['SOURCE']
           assert report['sourceTreeDirty'] is False
-          for platform in ('ubuntu-24.04','macos-14','windows-2025'):
+          for platform, runtime in (('ubuntu-24.04','linux'),('macos-14','darwin'),('windows-2025','win32')):
               receipts=list(pathlib.Path('native-results',f"vscode-native-{platform}-{os.environ['SOURCE']}").rglob('launcher.json'))
-              assert len(receipts)==1, (platform,receipts)
-              check_native(json.loads(receipts[0].read_text()),report['sha256'])
+              check_native_pair([json.loads(path.read_text()) for path in receipts],report['sha256'],runtime)
           PY
       - name: Publish qualified bytes and verify anonymous downloads
         env:
