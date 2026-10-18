@@ -44,6 +44,26 @@
    ||typeof message.source!=='string'||typeof message.sourceHash!=='string'||!/^[0-9a-f]{64}$/.test(message.sourceHash))return current;
   return {...current,source:message.source,sourceHash:message.sourceHash,revision:message.revision,historyGeneration:message.historyGeneration};
  }
+ /** Classify persisted view input without replaying it or inferring that stale metadata is empty. */
+ function retainedDraft(state,resource){
+  if(state==null||typeof state==='object'&&!Object.prototype.hasOwnProperty.call(state,'draft'))return {kind:'none'};
+  const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+  const keys=(value,allowed)=>object(value)&&Object.keys(value).every(key=>allowed.includes(key));
+  if(!keys(state,['resource','sequence','draft'])||typeof state.resource!=='string'||!state.resource
+   ||!Number.isSafeInteger(state.sequence)||state.sequence<1||typeof state.draft!=='string'
+   ||new TextEncoder().encode(state.draft).length>128*1024*1024)return {kind:'invalid'};
+  if(state.resource!==resource)return {kind:'foreign',resource:state.resource};
+  let value;try{value=JSON.parse(state.draft);}catch{return {kind:'invalid'};}
+  function valid(value,depth=0){
+   if(!object(value)||depth>1)return false;
+   if(value.kind==='external-adoption-conflict'||value.kind==='remote-view-conflict')return keys(value,['kind','previousAcceptedSource','rawDraft'])&&typeof value.previousAcceptedSource==='string'&&valid(value.rawDraft,depth+1);
+   return keys(value,['baseSourceHash','pending','body','alternatives','overflow'])&&typeof value.baseSourceHash==='string'&&/^[a-f0-9]{64}$/.test(value.baseSourceHash)
+    &&(value.body===undefined||typeof value.body==='string')&&(value.overflow===undefined||typeof value.overflow==='string')
+    &&(value.pending===undefined||keys(value.pending,['sequence','intents'])&&Number.isSafeInteger(value.pending.sequence)&&value.pending.sequence>=0&&Array.isArray(value.pending.intents)&&value.pending.intents.every(object))
+    &&(value.alternatives===undefined||Array.isArray(value.alternatives)&&value.alternatives.every(item=>keys(item,['value','committed'])&&typeof item.value==='string'&&typeof item.committed==='string'));
+  }
+  return valid(value)?{kind:'retained',draft:state.draft,sequence:state.sequence}:{kind:'invalid'};
+ }
  /** Let browser text selection finish synchronously without forwarding it twice. */
  function consumeEditableSelectAll(event,container){
   if(event.defaultPrevented||event.isComposing||event.altKey||event.shiftKey||event.ctrlKey===event.metaKey||event.key?.toLowerCase()!=='a')return false;
@@ -52,5 +72,5 @@
   if(!target||target.disabled||target.readOnly||target instanceof HTMLInputElement&&!['text','search','url','tel','email','password'].includes(target.type))return false;
   event.stopPropagation();return true;
  }
- return {settleSnapshot,refreshHash,isAdmissible:admitted,rebaseConflict,isSameAccepted:sameAccepted,consumeEditableSelectAll};
+ return {retainedDraft,settleSnapshot,refreshHash,isAdmissible:admitted,rebaseConflict,isSameAccepted:sameAccepted,consumeEditableSelectAll};
 });

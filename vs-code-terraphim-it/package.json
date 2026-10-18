@@ -132,7 +132,7 @@
     "watch": "npx tsc -watch -p ./",
     "update-ontologies": "npx ad-generate ontologies",
     "build-rust": "python3 scripts/legacy_assets.py --build",
-    "test:host": "node --test tests/hostProtocol.test.cjs tests/completionCache.test.cjs tests/checkpointStage.test.cjs tests/authorityRecovery.test.cjs tests/authorityDraftStage.test.cjs tests/resourceBackup.test.cjs tests/historyCommands.test.cjs tests/interactiveOpenDeadline.test.cjs tests/nativeSavedSnapshot.test.cjs tests/dependencyAuditWorkflow.test.cjs",
+    "test:host": "node --test tests/hostProtocol.test.cjs tests/completionCache.test.cjs tests/checkpointStage.test.cjs tests/authorityRecovery.test.cjs tests/authorityDraftStage.test.cjs tests/resourceBackup.test.cjs tests/historyCommands.test.cjs tests/interactiveOpenDeadline.test.cjs tests/nativeSavedSnapshot.test.cjs tests/dependencyAuditWorkflow.test.cjs tests/retainedRecovery.test.cjs",
     "test:assets": "python3 -m unittest discover -s tests -p \"*_test.py\"",
     "test:export": "node --test tests/knowledgeGraphExport.test.cjs tests/exportIntent.test.cjs tests/exportTarget.test.cjs",
     "editor:fetch": "python3 scripts/released_editor.py",
@@ -145,7 +145,8 @@
     "test:history-ui": "node tests/nativeAlternativeHistory.cjs",
     "test:authority": "node --test tests/resourceAuthority.test.cjs tests/resourceAuthorityNormalization.test.cjs",
     "test:authority-ui": "node tests/nativeAuthorityHistory.cjs",
-    "test:authority-controllers": "node tests/runNativeAuthorityControllers.cjs"
+    "test:authority-controllers": "node tests/runNativeAuthorityControllers.cjs",
+    "test:native-retained": "node tests/runRetainedRecovery.cjs"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",

@@ -103,6 +103,9 @@ jobs:
       - name: Exercise actual packaged extension in native host
         run: |
           if [[ "$RUNNER_OS" == Linux ]]; then xvfb-run -a npm run test:native; else npm run test:native; fi
+      - name: Exercise actual retained-input recovery with the exact packaged authority
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then xvfb-run -a npm run test:native-retained; else npm run test:native-retained; fi
       - name: Exercise recoverable notices in an actual browser DOM
         if: runner.os == 'Linux'
         run: |

@@ -17,7 +17,7 @@ const LIMIT = 16 * 1024 * 1024;
 const hash = (source: string) => createHash('sha256').update(source, 'utf8').digest('hex');
 interface HostMessage {
   protocol: number; type: string; resource: string; session: string; revision: number;
-  authorityEpoch?:string; operation?:Record<string,unknown>; route?:string; expectedBody?:string; meta?:Record<string,unknown>; textArgs?:string[]; targetBody?:string; operationsJson?:string; level?:string; kept?:number[]; afterHash?:string; draft?:string; draftSequence?:number; name?:string; args?:unknown[];
+  authorityEpoch?:string; operation?:Record<string,unknown>; route?:string; expectedBody?:string; meta?:Record<string,unknown>; textArgs?:string[]; targetBody?:string; operationsJson?:string; level?:string; kept?:number[]; afterHash?:string; draft?:string; draftHash?:string; draftSequence?:number; name?:string; args?:unknown[];
   id?: number; beforeHash?: string; sourceHash?: string; source?: string;
   format?: 'markdown' | 'knowledge-graph'; checkpoint?: unknown; historyGeneration?: number; nonce?: string; checkpointToken?:string; token?:string; index?:number; total?:number; bytes?:number; text?:string; historyCommandNonce?:string; viewEpoch?:number;
 }
@@ -81,8 +81,8 @@ export class AlternativeControlProvider implements vscode.CustomEditorProvider<A
   if(doc.authorityInitialization)return doc.authorityInitialization;
   if(doc.authority)return doc.authority;
   const initial=this.authorityBase(doc),source=doc.source;
-  const current=()=>!doc.disposed&&doc.authorityEpoch===initial.authorityEpoch&&doc.revision===initial.revision&&doc.historyGeneration===initial.historyGeneration;
-  const initialization=(async()=>{
+  const current=()=>!doc.disposed&&doc.authorityInitialization===initialization&&doc.authorityEpoch===initial.authorityEpoch&&doc.revision===initial.revision&&doc.historyGeneration===initial.historyGeneration;
+  const initialization:Promise<ResourceAuthority>=(async()=>{
    let authority:ResourceAuthority|undefined;
    try {
     const role=typeof doc.roleSnapshot==='string'?JSON.parse(doc.roleSnapshot) as {loaded?:boolean;thesaurusText?:string}:undefined;
@@ -142,15 +142,15 @@ export class AlternativeControlProvider implements vscode.CustomEditorProvider<A
    doc.recoveryArchive=target.toString();
   }
  }
- private async resetAuthority(doc:AlternativeDocument,replace:()=>void|Promise<void>):Promise<void> {
+ private async resetAuthority(doc:AlternativeDocument,replace:()=>void):Promise<void> {
   if(doc.authorityReset)await doc.authorityReset;
   const reset=(async()=>{
    await this.preserveAuthorityRecovery(doc);
    const authority=doc.authority,initialization=doc.authorityInitialization;
-   doc.authority=undefined;doc.authorityInitialization=undefined;doc.authorityEpoch=randomUUID();
-   for(const item of doc.views){item.nativeAttached=false;item.historyCommands.clear();}doc.pendingAuthority=undefined;
+   doc.authority=undefined;doc.authorityInitialization=undefined;
    await authority?.dispose();if(initialization)await initialization.then(old=>old.dispose(),()=>undefined);
-   if(doc.disposed)throw new Error('Document disposed');await replace();
+   if(doc.disposed)throw new Error('Document disposed');replace();
+   doc.authorityEpoch=randomUUID();for(const item of doc.views){item.nativeAttached=false;item.historyCommands.clear();}doc.pendingAuthority=undefined;
   })();
   doc.authorityReset=reset;
   try{await reset;}finally{if(doc.authorityReset===reset)doc.authorityReset=undefined;}
@@ -283,7 +283,7 @@ export class AlternativeControlProvider implements vscode.CustomEditorProvider<A
    for(let attempt=0;attempt<3;attempt++){
     if(resetEpoch&&doc.authorityEpoch!==resetEpoch)return false;
     const startingEpoch=doc.authorityEpoch;let authority:ResourceAuthority|undefined,authoritySnapshot:AuthoritySnapshot|undefined;
-    try{authority=type==='resource-conflict'||doc.blocked?undefined:await this.native(doc);authoritySnapshot=authority?await authority.snapshot():undefined;}
+    try{authority=type==='resource-conflict'||doc.blocked&&type!=='init'?undefined:await this.native(doc);authoritySnapshot=authority?await authority.snapshot():undefined;}
     catch(error){if(doc.disposed||!doc.views.has(view))return false;if(doc.authorityEpoch!==startingEpoch)continue;throw error;}
     if(doc.disposed||!doc.views.has(view))return false;
     const source=doc.source,revision=doc.revision,historyGeneration=doc.historyGeneration,checkpoint=doc.checkpoint,authorityEpoch=doc.authorityEpoch,sourceHash=hash(source);
@@ -365,7 +365,9 @@ export class AlternativeControlProvider implements vscode.CustomEditorProvider<A
   if(_token.isCancellationRequested)throw new vscode.CancellationError();
   const source=recovery?.source??(normal?.isDirty?normal.getText():disk);this.checkSize(source);
   const doc=new AlternativeDocument(uri,source,disk,()=>{if(this.resources.get(uri.toString())===doc)this.resources.delete(uri.toString());});
-  doc.recoveredBackup=retained;doc.recoveryDirty=source!==disk||Boolean(recovery?.drafts.length);for(const draft of recovery?.drafts??[])doc.drafts.set(draft.viewSession,draft);this.resources.set(uri.toString(),doc);return doc;
+  doc.recoveredBackup=retained;doc.recoveryDirty=source!==disk||Boolean(recovery?.drafts.length);for(const draft of recovery?.drafts??[])doc.drafts.set(draft.viewSession,draft);
+  if(recovery?.drafts.length){await this.preserveAuthorityRecovery(doc);doc.blocked=true;}
+  this.resources.set(uri.toString(),doc);return doc;
  }
  async activeCommand(type:string,command?:string):Promise<void> {
   for (const doc of this.resources.values()) for(const view of doc.views) if(view.panel.active && vscode.window.state.focused) {
@@ -471,17 +473,18 @@ export class AlternativeControlProvider implements vscode.CustomEditorProvider<A
   const stateListener=panel.onDidChangeViewState(()=>{view.epoch++;view.historyCommands.clear();void panel.webview.postMessage({protocol:1,type:'view-state',resource,session:view.session,active:panel.active,viewEpoch:view.epoch});});
   const listener=panel.webview.onDidReceiveMessage((value:unknown)=>{
    if(!value||typeof value!=='object') return;const message=value as HostMessage;
-   if(message.type==='ready') {void this.enqueue(doc,async()=>{const authority=await this.native(doc);if(!view.nativeAttached){await authority.attachView(view.session);view.nativeAttached=true;}const snapshot=await authority.snapshot();await this.sync(doc,view,'init',{authoritySnapshot:snapshot,recoveryDrafts:[...doc.drafts.values()]});if(doc.recoveryDirty){doc.recoveryDirty=false;this.changes.fire({document:doc});}}).catch(error=>this.block(doc,String(error)));return;}
+   if(message.type==='ready') {void this.enqueue(doc,async()=>{if(doc.drafts.has(view.session)){await this.preserveAuthorityRecovery(doc);doc.blocked=true;}const authority=await this.native(doc);if(!view.nativeAttached){await authority.attachView(view.session);view.nativeAttached=true;}const snapshot=await authority.snapshot();await this.sync(doc,view,'init',{authoritySnapshot:snapshot,retainedDraftSequence:doc.drafts.get(view.session)?.sequence??0,recoveryDrafts:doc.blocked?[...doc.drafts.values()]:[]});if(doc.recoveryDirty){doc.recoveryDirty=false;this.changes.fire({document:doc});}}).catch(error=>this.block(doc,String(error)));return;}
    if(message.protocol!==1||message.resource!==resource||message.session!==view.session) return;
-   if(message.type==='external-adoption-conflict') {
+   if(message.type==='external-adoption-conflict'||message.type==='retained-draft-conflict') {
     void this.enqueue(doc,async()=>{
-     if(disposed||doc.disposed||message.authorityEpoch!==doc.authorityEpoch||!doc.drafts.has(view.session))return;
+     const retainedMatches=()=>{const own=doc.drafts.get(view.session);return Boolean(own&&(message.type!=='retained-draft-conflict'||own.sequence===message.draftSequence&&hash(own.draft)===message.draftHash));};
+     if(disposed||doc.disposed||message.authorityEpoch!==doc.authorityEpoch||!retainedMatches())return;
      const epoch=doc.authorityEpoch;await this.preserveAuthorityRecovery(doc);
-     if(disposed||doc.disposed||epoch!==doc.authorityEpoch||!doc.drafts.has(view.session))return;
-     const reason='External changes raced an unsaved view draft. Open the recovery draft before choosing the current file.';
+     if(disposed||doc.disposed||epoch!==doc.authorityEpoch||!retainedMatches())return;
+     const reason=message.type==='retained-draft-conflict'?'Retained view input needs explicit recovery. Open the recovery draft before choosing the current file.':'External changes raced an unsaved view draft. Open the recovery draft before choosing the current file.';
      await this.block(doc,reason);
-     if(disposed||doc.disposed||epoch!==doc.authorityEpoch||!doc.drafts.has(view.session))return;
-     await this.sync(doc,view,'resource-conflict',{reason,externalAdoptionConflict:true});
+     if(disposed||doc.disposed||epoch!==doc.authorityEpoch||!retainedMatches())return;
+     await this.sync(doc,view,'resource-conflict',{reason,externalAdoptionConflict:true,...(message.type==='retained-draft-conflict'?{retainedDraftSequence:message.draftSequence,retainedDraftHash:message.draftHash}:{})});
     }).catch(error=>this.block(doc,String(error)));return;
    }
    if(message.type==='history-command-complete'){
@@ -525,7 +528,8 @@ export class AlternativeControlProvider implements vscode.CustomEditorProvider<A
     if(disposed) return;
     if(message.type==='resolve-conflict') {
      if(message.revision!==doc.revision||message.sourceHash!==hash(doc.source))throw new Error('Stale conflict recovery request');
-     if(doc.blocked) {await this.resetAuthority(doc,async()=>{const disk=await this.readDisk(doc.uri);doc.drafts.clear();doc.diskSource=disk;doc.source=this.normal(doc.uri)?.isDirty?this.normal(doc.uri)!.getText():disk;doc.conflictSource=undefined;doc.blocked=false;doc.checkpoint=undefined;doc.revision++;doc.historyGeneration++;});
+     if(!doc.blocked)throw new Error('No recovery conflict is pending; current source and drafts are unchanged');
+     if(doc.blocked) {const retainedSource=doc.source,retainedDrafts=JSON.stringify([...doc.drafts.values()]),disk=await this.readDisk(doc.uri);await this.resetAuthority(doc,()=>{if(doc.source!==retainedSource||JSON.stringify([...doc.drafts.values()])!==retainedDrafts)throw new Error('Retained input changed during recovery; all drafts remain retained. Retry explicit recovery.');doc.drafts.clear();doc.diskSource=disk;doc.source=this.normal(doc.uri)?.isDirty?this.normal(doc.uri)!.getText():disk;doc.conflictSource=undefined;doc.blocked=false;doc.checkpoint=undefined;doc.revision++;doc.historyGeneration++;});
       this.changes.fire({document:doc});await this.broadcast(doc,{reverted:true});}return;
     }
     const expected=message.type==='proposal'?message.beforeHash:message.sourceHash;

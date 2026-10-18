@@ -4,7 +4,7 @@
  if(document.body.dataset.authority!=='true')return;
  const vscode=acquireVsCodeApi(),container=document.getElementById('editor'),notice=document.getElementById('host-notice');
  const hostNotice=new TerraphimHostNotice(notice),assets=document.body.dataset.assets;
- let editor,bindings,base,recoveryPending=false,ready=false,sequence=0,draftSequence=0,receivedDraft=0,clearedDraft=0,acceptedCheckpoint,historyCommand;
+ let editor,bindings,base,recoveryPending=false,ready=false,sequence=0,draftSequence=0,receivedDraft=0,clearedDraft=0,acceptedCheckpoint,historyCommand,retainedRegistration,quarantinedDraft;
  let roleGeneration='0',providerGeneration='0',activeView=false,viewEpoch=0,paused=false,adopting=false;
  const requests=new Map(),stages=new Map();let stageTimer;let sending=Promise.resolve(),settling=Promise.resolve(),hostHistory=Promise.resolve(),synchronizing=Promise.resolve();
  const md=()=>editor.markdownEditor;
@@ -17,12 +17,15 @@
     overflow:container.querySelector('.te-overflow-text')?.value}:{} )});};
  function draft(){if(!ready||adopting||paused)return;recordDraft(rawDraft());}
  function recordDraft(value){const bytes=encodeSize(value);
-  if(bytes>128*1024*1024){block('Pending draft exceeds recovery capacity');return;}
+  if(bytes>128*1024*1024){quarantine('Pending draft exceeds recovery capacity',value);return false;}
+  if(!Number.isSafeInteger(draftSequence)||draftSequence>=Number.MAX_SAFE_INTEGER){quarantine('Pending draft sequence exceeds recovery capacity',value);return false;}
   draftSequence++;vscode.setState({resource:base.resource,draft:value,sequence:draftSequence});
   const token=crypto.randomUUID(),total=Math.max(1,Math.ceil(value.length/(256*1024)));
   for(let index=0;index<total;index++)vscode.postMessage({...identity(),type:'authority-draft-chunk',token,draftSequence,index,total,bytes,text:value.slice(index*256*1024,(index+1)*256*1024)});
+  return true;
  }
- function block(reason,localDraft){paused=true;hostNotice.blocking();notice.hidden=false;notice.replaceChildren();
+ function quarantine(reason,value){quarantinedDraft=value;block(reason,value);}
+ function block(reason,localDraft){if(quarantinedDraft!==undefined)localDraft=quarantinedDraft;paused=true;hostNotice.blocking();notice.hidden=false;notice.replaceChildren();
   const text=document.createElement('p');text.textContent=`${reason}. Accepted source and received drafts are retained. Recovery starts fresh Undo history.`;
   const copy=document.createElement('button');copy.textContent='Open recovery draft';copy.onclick=()=>{if(localDraft!==undefined){const retained=document.createElement('textarea');retained.readOnly=true;retained.setAttribute('aria-label','Retained external-change recovery data');retained.value=localDraft;notice.append(retained);retained.focus();retained.select();}else vscode.postMessage({...identity(),type:'recover-archive'});};
   const recover=document.createElement('button');recover.textContent='Recover current file with fresh history';recover.onclick=()=>{void requestRecovery(recover);};
@@ -129,7 +132,22 @@
    document.addEventListener('click',event=>{const target=event.composedPath().find(node=>node instanceof Element&&node.matches('.te-files-graph [data-action="download-graph"],.te-files-graph [data-action="download-graph-text"]'));
     if(target){event.preventDefault();event.stopImmediatePropagation();void command('export',target.dataset.action==='download-graph'?'knowledge-graph':'markdown');}},true);
    container.addEventListener('keydown',event=>{if(TerraphimAuthoritySnapshot.consumeEditableSelectAll(event,container))return;if(event.defaultPrevented&&!event.isComposing)event.stopPropagation();});
-   if(message.recoveryDrafts?.length||vscode.getState()?.draft)block('A retained pending draft is available; inspect it before choosing a recovery source');
+   const retained=vscode.getState(),decision=TerraphimAuthoritySnapshot.retainedDraft(retained,base.resource);
+   const ownSequence=message.retainedDraftSequence??0;
+   if(!Number.isSafeInteger(ownSequence)||ownSequence<0){quarantine('Retained host draft sequence could not be validated',retained?.draft??JSON.stringify(retained??null));return;}
+   draftSequence=Math.max(draftSequence,ownSequence);
+   if(decision.kind==='retained'){
+    // Preserve the exact opaque input under this resource's current identity;
+    // its older source hash is evidence, never an instruction to replay it.
+    draftSequence=Math.max(draftSequence,decision.sequence);
+    if(draftSequence>=Number.MAX_SAFE_INTEGER){quarantine('Retained draft sequence exceeds recovery capacity',decision.draft);return;}
+    const retainedEpoch=base.authorityEpoch;quarantine('Retained input is awaiting exact resource archival confirmation',decision.draft);
+    const draftHash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(decision.draft)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+    if(base.authorityEpoch!==retainedEpoch)return;retainedRegistration={sequence:draftSequence+1,draftHash,acknowledged:false};
+    recordDraft(decision.draft);
+   }else if(decision.kind==='foreign'||decision.kind==='invalid'){
+    quarantine(decision.kind==='foreign'?'A retained draft belongs to another resource and remains quarantined in this view':'Retained input could not be validated and remains quarantined in this view',typeof retained?.draft==='string'?retained.draft:JSON.stringify(retained));
+   }else if(message.recoveryDrafts?.length)block('A retained pending draft is available; inspect it before choosing a recovery source');
   }catch(error){block(String(error));}
  }
  function hostChunk(message){if(base&&(message.resource!==base.resource||message.session!==base.session||message.authorityEpoch!==base.authorityEpoch||message.revision<base.revision||message.revision===base.revision&&message.historyGeneration<base.historyGeneration))return;if(typeof message.token!=='string'||typeof message.text!=='string'||message.text.length>256*1024||!Number.isSafeInteger(message.total)||message.total<1||!Number.isSafeInteger(message.index)||message.index<0||message.index>=message.total||!Number.isSafeInteger(message.bytes)||message.bytes<0||message.bytes>503*16*1024*1024)throw new Error('Invalid authority checkpoint chunk');
@@ -185,8 +203,9 @@
    if(message.ok)waiting.resolve(message);else {const error=new Error(message.error||'Native operation refused');error.authorityUncertain=Boolean(message.authorityUncertain);error.authorityUnchanged=Boolean(message.authorityUnchanged);waiting.reject(error);}return;
   }
   if(message.type==='view-state'){activeView=message.active;viewEpoch=message.viewEpoch;return;}
-  if(message.type==='authority-draft-received'){receivedDraft=Math.max(receivedDraft,message.draftSequence);return;}
-  if(message.type==='resource-conflict'){base=TerraphimAuthoritySnapshot.rebaseConflict(message,base);block(message.reason);return;}
+  if(message.type==='authority-draft-received'){if(!Number.isSafeInteger(message.draftSequence)||message.draftSequence<0)return;receivedDraft=Math.max(receivedDraft,message.draftSequence);
+   if(retainedRegistration?.sequence===message.draftSequence&&!retainedRegistration.acknowledged){const retained=retainedRegistration;retained.acknowledged=true;vscode.postMessage({...identity(),type:'retained-draft-conflict',draftSequence:retained.sequence,draftHash:retained.draftHash});}return;}
+  if(message.type==='resource-conflict'){if(retainedRegistration?.acknowledged&&message.retainedDraftSequence===retainedRegistration.sequence&&message.retainedDraftHash===retainedRegistration.draftHash){retainedRegistration=undefined;quarantinedDraft=undefined;}base=TerraphimAuthoritySnapshot.rebaseConflict(message,base);block(message.reason);return;}
   if(message.type==='flush-request'){
    settling=settling.then(async()=>{try{await settled();vscode.postMessage({...identity(),type:'flush-complete',nonce:message.nonce});}
     catch{vscode.postMessage({...identity(),type:'flush-refused',nonce:message.nonce});}});return;
@@ -205,7 +224,7 @@
     resetTransport();base={...base,...message};recordDraft(retained);
     vscode.postMessage({...identity(),type:'external-adoption-conflict'});block('The saved file changed while this view retained input; both versions require explicit recovery');return;
    }
-   if(message.reverted){adopting=true;try{resetTransport();base={...base,...message};installRole(message.roleSnapshot);if(message.authoritySnapshot){roleGeneration=message.authoritySnapshot.roleGeneration;providerGeneration=message.authoritySnapshot.providerGeneration;}adoptSource(message.source);md().surface.resetHistory();md().resetAuthorityAfterRecovery();paused=false;container.inert=false;hostNotice.recoverable(message.externalAdoption?'File updated externally with fresh Undo history.':'Recovered with fresh Undo history. Preserved pending versions remain available in the recovery archive.');acceptedCheckpoint=JSON.stringify(capture());vscode.setState(undefined);}finally{adopting=false;}void acceptedHash();return;}
+   if(message.reverted){adopting=true;try{resetTransport();base={...base,...message};installRole(message.roleSnapshot);if(message.authoritySnapshot){roleGeneration=message.authoritySnapshot.roleGeneration;providerGeneration=message.authoritySnapshot.providerGeneration;}adoptSource(message.source);md().surface.resetHistory();md().resetAuthorityAfterRecovery();paused=false;container.inert=false;hostNotice.recoverable(message.externalAdoption?'File updated externally with fresh Undo history.':'Recovered with fresh Undo history. Preserved pending versions remain available in the recovery archive.');acceptedCheckpoint=JSON.stringify(capture());if(quarantinedDraft===undefined)vscode.setState(undefined);else block('Retained input remains quarantined; copy it before closing this view',quarantinedDraft);}finally{adopting=false;}void acceptedHash();return;}
    const epoch=base.authorityEpoch;synchronizing=synchronizing.then(()=>synchronize(message)).catch(error=>{if(epoch===base.authorityEpoch&&!error.authorityRetired)block(String(error));});return;
   }
  });

@@ -114,7 +114,7 @@ class AlternativeControlProvider {
         if (doc.authority)
             return doc.authority;
         const initial = this.authorityBase(doc), source = doc.source;
-        const current = () => !doc.disposed && doc.authorityEpoch === initial.authorityEpoch && doc.revision === initial.revision && doc.historyGeneration === initial.historyGeneration;
+        const current = () => !doc.disposed && doc.authorityInitialization === initialization && doc.authorityEpoch === initial.authorityEpoch && doc.revision === initial.revision && doc.historyGeneration === initial.historyGeneration;
         const initialization = (async () => {
             let authority;
             try {
@@ -255,18 +255,18 @@ class AlternativeControlProvider {
             const authority = doc.authority, initialization = doc.authorityInitialization;
             doc.authority = undefined;
             doc.authorityInitialization = undefined;
+            await authority?.dispose();
+            if (initialization)
+                await initialization.then(old => old.dispose(), () => undefined);
+            if (doc.disposed)
+                throw new Error('Document disposed');
+            replace();
             doc.authorityEpoch = (0, crypto_1.randomUUID)();
             for (const item of doc.views) {
                 item.nativeAttached = false;
                 item.historyCommands.clear();
             }
             doc.pendingAuthority = undefined;
-            await authority?.dispose();
-            if (initialization)
-                await initialization.then(old => old.dispose(), () => undefined);
-            if (doc.disposed)
-                throw new Error('Document disposed');
-            await replace();
         })();
         doc.authorityReset = reset;
         try {
@@ -493,7 +493,7 @@ class AlternativeControlProvider {
                 const startingEpoch = doc.authorityEpoch;
                 let authority, authoritySnapshot;
                 try {
-                    authority = type === 'resource-conflict' || doc.blocked ? undefined : await this.native(doc);
+                    authority = type === 'resource-conflict' || doc.blocked && type !== 'init' ? undefined : await this.native(doc);
                     authoritySnapshot = authority ? await authority.snapshot() : undefined;
                 }
                 catch (error) {
@@ -648,6 +648,10 @@ class AlternativeControlProvider {
         doc.recoveryDirty = source !== disk || Boolean(recovery?.drafts.length);
         for (const draft of recovery?.drafts ?? [])
             doc.drafts.set(draft.viewSession, draft);
+        if (recovery?.drafts.length) {
+            await this.preserveAuthorityRecovery(doc);
+            doc.blocked = true;
+        }
         this.resources.set(uri.toString(), doc);
         return doc;
     }
@@ -865,10 +869,13 @@ class AlternativeControlProvider {
                 return;
             const message = value;
             if (message.type === 'ready') {
-                void this.enqueue(doc, async () => { const authority = await this.native(doc); if (!view.nativeAttached) {
+                void this.enqueue(doc, async () => { if (doc.drafts.has(view.session)) {
+                    await this.preserveAuthorityRecovery(doc);
+                    doc.blocked = true;
+                } const authority = await this.native(doc); if (!view.nativeAttached) {
                     await authority.attachView(view.session);
                     view.nativeAttached = true;
-                } const snapshot = await authority.snapshot(); await this.sync(doc, view, 'init', { authoritySnapshot: snapshot, recoveryDrafts: [...doc.drafts.values()] }); if (doc.recoveryDirty) {
+                } const snapshot = await authority.snapshot(); await this.sync(doc, view, 'init', { authoritySnapshot: snapshot, retainedDraftSequence: doc.drafts.get(view.session)?.sequence ?? 0, recoveryDrafts: doc.blocked ? [...doc.drafts.values()] : [] }); if (doc.recoveryDirty) {
                     doc.recoveryDirty = false;
                     this.changes.fire({ document: doc });
                 } }).catch(error => this.block(doc, String(error)));
@@ -876,19 +883,20 @@ class AlternativeControlProvider {
             }
             if (message.protocol !== 1 || message.resource !== resource || message.session !== view.session)
                 return;
-            if (message.type === 'external-adoption-conflict') {
+            if (message.type === 'external-adoption-conflict' || message.type === 'retained-draft-conflict') {
                 void this.enqueue(doc, async () => {
-                    if (disposed || doc.disposed || message.authorityEpoch !== doc.authorityEpoch || !doc.drafts.has(view.session))
+                    const retainedMatches = () => { const own = doc.drafts.get(view.session); return Boolean(own && (message.type !== 'retained-draft-conflict' || own.sequence === message.draftSequence && hash(own.draft) === message.draftHash)); };
+                    if (disposed || doc.disposed || message.authorityEpoch !== doc.authorityEpoch || !retainedMatches())
                         return;
                     const epoch = doc.authorityEpoch;
                     await this.preserveAuthorityRecovery(doc);
-                    if (disposed || doc.disposed || epoch !== doc.authorityEpoch || !doc.drafts.has(view.session))
+                    if (disposed || doc.disposed || epoch !== doc.authorityEpoch || !retainedMatches())
                         return;
-                    const reason = 'External changes raced an unsaved view draft. Open the recovery draft before choosing the current file.';
+                    const reason = message.type === 'retained-draft-conflict' ? 'Retained view input needs explicit recovery. Open the recovery draft before choosing the current file.' : 'External changes raced an unsaved view draft. Open the recovery draft before choosing the current file.';
                     await this.block(doc, reason);
-                    if (disposed || doc.disposed || epoch !== doc.authorityEpoch || !doc.drafts.has(view.session))
+                    if (disposed || doc.disposed || epoch !== doc.authorityEpoch || !retainedMatches())
                         return;
-                    await this.sync(doc, view, 'resource-conflict', { reason, externalAdoptionConflict: true });
+                    await this.sync(doc, view, 'resource-conflict', { reason, externalAdoptionConflict: true, ...(message.type === 'retained-draft-conflict' ? { retainedDraftSequence: message.draftSequence, retainedDraftHash: message.draftHash } : {}) });
                 }).catch(error => this.block(doc, String(error)));
                 return;
             }
@@ -973,8 +981,12 @@ class AlternativeControlProvider {
                 if (message.type === 'resolve-conflict') {
                     if (message.revision !== doc.revision || message.sourceHash !== hash(doc.source))
                         throw new Error('Stale conflict recovery request');
+                    if (!doc.blocked)
+                        throw new Error('No recovery conflict is pending; current source and drafts are unchanged');
                     if (doc.blocked) {
-                        await this.resetAuthority(doc, async () => { const disk = await this.readDisk(doc.uri); doc.drafts.clear(); doc.diskSource = disk; doc.source = this.normal(doc.uri)?.isDirty ? this.normal(doc.uri).getText() : disk; doc.conflictSource = undefined; doc.blocked = false; doc.checkpoint = undefined; doc.revision++; doc.historyGeneration++; });
+                        const retainedSource = doc.source, retainedDrafts = JSON.stringify([...doc.drafts.values()]), disk = await this.readDisk(doc.uri);
+                        await this.resetAuthority(doc, () => { if (doc.source !== retainedSource || JSON.stringify([...doc.drafts.values()]) !== retainedDrafts)
+                            throw new Error('Retained input changed during recovery; all drafts remain retained. Retry explicit recovery.'); doc.drafts.clear(); doc.diskSource = disk; doc.source = this.normal(doc.uri)?.isDirty ? this.normal(doc.uri).getText() : disk; doc.conflictSource = undefined; doc.blocked = false; doc.checkpoint = undefined; doc.revision++; doc.historyGeneration++; });
                         this.changes.fire({ document: doc });
                         await this.broadcast(doc, { reverted: true });
                     }
