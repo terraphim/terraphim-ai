@@ -10,6 +10,7 @@ const { spawn, execFileSync } = require('node:child_process');
 const { once } = require('node:events');
 const { setTimeout: delay } = require('node:timers/promises');
 const { chromium } = require('playwright-core');
+const { matchesSavedSource } = require('./nativeSavedSnapshot.cjs');
 
 async function waitFor(check, description, timeout = 15000) {
   const until = Date.now() + timeout;
@@ -134,7 +135,7 @@ async function waitFor(check, description, timeout = 15000) {
     });
     const installedAssets=path.join(installedRoot,'media/editor');
     const { exportKnowledgeGraph } = require(path.join(installedRoot,'media/knowledge-graph.cjs'));
-    async function capture(name, expectedTerms, expectedBody) {
+    async function capture(name, expectedTerms, expectedBody, expectedFullSource) {
       await progress('capture: '+name);let saved;
       try { await waitFor(async () => {
         saved = await fs.readFile(filename, 'utf8');
@@ -142,6 +143,7 @@ async function waitFor(check, description, timeout = 15000) {
         return (await source.innerText()).split('\n')[0] === expectedBody &&
           await page.locator('.tabs-container .tab.dirty').count() === 0 &&
           saved.split('\n')[0] === expectedBody &&
+          matchesSavedSource(saved, expectedFullSource) &&
           JSON.stringify(Object.keys(graph.data).sort()) === JSON.stringify(expectedTerms);
       }, name + ' actual saved Markdown and graph');
       } catch(error) {
@@ -320,20 +322,20 @@ async function waitFor(check, description, timeout = 15000) {
     await focusView(frame);
     await page.keyboard.press('Control+z');
     await page.keyboard.press('Control+s');
-    assert.equal(await capture('12-ghost-other-view-undo',['risk','worry'],'Worry needs mitigation.'),priorGhosts);
+    assert.equal(await capture('12-ghost-other-view-undo',['risk','worry'],'Worry needs mitigation.',priorGhosts),priorGhosts);
     await page.keyboard.press('Control+Shift+z');
     await page.keyboard.press('Control+s');
-    assert.equal(await capture('13-ghost-other-view-redo',['risk','worry'],'Worry needs mitigation.'),promoted);
+    assert.equal(await capture('13-ghost-other-view-redo',['risk','worry'],'Worry needs mitigation.',promoted),promoted);
     await focusView(issuingFrame);
     await page.keyboard.press('Control+w');
     frame=survivingFrame;source=frame.getByRole('textbox',{name:'Markdown source',exact:true});
     await focusView(frame);
     await page.keyboard.press('Control+z');
     await page.keyboard.press('Control+s');
-    assert.equal(await capture('14-ghost-issuing-view-closed-undo',['risk','worry'],'Worry needs mitigation.'),priorGhosts);
+    assert.equal(await capture('14-ghost-issuing-view-closed-undo',['risk','worry'],'Worry needs mitigation.',priorGhosts),priorGhosts);
     await page.keyboard.press('Control+Shift+z');
     await page.keyboard.press('Control+s');
-    assert.equal(await capture('15-ghost-survivor-redo',['risk','worry'],'Worry needs mitigation.'),promoted);
+    assert.equal(await capture('15-ghost-survivor-redo',['risk','worry'],'Worry needs mitigation.',promoted),promoted);
     assert.deepEqual(persistedGhosts(await fs.readFile(filename,'utf8')),expectedGhosts);
     receipt.status='PASS';
   } catch (caught) {
