@@ -1,19 +1,19 @@
 {
-  "release": "https://github.com/terraphim/terraphim-editor/releases/tag/v0.1.0-rc.2",
-  "sourceCommit": "25ad3b16a1bebab6edd767a7efd1ace7b25c82ad",
+  "release": "https://github.com/terraphim/terraphim-editor/releases/tag/v0.1.0-rc.4",
+  "sourceCommit": "5fbe719667575db4415c2aa03cf706e51692c9c6",
   "archive": {
     "name": "editor-candidate.tar.gz",
-    "url": "https://github.com/terraphim/terraphim-editor/releases/download/v0.1.0-rc.2/editor-candidate.tar.gz",
-    "sha256": "daa104aecdca43df5ca6dcf36b420351be09784a8436ab61bd3fc9acb1504e73"
+    "url": "https://github.com/terraphim/terraphim-editor/releases/download/v0.1.0-rc.4/editor-candidate.tar.gz",
+    "sha256": "1bffba5845ed470be01049262d8814cddaa870fc0f04c5400680f464e78ba8e4"
   },
   "manifest": {
     "name": "assets-manifest.json",
-    "url": "https://github.com/terraphim/terraphim-editor/releases/download/v0.1.0-rc.2/assets-manifest.json",
-    "sha256": "4331adf222fedeeba04eb5986878bb4011f833e051b1a4f484274302ae4465a3"
+    "url": "https://github.com/terraphim/terraphim-editor/releases/download/v0.1.0-rc.4/assets-manifest.json",
+    "sha256": "1be05132c19e5cb7f965a1100cfaaba3ac40af5d30b15f979f92d781aa86a0a6"
   },
   "bridge": {
     "name": "host-session.js",
-    "url": "https://raw.githubusercontent.com/terraphim/terraphim-editor/25ad3b16a1bebab6edd767a7efd1ace7b25c82ad/public/js/host-session.js",
+    "url": "https://raw.githubusercontent.com/terraphim/terraphim-editor/5fbe719667575db4415c2aa03cf706e51692c9c6/public/js/host-session.js",
     "sha256": "9e5efc4c3f1f2003cd86f05b266b6666e546c68a065eaca67c897c2328a09388"
   },
   "sourceRepository": "https://github.com/terraphim/terraphim-editor",
