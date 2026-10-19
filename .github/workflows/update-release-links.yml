@@ -1,0 +1,95 @@
+name: Update release links
+
+# Repository-local release updater: discovers admitted release/channel inputs
+# using the pinned website tooling (terraphim/terraphim.ai), proposes a normal
+# reviewed PR on bot/release-updater, and dispatches the validation workflow
+# at the generated branch. The tooling pin is an immutable reviewed commit;
+# updating it requires a reviewed change to this file.
+# See terraphim/terraphim.ai docs/release-link-updater.md.
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+  release:
+    types: [published]
+
+concurrency:
+  group: release-updater-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # TODO(release-updater): set to the merged terraphim.ai tooling commit on its
+  # default branch once terraphim/terraphim.ai#34+#35 are merged. The workflow
+  # fails closed while this is a placeholder.
+  UPDATER_TOOLING_COMMIT: "50dc88dd2da97a24ec114c448538cd4639411694"
+
+jobs:
+  discover:
+    name: Discover admitted releases
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Checkout pinned updater tooling
+        uses: actions/checkout@v6
+        with:
+          repository: terraphim/terraphim.ai
+          ref: ${{ env.UPDATER_TOOLING_COMMIT }}
+          path: updater-tooling
+
+      - name: Collect release snapshot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 updater-tooling/scripts/update_release.py             --target terraphim-ai --root . --check             --snapshot-out snapshot.json             --receipt discovery-receipt.json || test $? -eq 1
+
+      - name: Upload discovery artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-update-discovery
+          path: |
+            snapshot.json
+            discovery-receipt.json
+          retention-days: 30
+
+  propose:
+    name: Propose update PR
+    needs: discover
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Checkout pinned updater tooling
+        uses: actions/checkout@v6
+        with:
+          repository: terraphim/terraphim.ai
+          ref: ${{ env.UPDATER_TOOLING_COMMIT }}
+          path: updater-tooling
+
+      - name: Download discovery artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-update-discovery
+
+      - name: Propose update PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 updater-tooling/scripts/release_update_pr.py             --repo "terraphim/terraphim-ai"             --target terraphim-ai             --root .             --snapshot snapshot.json             --validation-workflow ci-pr.yml              --receipt proposal-receipt.json
+
+      - name: Upload proposal receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-update-proposal
+          path: proposal-receipt.json
+          retention-days: 30
