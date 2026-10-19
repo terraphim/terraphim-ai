@@ -25,7 +25,7 @@ env:
   # TODO(release-updater): set to the merged terraphim.ai tooling commit on its
   # default branch once terraphim/terraphim.ai#34+#35 are merged. The workflow
   # fails closed while this is a placeholder.
-  UPDATER_TOOLING_COMMIT: "7696de026e2c031a0d86a6f5d11d345628e0e107"
+  UPDATER_TOOLING_COMMIT: "b3c7d3bc2f58869a9cec280dde0e37550b7f3467"
 
 jobs:
   discover:
