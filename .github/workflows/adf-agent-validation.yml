@@ -32,9 +32,30 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
-        with:
-          components: rustfmt, clippy
+        # Self-hosted bigbox runners already carry rustup and the pinned
+        # toolchain, and share a kache-backed CARGO_HOME whose build dir holds
+        # read-only hard-linked artefacts. Install through rustup, as
+        # release-lsp.yml does on its self-hosted lane. Installing 1.96 here
+        # keeps the host toolchain present; the repo root rust-toolchain.toml
+        # already selects it, so no override is set and the job neither drifts
+        # from the pin nor rewrites the shared stable toolchain on the host.
+        run: |
+          rustup toolchain install 1.96 --profile minimal --component rustfmt,clippy
+          rustc --version
+          cargo --version
+
+      - name: Put the kache build cache on PATH
+        # The runner host sets rustc-wrapper = "kache" in ~/.cargo/config.toml,
+        # and the daemon runs, but kache lives in ~/.local/bin which the
+        # terraphim-ai runner .env does not include. Without it cargo dies with
+        # "could not execute process `kache ...` (never executed)". Add the
+        # directory rather than clearing RUSTC_WRAPPER, so the build keeps the
+        # content-addressed cache the wrapper exists to provide.
+        run: |
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+          # GITHUB_PATH applies from the next step, so assert the binary
+          # directly here rather than relying on PATH already being updated.
+          "${HOME}/.local/bin/kache" --version
 
       - name: Build adf binary
         run: |
