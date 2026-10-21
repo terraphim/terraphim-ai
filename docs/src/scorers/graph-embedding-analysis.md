@@ -1,5 +1,7 @@
 # Terraphim Graph Embeddings vs Cleora
 
+> **See it running:** [Graph Embeddings, Explained Interactively](https://terraphim.ai/docs/graph-embeddings-interactive/) executes the real `terraphim_rolegraph` crate compiled to WebAssembly in the browser — the indexing and scoring described below are live on that page.
+
 ## 1. Terraphim Graph (Current Implementation)
 
 ### 1.1 Data structures
