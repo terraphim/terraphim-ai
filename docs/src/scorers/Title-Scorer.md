@@ -2,6 +2,10 @@
 
 Title scorer is a simple scorer for the "Default" role that matches documents by applying Levenshtein distance to document titles. This is the default scoring method for basic document ranking.
 
+synonyms:: title-scorer, title scorer
+checklist:: available scoring methods, configuration, usage, when to use
+
+
 ## Available Scoring Methods
 
 ### Similarity-Based Scoring (Default)

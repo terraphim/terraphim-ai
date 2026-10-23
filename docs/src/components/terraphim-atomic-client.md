@@ -2,6 +2,10 @@
 
 The `terraphim_atomic_client` crate provides a comprehensive client implementation for the Atomic Data protocol, enabling seamless integration with Atomic Data servers and resources.
 
+synonyms:: terraphim atomic client
+checklist:: architecture, api reference, error handling, resource management, wasm compatibility, testing, configuration, best practices
+
+
 ## Architecture
 
 ### Core Components

@@ -5,6 +5,10 @@
 **Date**: 2026-03-14
 **Reviewers**: Alex
 
+synonyms:: research document, tlaplus typescript bindings, research document typescript bindings for tla+
+checklist:: executive summary, essential questions check, problem statement, current state analysis, constraints, vital few essentialism, dependencies, risks and unknowns
+
+
 ## Executive Summary
 
 This research examines the TLA+ toolchain ecosystem to determine the optimal approach for creating TypeScript bindings. The ecosystem already contains significant TypeScript/JavaScript implementations: tree-sitter-tlaplus (npm parser), Spectacle (full JS interpreter ~5000 LOC), Quint (TypeScript-native TLA alternative by Informal Systems), and vscode-tlaplus (TypeScript IDE). Rather than binding the Java-based SANY/TLC directly, the most productive approach is to build a TypeScript-native TLA+ toolkit layering on tree-sitter-tlaplus for parsing and drawing architectural patterns from Spectacle's interpreter.

@@ -333,7 +333,7 @@ docker-compose up -d
 
 ## Reference Implementation
 
-This integration is based on the try_search project at `/Users/alex/projects/zestic-ai/charm/try_search` which demonstrates:
+This integration is based on the try_search project at `~/projects/zestic-ai/charm/try_search` which demonstrates:
 - Quickwit REST API usage
 - Multi-index support
 - Basic Authentication

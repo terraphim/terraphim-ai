@@ -2,6 +2,10 @@
 
 ## Overview
 
+synonyms:: branch protection and security, branch protection
+checklist:: overview, repository architecture, branch protection mechanisms, development workflows, troubleshooting, security features, best practices, advanced configuration
+
+
 Terraphim AI implements comprehensive branch protection to prevent private or sensitive code from leaking into the public repository. This system uses multiple layers of protection including pre-push hooks, branch naming conventions, and repository-level security rules.
 
 ## Repository Architecture

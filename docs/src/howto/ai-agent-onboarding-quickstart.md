@@ -2,6 +2,10 @@
 
 This quickstart is for AI coding agents working in `github.com/terraphim/terraphim-ai`. It describes the minimum safe workflow for becoming useful quickly without losing context, duplicating work, or bypassing project quality gates.
 
+synonyms:: ai agent onboarding quickstart
+checklist:: first five minutes, working rules, common commands, update and release checks, quality gate before handoff, handoff checklist
+
+
 ## First five minutes
 
 1. Confirm where you are working.

@@ -4,6 +4,10 @@
 It scans the learnings directory for captured corrections, converts `ToolPreference` entries
 into thesaurus mappings, and writes a JSON file that the `replace` command loads immediately.
 
+synonyms:: learning compile
+checklist:: the feedback loop, cli usage, what gets compiled, merge precedence, output format
+
+
 Source: `crates/terraphim_agent/src/learnings/compile.rs`
 
 ## The feedback loop

@@ -3,6 +3,10 @@
 This case study is the mdBook version of the website post:
 - https://terraphim.ai/posts/kg-validation-workflows-case-study/
 
+synonyms:: case study, kg validation workflows, case study knowledge graph validation workflows for pre/post-llm
+checklist:: why this existed, the approach, the results, appendix a workflow overview mermaid, appendix b primary sources
+
+
 It includes the same narrative plus additional technical appendices.
 
 ## Why This Existed
@@ -42,7 +46,7 @@ flowchart TD
 
 ## Appendix B: Primary Sources
 
-- `docs/sessions/research-underutilized-features.md`
-- `docs/sessions/design-underutilized-features.md`
-- `docs/sessions/implementation-summary.md`
-- `docs/sessions/session-20251228-201509.md`
+- `docs-internal/sessions/research-underutilized-features.md`
+- `docs-internal/sessions/design-underutilized-features.md`
+- `docs-internal/sessions/implementation-summary.md`
+- `docs-internal/sessions/session-20251228-201509.md`

@@ -2,6 +2,10 @@
 
 How Symphony orchestrated Claude Code agents to implement a complete PageRank Viewer from six Gitea issues -- autonomously.
 
+synonyms:: case study, symphony pagerank viewer, case study symphony builds a web application
+checklist:: summary, the problem, setup, issue description, instructions, execution, timeline, issues encountered and fixes
+
+
 ## Summary
 
 We used `terraphim_symphony` to build the [PageRank Viewer](https://git.terraphim.cloud/terraphim/pagerank-viewer), a vanilla JavaScript web application that visualises Gitea issue dependencies with PageRank scores. Symphony polled a Gitea repository for open issues, dispatched Claude Code agents to implement each one in an isolated workspace, and committed the results back to the repository. Six issues produced approximately 3,000 lines of production JavaScript across nine files, delivered in three batches of parallel agent sessions.

@@ -4,6 +4,10 @@ Terraphim AI is distributed through two supported channels. There is no
 in-repo Homebrew formula — installation is handled by the official Homebrew
 tap or directly from crates.io / source.
 
+synonyms:: installing terraphim ai, homebrew formula
+checklist:: option 1 homebrew tap recommended, option 2 cargo install from crates.io, option 3 build from source, release channels  source of truth
+
+
 ## Option 1: Homebrew tap (recommended)
 
 The official tap lives in a dedicated repository and covers the shipped CLI

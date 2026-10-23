@@ -42,6 +42,18 @@
 - [Learning Capture for opencode](./howto/learning-capture-opencode.md)
 - [Personal Assistant Role (JMAP + Obsidian)](./howto/personal-assistant-role.md)
 - [Plug Terraphim Search into Claude Code and opencode](./howto/mcp-integration-claude-opencode.md)
+- [Zero-Token LLM Routing: Deterministic Decisions Before the Call](./howto/zero-token-llm-routing.md)
+- [3 Ways to Save Money on Tokens for Your AI Agents](./howto/save-money-tokens-ai-agents.md)
+- [Graph Embeddings for Checklists](./howto/graph-embeddings-checklists.md)
+
+## Blog
+
+- [Introducing Dynamic Ontology](./blog/dynamic-ontology-launch.md)
+- [Dynamic Ontology Launch Announcement](./blog/announcement-dynamic-ontology.md)
+- [FFF Search Integration](./blog/fff-search-integration.md)
+- [Hybrid Code Search with LLM Fallback](./blog/terraphim-grep-hybrid-search-with-llm-fallback.md)
+- [Terraphim Grep Release](./blog/terraphim-grep-release.md)
+- [Operational Skill Store Release](./blog/operational-skill-store-release.md)
 
 ## Symphony
 
@@ -76,6 +88,7 @@
 
 ## Knowledge Graph
 
+- [Example Knowledge Graph](./kg/README.md)
 - [Knowledge Graph](./kg/knowledge-graph.md)
 - [Knowledge Graph System](./kg/knowledge-graph-system.md)
 - [KG Case Studies](./kg/case-studies/kg-validation-workflows.md)

@@ -3,6 +3,10 @@
 This case study is the mdBook version of the website post:
 - https://terraphim.ai/posts/deployment-lessons-vanilla-js-caddy/
 
+synonyms:: deployment lessons, deployment lessons vanilla js caddy, deployment lessons vanilla js ui + caddy + 1password
+checklist:: the problem, the turning point, the pattern boring ui fast deployment, hybrid delivery polling + websocket, secrets 1password runtime injection, appendix a deployment flow mermaid, appendix b primary sources, references
+
+
 It includes the same narrative plus additional technical appendices.
 
 ## The Problem

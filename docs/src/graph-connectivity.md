@@ -2,6 +2,10 @@
 
 Goal: Given an input text, detect terms via automata and verify whether there exists a single path in the role graph that connects all matched terms.
 
+synonyms:: graph connectivity check for matched terms, graph connectivity
+checklist:: algorithm, usage, tests, benchmarks
+
+
 ## Algorithm
 - Extract matched node IDs from text using `RoleGraph::find_matching_node_ids` (Aho-Corasick based)
 - Build an undirected adjacency map from `nodes.connected_with` and `edges`

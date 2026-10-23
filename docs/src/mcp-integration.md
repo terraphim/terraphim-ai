@@ -2,6 +2,10 @@
 
 This guide explains how to use Model Context Protocol (MCP) haystacks in Terraphim via the middleware MCP indexer.
 
+synonyms:: mcp integration
+checklist:: features, enable features, start a local everything server sse, role config haystack, live test, behavior, rust sdk optional
+
+
 ## Features
 - Transports:
   - SSE (localhost) with optional OAuth bearer

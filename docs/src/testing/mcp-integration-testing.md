@@ -2,6 +2,10 @@
 
 ## Overview
 
+synonyms:: mcp integration testing
+checklist:: overview, test suite architecture, knowledge graph bug reporting tests, knowledge graph term verification, advanced function testing, role-based functionality testing, edge cases and robustness testing, test infrastructure
+
+
 The MCP (Model Context Protocol) integration testing validates the comprehensive functionality of the Terraphim MCP server, including knowledge graph integration, autocomplete functionality, and advanced text processing capabilities.
 
 ## Test Suite Architecture

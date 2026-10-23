@@ -2,6 +2,10 @@
 
 ## Tweet 1
 
+synonyms:: x/twitter thread -- terraphim grep, x grep announcement
+checklist:: tweet 1, tweet 2, tweet 3, tweet 4, tweet 5, tweet 6, tweet 7, tweet 8
+
+
 You search a 1M-line codebase for "where is retry configured."
 
 Ripgrep prints 30 hits. None obviously right. You read all 30.

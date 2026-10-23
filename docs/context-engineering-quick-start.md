@@ -33,10 +33,10 @@ cargo build --release
 ```bash
 # Create context structure
 mkdir -p docs/context-library/{architecture,patterns,rules,references}
-mkdir -p docs/vibe-rules/{global,rust,python,typescript}
+mkdir -p docs-internal/vibe-rules/{global,rust,python,typescript}
 
 # Example vibe-rule
-cat > docs/vibe-rules/rust/async-patterns.md <<'EOF'
+cat > docs-internal/vibe-rules/rust/async-patterns.md <<'EOF'
 # Rust Async Patterns
 
 ## Tokio Spawn Pattern
@@ -158,7 +158,7 @@ You: "Show me async patterns"
 Claude: [Uses terraphim search tool]
 I found several async patterns in the knowledge graph:
 
-1. **Tokio Spawn Pattern** (docs/vibe-rules/rust/async-patterns.md:5)
+1. **Tokio Spawn Pattern** (docs-internal/vibe-rules/rust/async-patterns.md:5)
    Use `tokio::spawn` for concurrent tasks that don't share state.
 
    Example:
@@ -168,7 +168,7 @@ I found several async patterns in the knowledge graph:
    });
    ```
 
-2. **Bounded Channels** (docs/vibe-rules/rust/async-patterns.md:45)
+2. **Bounded Channels** (docs-internal/vibe-rules/rust/async-patterns.md:45)
    [...]
 ```
 
@@ -180,7 +180,7 @@ I found several async patterns in the knowledge graph:
 
 ```bash
 # Create rule
-cat > docs/vibe-rules/rust/error-handling.md <<'EOF'
+cat > docs-internal/vibe-rules/rust/error-handling.md <<'EOF'
 # Rust Error Handling
 
 ## thiserror Pattern
@@ -233,7 +233,7 @@ curl -X POST http://localhost:PORT/documents/search \
 **Goal**: Learn async cancellation in Rust
 
 1. **Search**: "Show me async cancellation"
-2. **Claude finds**: docs/vibe-rules/rust/async-patterns.md
+2. **Claude finds**: docs-internal/vibe-rules/rust/async-patterns.md
 3. **Extract context**: Specific `tokio::select!` example with line numbers
 4. **Get related**: "What else should I know about async?"
 5. **Claude suggests**: error-handling, testing, structured-concurrency
@@ -324,7 +324,7 @@ cat my_config.json | jq
 
 # Check paths exist
 ls docs/context-library/
-ls docs/vibe-rules/
+ls docs-internal/vibe-rules/
 
 # Check port conflicts
 lsof -i :8080  # or your configured port
@@ -429,10 +429,10 @@ See: [Context Collections](./context-collections.md)
 - [Context Collections](./context-collections.md) - Collection management
 
 ### Examples
-- `docs/vibe-rules/rust/async-patterns.md` - Async patterns
-- `docs/vibe-rules/rust/error-handling.md` - Error handling
-- `docs/vibe-rules/global/naming-conventions.md` - Naming rules
-- `docs/vibe-rules/global/documentation-standards.md` - Docs standards
+- `docs-internal/vibe-rules/rust/async-patterns.md` - Async patterns
+- `docs-internal/vibe-rules/rust/error-handling.md` - Error handling
+- `docs-internal/vibe-rules/global/naming-conventions.md` - Naming rules
+- `docs-internal/vibe-rules/global/documentation-standards.md` - Docs standards
 
 ### Community
 - GitHub Issues: https://github.com/terraphim/terraphim-ai/issues

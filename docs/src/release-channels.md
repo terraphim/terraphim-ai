@@ -3,6 +3,10 @@
 This document defines which release channel is **canonical** for fleet-internal agents consuming
 `terraphim_grep` and `terraphim_agent`, and how to interpret a version mismatch between channels.
 
+synonyms:: release channels
+checklist:: channel precedence, currently blessed versions, querying the canonical channel, interpreting channel lag, install smoke testing, see also
+
+
 Read this before reporting a "release failure". A crates.io or GitHub Releases version that trails
 the private registry is expected and is **not** a failure for fleet-internal work.
 

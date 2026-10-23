@@ -3,6 +3,10 @@
 This case study is the mdBook version of the website post:
 - https://terraphim.ai/posts/security-testing-lessons-learned/
 
+synonyms:: security testing lessons learned
+checklist:: the context, the core workflow fix - tests - remote validation, what we shipped, lessons that stuck, appendix a security testing coverage map mermaid, appendix b primary sources, references
+
+
 It includes the same narrative plus additional technical appendices.
 
 ## The Context

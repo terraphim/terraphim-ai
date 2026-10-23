@@ -2,6 +2,10 @@
 
 The `terraphim_automata` crate provides high-performance text processing capabilities using finite state automata (FST) for term matching, autocomplete, and fuzzy search.
 
+synonyms:: terraphim automata
+checklist:: architecture, api reference, performance characteristics, wasm compatibility, text processing, builder system, error handling, testing
+
+
 ## Architecture
 
 ### Core Components

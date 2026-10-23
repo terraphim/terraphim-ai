@@ -2,6 +2,10 @@
 
 This section covers security testing, hardening, and verification work.
 
+synonyms:: security domain, readme
+checklist:: what belongs here, case studies
+
+
 ## What belongs here
 
 - Security testing strategy

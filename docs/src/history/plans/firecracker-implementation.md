@@ -2,6 +2,10 @@
 
 ## Executive Summary
 
+synonyms:: terraphim firecracker project - implementation plan, firecracker implementation
+checklist:: executive summary, current implementation status, reasons for archiving, potential future reactivation, preserved intellectual property, lessons learned
+
+
 This document provides a comprehensive update on implementation status of Terraphim Firecracker sub-2 second VM boot optimization system. The project has made significant architectural progress but requires systematic resolution of compilation issues to achieve a fully functional system.
 
 **Status**: ARCHIVED - Project requirements evolved and priorities shifted

@@ -4,6 +4,10 @@ The listener can execute `terraphim-agent` subcommands triggered by `@adf:<agent
 on Gitea issues and comments. The result is posted back as a markdown comment with the command
 output in a code block.
 
+synonyms:: listener shell dispatch, listener dispatch
+checklist:: how it works, security layers, configuration, output format, search -- exit 0 0.4s
+
+
 Source: `crates/terraphim_agent/src/shell_dispatch.rs`, `crates/terraphim_agent/src/listener.rs`
 
 ## How it works

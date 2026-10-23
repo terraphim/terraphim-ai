@@ -12,7 +12,7 @@ Workspace-active members from `cargo metadata` count: **49** (includes `crates/t
 | 2 | `crates/terraphim_truthforge` | "Experimental crates" | **deferred** | Experimental; await graduation. |
 | 3 | `crates/terraphim_automata_py` | listed TWICE in exclude block (Cargo.toml ll. 4 & 8) — first as "Experimental", second as "Python bindings" | **awaiting-graduation** + housekeeping fix | Real classification is Python binding; needs `maturin develop`. **Action: dedupe the entry in Cargo.toml** as part of Stage A housekeeping. |
 | 4 | `crates/terraphim_rolegraph_py` | "Python bindings (need `maturin develop`)" | **awaiting-graduation** | Python binding; lifecycle differs from Rust crates; may move to its own repo when split alongside any future Rust-FFI strategy. |
-| 5 | `desktop/src-tauri` | "Desktop built separately via Tauri CLI" | **already-extracted** | Lives in `terraphim-ai-desktop` repo per `docs/reports/desktop-extraction-crate-architecture-review-2026-02-25.md`. |
+| 5 | `desktop/src-tauri` | "Desktop built separately via Tauri CLI" | **already-extracted** | Lives in `terraphim-ai-desktop` repo per `docs-internal/reports/desktop-extraction-crate-architecture-review-2026-02-25.md`. |
 | 6 | `crates/terraphim_build_args` | "Planned future use, not needed for workspace builds" | **deferred** | Skeleton; no consumers; revisit when build-args orchestration is needed. |
 | 7 | `crates/haystack_atlassian` | "Unused haystack providers (kept for future integration)" | **deferred** | Future haystack adapter; would join `terraphim-haystacks` repo (Phase 2 §13) on graduation. |
 | 8 | `crates/haystack_discourse` | "Unused haystack providers" | **deferred** | Same as #7. |

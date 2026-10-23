@@ -2,6 +2,10 @@
 
 This is a chronological changelog for Terraphim AI.
 
+synonyms:: changelog
+checklist:: 2026, 2025
+
+
 ## 2026
 
 ### v1.13.0
@@ -62,7 +66,7 @@ Highlights:
 - CI/CD infrastructure for multi-platform builds
 
 Reference notes (verbatim source):
-- `docs/archive/RELEASE_NOTES_v1.0.0.md`
+- `docs-internal/archive/RELEASE_NOTES_v1.0.0.md`
 
 ### v1.0.2
 
@@ -74,4 +78,4 @@ Highlights:
 - Role switching and search validation
 
 Reference notes (verbatim source):
-- `docs/archive/RELEASE_NOTES_v1.0.2.md`
+- `docs-internal/archive/RELEASE_NOTES_v1.0.2.md`

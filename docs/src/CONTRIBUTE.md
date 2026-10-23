@@ -2,6 +2,10 @@
 
 ## Overview
 
+synonyms:: contributing to terraphim ai, contribute
+checklist:: overview, repository structure, branch protection and naming, development setup, development methods, working with private code, troubleshooting, code quality
+
+
 This guide covers the complete contribution workflow for Terraphim AI, including our dual-repository approach, branch protection, and development setup.
 
 ## Repository Structure

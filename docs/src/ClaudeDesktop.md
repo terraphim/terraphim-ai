@@ -2,6 +2,10 @@
 
 Terraphim AI provides **two ways** to expose MCP (Model Context Protocol) server functionality for Claude Desktop integration:
 
+synonyms:: using terraphim desktop with claude via mcp, claudedesktop
+checklist:: mcp server options, prerequisites, claude desktop configuration, configuration steps, default configuration, verification, available search capabilities, troubleshooting
+
+
 ## MCP Server Options
 
 ### Option 1: Desktop Binary with MCP Mode (✅ **RECOMMENDED**)
@@ -51,9 +55,11 @@ The dedicated `terraphim_mcp_server` binary provides MCP server functionality:
 
 Configure Claude Desktop to use the desktop binary in MCP server mode:
 
+`<repo>` below is the absolute path of your terraphim-ai checkout.
+
 **Executable:**
 ```
-/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop
+<repo>/target/debug/terraphim-ai-desktop
 ```
 
 **Arguments:**
@@ -65,7 +71,7 @@ mcp-server
 
 **Executable:**
 ```
-/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim_mcp_server
+<repo>/target/debug/terraphim_mcp_server
 ```
 
 **Arguments:** *(leave empty)*

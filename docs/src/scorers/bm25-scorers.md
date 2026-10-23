@@ -2,6 +2,10 @@
 
 Terraphim supports multiple BM25-based scoring algorithms for document ranking and relevance calculation. These scorers provide different approaches to information retrieval, from traditional TF-IDF to advanced fielded BM25 variants.
 
+synonyms:: bm25 scorers
+checklist:: available bm25 scorers, configuration, parameters, usage examples, performance considerations, best practices, integration with terraphim
+
+
 ## Available BM25 Scorers
 
 ### BM25 (Okapi BM25)

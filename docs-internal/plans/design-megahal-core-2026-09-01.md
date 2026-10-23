@@ -1,0 +1,98 @@
+# Design: terraphim_megahal core engine + Ruby conformance harness
+
+**Date**: 2026-09-01
+**Issue**: terraphim/terraphim-ai#3261 (phase 2 of #3259)
+**Reference**: upstream `kranzky/megahal` (Ruby, Unlicense) — megahal.rb, keyword.rb, personalities/*.rb; sooth C kernel `ext/sooth_native/sooth_predictor.c`
+**Research**: `plans/megahal-rust-wasm-port-plan.md` (cto-executive-system) + phase 1 fixture pattern (`crates/terraphim_sooth/scripts/generate_fixtures.rb`)
+
+## Key upstream findings (drive the design)
+
+1. `Sooth::Predictor.new(0)` — error_event is **0**. C `select` returns the error event
+   (never nil) when the context is unknown or `limit` is 0/`>count`. All "no symbol"
+   paths in megahal.rb therefore flow through the literal symbol `0`.
+2. C `select(id, limit)` is a **cumulative-count scan over statistics sorted by event
+   ascending**. `select(id, count)` (used in `_generate` for the seed model) therefore
+   deterministically returns the **highest observed symbol** for that context.
+   terraphim_sooth's `BTreeMap` iteration order matches; a positional
+   `Predictor::select_limit(context, limit) -> Option<u32>` is added (None = error case,
+   megahal maps None -> 0).
+3. megahal.rb's RNG use is `Kernel#rand(int)` plus `Array#shuffle.first`. Ruby's Mersenne
+   Twister is not mirrored in Rust, so the conformance oracle defines **canonical RNG
+   primitives**, implemented identically on both sides:
+   - `rand(n)` = `next_u32() % n`, one draw always consumed; `n == 0` consumes one draw
+     and returns 0 (upstream `rand(0)+1` -> `select(ctx, 1)` on an empty context -> error
+     event 0; canonical path produces the identical outcome).
+   - `shuffle_first(xs)` = descending Fisher-Yates (`i` from `len-1` to `1`,
+     `j = rand(i+1)`, swap), then take element 0.
+   - RNG = `rand_pcg::Pcg32` seeded via `SeedableRng::seed_from_u64` (mirrored in pure
+     Ruby in the driver: PCG32 chunk-seeding per rand_core 0.10.1 `seed_from_u64`,
+     `from_seed` state/increment derivation, XSH-RR output function — pinned by an
+     `rng_self_check` vector in the fixtures).
+4. The Ruby `@brain` hash maps context tuples to sequential ids only because the C sooth
+   API takes scalar ids. The mapping is bijective, so the Rust port uses the `(u32,u32)`
+   tuples as predictor contexts directly and keeps a `BTreeMap<Context, u32>` brain for
+   state fidelity (Ruby assigns ids lazily **during generation** too — replicated).
+5. Dictionary ids: `{ "<error>":0, "<fence>":1, "<blank>":2 }`, `||= length` interning —
+   dense ids, mirrored with `entry().or_insert(len)`.
+
+## Structure
+
+```
+crates/terraphim_megahal/
+├── Cargo.toml                  # sooth + serde; thiserror for the CLI
+├── src/
+│   ├── lib.rs                  # MegaHal engine (new/blank/learn/reply/train/clear/save/load)
+│   ├── keyword.rs              # port of keyword.rb (GREETING/ANTONYMS/SWAP/AUXILIARY/BANNED/extract)
+│   ├── segment.rs              # _decompose/_segment port + CJK heuristic (replaces CLD)
+│   ├── personalities.rs        # include_str! corpora; `default` unconditional, rest behind
+│   │                           # the `personalities` feature (list()/become())
+│   └── bin/megahal.rs          # interactive CLI (native only)
+├── fixtures/megahal_fixtures.json  # Ruby-oracle golden replies
+├── scripts/
+│   ├── generate_megahal_fixtures.rb  # oracle driver (vendored gem sources + PCG32 mirror)
+│   ├── extract_personalities.rb      # corpora extraction from the gem sources
+│   └── ruby_vendor/            # megahal.rb, keyword.rb, personalities/*.rb (Unlicense)
+└── tests/{conformance.rs,engine.rs}
+```
+
+`terraphim_sooth`: additive `select_limit` mirroring the C scan (context, limit) with the
+same None cases; unit tests with hand-computed values. No behaviour change to existing APIs.
+
+## Semantics ported exactly
+
+- `_learn`: seed bigrams around `<blank>`, fore/back second-order with `<fence>` 1,1 start,
+  case = (prev word, current norm) -> word, punc = (word, next word) -> separator.
+- `reply`: 9 keyword-seeded + 1 keyword-free candidates; delete_if equals input symbols
+  (input symbols may be nil for unseen words); first-max `_select_utterance` (strict >);
+  `utterances.delete` removes the first equal candidate; rewrite retry loop bounded at 9;
+  punc `zip` drops the trailing separator; learning happens **after** generation.
+- `extract(nil)` -> GREETING; digits-leading/BANNED removed; SWAP antonym substitution;
+  keyword selection shuffles keywords minus AUXILIARY (empty -> plain walk).
+- Walks: up to 10 rolls per step, early break when a not-yet-used local keyword is drawn;
+  symbol 0 -> empty result; fence 1 terminates.
+- Segmentation: `[[:word:]]` runs, leading/trailing separator guards, apostrophe/hyphen
+  merge loop. CLD replaced by a Unicode-range CJK/Thai/Khmer/Lao/Burmese heuristic
+  (documented divergence; conformance fixtures are English-only).
+
+## Conformance contract
+
+`fixtures/megahal_fixtures.json` (generated by driving the real gem logic via vendored
+sources with the canonical RNG patches): `rng_self_check` (first 8 Pcg32 words per seed),
+plus scenarios `{seed, personality, train_lines, learning, conversation[], expected[]}`.
+`tests/conformance.rs` replays every scenario. Any divergence is a port bug.
+
+## Verification
+
+```bash
+cargo fmt -p terraphim_megahal terraphim_sooth -- --check
+cargo clippy -p terraphim_megahal terraphim_sooth --all-targets -- -D warnings
+cargo test -p terraphim_megahal -p terraphim_sooth
+cargo check -p terraphim_megahal --target wasm32-unknown-unknown
+ubs crates/terraphim_megahal/src crates/terraphim_megahal/tests
+```
+
+## Out of scope (later phases)
+
+terraphim_persistence backends (#3262), automata keyword injection (#3262), wasm-bindgen
++ Trunk demo (#3263), crates.io publishing + blog (#3264). Ruby Marshal brain import:
+explicitly not ported (own serde JSON format `MHRS1`).

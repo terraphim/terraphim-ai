@@ -5,6 +5,10 @@
 **Status:** Implemented
 **Research Document:** `docs/src/research/pagerank-bug-investigation.md`
 
+synonyms:: design, pagerank bug design, design pagerank bug fixes for gitea robot api
+checklist:: summary of changes, bug fix details, files changed, design decisions, verification plan, risk mitigation
+
+
 ---
 
 ## Summary of Changes

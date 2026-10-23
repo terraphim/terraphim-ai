@@ -2,6 +2,10 @@
 
 Curated summary of the v1.0.0 validation outcome, with links to verbatim evidence.
 
+synonyms:: final validation status v1.0.0, final validation status
+checklist:: what was validated, evidence, case study
+
+
 ## What was validated
 
 - Core libraries test suite passing (reported as 162/162)

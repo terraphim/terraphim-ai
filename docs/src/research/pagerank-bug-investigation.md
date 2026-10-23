@@ -4,6 +4,10 @@
 **Phase:** 1 -- Disciplined Research
 **Status:** Complete, awaiting approval for Phase 2
 
+synonyms:: research, pagerank bug investigation, research pagerank computation bug in gitea robot api
+checklist:: problem statement, existing system analysis, root cause analysis, verification of root cause hypothesis, proposed fixes, constraints and risks, open questions, recommended next steps
+
+
 ---
 
 ## Problem Statement
@@ -30,13 +34,13 @@ The Gitea Robot API at `https://git.terraphim.cloud` returns **uniform PageRank 
 
 | File | Role |
 |------|------|
-| `/Users/alex/projects/terraphim/gitea/models/issues/graph_cache.go` | **Core PageRank computation** (lines 66-173), cache CRUD, ranked issue queries |
-| `/Users/alex/projects/terraphim/gitea/routers/api/v1/robot/ready_graph.go` | Ready and Graph API handlers, reads cached PageRank |
-| `/Users/alex/projects/terraphim/gitea/routers/api/v1/robot/robot.go` | Triage API handler, input validation, permission checks |
-| `/Users/alex/projects/terraphim/gitea/services/robot/robot.go` | Triage service -- the **only caller** of `CalculatePageRank()` |
-| `/Users/alex/projects/terraphim/gitea/modules/setting/graph.go` | Configuration (damping=0.85, iterations=100) |
-| `/Users/alex/projects/terraphim/gitea/models/issues/dependency.go` | `IssueDependency` model -- defines `issue_id` and `dependency_id` columns |
-| `/Users/alex/projects/terraphim/gitea/models/migrations/v1_26/v326.go` | Migration creating `graph_cache` table |
+| `~/projects/terraphim/gitea/models/issues/graph_cache.go` | **Core PageRank computation** (lines 66-173), cache CRUD, ranked issue queries |
+| `~/projects/terraphim/gitea/routers/api/v1/robot/ready_graph.go` | Ready and Graph API handlers, reads cached PageRank |
+| `~/projects/terraphim/gitea/routers/api/v1/robot/robot.go` | Triage API handler, input validation, permission checks |
+| `~/projects/terraphim/gitea/services/robot/robot.go` | Triage service -- the **only caller** of `CalculatePageRank()` |
+| `~/projects/terraphim/gitea/modules/setting/graph.go` | Configuration (damping=0.85, iterations=100) |
+| `~/projects/terraphim/gitea/models/issues/dependency.go` | `IssueDependency` model -- defines `issue_id` and `dependency_id` columns |
+| `~/projects/terraphim/gitea/models/migrations/v1_26/v326.go` | Migration creating `graph_cache` table |
 
 ### Architecture Flow
 

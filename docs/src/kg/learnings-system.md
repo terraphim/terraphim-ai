@@ -2,6 +2,10 @@
 
 The Learning Capture System automatically captures failed commands and their error output as learning documents. This helps build a personal knowledge base of common mistakes and their corrections.
 
+synonyms:: learning capture system, learnings system
+checklist:: overview, architecture, storage locations, usage, automatic capture with hooks, secret redaction, ignored commands, learning document format
+
+
 ## Overview
 
 When you run a command that fails, the Learning Capture System:

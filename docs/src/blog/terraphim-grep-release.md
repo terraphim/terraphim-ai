@@ -2,6 +2,10 @@
 
 You search a million-line codebase for "where is retry configured." Ripgrep prints thirty hits. None of them are obviously the right one. You read all thirty. Five minutes gone.
 
+synonyms:: grep that knows when to ask an llm, terraphim grep release
+checklist:: what is new in this release
+
+
 Terraphim Grep does something different. It runs an [fff-search](https://github.com/AlexMikhalev/fff.nvim) code scan and a knowledge-graph concept lookup in parallel. A sufficiency judge looks at coverage, diversity, and KG confidence, and decides whether the local retrievers found enough signal. If they did, you get the chunks. If they did not, an LLM synthesises a cited answer.
 
 The CLI works in three modes, picked entirely from environment variables and role config -- no code changes needed:

@@ -4,6 +4,10 @@ The evaluation framework measures classification accuracy for automata-based ter
 compares `find_matches()` output against human-labeled ground-truth documents and reports
 micro-averaged precision, recall, and F1, per-term breakdowns, and systematic error detection.
 
+synonyms:: automata evaluation framework, evaluation framework
+checklist:: when to use it, ground-truth format, metrics explained, matching rules
+
+
 Source: `crates/terraphim_automata/src/evaluation.rs`
 
 ## When to use it

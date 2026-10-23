@@ -2,6 +2,10 @@
 
 ## What it does
 
+synonyms:: howto, learning capture claude code, howto learning capture for claude code
+checklist:: what it does, architecture, prerequisites, setup, how learning capture works, hook script details, key differences from opencode hooks, troubleshooting
+
+
 Claude Code automatically captures failed bash commands and stores them as learnings. When you run the same failing command again, the pre-tool-use hook warns you. Both Claude Code and opencode share the same learning store.
 
 ## Architecture

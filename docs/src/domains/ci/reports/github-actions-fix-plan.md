@@ -2,6 +2,10 @@
 
 This page curates the key points from the underlying plan and links to the raw evidence.
 
+synonyms:: github actions fix plan v1.0.0, github actions fix plan
+checklist:: context, key issues and fixes, evidence, case study
+
+
 ## Context
 
 Several release workflows were failing or stuck queued. The fix strategy focused on removing brittle assumptions and making workflows resilient to missing files.

@@ -2,6 +2,10 @@
 
 The Terraphim Knowledge Graph system provides semantic understanding and relationship mapping between concepts, enabling advanced document ranking and search capabilities.
 
+synonyms:: knowledge graph
+checklist:: architecture, graph construction, graph traversal, thesaurus management, integration with scoring, document preprocessing, graph analysis, performance optimization
+
+
 ## Architecture
 
 ### Core Components

@@ -2,6 +2,10 @@
 
 This guide walks you through setting up a development environment for contributing to Terraphim AI, including code quality tools and pre-commit hooks.
 
+synonyms:: development setup guide, development setup
+checklist:: prerequisites, quick start, pre-commit hooks overview, branch protection system, hook manager options, manual commands, conventional commits, biome configuration
+
+
 ## Prerequisites
 
 ### Required

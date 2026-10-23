@@ -2,6 +2,10 @@
 
 ## Search your local markdown files, build your own personal knowledge graph, then publish your knowledge to the web, then reuse
 
+synonyms:: use cases for terraphim ai, use cases
+checklist:: search your local markdown files build your own personal kno
+
+
 ### End to End flow
 
 The current focus is on perfecting overall end-to-end human usable flow:

@@ -2,6 +2,10 @@
 
 Longform case studies organised by domain.
 
+synonyms:: case studies, readme
+checklist:: symphony orchestration
+
+
 - VM: [VM](../domains/vm/README.md)
 - Security: [Security](../domains/security/README.md)
 - CI/CD: [CI/CD](../domains/ci/README.md)

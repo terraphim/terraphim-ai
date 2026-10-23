@@ -197,7 +197,7 @@ Create `terraphim_server/default/context_engineer_config.json`:
 ```bash
 # Create directory structure
 mkdir -p docs/context-library/{architecture,patterns,rules,references}
-mkdir -p docs/vibe-rules/{global,rust,python,typescript}
+mkdir -p docs-internal/vibe-rules/{global,rust,python,typescript}
 
 # Example structure:
 docs/context-library/
@@ -215,7 +215,7 @@ docs/context-library/
     ├── libraries.md
     └── tools.md
 
-docs/vibe-rules/
+docs-internal/vibe-rules/
 ├── global/
 │   ├── naming-conventions.md
 │   ├── documentation-standards.md
@@ -232,7 +232,7 @@ docs/vibe-rules/
 
 ### Step 3: Create Vibe-Rules as Knowledge Graph
 
-Example `docs/vibe-rules/rust/async-patterns.md`:
+Example `docs-internal/vibe-rules/rust/async-patterns.md`:
 
 ```markdown
 # Rust Async Programming Patterns
@@ -339,7 +339,7 @@ Claude: [Uses extract_paragraphs_from_automata] → Returns exact code with line
 Create named collections by organizing rules into directories:
 
 ```bash
-docs/vibe-rules/
+docs-internal/vibe-rules/
 ├── collections/
 │   ├── web-backend/        # Collection: Web backend rules
 │   │   ├── api-design.md
@@ -387,12 +387,12 @@ Implement global + role-specific rules:
 {
   "haystacks": [
     {
-      "location": "docs/vibe-rules/global",
+      "location": "docs-internal/vibe-rules/global",
       "service": "Ripgrep",
       "extra_parameters": {}
     },
     {
-      "location": "docs/vibe-rules/rust",
+      "location": "docs-internal/vibe-rules/rust",
       "service": "Ripgrep",
       "extra_parameters": {}
     }
@@ -408,7 +408,7 @@ Since rules are markdown files:
 
 ```bash
 # Track rule changes
-git add docs/vibe-rules/
+git add docs-internal/vibe-rules/
 git commit -m "Add async cancellation pattern"
 
 # Share rules with team
@@ -425,7 +425,7 @@ git pull origin main
 If you're currently using Conare:
 
 1. **Export context items**: Copy your uploaded documents to `docs/context-library/`
-2. **Export vibe-rules**: Copy your rules to `docs/vibe-rules/` as markdown with hashtags
+2. **Export vibe-rules**: Copy your rules to `docs-internal/vibe-rules/` as markdown with hashtags
 3. **Configure Terraphim**: Create `context_engineer_config.json` with your preferences
 4. **Run Terraphim**: Start the server and MCP server
 5. **Configure Claude Desktop**: Point to Terraphim MCP server
@@ -501,7 +501,7 @@ async fn main() {
 ### 4. Maintain Rule Hierarchy
 
 ```
-docs/vibe-rules/
+docs-internal/vibe-rules/
 ├── 00-global/              # Priority 1: Global rules
 ├── 10-language/            # Priority 2: Language-specific
 ├── 20-framework/           # Priority 3: Framework-specific
