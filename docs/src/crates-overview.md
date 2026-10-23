@@ -2,6 +2,10 @@
 
 Terraphim AI is a modular Rust workspace comprising 52 crates. Each crate has a single responsibility and can be used independently or composed into larger systems. All crates are available in the [terraphim-ai](https://github.com/terraphim/terraphim-ai) monorepo.
 
+synonyms:: crate reference, crates overview
+checklist:: core engine, binaries and clis, agent orchestration ai dark factory, knowledge graph intelligence, haystack integrations, session and usage analytics, devops and infrastructure, chat and assistants
+
+
 ## Core Engine
 
 The foundational crates that power Terraphim's deterministic knowledge graph search.

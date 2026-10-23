@@ -2,6 +2,10 @@
 
 This guide is curated from the original desktop testing docs.
 
+synonyms:: desktop frontend testing guide, testing guide
+checklist:: testing guide
+
+
 Source:
 - `desktop/TESTING.md`
 

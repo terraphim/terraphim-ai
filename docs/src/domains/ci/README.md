@@ -2,6 +2,10 @@
 
 This section covers CI pipelines, GitHub Actions, and deployment automation.
 
+synonyms:: ci/cd domain, readme
+checklist:: what belongs here, reports, case studies
+
+
 ## What belongs here
 
 - Workflow design and debugging

@@ -2,6 +2,10 @@
 
 ## Technical Lessons
 
+synonyms:: lessons learned, @lessons learned
+checklist:: technical lessons, agent evolution system implementation - new lessons, interactive examples project - major progress, code quality and pre-commit infrastructure 2025-09-15, multi-role agent system architecture 2025-09-16 - breakthrou, multi-agent system implementation success 2025-09-16 - major, multi-agent system implementation complete 2025-09-16 - prod, dynamic model selection implementation 2025-09-17 - critical
+
+
 ### Rust Type System Challenges
 1. **Trait Objects with Generics** - StateManager trait with generic methods can't be made into `dyn StateManager`
    - Solution: Either use concrete types or redesign trait without generics

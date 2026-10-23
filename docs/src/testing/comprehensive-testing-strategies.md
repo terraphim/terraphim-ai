@@ -209,6 +209,7 @@ let initial_rank = measure_search_rank("terraphim-graph");
 ```rust
 // Add new KG record with synonyms
 let new_kg_content = r#"
+
 synonyms:: data analysis, network analysis, graph processing,
           relationship mapping, connectivity analysis,
           terraphim-graph, graph embeddings

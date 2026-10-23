@@ -131,7 +131,7 @@ Each collection has a `collection.json` file:
       "priority": 1
     },
     {
-      "location": "docs/vibe-rules/global",
+      "location": "docs-internal/vibe-rules/global",
       "service": "Ripgrep",
       "priority": 2
     }
@@ -236,7 +236,7 @@ Create a role per collection:
           "service": "Ripgrep"
         },
         {
-          "location": "docs/vibe-rules/global",
+          "location": "docs-internal/vibe-rules/global",
           "service": "Ripgrep"
         }
       ],
@@ -323,7 +323,7 @@ tar czf web-backend-collection.tar.gz \
 # Include dependencies
 tar czf web-backend-full.tar.gz \
   docs/context-collections/web-backend/ \
-  docs/vibe-rules/global/
+  docs-internal/vibe-rules/global/
 
 # Share with team
 scp web-backend-collection.tar.gz team@server:/collections/

@@ -2,6 +2,10 @@
 
 This document describes the enhanced haystack configuration system that supports both Ripgrep and Atomic Server services with advanced configuration options.
 
+synonyms:: haystack configuration with extra parameters, haystack extra parameters
+checklist:: overview, configuration structure, configuration wizard updates, ripgrep extra parameters, atomic server configuration, security features, configuration examples, configuration wizard features
+
+
 ## Overview
 
 The haystack system now supports:

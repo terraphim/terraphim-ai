@@ -2,6 +2,10 @@
 
 This section covers the Tauri + Svelte desktop application.
 
+synonyms:: desktop domain, readme
+checklist:: what belongs here, testing, case studies
+
+
 ## What belongs here
 
 - Desktop architecture and development

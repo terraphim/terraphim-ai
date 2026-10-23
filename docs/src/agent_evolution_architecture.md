@@ -2,6 +2,10 @@
 
 ## Overview
 
+synonyms:: terraphim ai agent evolution system architecture, agent evolution architecture
+checklist:: overview, system architecture, core components, workflow patterns deep dive, integration layer, data flow architecture, persistence and state management, quality and performance metrics
+
+
 The Terraphim AI Agent Evolution System is a comprehensive orchestration framework that enables AI agents to track their development over time while executing complex tasks through intelligent workflow patterns. The system combines time-based state versioning with 5 distinct workflow patterns to provide reliable, high-quality AI agent execution.
 
 ## System Architecture

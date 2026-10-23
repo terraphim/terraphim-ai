@@ -2,6 +2,10 @@
 
 ## r/rust
 
+synonyms:: reddit announcements, reddit announcement
+checklist:: r/rust, r/localllama
+
+
 **Title:** We built a procedural memory system for AI coding agents in Rust -- procedures, replay, self-healing, knowledge graph matching
 
 **Body:**

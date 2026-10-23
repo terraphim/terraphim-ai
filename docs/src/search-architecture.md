@@ -2,6 +2,10 @@
 
 This document describes the complete search architecture of Terraphim AI -- a multi-layered, offline-first retrieval system combining knowledge graph traversal, statistical ranking, and symbolic similarity. The architecture is deliberately non-neural: no dense vector embeddings, no LLM inference at query time, deterministic and reproducible results, ~15-20 MB RAM footprint.
 
+synonyms:: terraphim search architecture, search architecture
+checklist:: design principles, pipeline overview, relevance functions integration points, session search terraphimsessions, performance characteristics
+
+
 ## Design Principles
 
 | Principle | Implication |

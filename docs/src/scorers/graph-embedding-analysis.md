@@ -1,8 +1,10 @@
 # Terraphim Graph Embeddings vs Cleora
 
-> **See it running:** [Graph Embeddings, Explained Interactively](https://terraphim.ai/docs/graph-embeddings-interactive/) executes the real `terraphim_rolegraph` crate compiled to WebAssembly in the browser — the indexing and scoring described below are live on that page.
-
 ## 1. Terraphim Graph (Current Implementation)
+
+synonyms:: terraphim graph embeddings vs cleora, graph embedding analysis
+checklist:: terraphim graph current implementation, cleora state-of-the-art rust graph embeddings, comparative analysis, proposed improvement roadmap, conclusion
+
 
 ### 1.1 Data structures
 - `RoleGraph` (crate `terraphim_rolegraph`) maintains:

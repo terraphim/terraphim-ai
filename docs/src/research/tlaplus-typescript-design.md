@@ -6,6 +6,10 @@
 **Phase**: 2 (Disciplined Design)
 **Research**: [tlaplus-typescript-bindings.md](./tlaplus-typescript-bindings.md)
 
+synonyms:: design document, tlaplus typescript design, design document typescript bindings for tla+
+checklist:: design overview, architecture, issue decomposition for symphony, dependency graph
+
+
 ## Design Overview
 
 A TypeScript library (`@terraphim/tlaplus`) providing native TLA+ tooling: parsing via tree-sitter-tlaplus, typed AST, expression evaluation, formatting, and TLC model checking bridge. Published as an npm package with CLI tool.

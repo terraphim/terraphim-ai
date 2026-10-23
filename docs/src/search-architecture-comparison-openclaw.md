@@ -2,6 +2,10 @@
 
 This document compares the search and memory retrieval architectures of Terraphim AI and OpenClaw, two agent runtime systems with fundamentally different design philosophies. The comparison is based on OpenClaw's `docs/concepts/memory.md` (commit `7f7d49ae`) and the Terraphim codebase as of March 2026.
 
+synonyms:: terraphim vs openclaw, search architecture comparison openclaw, terraphim vs openclaw search architecture comparison
+checklist:: executive summary, architecture comparison, what terraphim has that openclaw lacks, what openclaw has that terraphim lacks, potential cross-pollination, architectural trade-off summary
+
+
 ## Executive Summary
 
 Both systems solve the same problem -- retrieving relevant context for AI agents from accumulated knowledge -- but make opposite trade-offs:

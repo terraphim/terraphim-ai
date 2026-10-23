@@ -3,6 +3,10 @@
 This is a rendered copy of the raw artifact:
 - `docs/artifacts/GITHUB_ACTIONS_FIX_PLAN.md`
 
+synonyms:: artifact, github actions fix plan, artifact github actions fix plan for v1.0.0 release
+checklist:: github actions fix plan
+
+
 If you need to verify the verbatim source, use the raw artifact above.
 
 ---

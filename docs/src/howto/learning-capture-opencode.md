@@ -2,6 +2,10 @@
 
 ## What it does
 
+synonyms:: howto, learning capture opencode, howto learning capture for opencode
+checklist:: what it does, architecture, prerequisites, setup, how learning capture works, key implementation details, plugin file structure, troubleshooting
+
+
 opencode automatically captures failed bash commands and stores them as learnings. When you run the same failing command again, you get a warning with the previous error and any recorded correction. Both opencode and Claude Code share the same learning store.
 
 ## Architecture

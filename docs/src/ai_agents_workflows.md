@@ -10,6 +10,10 @@ author: Paolo Perrone
 > ## Excerpt
 > Master AI Agent workflows to get reliable, high-quality outputs. Learn prompt chaining, routing, orchestration, parallelization, and evaluation loops.
 
+synonyms:: 5 ai agent workflows for consistent results with code  data science collective, ai agents workflows
+checklist:: workflows 1 prompt chaining, workflows 2 routing, workflows 3 parallelization, workflows 4 orchestrator-workers, workflows 5 evaluator-optimizer, putting it all together
+
+
 ---
 [
 

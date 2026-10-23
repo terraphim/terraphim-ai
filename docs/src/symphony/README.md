@@ -2,6 +2,10 @@
 
 Symphony is an autonomous daemon that watches your issue tracker, picks up work, and runs a coding agent against each issue in an isolated workspace. It polls, dispatches, retries, and reports -- you configure it with a single `WORKFLOW.md` file.
 
+synonyms:: symphony orchestrator, readme
+checklist:: how it works, runners, configuration, http dashboard, quick start, production deployment, crate location
+
+
 ## How It Works
 
 ```

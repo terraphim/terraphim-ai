@@ -2,6 +2,10 @@
 
 This document demonstrates the KG auto-linking functionality.
 
+synonyms:: test kg auto-linking demo, test kg demo
+checklist:: testing
+
+
 When using the Terraphim Engineer role with `terraphim_it: true`, terms from the knowledge graph should automatically become clickable links:
 
 - The **graph** concept is central to our architecture

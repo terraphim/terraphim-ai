@@ -2,6 +2,10 @@
 
 This section documents the Terraphim AI desktop application (Tauri + Svelte).
 
+synonyms:: desktop app, readme
+checklist:: development, testing, source material
+
+
 ## Development
 
 From `desktop/`:

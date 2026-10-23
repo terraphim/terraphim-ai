@@ -119,7 +119,7 @@ Autocomplete search terms from knowledge graph.
       "term": "async-patterns",
       "normalized_term": "async patterns",
       "id": 12345,
-      "url": "file:///docs/vibe-rules/rust/async-patterns.md",
+      "url": "file:///docs-internal/vibe-rules/rust/async-patterns.md",
       "score": 0.98
     }
   ]
@@ -151,7 +151,7 @@ Autocomplete with code/documentation snippets.
     {
       "term": "tokio::spawn",
       "snippet": "async fn example() {\n    tokio::spawn(async { ... });\n}",
-      "url": "file:///docs/vibe-rules/rust/async-patterns.md",
+      "url": "file:///docs-internal/vibe-rules/rust/async-patterns.md",
       "start_line": 42
     }
   ]
@@ -251,7 +251,7 @@ console.log(`Found pattern at ${doc.url}:${paragraphs[0].start_line}`);
 ```
 
 **Claude's Response**:
-> Here's the recommended async cancellation pattern from `docs/vibe-rules/rust/async-patterns.md:42-48`:
+> Here's the recommended async cancellation pattern from `docs-internal/vibe-rules/rust/async-patterns.md:42-48`:
 >
 > ```rust
 > tokio::select! {

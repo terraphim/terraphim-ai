@@ -2,6 +2,10 @@
 
 Terraphim employs a comprehensive testing strategy to ensure code quality, reliability, and maintainability across all components and platforms.
 
+synonyms:: testing overview
+checklist:: testing strategy, unit testing, integration testing, end-to-end testing, performance testing, wasm testing, test data management, ci/cd testing
+
+
 ## Testing Strategy
 
 ### Multi-Level Testing

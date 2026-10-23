@@ -2,6 +2,10 @@
 
 This document provides a comprehensive architectural overview of Terraphim AI, a privacy-first AI assistant that operates locally, providing semantic search across multiple knowledge repositories.
 
+synonyms:: terraphim ai architecture, architecture
+checklist:: overall system architecture, haystack services architecture, core components architecture, crate dependency architecture, configuration and role system, knowledge graph processing pipeline, desktop application architecture, data flow architecture
+
+
 ## Overall System Architecture
 
 The system follows a multi-layered architecture with clear separation of concerns:

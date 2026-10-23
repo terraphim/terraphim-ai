@@ -1,29 +1,1565 @@
 {
   "name": "Terraphim Engineer",
   "data": {
-    "middleware": {
-      "id": 74,
-      "nterm": "service"
+    "architecture": {
+      "id": 100,
+      "nterm": "Architecture"
+    },
+    "terraphim ai architecture": {
+      "id": 100,
+      "nterm": "Architecture"
+    },
+    "code_of_conduct": {
+      "id": 101,
+      "nterm": "CODE_OF_CONDUCT"
+    },
+    "code of conduct": {
+      "id": 101,
+      "nterm": "CODE_OF_CONDUCT"
+    },
+    "contribute": {
+      "id": 102,
+      "nterm": "CONTRIBUTE"
+    },
+    "contributing to terraphim ai": {
+      "id": 102,
+      "nterm": "CONTRIBUTE"
+    },
+    "claudedesktop": {
+      "id": 103,
+      "nterm": "ClaudeDesktop"
+    },
+    "using terraphim desktop with claude via mcp": {
+      "id": 103,
+      "nterm": "ClaudeDesktop"
+    },
+    "designdecisions": {
+      "id": 104,
+      "nterm": "DesignDecisions"
+    },
+    "design decisions": {
+      "id": 104,
+      "nterm": "DesignDecisions"
+    },
+    "introduction": {
+      "id": 105,
+      "nterm": "Introduction"
+    },
+    "readme": {
+      "id": 106,
+      "nterm": "README"
+    },
+    "terraphim documentation": {
+      "id": 106,
+      "nterm": "README"
+    },
+    "use-cases": {
+      "id": 107,
+      "nterm": "Use-cases"
+    },
+    "use cases for terraphim ai": {
+      "id": 107,
+      "nterm": "Use-cases"
+    },
+    "use cases": {
+      "id": 107,
+      "nterm": "Use-cases"
+    },
+    "agent_evolution_architecture": {
+      "id": 108,
+      "nterm": "agent_evolution_architecture"
+    },
+    "terraphim ai agent evolution system architecture": {
+      "id": 108,
+      "nterm": "agent_evolution_architecture"
+    },
+    "agent evolution architecture": {
+      "id": 108,
+      "nterm": "agent_evolution_architecture"
+    },
+    "ai_agents_workflows": {
+      "id": 109,
+      "nterm": "ai_agents_workflows"
+    },
+    "5 ai agent workflows for consistent results with code  data science collective": {
+      "id": 109,
+      "nterm": "ai_agents_workflows"
+    },
+    "ai agents workflows": {
+      "id": 109,
+      "nterm": "ai_agents_workflows"
+    },
+    "api_reference": {
+      "id": 110,
+      "nterm": "api_reference"
+    },
+    "terraphim ai agent evolution system - api reference": {
+      "id": 110,
+      "nterm": "api_reference"
+    },
+    "api reference": {
+      "id": 110,
+      "nterm": "api_reference"
+    },
+    "artifacts": {
+      "id": 111,
+      "nterm": "README"
+    },
+    "github-actions-fix-plan": {
+      "id": 112,
+      "nterm": "github-actions-fix-plan"
+    },
+    "artifact": {
+      "id": 112,
+      "nterm": "github-actions-fix-plan"
+    },
+    "github actions fix plan": {
+      "id": 112,
+      "nterm": "github-actions-fix-plan"
+    },
+    "artifact github actions fix plan for v1.0.0 release": {
+      "id": 112,
+      "nterm": "github-actions-fix-plan"
+    },
+    "final-validation-status": {
+      "id": 113,
+      "nterm": "final-validation-status"
+    },
+    "final validation status": {
+      "id": 113,
+      "nterm": "final-validation-status"
+    },
+    "artifact v1.0.0 final validation status": {
+      "id": 113,
+      "nterm": "final-validation-status"
+    },
+    "release-status-final": {
+      "id": 114,
+      "nterm": "release-status-final"
+    },
+    "release status final": {
+      "id": 114,
+      "nterm": "release-status-final"
+    },
+    "artifact release status final": {
+      "id": 114,
+      "nterm": "release-status-final"
+    },
+    "atomic-server-integration": {
+      "id": 115,
+      "nterm": "atomic-server-integration"
+    },
+    "atomic server integration": {
+      "id": 115,
+      "nterm": "atomic-server-integration"
+    },
+    "automata-paragraph-extraction": {
+      "id": 116,
+      "nterm": "automata-paragraph-extraction"
+    },
+    "automata paragraph extraction": {
+      "id": 116,
+      "nterm": "automata-paragraph-extraction"
+    },
+    "announcement-dynamic-ontology": {
+      "id": 117,
+      "nterm": "announcement-dynamic-ontology"
+    },
+    "dynamic ontology launch announcement": {
+      "id": 117,
+      "nterm": "announcement-dynamic-ontology"
+    },
+    "announcement dynamic ontology": {
+      "id": 117,
+      "nterm": "announcement-dynamic-ontology"
+    },
+    "dynamic-ontology-launch": {
+      "id": 118,
+      "nterm": "dynamic-ontology-launch"
+    },
+    "introducing dynamic ontology": {
+      "id": 118,
+      "nterm": "dynamic-ontology-launch"
+    },
+    "dynamic ontology launch": {
+      "id": 118,
+      "nterm": "dynamic-ontology-launch"
+    },
+    "introducing dynamic ontology schema-first knowledge graphs": {
+      "id": 118,
+      "nterm": "dynamic-ontology-launch"
+    },
+    "fff-search-integration": {
+      "id": 119,
+      "nterm": "fff-search-integration"
+    },
+    "fff search integration": {
+      "id": 119,
+      "nterm": "fff-search-integration"
+    },
+    "fff search integration knowledge-graph-augmented file search for ai agents": {
+      "id": 119,
+      "nterm": "fff-search-integration"
+    },
+    "operational-skill-store-release": {
+      "id": 120,
+      "nterm": "operational-skill-store-release"
+    },
+    "npm": {
+      "id": 120,
+      "nterm": "operational-skill-store-release"
+    },
+    "yarn": {
+      "id": 120,
+      "nterm": "operational-skill-store-release"
+    },
+    "pnpm": {
+      "id": 120,
+      "nterm": "operational-skill-store-release"
+    },
+    "reddit-announcement": {
+      "id": 121,
+      "nterm": "reddit-announcement"
+    },
+    "reddit announcements": {
+      "id": 121,
+      "nterm": "reddit-announcement"
+    },
+    "reddit announcement": {
+      "id": 121,
+      "nterm": "reddit-announcement"
+    },
+    "reddit-grep-announcement": {
+      "id": 122,
+      "nterm": "reddit-grep-announcement"
+    },
+    "reddit announcements -- terraphim grep": {
+      "id": 122,
+      "nterm": "reddit-grep-announcement"
+    },
+    "reddit grep announcement": {
+      "id": 122,
+      "nterm": "reddit-grep-announcement"
+    },
+    "terraphim-grep-hybrid-search-with-llm-fallback": {
+      "id": 123,
+      "nterm": "terraphim-grep-hybrid-search-with-llm-fallback"
+    },
+    "hybrid code search that knows when to ask an llm": {
+      "id": 123,
+      "nterm": "terraphim-grep-hybrid-search-with-llm-fallback"
+    },
+    "terraphim grep hybrid search with llm fallback": {
+      "id": 123,
+      "nterm": "terraphim-grep-hybrid-search-with-llm-fallback"
+    },
+    "terraphim-grep-release": {
+      "id": 124,
+      "nterm": "terraphim-grep-release"
+    },
+    "grep that knows when to ask an llm": {
+      "id": 124,
+      "nterm": "terraphim-grep-release"
+    },
+    "terraphim grep release": {
+      "id": 124,
+      "nterm": "terraphim-grep-release"
+    },
+    "x-announcement": {
+      "id": 125,
+      "nterm": "x-announcement"
+    },
+    "x/twitter thread": {
+      "id": 125,
+      "nterm": "x-announcement"
+    },
+    "x announcement": {
+      "id": 125,
+      "nterm": "x-announcement"
+    },
+    "x-grep-announcement": {
+      "id": 126,
+      "nterm": "x-grep-announcement"
+    },
+    "x/twitter thread -- terraphim grep": {
+      "id": 126,
+      "nterm": "x-grep-announcement"
+    },
+    "x grep announcement": {
+      "id": 126,
+      "nterm": "x-grep-announcement"
+    },
+    "branch-protection": {
+      "id": 127,
+      "nterm": "branch-protection"
+    },
+    "branch protection and security": {
+      "id": 127,
+      "nterm": "branch-protection"
+    },
+    "branch protection": {
+      "id": 127,
+      "nterm": "branch-protection"
+    },
+    "case studies": {
+      "id": 128,
+      "nterm": "README"
+    },
+    "symphony-pagerank-viewer": {
+      "id": 129,
+      "nterm": "symphony-pagerank-viewer"
+    },
+    "case study": {
+      "id": 129,
+      "nterm": "symphony-pagerank-viewer"
+    },
+    "symphony pagerank viewer": {
+      "id": 129,
+      "nterm": "symphony-pagerank-viewer"
+    },
+    "case study symphony builds a web application": {
+      "id": 129,
+      "nterm": "symphony-pagerank-viewer"
+    },
+    "changelog": {
+      "id": 130,
+      "nterm": "changelog"
+    },
+    "claude-code-skills": {
+      "id": 131,
+      "nterm": "claude-code-skills"
+    },
+    "npx": {
+      "id": 131,
+      "nterm": "claude-code-skills"
+    },
+    "code-assistant-implementation": {
+      "id": 132,
+      "nterm": "code-assistant-implementation"
+    },
+    "code assistant implementation pr 277": {
+      "id": 132,
+      "nterm": "code-assistant-implementation"
+    },
+    "code assistant implementation": {
+      "id": 132,
+      "nterm": "code-assistant-implementation"
+    },
+    "command-rewriting-howto": {
+      "id": 133,
+      "nterm": "command-rewriting-howto"
+    },
+    "npm install": {
+      "id": 133,
+      "nterm": "command-rewriting-howto"
+    },
+    "yarn install": {
+      "id": 133,
+      "nterm": "command-rewriting-howto"
+    },
+    "pnpm install": {
+      "id": 133,
+      "nterm": "command-rewriting-howto"
+    },
+    "npm i": {
+      "id": 133,
+      "nterm": "command-rewriting-howto"
+    },
+    "yarn add": {
+      "id": 133,
+      "nterm": "command-rewriting-howto"
+    },
+    "pnpm add": {
+      "id": 133,
+      "nterm": "command-rewriting-howto"
+    },
+    "terraphim-atomic-client": {
+      "id": 134,
+      "nterm": "terraphim-atomic-client"
+    },
+    "terraphim atomic client": {
+      "id": 134,
+      "nterm": "terraphim-atomic-client"
+    },
+    "terraphim-automata": {
+      "id": 135,
+      "nterm": "terraphim-automata"
+    },
+    "terraphim automata": {
+      "id": 135,
+      "nterm": "terraphim-automata"
+    },
+    "terraphim-service": {
+      "id": 136,
+      "nterm": "terraphim-service"
+    },
+    "terraphim service": {
+      "id": 136,
+      "nterm": "terraphim-service"
+    },
+    "crates-overview": {
+      "id": 137,
+      "nterm": "crates-overview"
+    },
+    "crate reference": {
+      "id": 137,
+      "nterm": "crates-overview"
+    },
+    "crates overview": {
+      "id": 137,
+      "nterm": "crates-overview"
+    },
+    "desktop app": {
+      "id": 138,
+      "nterm": "README"
+    },
+    "development-setup": {
+      "id": 139,
+      "nterm": "development-setup"
+    },
+    "development setup guide": {
+      "id": 139,
+      "nterm": "development-setup"
+    },
+    "development setup": {
+      "id": 139,
+      "nterm": "development-setup"
+    },
+    "ci/cd domain": {
+      "id": 140,
+      "nterm": "README"
+    },
+    "deployment-lessons-vanilla-js-caddy": {
+      "id": 141,
+      "nterm": "deployment-lessons-vanilla-js-caddy"
+    },
+    "deployment lessons": {
+      "id": 141,
+      "nterm": "deployment-lessons-vanilla-js-caddy"
+    },
+    "deployment lessons vanilla js caddy": {
+      "id": 141,
+      "nterm": "deployment-lessons-vanilla-js-caddy"
+    },
+    "deployment lessons vanilla js ui + caddy + 1password": {
+      "id": 141,
+      "nterm": "deployment-lessons-vanilla-js-caddy"
+    },
+    "github actions fix plan v1.0.0": {
+      "id": 142,
+      "nterm": "github-actions-fix-plan"
+    },
+    "desktop domain": {
+      "id": 143,
+      "nterm": "README"
+    },
+    "release domain": {
+      "id": 144,
+      "nterm": "README"
+    },
+    "final validation status v1.0.0": {
+      "id": 145,
+      "nterm": "final-validation-status"
+    },
+    "security domain": {
+      "id": 146,
+      "nterm": "README"
+    },
+    "security-testing-lessons-learned": {
+      "id": 147,
+      "nterm": "security-testing-lessons-learned"
+    },
+    "security testing lessons learned": {
+      "id": 147,
+      "nterm": "security-testing-lessons-learned"
+    },
+    "vm domain": {
+      "id": 148,
+      "nterm": "README"
+    },
+    "dynamic-ontology": {
+      "id": 149,
+      "nterm": "dynamic-ontology"
+    },
+    "dynamic ontology": {
+      "id": 149,
+      "nterm": "dynamic-ontology"
+    },
+    "evaluation-framework": {
+      "id": 150,
+      "nterm": "evaluation-framework"
+    },
+    "automata evaluation framework": {
+      "id": 150,
+      "nterm": "evaluation-framework"
+    },
+    "evaluation framework": {
+      "id": 150,
+      "nterm": "evaluation-framework"
+    },
+    "graph-connectivity": {
+      "id": 151,
+      "nterm": "graph-connectivity"
+    },
+    "graph connectivity check for matched terms": {
+      "id": 151,
+      "nterm": "graph-connectivity"
+    },
+    "graph connectivity": {
+      "id": 151,
+      "nterm": "graph-connectivity"
+    },
+    "1password-integration": {
+      "id": 152,
+      "nterm": "1password-integration"
+    },
+    "1password integration for terraphim ainn overviewnnthis document describes the comprehensive 1password integration for terraphim ai providing enterprise-grade secret management across all components including backend services desktop applications and ci/cd pipelines.nn architecturenn three-vault strategynn- terraphim-dev": {
+      "id": 152,
+      "nterm": "1password-integration"
+    },
+    "1password integration": {
+      "id": 152,
+      "nterm": "1password-integration"
+    },
+    "1password integration for terraphim ainn overviewnnthis document describes the comprehensive 1password integration for terraphim ai providing enterprise-grade secret management across all components including backend services desktop applications and ci/cd pipelines.nn architecturenn three-vault strategynn- terraphim-dev development environment secretsn- terraphim-prod production environment secrets n- terraphim-shared shared secrets across environments signing keys monitoringnn integration methodsnn method 1 process memory injection recommendednbashn secrets are injected directly into process memorynop run --env-file.env.terraphim -- cargo runnnn method 2 secure file injectionnbashn secrets are written to secure temporary filesnop inject -i templates/settings.toml.template -o settings.tomlncargo runnnn setup instructionsnn 1. install 1password clinnmacosnbashnbrew install 1password-clinnnlinuxnbashncurl -ss https//downloads.1password.com/linux/keys/1password.asc  gpg --importnwget https//downloads.1password.com/linux/debian/amd64/stable/1password-cli-amd64-latest.debnsudo dpkg -i 1password-cli-amd64-latest.debnnn 2. initialize 1password integrationnnbashn run the setup script to create vaults and secret structuren./scripts/setup-1password-terraphim.sh devnn for production setupn./scripts/setup-1password-terraphim.sh prodnn for complete setupn./scripts/setup-1password-terraphim.sh allnnn 3. populate secretsnnafter running the setup script youll need to update the placeholder values in 1password with actual secretsnn1. open 1password and navigate to the appropriate vaultn2. update each secret item with real valuesn3. ensure all op// references in templates are validnn usagenn backend servicesnn option 1 direct 1password integrationnrustnuse terraphimsettingsdevicesettingsnntokiomainnasync fn main - result boxdyn stderrorerror n // load settings with 1password integrationn let settings  devicesettingsloadwithonepasswordnone.awaitn printlnloaded settings with resolved secretsn oknnnn option 2 template-based configurationnbashn generate configuration from templatenop inject -i templates/settings.toml.template -o settings.tomlnn run application with resolved configurationncargo runnnn desktop applicationnnthe tauri desktop application includes built-in 1password commandsnntypescriptnimport  invoke  from tauri-apps/api/taurinn// check 1password statusnconst status  await invokeonepasswordstatusnconsole.log1password available status.availablenconsole.log1password authenticated status.authenticatednn// resolve a secret referencenconst secret  await invokeonepasswordresolvesecret n request  reference op//terraphim-dev/openrouter/apikey nnn// process configuration with 1passwordnconst config  await invokeonepasswordprocessconfig n request  config apikey  op//terraphim-dev/openrouter/apikey nnnn ci/cd integrationnnuse the enhanced github actions workflow with 1password service accountsnnyamln .github/workflows/ci-1password.ymlnname ci with 1passwordnnenvn opserviceaccounttoken  secrets.opserviceaccounttoken nnjobsn buildn stepsn - name install 1password clin uses 1password/install-cli-actionv1n n - name generate configurationn run n op inject -i templates/env.terraphim.template -o .env.terraphimn n - name build with secretsn run n source .env.terraphimn cargo build --releasennn configuration templatesnn environment variables templatenbashn templates/env.terraphim.templatenopenrouterapikeyop//terraphim-dev/openrouter/apikeynanthropicapikeyop//terraphim-dev/anthropic/apikeynatomicserversecretop//terraphim-dev/atomicserver/secretnnn settings configuration templatentomln templates/settings.toml.templatenprofiles.s3nbucket  op//terraphim-dev/awss3/bucketnamenaccesskeyid  op//terraphim-dev/awss3/accesskeyidnsecretaccesskey  op//terraphim-dev/awss3/secretaccesskeynnn application configuration templatenjsonnn llm n openrouter n apikey op//terraphim-dev/openrouter/apikeyn n nnnn secret categoriesnn llm api keysn- openrouter apikey organizationidn- anthropic apikey modelnamen- ollama baseurl modelnamenn search servicesn- perplexity apikeyn- atomic server url secretn- clickup apitoken teamid listidnn cloud storagen- aws s3 accesskeyid secretaccesskey bucketname regionn- cloudflare r2 accountid accesskeyid secretaccesskeynn external apisn- github token organization repositoryn- discord bottoken guildid channelidnn database connectionsn- postgresql connectionstring username passwordn- redis url password host portnn shared secretsn- tauri signing privatekey publickey passphrasen- code signing certificatepath certificatepasswordn- monitoring sentrydsn datadogapikeynn security best practicesnn 1. vault access controln- use separate vaults for different environmentsn- implement least-privilege access policiesn- regularly audit vault permissionsnn 2. secret rotationn- rotate api keys regularlyn- update 1password references when secrets changen- monitor for deprecated or expired secretsnn 3. template securityn- never include hardcoded secrets in templatesn- use only op// references in configuration templatesn- validate template format before deploymentnn 4. ci/cd securityn- use 1password service accounts for automationn- limit service account permissions to specific vaultsn- clean up generated configuration files after usenn troubleshootingnn common issuesnn 1password cli not authenticatednbashn sign in to 1passwordnop signinnn verify authenticationnop vault listnnn secret reference not foundnbashn check vault contentsnop item list --vaultterraphim-devnn verify specific itemnop item get openrouter --vaultterraphim-devnnn template processing failednbashn validate template syntaxnop inject -i templates/env.terraphim.template --dry-runnn check for malformed referencesngrep -n op// templates/env.terraphim.templatennn debug commandsnnbashn test 1password integrationncargo run --bin debug-onepasswordnn validate configuration templatesn./scripts/validate-templates.shnn check secret resolutionnop run --env-file.env.terraphim -- env  grep -e openrouteranthropicnnn development workflownn local developmentn1. install 1password cli and authenticaten2. run vault setup script ./scripts/setup-1password-terraphim.sh devn3. populate development secrets in 1passwordn4. generate configuration op inject -i templates/env.terraphim.template -o .env.terraphimn5. run application source .env.terraphim && cargo runnn testingn1. use separate test vault or test-specific itemsn2. generate test configuration with mock valuesn3. run tests with isolated secrets op run --env-file.env.test -- cargo testnn production deploymentn1. use production vault and service accountsn2. validate all secret references before deploymentn3. deploy using ci/cd pipeline with 1password integrationn4. monitor for secret-related errors and alertsnn migration guidenn from environment variablesn1. identify current environment variablesn2. create corresponding 1password itemsn3. update configuration templates with op// referencesn4. test secret resolution in developmentn5. deploy with 1password integrationnn from configuration filesn1. extract sensitive values from configuration filesn2. store values in 1password vaultsn3. replace sensitive values with op// referencesn4. use op inject to generate final configurationn5. update deployment scripts to use template injectionnn supportnnfor issues with 1password integrationn1. check this documentation for common solutionsn2. validate 1password cli installation and authenticationn3. review secret references and vault permissionsn4. test with minimal configuration firstn5. contact the terraphim team for additional supportnn---nnnext stepsn- set up your 1password vaults using the setup scriptn- populate secrets with real valuesn- test integration in development environmentn- deploy with 1password-enhanced ci/cd pipeline": {
+      "id": 152,
+      "nterm": "1password-integration"
+    },
+    "haystack-extra-parameters": {
+      "id": 153,
+      "nterm": "haystack-extra-parameters"
+    },
+    "haystack configuration with extra parameters": {
+      "id": 153,
+      "nterm": "haystack-extra-parameters"
+    },
+    "haystack extra parameters": {
+      "id": 153,
+      "nterm": "haystack-extra-parameters"
+    },
+    "@lessons-learned": {
+      "id": 154,
+      "nterm": "@lessons-learned"
+    },
+    "lessons learned": {
+      "id": 154,
+      "nterm": "@lessons-learned"
+    },
+    "@lessons learned": {
+      "id": 154,
+      "nterm": "@lessons-learned"
+    },
+    "@memories": {
+      "id": 155,
+      "nterm": "@memories"
+    },
+    "progress memories": {
+      "id": 155,
+      "nterm": "@memories"
+    },
+    "@scratchpad": {
+      "id": 156,
+      "nterm": "@scratchpad"
+    },
+    "current work": {
+      "id": 156,
+      "nterm": "@scratchpad"
+    },
+    "current work terraphim multi-role agent system testing & production": {
+      "id": 156,
+      "nterm": "@scratchpad"
+    },
+    "lessons-learned-security-testing": {
+      "id": 157,
+      "nterm": "lessons-learned-security-testing"
+    },
+    "security testing lessons learned 2025-10-07": {
+      "id": 157,
+      "nterm": "lessons-learned-security-testing"
+    },
+    "lessons learned security testing": {
+      "id": 157,
+      "nterm": "lessons-learned-security-testing"
+    },
+    "comprehensive-lessons": {
+      "id": 158,
+      "nterm": "comprehensive-lessons"
+    },
+    "comprehensive lessons learned - terraphim ai development": {
+      "id": 158,
+      "nterm": "comprehensive-lessons"
+    },
+    "comprehensive lessons": {
+      "id": 158,
+      "nterm": "comprehensive-lessons"
+    },
+    "security-patterns": {
+      "id": 159,
+      "nterm": "security-patterns"
+    },
+    "security testing patterns - terraphim ai": {
+      "id": 159,
+      "nterm": "security-patterns"
+    },
+    "security patterns": {
+      "id": 159,
+      "nterm": "security-patterns"
+    },
+    "firecracker-implementation": {
+      "id": 160,
+      "nterm": "firecracker-implementation"
+    },
+    "terraphim firecracker project - implementation plan": {
+      "id": 160,
+      "nterm": "firecracker-implementation"
+    },
+    "firecracker implementation": {
+      "id": 160,
+      "nterm": "firecracker-implementation"
+    },
+    "security-testing-complete": {
+      "id": 161,
+      "nterm": "security-testing-complete"
+    },
+    "terraphim ai security testing implementation - complete": {
+      "id": 161,
+      "nterm": "security-testing-complete"
+    },
+    "security testing complete": {
+      "id": 161,
+      "nterm": "security-testing-complete"
+    },
+    "testing-infrastructure-improvement": {
+      "id": 162,
+      "nterm": "testing-infrastructure-improvement"
+    },
+    "terraphim ai testing infrastructure improvement plan": {
+      "id": 162,
+      "nterm": "testing-infrastructure-improvement"
+    },
+    "testing infrastructure improvement": {
+      "id": 162,
+      "nterm": "testing-infrastructure-improvement"
+    },
+    "homebrew-formula": {
+      "id": 163,
+      "nterm": "homebrew-formula"
+    },
+    "installing terraphim ai": {
+      "id": 163,
+      "nterm": "homebrew-formula"
+    },
+    "homebrew formula": {
+      "id": 163,
+      "nterm": "homebrew-formula"
+    },
+    "ai-agent-onboarding-quickstart": {
+      "id": 164,
+      "nterm": "ai-agent-onboarding-quickstart"
+    },
+    "ai agent onboarding quickstart": {
+      "id": 164,
+      "nterm": "ai-agent-onboarding-quickstart"
+    },
+    "graph-embeddings-checklists": {
+      "id": 165,
+      "nterm": "graph-embeddings-checklists"
+    },
+    "learning-capture-claude-code": {
+      "id": 166,
+      "nterm": "learning-capture-claude-code"
+    },
+    "howto": {
+      "id": 166,
+      "nterm": "learning-capture-claude-code"
+    },
+    "learning capture claude code": {
+      "id": 166,
+      "nterm": "learning-capture-claude-code"
+    },
+    "howto learning capture for claude code": {
+      "id": 166,
+      "nterm": "learning-capture-claude-code"
+    },
+    "learning-capture-opencode": {
+      "id": 167,
+      "nterm": "learning-capture-opencode"
+    },
+    "learning capture opencode": {
+      "id": 167,
+      "nterm": "learning-capture-opencode"
+    },
+    "howto learning capture for opencode": {
+      "id": 167,
+      "nterm": "learning-capture-opencode"
+    },
+    "mcp-integration-claude-opencode": {
+      "id": 168,
+      "nterm": "mcp-integration-claude-opencode"
+    },
+    "plug terraphim search into claude code and opencode": {
+      "id": 168,
+      "nterm": "mcp-integration-claude-opencode"
+    },
+    "mcp integration claude opencode": {
+      "id": 168,
+      "nterm": "mcp-integration-claude-opencode"
+    },
+    "personal-assistant-role": {
+      "id": 169,
+      "nterm": "personal-assistant-role"
+    },
+    "personal assistant role": {
+      "id": 169,
+      "nterm": "personal-assistant-role"
+    },
+    "personal assistant role search email and notes together": {
+      "id": 169,
+      "nterm": "personal-assistant-role"
+    },
+    "save-money-tokens-ai-agents": {
+      "id": 170,
+      "nterm": "save-money-tokens-ai-agents"
+    },
+    "3 ways to save money on tokens for your ai agents": {
+      "id": 170,
+      "nterm": "save-money-tokens-ai-agents"
+    },
+    "save money tokens ai agents": {
+      "id": 170,
+      "nterm": "save-money-tokens-ai-agents"
+    },
+    "zero-token-llm-routing": {
+      "id": 171,
+      "nterm": "zero-token-llm-routing"
+    },
+    "zero-token llm routing": {
+      "id": 171,
+      "nterm": "zero-token-llm-routing"
+    },
+    "zero token llm routing": {
+      "id": 171,
+      "nterm": "zero-token-llm-routing"
+    },
+    "zero-token llm routing deterministic decisions before the call": {
+      "id": 171,
+      "nterm": "zero-token-llm-routing"
+    },
+    "document retrieval": {
+      "id": 172,
+      "nterm": "README"
+    },
+    "keyword lookup": {
+      "id": 172,
+      "nterm": "README"
+    },
+    "api": {
+      "id": 173,
+      "nterm": "api"
+    },
+    "interface": {
+      "id": 173,
+      "nterm": "api"
+    },
+    "endpoint": {
+      "id": 173,
+      "nterm": "api"
+    },
+    "rest": {
+      "id": 173,
+      "nterm": "api"
+    },
+    "http": {
+      "id": 173,
+      "nterm": "api"
+    },
+    "bug-reporting": {
+      "id": 174,
+      "nterm": "bug-reporting"
+    },
+    "steps to reproduce": {
+      "id": 174,
+      "nterm": "bug-reporting"
+    },
+    "reproduction steps": {
+      "id": 174,
+      "nterm": "bug-reporting"
+    },
+    "repro steps": {
+      "id": 174,
+      "nterm": "bug-reporting"
+    },
+    "recreate issue": {
+      "id": 174,
+      "nterm": "bug-reporting"
+    },
+    "how to reproduce": {
+      "id": 174,
+      "nterm": "bug-reporting"
+    },
+    "reproduce bug": {
+      "id": 174,
+      "nterm": "bug-reporting"
+    },
+    "reproduce the issue": {
+      "id": 174,
+      "nterm": "bug-reporting"
+    },
+    "reproduction guide": {
+      "id": 174,
+      "nterm": "bug-reporting"
+    },
+    "step-by-step instructions": {
+      "id": 174,
+      "nterm": "bug-reporting"
+    },
+    "bun install": {
+      "id": 175,
+      "nterm": "bun install"
+    },
+    "bun": {
+      "id": 176,
+      "nterm": "bun"
+    },
+    "kg-validation-workflows": {
+      "id": 177,
+      "nterm": "kg-validation-workflows"
+    },
+    "kg validation workflows": {
+      "id": 177,
+      "nterm": "kg-validation-workflows"
+    },
+    "case study knowledge graph validation workflows for pre/post-llm": {
+      "id": 177,
+      "nterm": "kg-validation-workflows"
+    },
+    "code_review": {
+      "id": 178,
+      "nterm": "code_review"
+    },
+    "code review checklist": {
+      "id": 178,
+      "nterm": "code_review"
+    },
+    "pr review checklist": {
+      "id": 178,
+      "nterm": "code_review"
+    },
+    "pull request review checklist": {
+      "id": 178,
+      "nterm": "code_review"
+    },
+    "security": {
+      "id": 179,
+      "nterm": "security"
+    },
+    "security review": {
+      "id": 179,
+      "nterm": "security"
+    },
+    "security audit": {
+      "id": 179,
+      "nterm": "security"
+    },
+    "vulnerability assessment": {
+      "id": 179,
+      "nterm": "security"
+    },
+    "configuration": {
+      "id": 180,
+      "nterm": "configuration"
+    },
+    "application configuration": {
+      "id": 180,
+      "nterm": "configuration"
+    },
+    "runtime configuration": {
+      "id": 180,
+      "nterm": "configuration"
+    },
+    "database": {
+      "id": 181,
+      "nterm": "database"
+    },
+    "db": {
+      "id": 181,
+      "nterm": "database"
+    },
+    "datastore": {
+      "id": 181,
+      "nterm": "database"
+    },
+    "storage": {
+      "id": 181,
+      "nterm": "database"
+    },
+    "persistence": {
+      "id": 181,
+      "nterm": "database"
+    },
+    "docker compose": {
+      "id": 182,
+      "nterm": "docker compose"
+    },
+    "docker-compose": {
+      "id": 182,
+      "nterm": "docker compose"
+    },
+    "exit_classes": {
+      "id": 183,
+      "nterm": "exit_classes"
+    },
+    "timed out": {
+      "id": 183,
+      "nterm": "exit_classes"
+    },
+    "deadline exceeded": {
+      "id": 183,
+      "nterm": "exit_classes"
+    },
+    "wall-clock kill": {
+      "id": 183,
+      "nterm": "exit_classes"
+    },
+    "context deadline exceeded": {
+      "id": 183,
+      "nterm": "exit_classes"
+    },
+    "operation timed out": {
+      "id": 183,
+      "nterm": "exit_classes"
+    },
+    "execution expired": {
+      "id": 183,
+      "nterm": "exit_classes"
+    },
+    "generated_with_terraphim": {
+      "id": 184,
+      "nterm": "generated_with_terraphim"
+    },
+    "generated with claude code": {
+      "id": 184,
+      "nterm": "generated_with_terraphim"
+    },
+    "generated with claude": {
+      "id": 184,
+      "nterm": "generated_with_terraphim"
+    },
+    "graph-embeddings-learnings": {
+      "id": 185,
+      "nterm": "graph-embeddings-learnings"
+    },
+    "consistency": {
+      "id": 185,
+      "nterm": "graph-embeddings-learnings"
+    },
+    "availability": {
+      "id": 185,
+      "nterm": "graph-embeddings-learnings"
+    },
+    "partition tolerance": {
+      "id": 185,
+      "nterm": "graph-embeddings-learnings"
+    },
+    "cap": {
+      "id": 185,
+      "nterm": "graph-embeddings-learnings"
+    },
+    "graph": {
+      "id": 186,
+      "nterm": "graph"
+    },
+    "network": {
+      "id": 186,
+      "nterm": "graph"
+    },
+    "kg": {
+      "id": 186,
+      "nterm": "graph"
+    },
+    "knowledge-graph": {
+      "id": 186,
+      "nterm": "graph"
+    },
+    "semantic": {
+      "id": 186,
+      "nterm": "graph"
     },
     "haystack": {
-      "id": 73,
+      "id": 187,
       "nterm": "haystack"
     },
-    "service": {
-      "id": 74,
-      "nterm": "service"
-    },
-    "agent": {
-      "id": 73,
+    "haystacks": {
+      "id": 187,
       "nterm": "haystack"
     },
-    "provider": {
-      "id": 74,
-      "nterm": "service"
+    "data-source": {
+      "id": 187,
+      "nterm": "haystack"
     },
     "datasource": {
-      "id": 73,
+      "id": 187,
       "nterm": "haystack"
+    },
+    "data source": {
+      "id": 187,
+      "nterm": "haystack"
+    },
+    "https___terraphim_ai": {
+      "id": 188,
+      "nterm": "https___terraphim_ai"
+    },
+    "https://claude.com/claude-code": {
+      "id": 188,
+      "nterm": "https___terraphim_ai"
+    },
+    "https://anthropic.com": {
+      "id": 188,
+      "nterm": "https___terraphim_ai"
+    },
+    "https://claude.com": {
+      "id": 188,
+      "nterm": "https___terraphim_ai"
+    },
+    "issue-tracking": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "payroll system": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "payroll processing": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "salary calculation": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "wage calculation": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "compensation system": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "payroll errors": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "payroll bugs": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "payroll discrepancies": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "employee pay issues": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "salary issues": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "wage problems": {
+      "id": 189,
+      "nterm": "issue-tracking"
+    },
+    "knowledge graph": {
+      "id": 190,
+      "nterm": "knowledge-graph"
+    },
+    "learnings-system": {
+      "id": 191,
+      "nterm": "learnings-system"
+    },
+    "learning capture system": {
+      "id": 191,
+      "nterm": "learnings-system"
+    },
+    "learnings system": {
+      "id": 191,
+      "nterm": "learnings-system"
+    },
+    "middleware": {
+      "id": 192,
+      "nterm": "middleware"
+    },
+    "processing": {
+      "id": 192,
+      "nterm": "middleware"
+    },
+    "orchestration": {
+      "id": 192,
+      "nterm": "middleware"
+    },
+    "pipeline": {
+      "id": 192,
+      "nterm": "middleware"
+    },
+    "noreply_terraphim": {
+      "id": 193,
+      "nterm": "noreply_terraphim"
+    },
+    "noreply@anthropic.com": {
+      "id": 193,
+      "nterm": "noreply_terraphim"
+    },
+    "search": {
+      "id": 194,
+      "nterm": "search"
+    },
+    "service": {
+      "id": 195,
+      "nterm": "service"
+    },
+    "services": {
+      "id": 195,
+      "nterm": "service"
+    },
+    "component": {
+      "id": 195,
+      "nterm": "service"
+    },
+    "microservice": {
+      "id": 195,
+      "nterm": "service"
+    },
+    "system": {
+      "id": 196,
+      "nterm": "system"
+    },
+    "application": {
+      "id": 196,
+      "nterm": "system"
+    },
+    "platform": {
+      "id": 196,
+      "nterm": "system"
+    },
+    "framework": {
+      "id": 196,
+      "nterm": "system"
+    },
+    "terraphim-graph": {
+      "id": 197,
+      "nterm": "terraphim-graph"
+    },
+    "graph embeddings": {
+      "id": 197,
+      "nterm": "terraphim-graph"
+    },
+    "knowledge graph based embeddings": {
+      "id": 197,
+      "nterm": "terraphim-graph"
+    },
+    "terraphim_ai": {
+      "id": 198,
+      "nterm": "terraphim_ai"
+    },
+    "claude code": {
+      "id": 198,
+      "nterm": "terraphim_ai"
+    },
+    "claude": {
+      "id": 198,
+      "nterm": "terraphim_ai"
+    },
+    "thesaurus": {
+      "id": 199,
+      "nterm": "thesaurus"
+    },
+    "dictionary": {
+      "id": 199,
+      "nterm": "thesaurus"
+    },
+    "concepts": {
+      "id": 199,
+      "nterm": "thesaurus"
+    },
+    "terms": {
+      "id": 199,
+      "nterm": "thesaurus"
+    },
+    "uv": {
+      "id": 200,
+      "nterm": "uv"
+    },
+    "pip": {
+      "id": 200,
+      "nterm": "uv"
+    },
+    "pip3": {
+      "id": 200,
+      "nterm": "uv"
+    },
+    "pipx": {
+      "id": 200,
+      "nterm": "uv"
+    },
+    "pyenv": {
+      "id": 200,
+      "nterm": "uv"
+    },
+    "python -m pip": {
+      "id": 200,
+      "nterm": "uv"
+    },
+    "pip install": {
+      "id": 200,
+      "nterm": "uv"
+    },
+    "pip3 install": {
+      "id": 200,
+      "nterm": "uv"
+    },
+    "uv_add": {
+      "id": 201,
+      "nterm": "uv_add"
+    },
+    "pip add": {
+      "id": 201,
+      "nterm": "uv_add"
+    },
+    "pipx install": {
+      "id": 201,
+      "nterm": "uv_add"
+    },
+    "uv add": {
+      "id": 201,
+      "nterm": "uv_add"
+    },
+    "knowledge-graph-bug-reporting-enhancement": {
+      "id": 202,
+      "nterm": "knowledge-graph-bug-reporting-enhancement"
+    },
+    "learning-compile": {
+      "id": 203,
+      "nterm": "learning-compile"
+    },
+    "learning compile": {
+      "id": 203,
+      "nterm": "learning-compile"
+    },
+    "listener-dispatch": {
+      "id": 204,
+      "nterm": "listener-dispatch"
+    },
+    "listener shell dispatch": {
+      "id": 204,
+      "nterm": "listener-dispatch"
+    },
+    "listener dispatch": {
+      "id": 204,
+      "nterm": "listener-dispatch"
+    },
+    "mcp-integration": {
+      "id": 205,
+      "nterm": "mcp-integration"
+    },
+    "mcp integration": {
+      "id": 205,
+      "nterm": "mcp-integration"
+    },
+    "openrouter-integration": {
+      "id": 206,
+      "nterm": "openrouter-integration"
+    },
+    "openrouter ai-powered article summarization": {
+      "id": 206,
+      "nterm": "openrouter-integration"
+    },
+    "openrouter integration": {
+      "id": 206,
+      "nterm": "openrouter-integration"
+    },
+    "release-channels": {
+      "id": 207,
+      "nterm": "release-channels"
+    },
+    "release channels": {
+      "id": 207,
+      "nterm": "release-channels"
+    },
+    "release-process": {
+      "id": 208,
+      "nterm": "release-process"
+    },
+    "release process for terraphim ai": {
+      "id": 208,
+      "nterm": "release-process"
+    },
+    "release process": {
+      "id": 208,
+      "nterm": "release-process"
+    },
+    "pagerank-bug-design": {
+      "id": 209,
+      "nterm": "pagerank-bug-design"
+    },
+    "design": {
+      "id": 209,
+      "nterm": "pagerank-bug-design"
+    },
+    "pagerank bug design": {
+      "id": 209,
+      "nterm": "pagerank-bug-design"
+    },
+    "design pagerank bug fixes for gitea robot api": {
+      "id": 209,
+      "nterm": "pagerank-bug-design"
+    },
+    "pagerank-bug-investigation": {
+      "id": 210,
+      "nterm": "pagerank-bug-investigation"
+    },
+    "research": {
+      "id": 210,
+      "nterm": "pagerank-bug-investigation"
+    },
+    "pagerank bug investigation": {
+      "id": 210,
+      "nterm": "pagerank-bug-investigation"
+    },
+    "research pagerank computation bug in gitea robot api": {
+      "id": 210,
+      "nterm": "pagerank-bug-investigation"
+    },
+    "tlaplus-typescript-bindings": {
+      "id": 211,
+      "nterm": "tlaplus-typescript-bindings"
+    },
+    "research document": {
+      "id": 211,
+      "nterm": "tlaplus-typescript-bindings"
+    },
+    "tlaplus typescript bindings": {
+      "id": 211,
+      "nterm": "tlaplus-typescript-bindings"
+    },
+    "research document typescript bindings for tla+": {
+      "id": 211,
+      "nterm": "tlaplus-typescript-bindings"
+    },
+    "tlaplus-typescript-design": {
+      "id": 212,
+      "nterm": "tlaplus-typescript-design"
+    },
+    "design document": {
+      "id": 212,
+      "nterm": "tlaplus-typescript-design"
+    },
+    "tlaplus typescript design": {
+      "id": 212,
+      "nterm": "tlaplus-typescript-design"
+    },
+    "design document typescript bindings for tla+": {
+      "id": 212,
+      "nterm": "tlaplus-typescript-design"
+    },
+    "title-scorer": {
+      "id": 213,
+      "nterm": "Title-Scorer"
+    },
+    "title scorer": {
+      "id": 213,
+      "nterm": "Title-Scorer"
+    },
+    "bm25-scorers": {
+      "id": 214,
+      "nterm": "bm25-scorers"
+    },
+    "bm25 scorers": {
+      "id": 214,
+      "nterm": "bm25-scorers"
+    },
+    "graph-embedding-analysis": {
+      "id": 215,
+      "nterm": "graph-embedding-analysis"
+    },
+    "terraphim graph embeddings vs cleora": {
+      "id": 215,
+      "nterm": "graph-embedding-analysis"
+    },
+    "graph embedding analysis": {
+      "id": 215,
+      "nterm": "graph-embedding-analysis"
+    },
+    "search-architecture-comparison-openclaw": {
+      "id": 217,
+      "nterm": "search-architecture-comparison-openclaw"
+    },
+    "terraphim vs openclaw": {
+      "id": 217,
+      "nterm": "search-architecture-comparison-openclaw"
+    },
+    "search architecture comparison openclaw": {
+      "id": 217,
+      "nterm": "search-architecture-comparison-openclaw"
+    },
+    "terraphim vs openclaw search architecture comparison": {
+      "id": 217,
+      "nterm": "search-architecture-comparison-openclaw"
+    },
+    "search-architecture": {
+      "id": 218,
+      "nterm": "search-architecture"
+    },
+    "terraphim search architecture": {
+      "id": 218,
+      "nterm": "search-architecture"
+    },
+    "search architecture": {
+      "id": 218,
+      "nterm": "search-architecture"
+    },
+    "symphony orchestrator": {
+      "id": 219,
+      "nterm": "README"
+    },
+    "test-kg-demo": {
+      "id": 220,
+      "nterm": "test-kg-demo"
+    },
+    "test kg auto-linking demo": {
+      "id": 220,
+      "nterm": "test-kg-demo"
+    },
+    "test kg demo": {
+      "id": 220,
+      "nterm": "test-kg-demo"
+    },
+    "test_chat": {
+      "id": 221,
+      "nterm": "test_chat"
+    },
+    "relationship between aircraft and crew": {
+      "id": 221,
+      "nterm": "test_chat"
+    },
+    "test chat": {
+      "id": 221,
+      "nterm": "test_chat"
+    },
+    "comprehensive-testing-strategies": {
+      "id": 222,
+      "nterm": "comprehensive-testing-strategies"
+    },
+    "data analysis": {
+      "id": 222,
+      "nterm": "comprehensive-testing-strategies"
+    },
+    "network analysis": {
+      "id": 222,
+      "nterm": "comprehensive-testing-strategies"
+    },
+    "graph processing": {
+      "id": 222,
+      "nterm": "comprehensive-testing-strategies"
+    },
+    "desktop testing": {
+      "id": 223,
+      "nterm": "README"
+    },
+    "chat-layout-test-plan": {
+      "id": 224,
+      "nterm": "chat-layout-test-plan"
+    },
+    "chat layout responsive design test plan": {
+      "id": 224,
+      "nterm": "chat-layout-test-plan"
+    },
+    "chat layout test plan": {
+      "id": 224,
+      "nterm": "chat-layout-test-plan"
+    },
+    "testing-guide": {
+      "id": 225,
+      "nterm": "testing-guide"
+    },
+    "desktop frontend testing guide": {
+      "id": 225,
+      "nterm": "testing-guide"
+    },
+    "testing guide": {
+      "id": 225,
+      "nterm": "testing-guide"
+    },
+    "knowledge-graph-ranking-expansion": {
+      "id": 226,
+      "nterm": "knowledge-graph-ranking-expansion"
+    },
+    "relationship mapping": {
+      "id": 226,
+      "nterm": "knowledge-graph-ranking-expansion"
+    },
+    "connectivity analysis": {
+      "id": 226,
+      "nterm": "knowledge-graph-ranking-expansion"
+    },
+    "mcp-integration-testing": {
+      "id": 227,
+      "nterm": "mcp-integration-testing"
+    },
+    "mcp integration testing": {
+      "id": 227,
+      "nterm": "mcp-integration-testing"
+    },
+    "testing-overview": {
+      "id": 228,
+      "nterm": "testing-overview"
+    },
+    "testing overview": {
+      "id": 228,
+      "nterm": "testing-overview"
+    },
+    "testing_matrix": {
+      "id": 229,
+      "nterm": "testing_matrix"
+    },
+    "terraphim ai agent evolution system - testing matrix": {
+      "id": 229,
+      "nterm": "testing_matrix"
+    },
+    "testing matrix": {
+      "id": 229,
+      "nterm": "testing_matrix"
+    },
+    "tsify-implementation": {
+      "id": 230,
+      "nterm": "tsify-implementation"
+    },
+    "typescript bindings with tsify": {
+      "id": 230,
+      "nterm": "tsify-implementation"
+    },
+    "tsify implementation": {
+      "id": 230,
+      "nterm": "tsify-implementation"
+    },
+    "tui": {
+      "id": 231,
+      "nterm": "tui"
+    },
+    "terraphim tui": {
+      "id": 231,
+      "nterm": "tui"
+    },
+    "workflow_patterns_guide": {
+      "id": 232,
+      "nterm": "workflow_patterns_guide"
+    },
+    "terraphim ai agent workflow patterns guide": {
+      "id": 232,
+      "nterm": "workflow_patterns_guide"
+    },
+    "workflow patterns guide": {
+      "id": 232,
+      "nterm": "workflow_patterns_guide"
     }
   }
 }

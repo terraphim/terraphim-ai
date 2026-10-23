@@ -2,6 +2,10 @@
 
 ## Introduction
 
+synonyms:: terraphim ai agent workflow patterns guide, workflow patterns guide
+checklist:: introduction, pattern overview, prompt chaining pattern, routing pattern, parallelization pattern, orchestrator-workers pattern, evaluator-optimizer pattern, pattern selection guidelines
+
+
 This guide provides comprehensive documentation for the 5 core workflow patterns implemented in the Terraphim AI Agent Evolution System. Each pattern is designed for specific use cases and execution scenarios, providing reliable and optimized AI agent orchestration.
 
 ## Pattern Overview

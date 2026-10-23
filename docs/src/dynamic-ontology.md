@@ -2,6 +2,10 @@
 
 Terraphim's Dynamic Ontology enables schema-first knowledge graph construction with coverage governance signals. This document explains the architecture, feature gates, and usage.
 
+synonyms:: dynamic ontology
+checklist:: overview, architecture, feature gates, core types, usage examples, multi-agent workflow, coverage governance, performance
+
+
 ## Overview
 
 Dynamic Ontology is a schema-first approach to knowledge graphs inspired by Akash Goyal's methodology. It provides:

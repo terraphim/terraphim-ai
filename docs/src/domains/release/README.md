@@ -2,6 +2,10 @@
 
 This section covers release processes, signing/notarization, and changelog history.
 
+synonyms:: release domain, readme
+checklist:: what belongs here, release coordinator, reports, case studies
+
+
 ## What belongs here
 
 - Release pipeline and tooling

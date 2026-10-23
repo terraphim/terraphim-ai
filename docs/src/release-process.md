@@ -2,6 +2,10 @@
 
 This document describes the complete release process for Terraphim AI, including all three main components: server, TUI, and desktop application.
 
+synonyms:: release process for terraphim ai, release process
+checklist:: overview, release components, automated release workflow, configuration files, manual release steps if needed, version management, installation methods, troubleshooting
+
+
 ## Overview
 
 Terraphim AI uses an automated release process powered by:

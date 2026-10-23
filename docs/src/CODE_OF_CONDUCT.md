@@ -3,6 +3,10 @@
 
 ## Our Pledge
 
+synonyms:: code of conduct
+checklist:: our pledge, our standards, enforcement responsibilities, scope, enforcement, attribution
+
+
 In the interest of fostering an open and welcoming environment, we as contributors and maintainers pledge to make participation in our project and our community a harassment-free experience for everyone, regardless of age, body size, disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
 
 We pledge to act and interact in ways that contribute to an open, welcoming, diverse, inclusive, and healthy community.

@@ -2,6 +2,10 @@
 
 Here are some additional questions to consider when defining the relationships between aircraft and crew:
 
+synonyms:: relationship between aircraft and crew, test chat
+checklist:: test chat
+
+
 What is the relationship between an aircraft and its crew members? Is it a one-to-many relationship, where an aircraft has multiple crew members, but a crew member is only associated with one aircraft?
 Can a crew member be assigned to multiple aircraft at the same time? If so, how would you represent this in the data model?
 Can an aircraft have multiple crew members assigned at the same time? If so, how would you represent this in the data model?

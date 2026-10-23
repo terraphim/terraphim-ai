@@ -2,6 +2,10 @@
 
 ## Tweet 1
 
+synonyms:: x/twitter thread, x announcement
+checklist:: tweet 1, tweet 2, tweet 3, tweet 4, tweet 5, tweet 6, tweet 7
+
+
 Your AI coding agent has the memory of a goldfish.
 
 It suggests npm after you said bun. It runs git reset --hard after you warned against it. It repeats the same mistake you corrected three hours ago.

@@ -2,6 +2,10 @@
 
 ## Overview
 
+synonyms:: terraphim ai agent evolution system - api reference, api reference
+checklist:: overview, core types and traits, agent evolution system, memory evolution, task evolution, lessons evolution, workflow patterns, specific workflow patterns
+
+
 This document provides comprehensive API reference for the Terraphim AI Agent Evolution System. The API is designed around trait-based abstractions that provide flexibility and extensibility while maintaining type safety.
 
 ## Core Types and Traits

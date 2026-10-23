@@ -5,6 +5,10 @@ Terraphim includes a terminal interface with three execution modes:
 - REPL (`terraphim-agent repl`) - offline-capable by default
 - CLI subcommands (`terraphim-agent <command>`) - offline-capable by default unless `--server` is used
 
+synonyms:: terraphim tui, tui
+checklist:: installation, feature flags, interactive modes, cli subcommands, behavior, key features, roadmap
+
+
 ## Installation
 
 Build from the workspace with optional feature flags:

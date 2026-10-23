@@ -2,6 +2,10 @@
 
 ## Overview
 
+synonyms:: atomic server integration
+checklist:: overview, features, configuration, api endpoints, testing, best practices, troubleshooting, integration examples
+
+
 Terraphim provides comprehensive integration with Atomic Data servers, enabling both read and write operations for document management and search functionality. This integration supports both public access (for reading documents) and authenticated access (for writing documents).
 
 ## Features

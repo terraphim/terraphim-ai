@@ -2,6 +2,10 @@
 
 ## r/rust
 
+synonyms:: reddit announcements -- terraphim grep, reddit grep announcement
+checklist:: r/rust, r/programming
+
+
 **Title:** Hybrid code search in Rust: ripgrep-speed retrieval + knowledge graph + LLM fallback, with a four-layer no-mocks test pyramid
 
 **Body:**

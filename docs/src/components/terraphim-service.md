@@ -2,6 +2,10 @@
 
 The `terraphim_service` crate is the core service layer that provides document search, ranking, and management capabilities for the Terraphim system.
 
+synonyms:: terraphim service
+checklist:: architecture, api reference, scoring algorithms, knowledge graph integration, ai enhancement, error handling, performance considerations, testing
+
+
 ## Architecture
 
 ### Core Components

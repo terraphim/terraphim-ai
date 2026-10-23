@@ -2,6 +2,10 @@
 
 The Personal Assistant role indexes a Fastmail JMAP mailbox and an Obsidian vault under a single Terraphim role, so one query returns both notes and email ordered by knowledge-graph relevance. This how-to shows the end-to-end setup.
 
+synonyms:: personal assistant role, personal assistant role search email and notes together
+checklist:: why this exists, prerequisites, step 1 -- add the role to embeddedconfig.json, step 2 -- wrapper script for token injection, step 3 -- verify search, auto-routing, troubleshooting, related
+
+
 ## Why this exists
 
 Most "personal AI" tools split your context across silos: one search box for email, another for notes, a third for chat history. Terraphim treats every source as a haystack on the same role, so a single query crosses them. The Personal Assistant role wires up the two most common personal sources -- email (JMAP) and notes (Obsidian) -- with deterministic, sub-millisecond ranking and no cloud round-trip.
@@ -53,14 +57,14 @@ Add the role under `roles` in `~/.config/terraphim/embedded_config.json`:
     "automata_path": null,
     "knowledge_graph_local": {
       "input_type": "markdown",
-      "path": "/Users/alex/synced/ObsidianVault"
+      "path": "/absolute/path/to/ObsidianVault"
     },
     "public": false,
     "publish": false
   },
   "haystacks": [
     {
-      "location": "/Users/alex/synced/ObsidianVault",
+      "location": "/absolute/path/to/ObsidianVault",
       "service": "Ripgrep",
       "read_only": true
     },
@@ -109,7 +113,7 @@ cat > ~/bin/terraphim-agent-pa <<'SH'
 #!/usr/bin/env bash
 exec op run --account my.1password.com \
   --env-file=<(echo 'JMAP_ACCESS_TOKEN=op://VAULT/ITEM/credential') \
-  -- /Users/alex/.cargo/bin/terraphim-agent "$@"
+  -- "$HOME/.cargo/bin/terraphim-agent" "$@"
 SH
 chmod +x ~/bin/terraphim-agent-pa
 ```

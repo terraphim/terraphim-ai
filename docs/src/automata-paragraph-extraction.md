@@ -2,6 +2,10 @@
 
 Goal: Given a thesaurus-backed automata, find paragraphs in a text starting from matched automata terms.
 
+synonyms:: automata paragraph extraction
+checklist:: plan, function, example, tests, benchmarks
+
+
 ## Plan
 - Build/obtain a `Thesaurus` for the automata
 - Use `find_matches(text, thesaurus, return_positions=true)` to get term matches with positions
