@@ -17,3 +17,10 @@
 /pagefind/*
   Content-Type: application/javascript
   Cache-Control: public, max-age=0, must-revalidate
+
+# Catch-all for HTML pages and any unlisted path: always revalidate so
+# removed or renamed pages are not pinned by the zone-level edge cache
+# (the zone runs cache_level=aggressive, which once kept deleted pages
+# alive for s-maxage=604800 after a deploy).
+/*
+  Cache-Control: public, max-age=0, must-revalidate

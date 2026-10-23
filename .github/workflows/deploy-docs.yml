@@ -31,6 +31,11 @@ env:
   OP_API_TOKEN: op://TerraphimPlatform/terraphim-md-book-cloudflare/workers-api-token
   OP_ACCOUNT_ID: op://TerraphimPlatform/terraphim-md-book-cloudflare/account_id
   OP_ZONE_ID: op://TerraphimPlatform/terraphim-md-book-cloudflare/zone-id
+  # Cache purge needs Zone.Cache Purge on the zone — the workers-api-token
+  # used for Pages deploys does not have it. Create a dedicated token in
+  # Cloudflare (My Profile -> API Tokens -> Zone.Cache Purge for this zone)
+  # and store it as field 'cache-purge-token' on the same 1Password item.
+  OP_CACHE_PURGE_TOKEN: op://TerraphimPlatform/terraphim-md-book-cloudflare/cache-purge-token
 
 jobs:
   build:
@@ -205,12 +210,14 @@ jobs:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ env.OP_API_TOKEN }}
+          CLOUDFLARE_CACHE_PURGE_TOKEN: ${{ env.OP_CACHE_PURGE_TOKEN }}
           CLOUDFLARE_ZONE_ID: ${{ env.OP_ZONE_ID }}
 
       - name: Purge Cloudflare Cache
         run: |
-          curl -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+          response=$(curl -fsS -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CLOUDFLARE_CACHE_PURGE_TOKEN}" \
             -H "Content-Type: application/json" \
-            --data '{"purge_everything":true}' || true
+            --data '{"hosts":["docs.terraphim.ai"]}')
+          echo "$response"
+          echo "$response" | grep -q '"success":true' || { echo "::error::Cloudflare cache purge failed"; exit 1; }
