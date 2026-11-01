@@ -20,12 +20,11 @@ curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts
 ```
 
 **Features:**
-- ✅ Cross-platform support (Linux, macOS, Windows/WSL)
-- ✅ Automatic platform detection
-- ✅ Security verification with checksums
-- ✅ Pre-built binaries when available
-- ✅ Fallback to source compilation
-- ✅ Multiple installation options
+- Cross-platform support (Linux, macOS, Windows/WSL)
+- Automatic platform detection
+- Checksum verification when published checksums are available
+- Installs pre-built release binaries; it does not compile from source
+- Multiple installation options
 
 **Installation Options:**
 ```bash
