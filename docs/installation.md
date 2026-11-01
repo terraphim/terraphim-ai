@@ -13,19 +13,18 @@ The universal installer provides a single-command installation for all platforms
 curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
 
 # Install both agent and CLI tools
-curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash --with-cli
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash -s -- --with-cli
 
 # Install to custom directory
-curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash --install-dir /usr/local/bin
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash -s -- --install-dir /usr/local/bin
 ```
 
 **Features:**
-- ✅ Cross-platform support (Linux, macOS, Windows/WSL)
-- ✅ Automatic platform detection
-- ✅ Security verification with checksums
-- ✅ Pre-built binaries when available
-- ✅ Fallback to source compilation
-- ✅ Multiple installation options
+- Cross-platform support (Linux, macOS, Windows/WSL)
+- Automatic platform detection
+- Checksum verification when published checksums are available
+- Installs pre-built release binaries; it does not compile from source
+- Multiple installation options
 
 **Installation Options:**
 ```bash

@@ -1,14 +1,47 @@
-# Terraphim AI Assistant
+<p align="center">
+  <a href="https://terraphim.ai">
+    <img alt="Terraphim AI" src="https://raw.githubusercontent.com/terraphim/terraphim.ai/main/static/images/terraphim_logo_gray.png" width="160" />
+  </a>
+</p>
 
-[![Crates.io](https://img.shields.io/crates/v/terraphim_agent.svg)](https://crates.io/crates/terraphim_agent)
-[![Homebrew](https://img.shields.io/badge/homebrew-terraphim-orange?logo=homebrew)](https://github.com/terraphim/homebrew-terraphim)
-[![npm](https://img.shields.io/npm/v/@terraphim/autocomplete.svg)](https://www.npmjs.com/package/@terraphim/autocomplete)
-[![PyPI](https://img.shields.io/pypi/v/terraphim-automata.svg)](https://pypi.org/project/terraphim-automata/)
-[![Discord](https://img.shields.io/discord/852545081613615144?label=Discord&logo=Discord)](https://discord.gg/VPJXB6BGuY)
-[![Discourse](https://img.shields.io/discourse/users?server=https%3A%2F%2Fterraphim.discourse.group)](https://terraphim.discourse.group)
-[![Crates.io](https://img.shields.io/crates/v/terraphim-repl.svg)](https://crates.io/crates/terraphim-repl)
+<h1 align="center">Terraphim AI</h1>
 
-Terraphim is a privacy-first AI assistant that works for you under your complete control and is fully deterministic.
+<p align="center">
+  <strong>A privacy-first, deterministic AI assistant that runs on your own hardware and works for you.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/terraphim/terraphim-clients/releases/latest"><img alt="CLI release" src="https://img.shields.io/github/v/release/terraphim/terraphim-clients?filter=v*&label=CLI%20release" /></a>
+  <a href="https://github.com/terraphim/homebrew-terraphim"><img alt="Homebrew tap" src="https://img.shields.io/badge/homebrew-terraphim%2Fterraphim-orange?logo=homebrew" /></a>
+  <a href="https://crates.io/crates/terraphim_grep"><img alt="terraphim_grep on crates.io" src="https://img.shields.io/crates/v/terraphim_grep.svg?label=terraphim_grep" /></a>
+  <a href="https://pypi.org/project/terraphim-automata/"><img alt="terraphim-automata on PyPI" src="https://img.shields.io/pypi/v/terraphim-automata.svg?label=terraphim-automata" /></a>
+  <a href="LICENSE-Apache-2.0"><img alt="Licence: Apache-2.0" src="https://img.shields.io/badge/licence-Apache--2.0-blue.svg" /></a>
+  <a href="https://discord.gg/VPJXB6BGuY"><img alt="Discord" src="https://img.shields.io/badge/Discord-community-5865F2?logo=discord" /></a>
+  <a href="https://terraphim.discourse.group"><img alt="Discourse" src="https://img.shields.io/badge/Discourse-community-blue?logo=discourse" /></a>
+</p>
+
+<p align="center">
+  <a href="https://terraphim.ai">Website</a> |
+  <a href="https://docs.terraphim.ai">Documentation</a> |
+  <a href="https://terraphim.ai/how-tos/">How-tos</a> |
+  <a href="https://terraphim.ai/editor/">Browser editor</a> |
+  <a href="https://github.com/orgs/terraphim/repositories">All repositories</a>
+</p>
+
+Terraphim searches your code, notes and team knowledge through role-based knowledge graphs. Matching uses Aho-Corasick automata over terms you define, so every result traces back to a concept, and the same input gives the same output. Indexing and search run locally. LLM synthesis is optional and off unless you ask for it.
+
+This repository holds the HTTP server, the desktop front end, language bindings and project documentation. The CLI tools and foundation crates live in [related repositories](#ecosystem).
+
+https://github.com/terraphim/terraphim-ai/assets/175809/59c74652-bab4-45b2-99aa-1c0c9b90196b
+
+## Contents
+
+| | | |
+|---|---|---|
+| [Current downloads](#current-downloads) | [Features](#features) | [Build from source](#build-from-source) |
+| [Installation](#installation) | [Ecosystem](#ecosystem) | [Why Terraphim?](#why-terraphim) |
+| [Quick start](#quick-start) | [Terminology](#terminology) | [Contributing](#contributing) |
+| [AI coding agents](#ai-coding-agents) | [Documentation](#documentation) | [Licence](#licence) |
 
 ## Current downloads
 <!-- terraphim-downloads:start -->
@@ -25,873 +58,284 @@ separate releases.
 | Stock Zed extension | [v0.2.1](https://github.com/terraphim/zed-terraphim/releases/tag/v0.2.1) | GitHub download; official Zed catalogue submission remains pending |
 | Continue integration | [0.1.1](https://github.com/terraphim/terraphim-ai/releases/tag/terraphim_continue-v0.1.1) | Continue integration package |
 <!-- terraphim-downloads:end -->
-For future stable releases, use [latest core
-downloads](https://github.com/terraphim/terraphim-ai/releases/latest) or [latest
-CLI client
-downloads](https://github.com/terraphim/terraphim-clients/releases/latest). Use
-the explicit version links above for prereleases.
+
+For future stable releases, use [latest core downloads](https://github.com/terraphim/terraphim-ai/releases/latest) or [latest CLI client downloads](https://github.com/terraphim/terraphim-clients/releases/latest). Use the explicit version links above for prereleases. [Release channels](docs/src/release-channels.md) explains how the channels relate.
+
+## Installation
+
+### Installer script (macOS and Linux)
+
+```bash
+# terraphim-agent only
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
+
+# terraphim-agent, terraphim-grep and terraphim-cli
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh \
+  | bash -s -- --with-grep --with-cli
+```
+
+The script verifies published checksums when they are available, installs to `~/.local/bin` and adds that directory to your shell's `PATH`. Run it with `--help` for all options.
+
+### Homebrew (macOS and Linux)
+
+```bash
+brew tap terraphim/terraphim
+brew install terraphim-grep     # Local code and documentation search
+brew install terraphim-agent    # Agent memory, learning and session commands
+brew install terraphim-server   # HTTP API server
+```
+
+### Cargo
+
+```bash
+cargo install terraphim_grep --locked
+cargo install terraphim_agent --locked
+cargo install terraphim-cli --locked
+```
+
+The crates.io packages can lag behind the binaries listed under [Current downloads](#current-downloads).
+
+### Python
+
+```bash
+pip install terraphim-automata
+```
+
+```python
+import json
+from terraphim_automata import build_index
+
+thesaurus = json.dumps({"name": "Engineering", "data": {
+    "machine learning": {"id": 1, "nterm": "machine learning", "url": "https://example.com/ml"},
+}})
+
+for result in build_index(thesaurus).search("mach", max_results=10):
+    print(result.term, result.url)
+```
+
+See the [Python bindings guide](crates/terraphim_automata_py/README.md) for fuzzy search, link replacement and paragraph extraction.
+
+### Docker
+
+The public server image is `ghcr.io/terraphim/terraphim-ai:latest`. It needs an explicit role configuration and the dependencies for your haystacks. See [Released server qualification](docs/vscode-released-server-qualification.md) for the exact tested image, configuration and runtime dependencies.
+
+## Quick start
+
+Search a codebase. No configuration, thesaurus or API key is needed:
+
+```bash
+terraphim-grep "fn main" --haystack code --paths . --search-only
+```
+
+Check a shell command before an agent runs it:
+
+```bash
+terraphim-agent guard --json "git reset --hard"
+```
+
+Use a knowledge graph to rewrite text. Each Markdown file defines a concept and its synonyms:
+
+```bash
+terraphim-agent setup --template llm-enforcer
+
+mkdir -p docs/src/kg
+cat > docs/src/kg/bun_install.md <<'EOF'
+# bun install
+
+synonyms:: npm install, yarn install, pnpm install
+EOF
+
+echo "npm install" | terraphim-agent replace
+# bun install
+```
+
+Run `terraphim-agent setup --list-templates` to see other starting roles, including local notes, Rust, Python, frontend and Quickwit log analysis. Start the offline REPL with `terraphim-agent repl`.
 
 ### From wording alternatives to search
 
-[Try the browser editor](https://terraphim.ai/editor/): add **Concern** as an
-alternative to **Risk**, save the annotated Markdown, then export its knowledge
-graph. Knowledge notes can also declare aliases with `synonyms:: Risk, Concern`.
-Supply the exported graph explicitly to the released `terraphim-grep` client to
-retrieve related passages. Synthesis is optional.
+[Try the browser editor](https://terraphim.ai/editor/): add **Concern** as an alternative to **Risk**, save the annotated Markdown, then export its knowledge graph. Knowledge notes can also declare aliases with `synonyms:: Risk, Concern`. Supply the exported graph explicitly to the released `terraphim-grep` client to retrieve related passages. Synthesis is optional.
 
-Follow the [saved-output
-walkthrough](https://terraphim.ai/how-tos/synonym-search/) for the exact search
-commands and example files.
+Follow the [saved-output walkthrough](https://terraphim.ai/how-tos/synonym-search/) for the exact search commands and example files.
 
-See the [agent onboarding
-quickstart](docs/src/howto/ai-agent-onboarding-quickstart.md) for CLI setup and
-examples.
+## AI coding agents
 
-## Installation options
-
-**Quick Install** (works on Linux, macOS, Windows):
-
-**Option 1: Universal Installer** (recommended)
-```bash
-# Single command installation with platform detection
-curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
-
-# Install both agent and CLI tools
-curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash --with-cli
-```
-
-**Option 2: Homebrew** (macOS/Linux - recommended)
-```bash
-# Add Terraphim tap
-brew tap terraphim/terraphim
-
-# Install server
-brew install terraphim-server
-
-# Install TUI/REPL
-brew install terraphim-agent
-```
-
-**Option 3: Cargo Install**
-```bash
-cargo install terraphim-repl    # Interactive REPL (11 commands)
-cargo install terraphim-cli     # Automation CLI (8 commands)
-```
-
-**Features**:
-- 🔍 Semantic knowledge graph search
-- 🔗 Smart text linking (markdown/html/wiki)
-- 💾 Offline-capable (embedded defaults)
-- ⚡ Lightweight (15 MB RAM, 13 MB disk)
-- 🚀 Fast (<200ms operations)
-
-**Learn more**: [Quickstart](QUICKSTART.md) | [AI Agent Onboarding](docs/src/howto/ai-agent-onboarding-quickstart.md) | [Changelog](https://docs.terraphim.ai/src/changelog.html) | [Cross-Platform Guide](docs/archive/root/CROSS_PLATFORM_STATUS.md)
-
-You can use it as a local search engine, configured to search for different types of content on StackOverflow, GitHub, and the local filesystem using a predefined folder, which includes your Markdown files.
-
-Terraphim operates on local infrastructure and works exclusively for the owner's benefit.
-
-## Packages and integrations
-
-Terraphim provides Rust, Node.js and Python integrations:
-
-### ✨ New Packages Available
-- **🦀 Rust**: `terraphim_agent` - Complete CLI and TUI interface via crates.io
-- **📦 Node.js**: `@terraphim/autocomplete` - Native npm package with autocomplete and knowledge graph
-- **🐍 Python**: `terraphim-automata` - High-performance text processing library via PyPI
-
-### 🚀 Quick Installation
-
-**Universal Installer (Recommended)**
-```bash
-# Single command installation for all platforms
-curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
-```
-
-**Package Managers**
-```bash
-# Homebrew (macOS/Linux - signed & notarized binaries)
-brew tap terraphim/terraphim
-brew install terraphim-server  # HTTP API server
-brew install terraphim-agent   # TUI/REPL interface
-
-# Rust CLI (interactive TUI)
-cargo install terraphim_agent
-
-# Node.js package (autocomplete + knowledge graph)
-npm install @terraphim/autocomplete
-
-# Python library (high-performance text processing)
-pip install terraphim-automata
-```
-
-https://github.com/terraphim/terraphim-ai/assets/175809/59c74652-bab4-45b2-99aa-1c0c9b90196b
-
-
-## Why Terraphim?
-
-There are growing concerns about the privacy of data and the sharing of individuals' data across an ever-growing list of services, some of which have questionable data ethics policies. <sup>[1],[2],[3],[4]</sup>
-
-**Individuals struggle to find relevant information in different knowledge repositories:**
-
-- Personal ones like Roam Research, Obsidian, Coda, and Notion.
-- Team-focused ones like Jira, Confluence, and SharePoint.
-- Public sources such as StackOverflow and GitHub.
-
-Terraphim aims to bridge this gap by providing a privacy-first AI assistant that operates locally on the user's hardware, enabling seamless access to various knowledge repositories without compromising privacy. With Terraphim, users can efficiently search personal, team-focused, and public knowledge sources, ensuring that their data remains under their control at all times.
-
-[1]: https://www.coveo.com/en/resources/reports/relevance-report-workplace
-[2]: https://cottrillresearch.com/various-survey-statistics-workers-spend-too-much-time-searching-for-information/
-[3]: https://www.forbes.com/sites/forbestechcouncil/2019/12/17/reality-check-still-spending-more-time-gathering-instead-of-analyzing/
-[4]: https://www.theatlantic.com/technology/archive/2021/06/the-internet-is-a-collective-hallucination/619320/
-
-## 🚀 Getting Started
-
-### Option 1: Install from Package Managers (Recommended)
-
-#### 🦀 Rust CLI/TUI (Most Features)
-```bash
-# Basic installation
-cargo install terraphim_agent
-
-# Full installation with session search support
-cargo install terraphim_agent --features repl-full
-
-terraphim-agent --help
-```
-
-#### 📦 Node.js Package (Autocomplete + Knowledge Graph)
-```bash
-npm install @terraphim/autocomplete
-# or with Bun
-bun add @terraphim/autocomplete
-```
-
-#### 🐍 Python Library (Text Processing)
-```bash
-pip install terraphim-automata
-```
-
-### Option 2: Development Setup
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/terraphim/terraphim-ai.git
-   cd terraphim-ai
-   ```
-
-2. **Set up development environment**:
-   ```bash
-   # Install Git hooks for code quality (optional but recommended)
-   ./scripts/install-hooks.sh
-   ```
-
-3. **Start the backend server**:
-   ```bash
-   cargo run
-   ```
-   This starts an API endpoint for indexing and querying documents.
-
-4. **Run the frontend** (choose one):
-
-   **Web Frontend:**
-   ```bash
-   cd desktop
-   yarn install
-   yarn run dev
-   ```
-
-   **Desktop App (Tauri):**
-   ```bash
-   cd desktop
-   yarn install
-   yarn run tauri dev
-   ```
-
-   **Terminal Interface (Agent):**
-   ```bash
-   # Build with all features (recommended)
-   cargo build -p terraphim_agent --features repl-full --release
-   ./target/release/terraphim-agent
-
-   # Or run minimal version
-   cargo run -p terraphim_agent --bin terraphim-agent
-   ```
-
-(See the [desktop README](desktop/README.md), [TUI documentation](docs/tui-usage.md), and [development setup guide](docs/src/development-setup.md) for more details.)
-
-### AI Agent Onboarding
-
-AI coding agents should start with the [AI Agent Onboarding Quickstart](docs/src/howto/ai-agent-onboarding-quickstart.md). It covers repository orientation, Terraphim-first search, Gitea task tracking, quality gates, release checks, and safe handoff expectations for work in this repository.
-
-## 📚 Usage Examples
-
-### 🦀 Rust CLI/TUI
-```bash
-# Fullscreen TUI (requires a running server at TERRAPHIM_SERVER or localhost:8000)
-terraphim-agent
-
-# Offline-capable REPL
-terraphim-agent repl
-
-# Search commands
-terraphim-agent search "Rust async programming"
-terraphim-agent search --role engineer "microservices"
-
-# Chat with AI
-terraphim-agent chat "Explain knowledge graphs"
-
-# Commands list
-terraphim-agent commands list
-terraphim-agent commands search "Rust"
-
-# Auto-update management
-terraphim-agent check-update    # Check for updates without installing
-terraphim-agent update          # Update to latest version if available
-```
-
-### 📦 Node.js Package
-```javascript
-// Import the package
-import * as autocomplete from '@terraphim/autocomplete';
-
-// Build autocomplete index from JSON thesaurus
-const thesaurus = {
-  "name": "Engineering",
-  "data": {
-    "machine learning": {
-      "id": 1,
-      "nterm": "machine learning",
-      "url": "https://example.com/ml"
-    }
-  }
-};
-
-const indexBytes = autocomplete.buildAutocompleteIndexFromJson(JSON.stringify(thesaurus));
-
-// Search for terms
-const results = autocomplete.autocomplete(indexBytes, "machine", 10);
-console.log('Autocomplete results:', results);
-
-// Knowledge graph operations
-const graphBytes = autocomplete.buildRoleGraphFromJson("Engineer", JSON.stringify(thesaurus));
-const isConnected = autocomplete.areTermsConnected(graphBytes, "machine learning");
-console.log('Terms connected:', isConnected);
-```
-
-### 🐍 Python Library
-```python
-import terraphim_automata as ta
-
-# Create thesaurus
-thesaurus = ta.Thesaurus(name="Engineering")
-thesaurus.add_term("machine learning", url="https://example.com/ml")
-thesaurus.add_term("deep learning", url="https://example.com/dl")
-
-# Build autocomplete index
-index = ta.build_autocomplete_index(thesaurus)
-print(f"Index size: {len(index)} bytes")
-
-# Search for terms
-results = ta.autocomplete(index, "machine", limit=10)
-for result in results:
-    print(f"Found: {result.term} (score: {result.score})")
-
-# Fuzzy search
-fuzzy_results = ta.fuzzy_autocomplete_search(index, "machin", min_distance=0.8)
-print(f"Fuzzy results: {len(fuzzy_results)}")
-```
-
-### 📊 Quickwit Log Search
-```bash
-# Search application logs with Quickwit integration
-terraphim-agent --config terraphim_server/default/quickwit_engineer_config.json
-
-# In REPL, search for errors
-> /search "level:ERROR"
-
-# Time-based search
-> /search "timestamp:[2024-01-13T10:00:00Z TO *]"
-
-# Multi-field search
-> /search "service:api-server AND (error OR timeout)"
-
-# Auto-discovery mode (searches all indexes)
-terraphim-agent --config terraphim_server/default/quickwit_autodiscovery_config.json
-> /search error
-
-# With authentication (production)
-export QUICKWIT_PASSWORD=$(op read "op://Private/Quickwit/password")
-terraphim-agent --config terraphim_server/default/quickwit_production_config.json
-> /search "database connection failed"
-```
-
-**Complete Example:** See [examples/quickwit-log-search.md](examples/quickwit-log-search.md) for incident investigation walkthrough.
-
-## Features introduced in v1.0.0
-
-### 🔍 Enhanced Search Capabilities
-- **Grep.app Integration**: Search across 500,000+ GitHub repositories
-- **Advanced Filtering**: Language, repository, and path-based filtering
-- **Semantic Search**: Knowledge graph-powered semantic understanding
-
-### 📊 Multi-Language Support
-- **Rust**: Native performance with complete CLI/TUI interface
-- **Node.js**: High-performance autocomplete with native bindings
-- **Python**: Fast text processing and autocomplete algorithms
-
-### 🤖 AI Integration
-- **MCP Server**: Model Context Protocol for AI tool integration
-- **Claude Code Hooks**: Automated development workflows
-- **Knowledge Graphs**: Semantic relationship analysis and discovery
-
-### 🔄 Auto-Update System
-- **Seamless Updates**: Self-updating CLI using GitHub Releases
-- **Cross-Platform**: Works on Linux, macOS, and Windows
-- **Smart Versioning**: Intelligent version comparison and update detection
-- **Progress Tracking**: Real-time download progress and status indicators
-
-## Terminal Agent Interface
-
-Terraphim includes a comprehensive terminal agent that provides both interactive REPL functionality and CLI commands for advanced operations:
-
-### Key Features
-
-- **🤖 AI Chat Integration**: OpenRouter and Ollama support for intelligent conversations
-- **⚡ Sub-2 Second VM Boot**: Advanced VM optimization system with sub-500ms allocation
-- **🖥️ Enhanced VM Management**: Firecracker microVM pools with intelligent allocation
-- **📝 Markdown Command System**: Extensible commands defined in YAML frontmatter
-- **🔒 Security-First Execution**: Three execution modes (Local, Firecracker, Hybrid) with knowledge graph validation
-- **🌐 Web Operations**: Secure web requests through VM sandboxing
-- **📁 File Operations**: Semantic file analysis and intelligent content management
-- **🔍 Knowledge Graph**: Interactive rolegraph visualization and navigation
-- **⚙️ Configuration**: Real-time role and configuration management
-- **🔄 Auto-Update**: Seamless self-updating mechanism using GitHub Releases
-
-### 🔄 Auto-Update System
-
-Terraphim-agent includes a built-in auto-update system that keeps your installation current with the latest releases from GitHub.
-
-#### Features
-- **🚀 Seamless Updates**: Automatic binary replacement without manual intervention
-- **📊 Progress Tracking**: Real-time download progress and status indicators
-- **🔒 Secure Verification**: GitHub Releases integration ensures authenticated updates
-- **🌐 Cross-Platform**: Works on Linux, macOS, and Windows
-- **📋 Version Intelligence**: Smart version comparison and update availability detection
-
-#### Usage
+`terraphim-agent` adds safety checks, searchable history and durable memory to coding agents such as Claude Code, Codex and Cursor.
 
 ```bash
-# Check for updates without installing
-terraphim-agent check-update
-
-# Update to latest version if available
-terraphim-agent update
-
-# Get help for update commands
-terraphim-agent check-update --help
-terraphim-agent update --help
+terraphim-agent sessions sources             # Detect Claude Code, Cursor and Aider history
+terraphim-agent sessions search "rust"       # Search imported sessions
+terraphim-agent learn install-hook claude    # Capture failed commands (also: codex, opencode)
+terraphim-agent learn query "npm"            # Look up past failures and corrections
+terraphim-agent memory capture --content "Use the project validation command."
 ```
 
-#### Update Status Messages
+<details>
+<summary>Block destructive commands in Claude Code</summary>
 
-- **🔍 Checking**: "🔍 Checking for terraphim-agent updates..."
-- **✅ Up-to-date**: "✅ Already running latest version: X.Y.Z"
-- **📦 Update Available**: "📦 Update available: X.Y.Z → A.B.C"
-- **🚀 Updated**: "🚀 Updated from X.Y.Z to A.B.C"
-- **❌ Failed**: "❌ Update failed: [error details]"
-
-#### Technical Details
-
-- **Source**: GitHub Releases from `terraphim/terraphim-ai` repository
-- **Mechanism**: Rust `self_update` crate with secure binary verification
-- **Architecture**: Async-safe implementation using `tokio::task::spawn_blocking`
-- **Compatibility**: Requires internet connectivity for update checks
-
-#### Example Workflow
+Save this as `~/.claude/hooks/pre_tool_use.sh` and make it executable:
 
 ```bash
-$ terraphim-agent check-update
-🔍 Checking for terraphim-agent updates...
-📦 Update available: 1.0.0 → 1.0.1
+#!/bin/bash
+set -euo pipefail
+INPUT=$(cat)
+[ "$(jq -r '.tool_name // empty' <<< "$INPUT")" = "Bash" ] || exit 0
+COMMAND=$(jq -r '.tool_input.command // empty' <<< "$INPUT")
+[ -n "$COMMAND" ] || exit 0
 
-$ terraphim-agent update
-🚀 Updating terraphim-agent...
-✅ Already running latest version: 1.0.1
+GUARD=$(terraphim-agent guard --json <<< "$COMMAND" 2>/dev/null || echo '{"decision":"allow"}')
+if [ "$(jq -r '.decision' <<< "$GUARD")" = "block" ]; then
+  jq -n --arg reason "$(jq -r '.reason' <<< "$GUARD")" \
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'
+fi
 ```
 
-### Quick Start
+Then register it in `~/.claude/settings.json`:
 
-```bash
-# Build with all features
-cargo build -p terraphim_agent --features repl-full --release
-
-# Launch fullscreen TUI (server-backed)
-./target/release/terraphim-agent
-
-# Launch REPL (offline-capable by default)
-./target/release/terraphim-agent repl
-
-# Available REPL commands:
-/help           # Show all commands
-/search "query" # Semantic search
-/chat "message" # AI conversation
-/commands list  # List available markdown commands
-/deploy staging # Execute deployment (Firecracker mode)
-/search "TODO"  # Execute search command (Local mode)
-/vm list        # VM management with sub-2s boot
-/web get URL    # Web operations
-/file search    # Semantic file operations
-
-# Session search commands (requires repl-full feature):
-/sessions sources          # Detect available session sources
-/sessions import           # Import sessions from Claude Code, Cursor, Aider
-/sessions list             # List imported sessions
-/sessions search <query>   # Full-text search across sessions
-/sessions stats            # Show session statistics
-/sessions concepts <term>  # Knowledge graph concept search
-/sessions related <id>     # Find related sessions
-/sessions timeline         # Timeline visualization
-/sessions export           # Export to JSON/Markdown
-```
-
-For detailed documentation, see [TUI Usage Guide](docs/tui-usage.md) and [Auto-Update System](docs/autoupdate.md).
-
-### Session Search
-
-Search across AI coding assistant history from Claude Code, Cursor, and Aider sessions:
-
-```bash
-# Install with session search support
-cargo install terraphim_agent --features repl-full
-
-# Launch REPL (offline-capable)
-terraphim-agent repl
-
-# In REPL:
-/sessions sources          # Detect available session sources (e.g., 419 Claude Code sessions)
-/sessions import           # Import sessions from all sources
-/sessions list             # List imported sessions with ID, source, title, message count
-/sessions search "rust"    # Full-text search across sessions
-/sessions stats            # Show statistics (total sessions, messages, breakdown by source)
-/sessions concepts "async" # Knowledge graph concept search
-/sessions related <id>     # Find related sessions by shared concepts
-/sessions timeline         # Timeline visualization grouped by day/week/month
-/sessions export           # Export to JSON or Markdown
-```
-
-**Supported Sources:**
-- Claude Code (`~/.claude/projects/`)
-- Cursor IDE sessions
-- Aider git-based conversation logs
-
-## Terminology
-
-When configuring or working on Terraphim, you will encounter the following
-terms and concepts:
-
-- **Haystack**: A data source that Terraphim can search through. For example, this
-  could be a folder on your computer, a Notion workspace, or your email account.
-- **Knowledge Graph**: A structured graph of information created from a
-  haystack, where nodes represent entities and edges represent relationships
-  between them.
-- **Profile**: An endpoint for persisting user data (e.g. Amazon S3, sled, or
-  rocksdb).
-- **Role**: A role is a set of settings that define the default behavior of the
-  AI assistant. For example, a developer role will search for code-related
-  content, while a "father" role might search for parenting-related content. Each
-  Terraphim role has its own separate knowledge graph that contains relevant
-  concepts, with all synonyms.
-- **Rolegraph**: A structure for ingesting documents into Terraphim. It is a knowledge
-  graph that uses a scoring function (an Aho-Corasick automata build from the
-  knowledge graph) for ranking results.
-
-## Why "Terraphim"?
-
-The term is originally taken from the [Relict series][relict] of science fiction
-novels by [Vasiliy Golovachev](https://en.wikipedia.org/wiki/Vasili_Golovachov).
-Terraphim is an artificial intelligence living inside a spacesuit (part of an
-exocortex), or inside your house or vehicle, and it is designed to help you with
-your tasks. You can carry it around with you.
-Similar entities now common in science fiction, for example Destiny 2 has entity called [Ghost][ghost].
-
-
-Or in Star Wars Jedi Survivor there is an AI assistant [BD-1][bd-1].
-
-The compactness and mobility of such AI assistant drives the [[Design Decisions]] of Terraphim.
-
-[bd-1]: https://starwars.fandom.com/wiki/BD-1
-[ghost]: https://www.destinypedia.com/Ghost
-[relict]: https://www.goodreads.com/en/book/show/196710046
-
-Terraphim is a trademark registered in the UK, US and internationally (WIPO). All other trademarks mentioned above are the property of their respective owners.
-
-## 🔒 Validation Framework
-
-Terraphim includes a comprehensive validation system that ensures security, quality, and compliance across all AI operations.
-
-### 🛡️ Runtime Validation Hooks
-
-**Two-Stage Security Flow**:
-1. **Guard Stage**: Blocks dangerous operations (e.g., `git commit --no-verify`)
-2. **Replacement Stage**: Enhances commands using knowledge graph intelligence
-
-**Hook Coverage**:
-- **Pre/Post LLM**: Validates AI inputs/outputs for safety and quality
-- **Pre/Post Tool**: Secures code execution in VM environments
-- **Claude Code Integration**: Seamless workflow validation with guard+replacement
-
-**Configuration**: `~/.config/terraphim/runtime-validation.toml`
-```toml
-[hooks]
-enabled = true
-fail_open = true          # Development mode
-
-[guard]
-strict_mode = false        # Balance security vs. productivity
-
-[llm_hooks]
-enabled = true
-require_human_review = false
-
-[tool_hooks]
-enabled = true
-vm_isolation = true
-```
-
-### 📋 Release Validation
-
-Comprehensive release testing and validation system:
-- **Multi-Platform Testing**: Windows, macOS, Linux validation
-- **Security Scanning**: Automated vulnerability assessment
-- **Performance Benchmarking**: CI/CD integrated performance tests
-- **Installation Testing**: Package installation verification
-- **Functional Testing**: End-to-end feature validation
-
-**Usage**:
-```bash
-# Run complete release validation
-terraphim-validation validate --version v1.5.0
-
-# Run specific validation categories
-terraphim-validation validate --categories security,performance
-
-# Generate validation report
-terraphim-validation status --report-format json
-```
-
-**Documentation**: See [Runtime Validation Hooks](.docs/runtime-validation-hooks.md) for detailed implementation guide.
-
-### Development with Validation
-
-During development, hooks operate in fail-open mode to avoid blocking workflows:
-```bash
-# Development configuration
-export TERRAPHIM_RUNTIME_VALIDATION_HOOKS=true
-export TERRAPHIM_FAIL_OPEN=true
-export TERRAPHIM_GUARD_STAGE=true
-export TERRAPHIM_REPLACEMENT_STAGE=true
-```
-
-## Configuration
-
-### Storage Backends
-
-Terraphim supports multiple storage backends for different deployment scenarios:
-
-#### Local Development (Default)
-The system uses local storage backends by default, requiring no additional configuration:
-- **Memory**: In-memory storage for testing
-- **DashMap**: High-performance concurrent storage
-- **SQLite**: Local database storage
-- **ReDB**: Embedded key-value database
-
-#### Cloud Storage (Optional)
-For production deployments, you can optionally enable cloud storage:
-
-##### AWS S3 Configuration
-To use AWS S3 storage, set the following environment variables:
-```bash
-export AWS_ACCESS_KEY_ID="your-access-key"
-export AWS_SECRET_ACCESS_KEY="your-secret-key"
-export TERRAPHIM_PROFILE_S3_REGION="us-east-1"
-export TERRAPHIM_PROFILE_S3_ENDPOINT="https://s3.amazonaws.com/"
-```
-
-**Note**: AWS credentials are completely optional. The system will automatically fall back to local storage if AWS credentials are not available, ensuring local development works without any cloud dependencies.
-
-### Environment Variables
-- `TERRAPHIM_SETTINGS_PATH`: Override the settings file path
-- `TERRAPHIM_DATA_PATH`: Set the data directory location
-- `LOG_LEVEL`: Set logging verbosity (debug, info, warn, error)
-
-## Installation Methods
-
-### For End Users
-
-#### Homebrew (macOS/Linux)
-```bash
-brew install terraphim/terraphim-ai/terraphim-ai
-```
-This installs the server, terminal agent, and desktop app (macOS only).
-
-#### Debian/Ubuntu
-```bash
-# Download from GitHub releases
-sudo dpkg -i terraphim-server_*.deb
-sudo dpkg -i terraphim-agent_*.deb
-sudo dpkg -i terraphim-ai-desktop_*.deb
-```
-
-#### Docker
-
-The public server image is `ghcr.io/terraphim/terraphim-ai:latest`. It needs an explicit role configuration and the dependencies for your haystacks. See [Released server qualification](docs/vscode-released-server-qualification.md) for the exact tested image, configuration, runtime dependencies and released VS Code extension results.
-
-#### Direct Download
-Download pre-built binaries from [GitHub Releases](https://github.com/terraphim/terraphim-ai/releases).
-
-> **Note for fleet-internal agents:** GitHub Releases and crates.io are **not** the fleet-canonical
-> channel for `terraphim_grep` and `terraphim_agent` — they track behind the private Gitea cargo
-> registry. See [Release Channels](docs/src/release-channels.md) before reporting a version mismatch
-> as a release failure.
-
-### Development Setup
-
-For development, see our comprehensive [Development Setup Guide](docs/src/development-setup.md) which covers:
-- Code quality tools and pre-commit hooks
-- Multiple installation options (no Python required!)
-- IDE integration and troubleshooting
-
-## Claude Code Integration
-
-Terraphim provides seamless integration with Claude Code through hooks, skills, and the terraphim-agent CLI.
-
-### Quick Setup (User-Level)
-
-**Step 1: Install terraphim-agent**
-```bash
-# macOS ARM64 (Apple Silicon)
-gh release download --repo terraphim/terraphim-ai \
-  --pattern "terraphim-agent-aarch64-apple-darwin" --dir /tmp
-chmod +x /tmp/terraphim-agent-aarch64-apple-darwin
-mv /tmp/terraphim-agent-aarch64-apple-darwin ~/.cargo/bin/terraphim-agent
-
-# macOS x86_64 (Intel)
-gh release download --repo terraphim/terraphim-ai \
-  --pattern "terraphim-agent-x86_64-apple-darwin" --dir /tmp
-chmod +x /tmp/terraphim-agent-x86_64-apple-darwin
-mv /tmp/terraphim-agent-x86_64-apple-darwin ~/.cargo/bin/terraphim-agent
-
-# Linux x86_64
-gh release download --repo terraphim/terraphim-ai \
-  --pattern "terraphim-agent-x86_64-unknown-linux-gnu" --dir /tmp
-chmod +x /tmp/terraphim-agent-x86_64-unknown-linux-gnu
-mv /tmp/terraphim-agent-x86_64-unknown-linux-gnu ~/.cargo/bin/terraphim-agent
-```
-
-**Note:** For full functionality including `hook`, `guard`, and session search commands, install with features:
-```bash
-cargo install terraphim_agent --features repl-full
-```
-
-**Step 2: Install Claude Code Skills Plugin**
-```bash
-claude plugin marketplace add terraphim/terraphim-skills
-claude plugin install terraphim-engineering-skills@terraphim-skills
-```
-
-**Step 3: Configure User-Level Hooks**
-
-Add to `~/.claude/settings.local.json`:
 ```json
 {
   "hooks": {
     "PreToolUse": [{
       "matcher": "Bash",
-      "hooks": [{
-        "type": "command",
-        "command": "~/.claude/hooks/pre_tool_use.sh"
-      }]
+      "hooks": [{ "type": "command", "command": "~/.claude/hooks/pre_tool_use.sh" }]
     }]
   }
 }
 ```
 
-Create `~/.claude/hooks/pre_tool_use.sh`:
+</details>
+
+Further guides:
+
+- [AI Agent Onboarding Quickstart](docs/src/howto/ai-agent-onboarding-quickstart.md) — Orientation for agents working in this repository.
+- [Claude Code integration](examples/TERRAPHIM_CLAUDE_INTEGRATION.md) — Hooks and skills for knowledge graph replacement.
+- [MCP integration](docs/src/mcp-integration.md) — Connect Terraphim to MCP clients using `terraphim_mcp_server`.
+- [Codebase quality evaluation](examples/codebase-evaluation/) — Compare a codebase before and after an agent's changes.
+- [Terraphim Skills](https://terraphim-skills.md) — Discover, install and publish skills for any AI coding agent.
+
+## Features
+
+- **Role-based knowledge graphs** — Each role has its own concepts, synonyms and data sources.
+- **Deterministic ranking** — Aho-Corasick automata and graph embeddings, with no neural vectors or GPU.
+- **Many haystacks** — Local files, code, Quickwit logs and other providers, configured per role.
+- **Local by default** — Storage is local unless you opt in to a cloud profile such as Amazon S3.
+- **Optional LLM support** — Chat and synthesis through OpenRouter or Ollama when you enable them.
+- **Agent safety** — Guard patterns, knowledge graph replacement, failure capture and memory lifecycle commands.
+- **Self-updating CLI** — `terraphim-agent check-update` and `terraphim-agent update`. See [auto-update](docs/autoupdate.md).
+
+## Ecosystem
+
+Terraphim was split into focused repositories, so many crates that once lived here now have their own home. The [full list of public repositories](https://github.com/orgs/terraphim/repositories) also includes experiments and third-party forks.
+
+### Clients and distribution
+
+- [terraphim-clients](https://github.com/terraphim/terraphim-clients) — `terraphim-grep`, `terraphim-agent`, `terraphim-cli`, MCP server, LSP server and session search.
+- [homebrew-terraphim](https://github.com/terraphim/homebrew-terraphim) — Homebrew tap for the agent, grep and server.
+
+### Foundation crates
+
+- [terraphim-core](https://github.com/terraphim/terraphim-core) — Types, Markdown parser, automata and role graph. Builds from crates.io without private registry credentials.
+- [terraphim-config-persistence](https://github.com/terraphim/terraphim-config-persistence) — Role configuration and multi-backend persistence.
+- [terraphim-service](https://github.com/terraphim/terraphim-service) — Service layer, middleware, routing, haystack providers and session analysis.
+- [terraphim-agents](https://github.com/terraphim/terraphim-agents) — Multi-agent orchestration.
+- [terraphim-kg-agents](https://github.com/terraphim/terraphim-kg-agents) — Knowledge graph agents, linting and codebase evaluation.
+
+### Editors and integrations
+
+- [terraphim-editor](https://github.com/terraphim/terraphim-editor) — Markdown editor in Rust and WebAssembly that keeps alternative wordings. Prerelease.
+- [zed-terraphim](https://github.com/terraphim/zed-terraphim) — Zed adapter for knowledge graphs, synonyms and Markdown annotations.
+- [terraphim-cursor-plugin](https://github.com/terraphim/terraphim-cursor-plugin) — Cursor skills for search, synonyms, learning and memory.
+- [nimbalyst-terraphim](https://github.com/terraphim/nimbalyst-terraphim) — Nimbalyst editor components. In development.
+- [VS Code extension](vs-code-terraphim-it/README.md) — In this repository. Prerelease.
+- [Continue integration](integrations/continue/README.md) — In this repository.
+- [Browser extensions](browser_extensions/INSTALL.md) — In this repository.
+
+### Desktop
+
+- [terraphim-ai-desktop](https://github.com/terraphim/terraphim-ai-desktop) — Tauri desktop application.
+- [terraphim-gpui-desktop](https://github.com/terraphim/terraphim-gpui-desktop) — Native desktop application using GPUI. Experimental.
+- [terraphim-gpui-editor](https://github.com/terraphim/terraphim-gpui-editor) — GPUI editor with slash commands and block editing. Experimental.
+
+### Websites and documentation
+
+- [terraphim.ai](https://github.com/terraphim/terraphim.ai) — Source for the [project website](https://terraphim.ai).
+- [terraphim.rs](https://github.com/terraphim/terraphim.rs) — Source for [terraphim.rs](https://terraphim.rs).
+- [md-book](https://github.com/terraphim/md-book) — Rust documentation generator.
+- [Terraphim Skills](https://terraphim-skills.md) — Marketplace of skills for AI coding agents.
+
+### Developer tooling
+
+- [gitea-robot](https://github.com/terraphim/gitea-robot) — Gitea CLI with PageRank-based issue prioritisation.
+- [gitea](https://github.com/terraphim/gitea) — Gitea fork customised for agent-native development.
+- [pi_agent_rust](https://github.com/terraphim/pi_agent_rust) — Fork of a Rust AI coding agent CLI.
+- [terraphim-essentialist-design](https://github.com/terraphim/terraphim-essentialist-design) — Design system skill for Terraphim interfaces.
+
+## Terminology
+
+- **Haystack** — A data source that Terraphim can search, such as a local folder, a Notion workspace or an email account.
+- **Knowledge graph** — A structured graph built from a haystack. Nodes represent entities and edges represent the relationships between them.
+- **Profile** — An endpoint for persisting user data, such as Amazon S3, sled or RocksDB.
+- **Role** — A set of settings that defines how the assistant behaves. A developer role searches code-related content; a parent's role might search parenting advice. Each role has its own knowledge graph of concepts and synonyms.
+- **Rolegraph** — The structure that ingests documents into Terraphim. It is a knowledge graph that ranks results with a scoring function built from an Aho-Corasick automaton.
+
+## Documentation
+
+- [Documentation site](https://docs.terraphim.ai) — Guides and reference.
+- [Quickstart](QUICKSTART.md) — Fast paths for getting running.
+- [Installation and deployment](docs/installation.md) — Platform packages and deployment options.
+- [Architecture](docs/src/Architecture.md) — How the system fits together.
+- [TUI usage](docs/tui-usage.md) — Terminal interface reference.
+- [Quickwit log search](examples/quickwit-log-search.md) — Incident investigation walkthrough.
+- [Runtime validation hooks](.docs/runtime-validation-hooks.md) — Guard and validation design.
+- [Changelog](https://docs.terraphim.ai/src/changelog.html) — Release history.
+
+## Build from source
+
+> [!IMPORTANT]
+> This workspace resolves some dependencies from the private `terraphim` Cargo registry, so `cargo build` needs a token in `CARGO_REGISTRIES_TERRAPHIM_TOKEN`. Without one, use the released binaries above, or start from [terraphim-core](https://github.com/terraphim/terraphim-core), which builds from crates.io alone.
+
 ```bash
-#!/bin/bash
-set -euo pipefail
-INPUT=$(cat)
-TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
-COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
-
-[ "$TOOL_NAME" != "Bash" ] && exit 0
-[ -z "$COMMAND" ] && exit 0
-
-AGENT="$HOME/.cargo/bin/terraphim-agent"
-[ ! -x "$AGENT" ] && exit 0
-
-# Git Safety Guard - block destructive commands
-GUARD=$($AGENT guard --json <<< "$COMMAND" 2>/dev/null || echo '{"decision":"allow"}')
-if echo "$GUARD" | jq -e '.decision == "block"' >/dev/null 2>&1; then
-    REASON=$(echo "$GUARD" | jq -r '.reason')
-    echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: '"$REASON"'"}}'
-    exit 0
-fi
-
-# Knowledge graph replacement
-cd ~/.config/terraphim 2>/dev/null && $AGENT hook --hook-type pre-tool-use --json <<< "$INPUT" 2>/dev/null
+git clone https://github.com/terraphim/terraphim-ai.git
+cd terraphim-ai
+./scripts/install-hooks.sh    # Optional code quality hooks
+cargo run                     # Starts the HTTP API server
 ```
+
+To run the web front end:
 
 ```bash
-mkdir -p ~/.claude/hooks && chmod +x ~/.claude/hooks/pre_tool_use.sh
+cd desktop
+yarn install
+yarn run dev
 ```
 
-**Step 4: Set Up Knowledge Graph**
-```bash
-mkdir -p ~/.config/terraphim/docs/src/kg
+The [development setup guide](docs/src/development-setup.md) covers tooling and IDE integration.
 
-cat > ~/.config/terraphim/docs/src/kg/bun_install.md << 'EOF'
-# bun install
-synonyms:: npm install, yarn install, pnpm install
-EOF
-```
+## Why Terraphim?
 
-### Features
+People struggle to find information spread across personal tools such as Obsidian and Notion, team tools such as Jira and Confluence, and public sources such as StackOverflow and GitHub.<sup>[1],[2],[3]</sup> Sending all of it to third-party services raises real concerns about privacy.<sup>[4]</sup> Terraphim bridges those sources from your own hardware, so your data stays under your control.
 
-| Feature | Command | Description |
-|---------|---------|-------------|
-| **Git Safety Guard** | `terraphim-agent guard` | Blocks destructive commands (git reset --hard, rm -rf, etc.) |
-| **Text Replacement** | `terraphim-agent replace` | Knowledge graph-based text substitution |
-| **Hook Integration** | `terraphim-agent hook` | Claude Code PreToolUse/PostToolUse hooks |
+The name comes from the [Relict series][relict] of science fiction novels by [Vasiliy Golovachev](https://en.wikipedia.org/wiki/Vasili_Golovachov). A Terraphim is an artificial intelligence living inside a spacesuit as part of an exocortex, or inside your house or vehicle, and it helps you with your tasks wherever you are. Similar companions appear elsewhere in science fiction, such as the [Ghost][ghost] in Destiny 2 and [BD-1][bd-1] in Star Wars Jedi: Survivor. That compactness and mobility drive Terraphim's design.
 
-### Verification
-```bash
-# Test guard
-echo "git reset --hard" | terraphim-agent guard --json
-# {"decision":"block","reason":"git reset --hard destroys uncommitted changes..."}
-
-# Test replacement
-cd ~/.config/terraphim && echo "npm install" | terraphim-agent replace
-# bun install
-```
-
-📖 **Full Documentation**: [terraphim-skills README](https://github.com/terraphim/terraphim-skills)
-
-### 🔄 Text Replacement (Hooks & Skills)
-
-Use Terraphim's knowledge graph capabilities to automatically replace text patterns in your development workflow:
-
-**Claude Code Hooks** - Automatic, transparent replacements:
-```bash
-# Example: Automatically replace npm with bun
-echo "npm install" | terraphim-agent replace
-# Output: bun install
-```
-
-**Claude Skills** - Context-aware, conversational assistance:
-- Works across all Claude platforms
-- Provides explanations and reasoning
-- Progressive disclosure of functionality
-
-**Examples:**
-- Package manager enforcement (npm/yarn/pnpm -> bun)
-- Attribution replacement (Claude Code -> Terraphim AI)
-- Custom domain-specific replacements
-
-📖 **Complete Guide**: [examples/TERRAPHIM_CLAUDE_INTEGRATION.md](examples/TERRAPHIM_CLAUDE_INTEGRATION.md)
-
-### 📊 Codebase Quality Evaluation
-
-Evaluate whether AI agents (Claude Code, GitHub Copilot, autonomous agents) improve or deteriorate your codebase using deterministic, knowledge graph-based assessment:
-
-**Key Features:**
-- **Deterministic**: Aho-Corasick automata for consistent scoring
-- **Privacy-First**: All evaluation runs locally
-- **Multi-Dimensional**: Security, performance, quality perspectives
-- **CI/CD Ready**: Automated quality gates with exit codes
-
-**Quick Start:**
-```bash
-cd examples/codebase-evaluation
-./scripts/evaluate-ai-agent.sh /path/to/codebase
-
-# Generates verdict:
-# ✅ IMPROVEMENT: The AI agent improved the codebase quality.
-# - Improved metrics: 3
-# - Deteriorated metrics: 0
-```
-
-**Evaluation Metrics:**
-- Clippy warnings, anti-patterns, TODO counts
-- Knowledge graph density and semantic matches
-- Test pass rates and code coverage
-- Custom domain-specific patterns
-
-**Use Cases:**
-1. Evaluate PRs from AI agents before merge
-2. Continuous quality monitoring in CI/CD pipelines
-3. Historical trend analysis across evaluations
-4. Multi-role evaluation (security + performance + quality)
-
-📖 **Complete Documentation**: [examples/codebase-evaluation/](examples/codebase-evaluation/)
-
-**Example GitHub Actions Integration:**
-```yaml
-- name: Baseline evaluation
-  run: ./scripts/baseline-evaluation.sh ${{ github.workspace }}
-- name: Apply AI changes
-  run: # Your AI agent step
-- name: Post-change evaluation
-  run: ./scripts/post-evaluation.sh ${{ github.workspace }}
-- name: Generate verdict (fails on deterioration)
-  run: ./scripts/compare-evaluations.sh
-```
+[1]: https://www.coveo.com/en/resources/reports/relevance-report-workplace
+[2]: https://cottrillresearch.com/various-survey-statistics-workers-spend-too-much-time-searching-for-information/
+[3]: https://www.forbes.com/sites/forbestechcouncil/2019/12/17/reality-check-still-spending-more-time-gathering-instead-of-analyzing/
+[4]: https://www.theatlantic.com/technology/archive/2021/06/the-internet-is-a-collective-hallucination/619320/
+[relict]: https://www.goodreads.com/en/book/show/196710046
+[ghost]: https://www.destinypedia.com/Ghost
+[bd-1]: https://starwars.fandom.com/wiki/BD-1
 
 ## Contributing
 
-We welcome contributions! Here's how to get started:
+Contributions are welcome. Read the [contributing guide](CONTRIBUTING.md) first. Commits follow [Conventional Commits](https://www.conventionalcommits.org/), Rust is formatted with `cargo fmt`, JavaScript and TypeScript use [Biome](https://biomejs.dev/), and secrets and large files must stay out of commits.
 
-1. **Read our guides**:
-   - [Contributing guide](CONTRIBUTING.md)
-   - [Development setup](docs/src/development-setup.md)
+Join the discussion on [Discourse](https://terraphim.discourse.group) or [Discord](https://discord.gg/VPJXB6BGuY).
 
-2. **Set up your environment**:
-   ```bash
-   git clone https://github.com/terraphim/terraphim-ai.git
-   cd terraphim-ai
-   ./scripts/install-hooks.sh  # Sets up code quality tools
-   ```
-
-3. **Code quality standards**:
-   - All commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
-   - Rust code is automatically formatted with `cargo fmt`
-   - JavaScript/TypeScript uses [Biome](https://biomejs.dev/) for linting and formatting
-   - No secrets or large files allowed in commits
-
-4. **Make your changes**:
-   - Create a feature branch: `git checkout -b feat/your-feature`
-   - Make your changes with proper tests
-   - Commit with conventional format: `git commit -m "feat: add amazing feature"`
-   - Push and create a Pull Request
-
-### Dependency Management
-
-**Important**: Some dependencies are pinned to specific versions to ensure compatibility:
-
-- `wiremock = "0.6.4"` - Version 0.6.5 uses unstable Rust features requiring nightly compiler
-- `schemars = "0.8.22"` - Version 1.0+ introduces breaking API changes
-- `thiserror = "1.0.x"` - Version 2.0+ requires code migration for breaking changes
-
-These constraints are enforced in `.github/dependabot.yml` to prevent automatic updates that would break CI. Future upgrades require manual code migration work.
-
-### Contributors are awesome
 <a href="https://github.com/terraphim/terraphim-ai/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=terraphim/terraphim-ai" />
+  <img alt="Contributors" src="https://contrib.rocks/image?repo=terraphim/terraphim-ai" />
 </a>
 
+## Licence
 
+This project is licensed under the [Apache License 2.0](LICENSE-Apache-2.0). Related repositories carry their own licences.
 
-## License
-
-This project is licensed under the [Apache license](LICENSE).
+Terraphim is a trademark registered in the UK, US and internationally (WIPO). All other trademarks mentioned above are the property of their respective owners.
