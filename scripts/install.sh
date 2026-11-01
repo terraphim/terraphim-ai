@@ -78,7 +78,7 @@ show_help() {
 Terraphim Universal Installer
 
 USAGE:
-    curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash [OPTIONS]
+    curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash -s -- [OPTIONS]
 
 OPTIONS:
     --install-dir DIR    Installation directory (default: $DEFAULT_INSTALL_DIR)
@@ -99,9 +99,9 @@ EXIT CODES:
 
 EXAMPLES:
     curl -fsSL ... | bash
-    curl -fsSL ... | bash --with-cli --with-grep
-    curl -fsSL ... | bash --install-dir /usr/local/bin
-    curl -fsSL ... | bash --version 1.21.16
+    curl -fsSL ... | bash -s -- --with-cli --with-grep
+    curl -fsSL ... | bash -s -- --install-dir /usr/local/bin
+    curl -fsSL ... | bash -s -- --version 1.21.16
 
 Published binaries: ${SUPPORTED_TOOLS[*]}
 Not published here: terraphim-server, terraphim-ai (see https://github.com/terraphim/terraphim-ai)
@@ -441,6 +441,6 @@ main() {
     show_completion_message
 }
 
-if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-$0}" == "$0" ]]; then
     main "$@"
 fi
