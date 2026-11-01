@@ -16,7 +16,7 @@
   <a href="https://crates.io/crates/terraphim_grep"><img alt="terraphim_grep on crates.io" src="https://img.shields.io/crates/v/terraphim_grep.svg?label=terraphim_grep" /></a>
   <a href="https://pypi.org/project/terraphim-automata/"><img alt="terraphim-automata on PyPI" src="https://img.shields.io/pypi/v/terraphim-automata.svg?label=terraphim-automata" /></a>
   <a href="LICENSE-Apache-2.0"><img alt="Licence: Apache-2.0" src="https://img.shields.io/badge/licence-Apache--2.0-blue.svg" /></a>
-  <a href="https://discord.gg/VPJXB6BGuY"><img alt="Discord" src="https://img.shields.io/discord/852545081613615144?label=Discord&logo=discord" /></a>
+  <a href="https://discord.gg/VPJXB6BGuY"><img alt="Discord" src="https://img.shields.io/badge/Discord-community-5865F2?logo=discord" /></a>
   <a href="https://terraphim.discourse.group"><img alt="Discourse" src="https://img.shields.io/badge/Discourse-community-blue?logo=discourse" /></a>
 </p>
 
@@ -70,7 +70,8 @@ For future stable releases, use [latest core downloads](https://github.com/terra
 curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
 
 # terraphim-agent, terraphim-grep and terraphim-cli
-curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash -s -- --with-grep --with-cli
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh \
+  | bash -s -- --with-grep --with-cli
 ```
 
 The script verifies published checksums when they are available, installs to `~/.local/bin` and adds that directory to your shell's `PATH`. Run it with `--help` for all options.
