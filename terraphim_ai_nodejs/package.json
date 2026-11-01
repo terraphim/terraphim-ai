@@ -4,20 +4,16 @@
   "description": "Fast autocomplete and knowledge graph functionality for Terraphim AI with native Node.js and WASM support",
   "main": "index.js",
   "types": "index.d.ts",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "napi": {
     "name": "terraphim_ai_nodejs",
     "triples": {
       "defaults": false,
       "additional": [
-        "x86_64-unknown-linux-gnu",
+        "x86_64-apple-darwin",
         "aarch64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
         "aarch64-unknown-linux-gnu",
-        "aarch64-pc-windows-msvc",
-        "x86_64-pc-windows-msvc",
-        "universal-apple-darwin"
+        "x86_64-pc-windows-msvc"
       ]
     }
   },
@@ -60,7 +56,6 @@
     "artifacts": "napi artifacts",
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
-    "prepublishOnly": "napi prepublish -t npm",
     "test": "node test_autocomplete.js && node test_knowledge_graph.js && node __test__/msteams-sdk-test.mjs",
     "test:bun": "bun test_autocomplete.js && bun test_knowledge_graph.js",
     "test:node": "node test_autocomplete.js && node test_knowledge_graph.js",
@@ -68,7 +63,8 @@
     "universal": "napi universal",
     "version": "1.0.0",
     "install:bun": "bun install",
-    "start:bun": "bun run test:all"
+    "start:bun": "bun run test:all",
+    "test:packaging": "node --test scripts/prepare-npm-packages.test.mjs"
   },
   "files": [
     "index.js",
@@ -76,11 +72,10 @@
     "README.md"
   ],
   "optionalDependencies": {
-    "@terraphim/autocomplete-darwin-arm64": "1.0.0",
-    "@terraphim/autocomplete-darwin-universal": "1.0.0",
-    "@terraphim/autocomplete-linux-arm64-gnu": "1.0.0",
-    "@terraphim/autocomplete-linux-x64-gnu": "1.0.0",
-    "@terraphim/autocomplete-win32-arm64-msvc": "1.0.0",
-    "@terraphim/autocomplete-win32-x64-msvc": "1.0.0"
+    "@terraphim/autocomplete-darwin-arm64": "1.3.1",
+    "@terraphim/autocomplete-darwin-x64": "1.3.1",
+    "@terraphim/autocomplete-linux-arm64-gnu": "1.3.1",
+    "@terraphim/autocomplete-linux-x64-gnu": "1.3.1",
+    "@terraphim/autocomplete-win32-x64-msvc": "1.3.1"
   }
 }

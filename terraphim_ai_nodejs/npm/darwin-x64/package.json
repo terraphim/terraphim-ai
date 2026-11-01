@@ -1,0 +1,24 @@
+{
+  "name": "@terraphim/autocomplete-darwin-x64",
+  "version": "1.3.1",
+  "description": "darwin-x64 binary for @terraphim/autocomplete",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "terraphim_ai_nodejs.darwin-x64.node",
+  "files": [
+    "terraphim_ai_nodejs.darwin-x64.node"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/terraphim/terraphim-ai.git",
+    "directory": "terraphim_ai_nodejs"
+  },
+  "engines": {
+    "node": ">= 14"
+  }
+}
