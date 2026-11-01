@@ -210,6 +210,7 @@ Further guides:
 - [Claude Code integration](examples/TERRAPHIM_CLAUDE_INTEGRATION.md) — Hooks and skills for knowledge graph replacement.
 - [MCP integration](docs/src/mcp-integration.md) — Connect Terraphim to MCP clients using `terraphim_mcp_server`.
 - [Codebase quality evaluation](examples/codebase-evaluation/) — Compare a codebase before and after an agent's changes.
+- [Terraphim Skills](https://terraphim-skills.md) — Discover, install and publish skills for any AI coding agent.
 
 ## Features
 
@@ -259,6 +260,7 @@ Terraphim was split into focused repositories, so many crates that once lived he
 - [terraphim.ai](https://github.com/terraphim/terraphim.ai) — Source for the [project website](https://terraphim.ai).
 - [terraphim.rs](https://github.com/terraphim/terraphim.rs) — Source for [terraphim.rs](https://terraphim.rs).
 - [md-book](https://github.com/terraphim/md-book) — Rust documentation generator.
+- [Terraphim Skills](https://terraphim-skills.md) — Marketplace of skills for AI coding agents.
 
 ### Developer tooling
 
