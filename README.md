@@ -70,10 +70,10 @@ For future stable releases, use [latest core downloads](https://github.com/terra
 curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
 
 # terraphim-agent, terraphim-grep and terraphim-cli
-curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash -s -- --with-grep --tool terraphim-cli
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash -s -- --with-grep --with-cli
 ```
 
-The script verifies checksums, installs to `~/.local/bin` and adds that directory to your shell's `PATH`. Run it with `--help` for all options.
+The script verifies published checksums when they are available, installs to `~/.local/bin` and adds that directory to your shell's `PATH`. Run it with `--help` for all options.
 
 ### Homebrew (macOS and Linux)
 

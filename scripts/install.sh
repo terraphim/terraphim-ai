@@ -108,6 +108,19 @@ Not published here: terraphim-server, terraphim-ai (see https://github.com/terra
 EOF
 }
 
+tool_selected() {
+    local tool
+    # The +expansion keeps an empty array safe under set -u on bash 3.2.
+    for tool in ${TOOLS_TO_INSTALL[@]+"${TOOLS_TO_INSTALL[@]}"}; do
+        [[ "$tool" == "$1" ]] && return 0
+    done
+    return 1
+}
+
+add_tool() {
+    tool_selected "$1" || TOOLS_TO_INSTALL+=("$1")
+}
+
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -115,15 +128,15 @@ parse_args() {
                 [[ -n "${2:-}" ]] || { log_error "--install-dir needs a directory"; exit $EXIT_USAGE; }
                 INSTALL_DIR="$2"; shift 2 ;;
             --with-cli)
-                TOOLS_TO_INSTALL=("terraphim-agent" "terraphim-cli"); shift ;;
+                add_tool "terraphim-cli"; shift ;;
             --cli-only)
                 TOOLS_TO_INSTALL=("terraphim-cli"); shift ;;
             --with-grep)
-                TOOLS_TO_INSTALL=("terraphim-agent" "terraphim-grep"); shift ;;
+                add_tool "terraphim-grep"; shift ;;
             --tool)
                 [[ -n "${2:-}" ]] || { log_error "--tool needs a name"; exit $EXIT_USAGE; }
                 [[ ${#TOOLS_TO_INSTALL[@]} -eq 1 && "${TOOLS_TO_INSTALL[0]}" == "terraphim-agent" ]] && TOOLS_TO_INSTALL=()
-                TOOLS_TO_INSTALL+=("$2"); shift 2 ;;
+                add_tool "$2"; shift 2 ;;
             --version)
                 [[ -n "${2:-}" ]] || { log_error "--version needs a value"; exit $EXIT_USAGE; }
                 VERSION="$2"; shift 2 ;;
@@ -400,8 +413,12 @@ show_completion_message() {
     done
     echo
     echo "Next steps:"
-    echo "  terraphim-agent --version"
-    echo "  terraphim-agent repl"
+    for tool in "${TOOLS_TO_INSTALL[@]}"; do
+        echo "  $tool --version"
+    done
+    if tool_selected "terraphim-agent"; then
+        echo "  terraphim-agent repl"
+    fi
     echo
     echo "Docs:     ${SOURCE_URL%/scripts/install.sh}"
     echo "Releases: https://github.com/terraphim/terraphim-clients/releases"
