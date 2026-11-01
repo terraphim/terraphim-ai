@@ -116,7 +116,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         if: ${{ !matrix.settings.cross }}
         with:
-          toolchain: stable
+          # Matches rust-toolchain.toml, which is what the build actually uses.
+          toolchain: '1.96'
           targets: ${{ matrix.settings.target }}
 
       - name: Cache Cargo dependencies
@@ -143,6 +144,8 @@ jobs:
       - name: Build in docker (cross-compilation)
         if: ${{ matrix.settings.cross }}
         working-directory: ${{ github.workspace }}
+        env:
+          CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/build \
@@ -150,10 +153,13 @@ jobs:
             -e CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
             -e CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
             -e CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
+            -e CARGO_REGISTRIES_TERRAPHIM_TOKEN \
             terraphim-nodejs-builder \
-            bash -c "npm install --omit=optional && ${{ matrix.settings.build }}"
+            bash -c "rustup target add ${{ matrix.settings.target }} && npm install --omit=optional && ${{ matrix.settings.build }}"
 
       - name: Build
+        env:
+          CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
         run: ${{ matrix.settings.build }}
         if: ${{ !matrix.settings.cross }}
 
