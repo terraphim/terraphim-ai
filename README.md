@@ -17,7 +17,7 @@
   <a href="https://pypi.org/project/terraphim-automata/"><img alt="terraphim-automata on PyPI" src="https://img.shields.io/pypi/v/terraphim-automata.svg?label=terraphim-automata" /></a>
   <a href="LICENSE-Apache-2.0"><img alt="Licence: Apache-2.0" src="https://img.shields.io/badge/licence-Apache--2.0-blue.svg" /></a>
   <a href="https://discord.gg/VPJXB6BGuY"><img alt="Discord" src="https://img.shields.io/discord/852545081613615144?label=Discord&logo=discord" /></a>
-  <a href="https://terraphim.discourse.group"><img alt="Discourse" src="https://img.shields.io/discourse/users?server=https%3A%2F%2Fterraphim.discourse.group" /></a>
+  <a href="https://terraphim.discourse.group"><img alt="Discourse" src="https://img.shields.io/badge/Discourse-community-blue?logo=discourse" /></a>
 </p>
 
 <p align="center">
