@@ -1,4 +1,4 @@
-name: Publish Node.js Package to GitHub Packages
+name: Publish Node.js Package to npm
 
 on:
   workflow_dispatch:
@@ -31,6 +31,8 @@ jobs:
   validate:
     name: Validate Package
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     defaults:
       run:
         working-directory: terraphim_ai_nodejs
@@ -52,16 +54,24 @@ jobs:
         run: |
           node -e "const pkg = require('./package.json'); console.log('Package name:', pkg.name); console.log('Version:', pkg.version);"
 
-      - name: Validate version format
+      - name: Test package preparation
+        run: npm run test:packaging
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
+          VERSION="$INPUT_VERSION"
           if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == refs/tags/* ]]; then
-            VERSION=$(echo "$GITHUB_REF" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
-            if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "Invalid version format: $VERSION"
-              exit 1
-            fi
-            echo "Version to publish: $VERSION"
+            VERSION="${GITHUB_REF#refs/tags/nodejs-v}"
           fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version format: $VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version to publish: $VERSION"
 
   build:
     name: Build Multi-Platform Binaries
@@ -106,7 +116,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         if: ${{ !matrix.settings.cross }}
         with:
-          toolchain: stable
+          # Matches rust-toolchain.toml, which is what the build actually uses.
+          toolchain: '1.96'
           targets: ${{ matrix.settings.target }}
 
       - name: Cache Cargo dependencies
@@ -117,7 +128,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             .cargo-cache
-            target/
+            terraphim_ai_nodejs/target/
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
 
       - name: Install dependencies
@@ -141,7 +152,7 @@ jobs:
             -e CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
             -e CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
             terraphim-nodejs-builder \
-            bash -c "npm install --omit=optional && ${{ matrix.settings.build }}"
+            bash -c "rustup target add ${{ matrix.settings.target }} && npm install --omit=optional && ${{ matrix.settings.build }}"
 
       - name: Build
         run: ${{ matrix.settings.build }}
@@ -334,10 +345,28 @@ jobs:
           path: terraphim_ai_nodejs/artifacts/terraphim_ai_nodejs.darwin-universal.node
           if-no-files-found: error
 
-  publish:
-    name: Publish to GitHub Packages
-    runs-on: ubuntu-latest
-    needs: [test-universal, test-macos]
+  verify-package:
+    name: Install Packed Tarballs (${{ matrix.settings.platform }})
+    runs-on: ${{ matrix.settings.host }}
+    needs: [validate, build]
+    defaults:
+      run:
+        shell: bash
+        working-directory: terraphim_ai_nodejs
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: macos-latest
+            platform: darwin-arm64
+          - host: macos-15-intel
+            platform: darwin-x64
+          - host: ubuntu-latest
+            platform: linux-x64-gnu
+          - host: ubuntu-24.04-arm
+            platform: linux-arm64-gnu
+          - host: windows-latest
+            platform: win32-x64-msvc
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -346,191 +375,134 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@terraphim'
-          cache: 'yarn'
-          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
-
-      - name: Install dependencies
-        working-directory: terraphim_ai_nodejs
-        run: npm install --omit=optional --ignore-scripts
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Prepare package for publishing
-        working-directory: terraphim_ai_nodejs
+      - name: Prepare packages
         env:
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          # Create npm directory structure
-          mkdir -p npm
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: node scripts/prepare-npm-packages.mjs --version "$VERSION" --artifacts ../artifacts
 
-          # Copy all built binaries to npm directory (artifacts are in repo root)
-          find ../artifacts -name "*.node" -exec cp {} npm/ \;
-
-          # If no binaries found (NAPI build failed), try to find them manually
-          if [ -z "$(ls -A npm/)" ]; then
-            echo "⚠️  No NAPI artifacts found, searching for built libraries..."
-            # Look for libraries in target directories
-            find ../target -name "libterraphim_ai_nodejs.so" -exec cp {} npm/terraphim_ai_nodejs.linux-x64-gnu.node \;
-            find ../target -name "libterraphim_ai_nodejs.dylib" -exec cp {} npm/terraphim_ai_nodejs.darwin-x64.node \;
-            find ../target -name "terraphim_ai_nodejs.dll" -exec cp {} npm/terraphim_ai_nodejs.win32-x64-msvc.node \;
-          fi
-
-          # List what we have
-          echo "📦 Built binaries:"
-          ls -la npm/
-
-          # Update package.json version if needed
-          VERSION_TO_USE=""
-          if [[ "$INPUT_VERSION" != "" ]]; then
-            VERSION_TO_USE="$INPUT_VERSION"
-          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == refs/tags/* ]]; then
-            VERSION_TO_USE=$(echo "$GITHUB_REF" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
-          fi
-
-          if [[ "$VERSION_TO_USE" != "" ]]; then
-            echo "📝 Updating version to $VERSION_TO_USE"
-            npm pkg set "version=$VERSION_TO_USE"
-          fi
-
-      - name: Configure npm for GitHub Packages
-        working-directory: terraphim_ai_nodejs
+      - name: Install the tarballs into a clean project and run a search
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PLATFORM: ${{ matrix.settings.platform }}
         run: |
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > ~/.npmrc
-          echo "@terraphim:registry=https://npm.pkg.github.com" >> ~/.npmrc
+          set -euo pipefail
+          mkdir -p ../.pack-out ../.consumer
+          (cd "npm/$PLATFORM" && npm pack --ignore-scripts --pack-destination ../../../.pack-out)
+          npm pack --ignore-scripts --pack-destination ../.pack-out
+          cd ../.consumer
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund --no-workspaces ../.pack-out/*.tgz
+          node ../terraphim_ai_nodejs/scripts/smoke-test-installed.cjs
 
-          # Show current package info
-          echo "Package information:"
-          npm pack --dry-run | head -20
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: [validate, test-universal, test-macos, verify-package]
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
+    env:
+      DRY_RUN: ${{ inputs.dry_run }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-      - name: Determine publishing strategy
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          scope: '@terraphim'
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare packages
+        run: node scripts/prepare-npm-packages.mjs --version "$VERSION" --artifacts ../artifacts
+
+      - name: Check npm credentials
+        run: npm whoami
+
+      - name: Determine npm tag
         id: strategy
         env:
-          INPUT_VERSION: ${{ inputs.version }}
           INPUT_TAG: ${{ inputs.tag }}
         run: |
-          VERSION_TYPE="patch"
-          NPM_TAG="latest"
-
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            if [[ "$INPUT_VERSION" != "" ]]; then
-              VERSION_TYPE="manual"
-              NPM_TAG="$INPUT_TAG"
-            fi
-          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == refs/tags/* ]]; then
-            VERSION_TAG=$(echo "$GITHUB_REF" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
-            if [[ "$VERSION_TAG" =~ -beta$ ]]; then
-              NPM_TAG="beta"
-            elif [[ "$VERSION_TAG" =~ -alpha$ ]]; then
-              NPM_TAG="alpha"
-            elif [[ "$VERSION_TAG" =~ -rc ]]; then
-              NPM_TAG="rc"
-            else
-              NPM_TAG="latest"
-            fi
-          elif [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
-            NPM_TAG="latest"
+          NPM_TAG="${INPUT_TAG:-latest}"
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            case "$VERSION" in
+              *-beta*) NPM_TAG="beta" ;;
+              *-alpha*) NPM_TAG="alpha" ;;
+              *-rc*) NPM_TAG="rc" ;;
+              *) NPM_TAG="latest" ;;
+            esac
           fi
-
-          echo "version_type=$VERSION_TYPE" >> "$GITHUB_OUTPUT"
           echo "npm_tag=$NPM_TAG" >> "$GITHUB_OUTPUT"
-          echo "🎯 Publishing strategy: $VERSION_TYPE -> $NPM_TAG"
 
-      - name: Publish to GitHub Packages
-        working-directory: terraphim_ai_nodejs
+      - name: Publish platform packages, then the main package
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TAG: ${{ steps.strategy.outputs.npm_tag }}
         run: |
-          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            echo "Dry run mode - checking package only"
-            npm publish --dry-run --access public --tag ${{ steps.strategy.outputs.npm_tag }}
-          else
-            echo "Publishing @terraphim/autocomplete to GitHub Packages"
-            echo "Registry: https://npm.pkg.github.com"
-            echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
-
-            # Publish to GitHub Packages
-            npm publish --ignore-scripts --access public --tag ${{ steps.strategy.outputs.npm_tag }}
-
-            echo "Package published successfully!"
-            echo "Install with: npm install @terraphim/autocomplete --registry=https://npm.pkg.github.com"
+          set -euo pipefail
+          FLAGS=(--ignore-scripts --access public --tag "$NPM_TAG")
+          if [[ "$DRY_RUN" == "true" ]]; then
+            FLAGS+=(--dry-run)
           fi
 
-      - name: Verify published package
-        if: inputs.dry_run != 'true'
-        working-directory: terraphim_ai_nodejs
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          publish() {
+            local directory="$1" name
+            name=$(node -p "require('./$directory/package.json').name")
+            if [[ "$DRY_RUN" != "true" ]] && npm view "$name@$VERSION" version >/dev/null 2>&1; then
+              echo "$name@$VERSION is already published"
+              return 0
+            fi
+            (cd "$directory" && npm publish "${FLAGS[@]}")
+          }
+
+          # Platform packages go first so the main package never points at a missing one.
+          for binary in npm/*/*.node; do
+            publish "$(dirname "$binary")"
+          done
+          publish .
+
+      - name: Install from the registry and run a search
+        if: ${{ inputs.dry_run != true }}
         run: |
-          echo "Verifying published package..."
-
-          # Wait a moment for registry to update
-          sleep 10
-
-          # Check if package is available
-          PACKAGE_NAME="@terraphim/autocomplete"
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-
-          echo "Checking: $PACKAGE_NAME@$PACKAGE_VERSION"
-          npm view "$PACKAGE_NAME@$PACKAGE_VERSION" --registry=https://npm.pkg.github.com || echo "Package not immediately visible (may take a few minutes)"
-
-          echo "GitHub Packages URL: https://github.com/terraphim/terraphim-ai/packages"
+          set -euo pipefail
+          mkdir -p ../.registry-consumer
+          cd ../.registry-consumer
+          npm init -y >/dev/null
+          for attempt in 1 2 3 4 5 6; do
+            if npm install --no-audit --no-fund --no-workspaces "@terraphim/autocomplete@$VERSION"; then
+              break
+            fi
+            if [[ "$attempt" == "6" ]]; then
+              echo "@terraphim/autocomplete@$VERSION did not become installable"
+              exit 1
+            fi
+            sleep 30
+          done
+          node ../terraphim_ai_nodejs/scripts/smoke-test-installed.cjs
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/nodejs-') && inputs.dry_run != 'true'
+        if: startsWith(github.ref, 'refs/tags/nodejs-') && inputs.dry_run != true
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
           name: "@terraphim/autocomplete ${{ github.ref_name }}"
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
-            ## Node.js Package Release
-
-            **Package**: `@terraphim/autocomplete`
-            **Version**: ${{ steps.strategy.outputs.version_type }}
-            **Tag**: ${{ steps.strategy.outputs.npm_tag }}
-
-            ### Installation
             ```bash
-            npm install @terraphim/autocomplete@${{ steps.strategy.outputs.npm_tag }} --registry=https://npm.pkg.github.com
+            npm install @terraphim/autocomplete@${{ needs.validate.outputs.version }}
             ```
-
-            ### Features
-            - **Autocomplete**: Fast prefix search with scoring
-            - **Knowledge Graph**: Semantic connectivity analysis
-            - **Native Performance**: Rust backend with NAPI bindings
-            - **Cross-Platform**: Linux, macOS, Windows support
-            - **TypeScript**: Auto-generated type definitions
-
-            ### Performance
-            - **Autocomplete Index**: ~749 bytes
-            - **Knowledge Graph**: ~856 bytes
-            - **Native Library**: ~10MB (optimized for production)
-
-            ### Links
-            - [GitHub Package](https://github.com/terraphim/terraphim-ai/packages)
-            - [Documentation](https://github.com/terraphim/terraphim-ai/tree/main/terraphim_ai_nodejs)
-
-            ---
-            🤖 Generated on: $(date)
           draft: false
           prerelease: ${{ steps.strategy.outputs.npm_tag != 'latest' }}
-
-      - name: Notify on success
-        if: inputs.dry_run != 'true'
-        working-directory: terraphim_ai_nodejs
-        run: |
-          echo "Publishing workflow completed successfully!"
-          echo "Package: @terraphim/autocomplete"
-          echo "Registry: GitHub Packages (npm.pkg.github.com)"
-          echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
-          echo "Version: $(node -p "require('./package.json').version")"
-          echo ""
-          echo "Install with:"
-          echo "  npm install @terraphim/autocomplete --registry=https://npm.pkg.github.com"

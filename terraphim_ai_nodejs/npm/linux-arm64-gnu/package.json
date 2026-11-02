@@ -1,21 +1,27 @@
 {
-  "name": "terraphim-ai-nodejs-linux-arm64-gnu",
-  "version": "1.0.0",
+  "name": "@terraphim/autocomplete-linux-arm64-gnu",
+  "version": "1.3.1",
+  "description": "linux-arm64-gnu binary for @terraphim/autocomplete",
   "os": [
     "linux"
   ],
   "cpu": [
     "arm64"
   ],
-  "main": "terraphim-ai-nodejs.linux-arm64-gnu.node",
-  "files": [
-    "terraphim-ai-nodejs.linux-arm64-gnu.node"
-  ],
-  "license": "MIT",
-  "engines": {
-    "node": ">= 10"
-  },
   "libc": [
     "glibc"
-  ]
+  ],
+  "main": "terraphim_ai_nodejs.linux-arm64-gnu.node",
+  "files": [
+    "terraphim_ai_nodejs.linux-arm64-gnu.node"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/terraphim/terraphim-ai.git",
+    "directory": "terraphim_ai_nodejs"
+  },
+  "engines": {
+    "node": ">= 14"
+  }
 }

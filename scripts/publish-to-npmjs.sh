@@ -107,15 +107,12 @@ echo "  Tag: $TAG"
 echo "  Registry: https://registry.npmjs.org/"
 echo ""
 
-# Check for native binaries
-if ls *.node &> /dev/null; then
-    echo "Native binaries found:"
-    ls -la *.node
-    echo ""
-else
-    echo "Warning: No native binaries (.node files) found in package directory"
-    echo "You may need to build them first with: yarn build"
-    echo ""
+# The native binaries ship in per-platform packages, so a real publish from one
+# machine would release a package that cannot load on any other platform.
+if [[ "${DRY_RUN:-false}" != "true" ]]; then
+    echo "Error: publish @terraphim/autocomplete with .github/workflows/publish-npm.yml" >&2
+    echo "It builds, publishes and tests every platform package." >&2
+    exit 1
 fi
 
 # Run npm pack to show what will be published

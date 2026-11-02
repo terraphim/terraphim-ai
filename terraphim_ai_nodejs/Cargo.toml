@@ -1,8 +1,8 @@
 [package]
-edition.workspace = true
+edition = "2024"
 name = "terraphim_ai_nodejs"
-version.workspace = true
-rust-version.workspace = true
+version = "1.21.3"
+rust-version = "1.91"
 description = "Node.js bindings for Terraphim AI"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
@@ -19,7 +19,7 @@ crate-type = ["cdylib"]
 # Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
 napi = { version = "3.8.3", default-features = false, features = ["napi8", "tokio_rt"] }
 napi-derive = "3.5.2"
-serde_json = { workspace = true }
+serde_json = "1.0"
 terraphim_automata = { version = "1.20.4", default-features = false }
 terraphim_service = { version = "1.20.4" }
 terraphim_config = { version = "1.20.4", default-features = false }
@@ -27,16 +27,24 @@ terraphim_persistence = { version = "1.20.4" }
 terraphim_settings = { version = "1.20.4" }
 terraphim_types = { version = "1.20.4", default-features = false }
 terraphim_rolegraph = { version = "1.20.4" }
-anyhow = { workspace = true }
-tokio = { workspace = true }
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["full"] }
 ahash = "0.8.12"
-serde = { workspace = true }
+serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
 
 [dev-dependencies.tempfile]
-workspace = true
+version = "3.27"
 [build-dependencies]
 napi-build = "2.3.1"
 
-# NOTE: Profile configuration moved to workspace Cargo.toml for consistency
+[profile.release]
+panic = "unwind"
+lto = false
+codegen-units = 1
+opt-level = 3
+
+# A separate workspace, so this public package builds from crates.io alone and
+# does not need the private registry that the main workspace resolves from.
+[workspace]
